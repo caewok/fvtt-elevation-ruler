@@ -8,7 +8,7 @@ const FORCE_DEBUG = true; // used for logging before dev mode is set up
 export function log(...args) {
   try {
     const isDebugging = window.DEV?.getPackageDebugValue(CONSTANTS.MODULE_ID);
-    console.log(MODULE_ID, '|', `isDebugging: ${isDebugging}.`);
+    //console.log(MODULE_ID, '|', `isDebugging: ${isDebugging}.`);
 
     if (FORCE_DEBUG || isDebugging) {
       console.log(MODULE_ID, '|', ...args);
@@ -18,18 +18,19 @@ export function log(...args) {
 
 
 Hooks.once('init', async function() {
-  console.log("Initializing Elevation Ruler Options.");
+  log("Initializing Elevation Ruler Options.");
   registerSettings();
 });
 
 
 Hooks.once('ready', async function() {
+  log("Readying Elevation Ruler.");
   if(!game.modules.get('lib-wrapper')?.active && game.user.isGM)
         ui.notifications.error("Module Elevation Ruler requires the 'libWrapper' module. Please install and activate it.");
 });
 
 Hooks.once('setup', async function() {
-  console.log("Setup for Elevation Ruler.");
+  log("Setup for Elevation Ruler.");
   registerRuler();
 });
 
