@@ -1,6 +1,6 @@
 import { registerSettings } from "./settings.js";
 
-const MODULE_ID = 'elevation-ruler';
+export const MODULE_ID = 'elevation-ruler';
 const FORCE_DEBUG = true; // used for logging before dev mode is set up
 
 
