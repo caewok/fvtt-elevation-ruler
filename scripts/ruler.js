@@ -9,6 +9,7 @@ import { log } from "./module.js";
  */
  
 export function elevationRulerConstructor(wrapped, ...args) {
+  console.log("Elevation Ruler|wrapper elevationRulerConstructor called.");
   log("elevationRulerConstructor this", this)
   let result = wrapped(...args);
   
