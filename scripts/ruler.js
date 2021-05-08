@@ -8,41 +8,17 @@ import { log } from "./module.js";
  * Display current elevation change and change at each waypoint.
  */
  
+/**
+ * Typical Ruler workflow:
+ * - clear when drag starts
+ * - create initial waypoint
+ * - measure (likely multiple)
+ * - add'l waypoints (optional)
+ * - possible token movement
+ * - clear when drag abandoned
+ */
+ 
 // wrapping the constructor appears not to work.
-export function elevationRulerConstructor(wrapped, ...args) {
-  console.log("Elevation Ruler|wrapper elevationRulerConstructor called.");
-  return wrapped(...args);
-  
-  //log("elevationRulerConstructor this", this)
-  //let result = wrapped(...args);
-  
-  
-  /**
-   * This Array tracks elevation change at waypoints along the measured path.
-   * The first waypoint is always the origin of the route. See class Ruler.
-   * @type {Array.integer}
-   */
-  //this.elevation_increments = [];
-  
-  /**
-   * This elevation labels element is a container of Text elements which label
-   *   elevation changes along the measured path. 
-   * Cf. Range.labels.
-   * @type {PIXI.Container}
-   */
-  //this.elevation_labels = this.addChild(new PIXIContainer());
-  
-  /**
-   * Track the elevation state of the destination, relative to origin
-   * @type {number}
-   */
-  //this.destination_elevation_increment = 0;
-  
-  //log("elevationRulerConstructor this after", this);
-  //log("elevationRulerConstructor result", result);
-  
-  //return result;
-}
 
 
 // will need to update measuring to account for elevation
@@ -60,6 +36,19 @@ export function elevationRulerMoveToken(wrapped, ...args) {
 // clear should reset elevation info
 export function elevationRulerClear(wrapped, ...args) {
   log("we are clearing!", this);
+  
+  /**
+     * The current destination point at the end of the measurement
+     * @type {PIXI.Point}
+     */
+  this.elevation_increments = [];
+  
+  /**
+   * The current destination point elevation increment relative to origin.
+   * @type {integer}
+   */
+  this.destination_elevation_increment = 0; 
+  
   return wrapped(...args);
 }
 

@@ -1,6 +1,5 @@
 import { MODULE_ID, log } from "./module.js";
-import { elevationRulerConstructor, 
-         elevationRulerMeasure, 
+import { elevationRulerMeasure, 
          elevationRulerMoveToken,
          elevationRulerClear,
          elevationRulerUpdate,
@@ -8,7 +7,6 @@ import { elevationRulerConstructor,
 
 export function registerRuler() {
 
-  libWrapper.register(MODULE_ID, 'Ruler.prototype.constructor', elevationRulerConstructor, 'WRAPPER');
   libWrapper.register(MODULE_ID, 'Ruler.prototype.measure', elevationRulerMeasure, 'WRAPPER');
   libWrapper.register(MODULE_ID, 'Ruler.prototype.moveToken', elevationRulerMeasure, 'WRAPPER');
   libWrapper.register(MODULE_ID, 'Ruler.prototype.clear', elevationRulerClear, 'WRAPPER');
