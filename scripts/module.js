@@ -22,6 +22,9 @@ Hooks.once('init', async function() {
 });
 
 Hooks.once('ready', async function() {
+  if(!game.modules.get('lib-wrapper')?.active && game.user.isGM)
+        ui.notifications.error("Module Elevation Ruler requires the 'libWrapper' module. Please install and activate it.");
+
 
 });
 
