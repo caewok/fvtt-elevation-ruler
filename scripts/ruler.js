@@ -8,7 +8,7 @@ import { log } from "./module.js";
  * Display current elevation change and change at each waypoint.
  */
  
-function elevationRulerConstructor(wrapped, ...args) {
+export function elevationRulerConstructor(wrapped, ...args) {
   log("elevationRulerConstructor this", this)
   let result = wrapped(...args);
   
