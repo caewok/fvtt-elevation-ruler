@@ -1,4 +1,5 @@
 import { registerSettings } from "./settings.js";
+import { registerRuler } from "./patching.js";
 
 export const MODULE_ID = 'elevation-ruler';
 const FORCE_DEBUG = true; // used for logging before dev mode is set up
@@ -21,8 +22,14 @@ Hooks.once('init', async function() {
   registerSettings();
 });
 
-Hooks.once('ready', async function() {
 
+Hooks.once('ready', async function() {
+  if(!game.modules.get('lib-wrapper')?.active && game.user.isGM)
+        ui.notifications.error("Module Elevation Ruler requires the 'libWrapper' module. Please install and activate it.");
 });
 
+Hooks.once('setup', async function() {
+  console.log("Setup for Elevation Ruler.");
+  registerRuler();
+});
 
