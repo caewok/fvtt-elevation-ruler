@@ -10,8 +10,10 @@ import { log } from "./module.js";
  
 export function elevationRulerConstructor(wrapped, ...args) {
   console.log("Elevation Ruler|wrapper elevationRulerConstructor called.");
-  log("elevationRulerConstructor this", this)
-  let result = wrapped(...args);
+  return wrapped(...args);
+  
+  //log("elevationRulerConstructor this", this)
+  //let result = wrapped(...args);
   
   
   /**
@@ -19,7 +21,7 @@ export function elevationRulerConstructor(wrapped, ...args) {
    * The first waypoint is always the origin of the route. See class Ruler.
    * @type {Array.integer}
    */
-  this.elevation_increments = [];
+  //this.elevation_increments = [];
   
   /**
    * This elevation labels element is a container of Text elements which label
@@ -27,16 +29,21 @@ export function elevationRulerConstructor(wrapped, ...args) {
    * Cf. Range.labels.
    * @type {PIXI.Container}
    */
-  this.elevation_labels = this.addChild(new PIXIContainer());
+  //this.elevation_labels = this.addChild(new PIXIContainer());
   
   /**
    * Track the elevation state of the destination, relative to origin
    * @type {number}
    */
-  this.destination_elevation_increment = 0;
+  //this.destination_elevation_increment = 0;
   
-  log("elevationRulerConstructor this after", this);
-  log("elevationRulerConstructor result", result);
+  //log("elevationRulerConstructor this after", this);
+  //log("elevationRulerConstructor result", result);
   
-  return result;
+  //return result;
+}
+
+export function elevationRulerMeasure(wrapped, ...args) {
+  console.log("Elevation Ruler|we are measuring!");
+  return wrapped(...args);
 }
