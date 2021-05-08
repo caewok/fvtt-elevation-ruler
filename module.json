@@ -1,7 +1,7 @@
 {
-  "name": "module",
-  "title": "New Module",
-  "description": "",
+  "name": "elevation-ruler",
+  "title": "Elevation Ruler",
+  "description": "Modify Foundry VTT ruler to adjust for relative elevation of the destination.",
   "version": "This is auto replaced",
   "library": "false",
   "manifestPlusVersion": "1.0.0",
@@ -9,12 +9,16 @@
   "compatibleCoreVersion": "0.7.9",
   "authors": [
     {
-      "name": "The League of Extraordinary FVTT Developers",
-      "url": "https://github.com/League-of-Foundry-Developers",
-      "discord": "discordID#0001"
+      "name": "caewok",
+      "url": "https://github.com/caewok",
+      "discord": "caewok#9192"
     }
   ],
   "dependencies": [
+    {
+      "name": "lib-wrapper",
+      "manifest": "https://raw.githubusercontent.com/ruipin/fvtt-lib-wrapper/master/module.json"
+    }
 
   ],
   "conflicts": [
