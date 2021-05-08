@@ -1,5 +1,5 @@
 import { MODULE_ID, log } from "./module.js";
-import { elevationRulerConstructor } from "./ruler.js";
+import { elevationRulerConstructor, elevationRulerMeasure } from "./ruler.js";
 
 export function registerRuler() {
   libWrapper.register(MODULE_ID, 'Ruler.prototype.constructor', elevationRulerConstructor, 'WRAPPER');
