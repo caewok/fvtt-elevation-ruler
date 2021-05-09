@@ -1,4 +1,5 @@
 import { MODULE_ID, log } from "./module.js";
+import { incrementElevation, decrementElevation } from "./ruler.js";
 
 export function getSetting(settingName) {
   return game.settings.get(MODULE_ID, settingName);
@@ -54,7 +55,7 @@ export function registerHotkeys() {
 //		get: () => game.settings.get(MODULE_ID, `increment-elevation-hotkey`),
 //		set: async value => await game.settings.set(MODULE_ID, `increment-elevation-hotkey`, "ArrowUp"),
 		default: () => { return { key: Hotkeys.keys.BracketLeft, alt: false, ctrl: false, shift: false }; },
-		onKeyDown: self => { console.log('You hit my custom increment-elevation-hotkey!') },
+		onKeyDown: incrementElevation },
 	}); 
   
   log("Registering decrement elevation hotkey.");
@@ -66,7 +67,7 @@ export function registerHotkeys() {
 //		get: () => game.settings.get(MODULE_ID, `${MODULE_ID}.decrement-elevation-hotkey`),
 //		set: async value => await game.settings.set(MODULE_ID, `${MODULE_ID}.decrement-elevation-hotkey`, "ArrowDown"),
 		default: () => { return { key: Hotkeys.keys.BracketRight, alt: false, ctrl: false, shift: false }; },
-		onKeyDown: self => { console.log('You hit my custom decrement-elevation-hotkey!') },
+		onKeyDown: decrementElevation },
 	}); 
 
 }
