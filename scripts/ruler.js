@@ -22,9 +22,13 @@ import { MODULE_ID, log } from "./module.js";
 // see https://github.com/ruipin/fvtt-lib-wrapper/issues/14
 
 // need a function to change elevation on the ruler item
-export Ruler.prototype.changeElevation = function(elevation_increment) {
-  log(`we are changing elevation by ${elevation_increment}!`, this);
-}
+Object.defineProperty(Ruler.prototype, "changeElevation", {
+  value: function changeElevation(elevation_increment) {
+    log(`we are changing elevation by ${elevation_increment}!`, this);
+  },
+  writable: true,
+  configurable: true
+});
 
 // will need to update measuring to account for elevation
 export function elevationRulerMeasure(wrapped, ...args) {
@@ -47,13 +51,14 @@ export function elevationRulerClear(wrapped, ...args) {
    * Note: waypoint 0 is origin and should be elevation 0 (no increment +/-)
    * type: Array of integers
    */  
-  this.setFlag(MODULE_ID, "elevation_increments", []);   
+  // setFlag not a function for Ruler object
+  this.elevation_increments = [];
   
   /**
    * The current destination point elevation increment relative to origin.
    * type: integer
    */ 
-  this.setFlag(MODULE_ID, "destination_elevation_increment", 0);
+  this.destination_elevation_increment = 0;
   
   
   return wrapped(...args);
@@ -72,16 +77,16 @@ export function elevationRulerAddWaypoint(wrapped, ...args) {
 }
 
 export function incrementElevation() {
-  log("Trying to increment...");
   const ruler = canvas.controls.ruler;
-  if(!ruler || !ruler.active()) return;
+  log("Trying to increment...", ruler);
+  if(!ruler || !ruler.active) return;
   ruler.changeElevation(1);
 }
 
 export function decrementElevation() {
-  log("Trying to decrement...");
   const ruler = canvas.controls.ruler;
-  if(!ruler || !ruler.active()) return;
+  log("Trying to decrement...", ruler);
+  if(!ruler || !ruler.active) return;
   ruler.changeElevation(-1);
 }
 

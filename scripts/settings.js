@@ -27,6 +27,7 @@ export function registerSettings() {
     default: 'CityBlock',
   });
  
+/*
   log("Registering hotkey menu.");
   game.settings.registerMenu(MODULE_ID, {
 	  name: 'Elevation Ruler Hotkeys',
@@ -34,7 +35,7 @@ export function registerSettings() {
 	});
 
   log("Done registering settings.");
-
+*/
 }
 
 export function registerHotkeys() {
@@ -55,7 +56,7 @@ export function registerHotkeys() {
 //		get: () => game.settings.get(MODULE_ID, `increment-elevation-hotkey`),
 //		set: async value => await game.settings.set(MODULE_ID, `increment-elevation-hotkey`, "ArrowUp"),
 		default: () => { return { key: Hotkeys.keys.BracketLeft, alt: false, ctrl: false, shift: false }; },
-		onKeyDown: incrementElevation },
+		onKeyDown: incrementElevation,
 	}); 
   
   log("Registering decrement elevation hotkey.");
@@ -67,7 +68,7 @@ export function registerHotkeys() {
 //		get: () => game.settings.get(MODULE_ID, `${MODULE_ID}.decrement-elevation-hotkey`),
 //		set: async value => await game.settings.set(MODULE_ID, `${MODULE_ID}.decrement-elevation-hotkey`, "ArrowDown"),
 		default: () => { return { key: Hotkeys.keys.BracketRight, alt: false, ctrl: false, shift: false }; },
-		onKeyDown: decrementElevation },
+		onKeyDown: decrementElevation,
 	}); 
 
 }
