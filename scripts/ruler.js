@@ -105,17 +105,17 @@ function ProjectElevatedPoint(A, B, height) {
 }
 
 // will need to update measuring to account for elevation
-export function elevationRulerMeasure(wrapped, ...args) {
+export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}) {
   log("we are measuring!");
-  log(`${this.waypoints.length} waypoints. ${this.destination_elevation_increment} elevation increments for destination. ${this.elevation_increments} elevation waypoints.`);
+  log(`${this.waypoints.length} waypoints. ${this.destination_elevation_increment} elevation increments for destination. ${this.elevation_increments.length} elevation waypoints.`, this.elevation_increments);
   
   // if no elevation present, go with original function.
   if(!this.destination_elevation_increment &&
      (!this.elevation_increments ||
-       this.elevation_increments.reduce((a, b) => a == 0 && b == 0, true) 
-     )) {
+       this.elevation_increments.every(i => i === 0))) { 
+    
      log("Using original measure");
-     return wrapped(...args);
+     return wrapped(destination, gridSpaces);
   }  
   
   // Mostly a copy from Ruler.measure, but adding in distance for elevation
@@ -128,6 +128,8 @@ export function elevationRulerMeasure(wrapped, ...args) {
   const waypoints = this.waypoints.concat([destination]);
   const r = this.ruler;
   this.destination = destination;
+
+  log("Measure ruler", r);
   
   // Iterate over waypoints and construct segment rays
   // Also create elevation segments, adjusting segments for elevation
@@ -144,7 +146,10 @@ export function elevationRulerMeasure(wrapped, ...args) {
     const elevation = this.elevation_increments[i + 1] * canvas.scene.data.gridDistance * canvas.scene.data.grid; 
     const elevated_dest = ProjectElevatedPoint(origin, dest, elevation);
     const ray_elevated = new Ray(origin, elevated_dest);
-    
+ 
+//    log("Segment ray", ray);
+//    log("Elevated segment ray", ray);
+   
     if ( ray_elevated.distance < 10 ) {
       if ( label ) label.visible = false;
       continue;
@@ -152,14 +157,21 @@ export function elevationRulerMeasure(wrapped, ...args) {
     segments.push({ray, label});
     elevation_segments.push({ray_elevated, label});
   }
-  
+ 
+  log("Segments", segments);
+  log("Elevation segments", elevation_segments);
+ 
   // Compute measured distance
-	const distances = canvas.grid.measureDistances(elevation_segments, {gridSpaces});
+	const distances = canvas.grid.measureDistances(segments, {gridSpaces});
+   log("Distances", distances);
+
+
 	let totalDistance = 0;
 	let totalElevation = 0;
 	for ( let [i, d] of distances.entries() ) {
 		totalDistance += d;
 		
+           log(`Distance ${d}; total distance ${totalDistance}`);
 		
 		let s = segments[i];
 		s.last = i === (segments.length - 1);
@@ -174,11 +186,16 @@ export function elevationRulerMeasure(wrapped, ...args) {
 		}
 	}
 	
+   log(`Total distance ${totalDistance}; total elevation ${totalElevation}`);
+
 	// Clear the grid highlight layer
 	const hlt = canvas.grid.highlightLayers[this.name];
 	hlt.clear();
 	// Draw measured path
+   log("Cleared grid highlight layer.", r);
 	r.clear();
+
+   log("Drawing line segments.");
 	for ( let s of segments ) {
 		const {ray, label, text, last} = s;
 		// Draw line segment
@@ -196,6 +213,8 @@ export function elevationRulerMeasure(wrapped, ...args) {
 		this._highlightMeasurement(ray);
 	}
 	// Draw endpoints
+
+     log("Drawing endpoints.");
 	for ( let p of waypoints ) {
 		r.lineStyle(2, 0x000000, 0.5).beginFill(this.color, 0.25).drawCircle(p.x, p.y, 8);
 	}
