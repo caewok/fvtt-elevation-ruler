@@ -21,7 +21,7 @@ import { MODULE_ID, log } from "./module.js";
 // wrapping the constructor appears not to work.
 // see https://github.com/ruipin/fvtt-lib-wrapper/issues/14
 
-// need a function to change elevation on the ruler item
+
 Object.defineProperty(Ruler.prototype, "elevation_increments", {
   value: [],
   writable: true,
@@ -34,11 +34,11 @@ Object.defineProperty(Ruler.prototype, "destination_elevation_increment", {
   configurable: true
 });
 
+// need a function to change elevation on the ruler item
 Object.defineProperty(Ruler.prototype, "changeElevation", {
   value: function changeElevation(elevation_increment) {
-    log(`we are changing elevation by ${elevation_increment}!`, this);
+    log(`we are changing elevation by ${elevation_increment}!`);
     this.destination_elevation_increment += elevation_increment;
-    log(`changed elevation by ${elevation_increment}!`, this);
   },
   writable: true,
   configurable: true
@@ -47,14 +47,14 @@ Object.defineProperty(Ruler.prototype, "changeElevation", {
 
 // will need to update measuring to account for elevation
 export function elevationRulerMeasure(wrapped, ...args) {
-  log("we are measuring!", this);
+  log("we are measuring!");
   log(`${this.waypoints.length} waypoints. ${this.destination_elevation_increment} elevation increments.`);
   return wrapped(...args);
 }
 
 // moveToken should modify token elevation 
 export function elevationRulerMoveToken(wrapped, ...args) {
-  log("we are moving!", this);
+  log("we are moving!");
   return wrapped(...args);
 }
 
@@ -88,7 +88,7 @@ export function elevationRulerUpdate(wrapped, ...args) {
 
 // adding waypoint should also add elevation info
 export function elevationRulerAddWaypoint(wrapped, ...args) {
-  log("adding waypoint!", this);
+  log("adding waypoint!");
   return wrapped(...args);
 }
 
@@ -97,7 +97,6 @@ export function incrementElevation() {
   log("Trying to increment...", ruler);
   if(!ruler || !ruler.active) return;
   ruler.changeElevation(1);
-  log("incremented.", ruler);
 }
 
 export function decrementElevation() {
@@ -105,6 +104,5 @@ export function decrementElevation() {
   log("Trying to decrement...", ruler);
   if(!ruler || !ruler.active) return;
   ruler.changeElevation(-1);
-  log("decremented.", ruler);
 }
 
