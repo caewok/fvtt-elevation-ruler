@@ -25,7 +25,20 @@ import { MODULE_ID, log } from "./module.js";
 Object.defineProperty(Ruler.prototype, "changeElevation", {
   value: function changeElevation(elevation_increment) {
     log(`we are changing elevation by ${elevation_increment}!`, this);
+    this.destination_elevation_increment += elevation_increment;
   },
+  writable: true,
+  configurable: true
+});
+
+Object.defineProperty(Ruler.prototype, "elevation_increments", {
+  value: [],
+  writable: true,
+  configurable: true
+});
+
+Object.defineProperty(Ruler.prototype, "destination_elevation_increment", {
+  value: 0,
   writable: true,
   configurable: true
 });
