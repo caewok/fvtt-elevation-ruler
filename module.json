@@ -18,6 +18,11 @@
     {
       "name": "lib-wrapper",
       "manifest": "https://raw.githubusercontent.com/ruipin/fvtt-lib-wrapper/master/module.json"
+    },
+    
+    {
+      "name": "lib-df-hotkeys",
+      "manifest": "https://raw.githubusercontent.com/flamewave000/dragonflagon-fvtt/master/module.json"
     }
 
   ],
