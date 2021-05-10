@@ -247,7 +247,7 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
 		  totalElevation += elevation;
 		  log(`Elevation ${elevation}; total elevation ${totalElevation}`);
 		  
-		  s.text = s.text + this._getSegmentElevationLabel(elevation, totalElevation, s.last);
+		  s.text = s.text + "\n" + this._getSegmentElevationLabel(elevation, totalElevation, s.last);
 		}
 	}
 	
