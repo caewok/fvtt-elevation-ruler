@@ -96,13 +96,61 @@ Object.defineProperty(Ruler.prototype, "_getSegmentElevationLabel", {
  * @param {{x: number, y: number}} B
  */
 function ProjectElevatedPoint(A, B, height) {
-  const dx = B.x - A.x;
-  const dy = B.y - A.y;
-  const distance = Math.hypot(dy, dx);
-  const projected_x = ((height * (B.y - A.y)) / distance) + B.x;
-  const projected_y = ((height * (B.x - A.x)) / distance) + B.y;
+  const distance = CalculateDistance(A, B);
+  const projected_x = B.x + ((height / distance) * (A.y - B.y));
+  const projected_y = B.y + ((height / distance) * (A.x - B.x));
+
   return new PIXI.Point(projected_x, projected_y);
 }
+
+function CalculateDistance(A, B) {
+  const dx = B.x - A.x;
+  const dy = B.y - A.y;
+  return Math.hypot(dy, dx);
+}
+
+// console.log(Math.hypot(3, 4));
+// // expected output: 5
+// 
+// console.log(Math.hypot(5, 12));
+// // expected output: 13
+// 
+// let m;
+// let o = {x:0, y:0}
+// m = ProjectElevatedPoint(o, {x:1, y:0}, 1);
+// CalculateDistance(o, m) // 1.414
+// 
+// m = ProjectElevatedPoint(o, {x:3, y:0}, 4);
+// CalculateDistance(o, m) // 5
+// 
+// m = ProjectElevatedPoint(o, {x:0, y:3}, 4);
+// CalculateDistance(o, m) // 5 
+// 
+// m = ProjectElevatedPoint(o, {x:0, y:3}, 4);
+
+// m = distance
+// n = height
+// A = origin ()
+// B = destination (1)
+// C = destination with height (2)
+// |Ay - By| / m = |Bx - Cx| / n
+// |Ax - Bx| / m = |Cy - By| / n
+// 
+// |Bx - Cx| / n = |Ay - By| / m
+// |Cy - By| / n = |Ax - Bx| / m
+// 
+// |Bx - Cx| = |Ay - By| * n/m
+// |Cy - By| = |Ax - Bx| * n/m
+// 
+// Bx - Cx = ± n/m * (Ay - By)
+// Cy - By = ± n/m * (Ax - Bx)
+// 
+// Cx = Bx ± n/m * (Ay - By)
+// Cy = By ± n/m * (Ax - Bx)
+
+
+
+
 
 // will need to update measuring to account for elevation
 export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}) {
@@ -157,10 +205,7 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
     
     const elevated_dest = ProjectElevatedPoint(origin, dest, elevation);
     const ray_elevated = new Ray(origin, elevated_dest);
- 
-//    log("Segment ray", ray);
-//    log("Elevated segment ray", ray);
-   
+    
     if ( ray_elevated.distance < 10 ) {
       if ( label ) label.visible = false;
       continue;
@@ -199,16 +244,16 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
 		}
 	}
 	
-   log(`Total distance ${totalDistance}; total elevation ${totalElevation}`);
+  log(`Total distance ${totalDistance}; total elevation ${totalElevation}`);
 
 	// Clear the grid highlight layer
 	const hlt = canvas.grid.highlightLayers[this.name];
 	hlt.clear();
 	// Draw measured path
-   log("Cleared grid highlight layer.", r);
+  log("Cleared grid highlight layer.", r);
 	r.clear();
 
-   log("Drawing line segments.");
+  log("Drawing line segments.");
 	for ( let s of segments ) {
 		const {ray, label, text, last} = s;
 		// Draw line segment
@@ -227,7 +272,7 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
 	}
 	// Draw endpoints
 
-     log("Drawing endpoints.");
+  log("Drawing endpoints.");
 	for ( let p of waypoints ) {
 		r.lineStyle(2, 0x000000, 0.5).beginFill(this.color, 0.25).drawCircle(p.x, p.y, 8);
 	}
