@@ -126,6 +126,8 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
 
   destination = new PIXI.Point(...canvas.grid.getCenter(destination.x, destination.y));
   const waypoints = this.waypoints.concat([destination]);
+  const waypoints_elevation = this.elevation_increments.concat([this.destination_elevation_increment]);
+  
   const r = this.ruler;
   this.destination = destination;
 
@@ -133,9 +135,16 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
   
   // Iterate over waypoints and construct segment rays
   // Also create elevation segments, adjusting segments for elevation
+  // waypoint 0 is added as the origin (see _onDragStart)
+  // so elevation_waypoint 0 should also be the origin, and so 0
+  // the for loop uses the next waypoint as destination. 
+  // for loop will count from 0 to waypoints.length - 1
+  
   const segments = [];
   const elevation_segments = [];
   for ( let [i, dest] of waypoints.slice(1).entries() ) {
+    log(`Processing waypoint ${i}`, dest);
+  
     const origin = waypoints[i];
     const label = this.labels.children[i];
     const ray = new Ray(origin, dest);
@@ -143,7 +152,9 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
     // first waypoint is origin; elevation increment is 0.
     // need to account for units of the grid
     // canvas.scene.data.grid e.g. 140; canvas.scene.data.gridDistance e.g. 5
-    const elevation = this.elevation_increments[i + 1] * canvas.scene.data.gridDistance * canvas.scene.data.grid; 
+    const elevation = waypoints_elevation[i + 1] * canvas.scene.data.gridDistance * canvas.scene.data.grid; 
+    log(`Elevation ${elevation} for i = ${i}.`);
+    
     const elevated_dest = ProjectElevatedPoint(origin, dest, elevation);
     const ray_elevated = new Ray(origin, elevated_dest);
  
@@ -162,8 +173,8 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
   log("Elevation segments", elevation_segments);
  
   // Compute measured distance
-	const distances = canvas.grid.measureDistances(segments, {gridSpaces});
-   log("Distances", distances);
+	const distances = canvas.grid.measureDistances(elevation_segments, {gridSpaces});
+  log("Distances", distances);
 
 
 	let totalDistance = 0;
@@ -171,7 +182,7 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
 	for ( let [i, d] of distances.entries() ) {
 		totalDistance += d;
 		
-           log(`Distance ${d}; total distance ${totalDistance}`);
+    log(`Distance ${d}; total distance ${totalDistance}`);
 		
 		let s = segments[i];
 		s.last = i === (segments.length - 1);
@@ -179,9 +190,11 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
 		s.text = this._getSegmentLabel(d, totalDistance, s.last);
 		
 		// add in elevation text if elevation has changed
-		if(elevation_increments[i + 1] != 0) {
+		if(this.elevation_increments[i + 1] != 0) {
 		  const elevation = this.elevation_increments[i + 1] * canvas.scene.data.gridDistance * canvas.scene.data.grid;
 		  totalElevation += elevation;
+		  log(`Elevation ${elevation}; total elevation ${totalElevation}`);
+		  
 		  s.text = s.text + this._getSegmentElevationLabel(elevation, totalElevation, s.last);
 		}
 	}
