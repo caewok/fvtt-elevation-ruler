@@ -63,18 +63,20 @@ Object.defineProperty(Ruler.prototype, "changeElevation", {
  */
 Object.defineProperty(Ruler.prototype, "_getSegmentElevationLabel", {
   value: function _getSegmentElevationLabel(segmentElevationIncrement, totalElevationIncrement, isTotal) {
+   
+  log(`segmentElevationIncrement: ${segmentElevationIncrement}; totalElevationIncrement: ${totalElevationIncrement}`);
   const units = canvas.scene.data.gridUnits;
   
   const segmentArrow = (segmentElevationIncrement > 0) ? "↑" :
                       (segmentElevationIncrement < 0) ? "↓" :
                       "";
   
-  let label = `${segmentArrow}${Math.round(segmentDistance * 100) / 100} ${units}`;
+  let label = `${segmentArrow}${Math.round(segmentElevationIncrement * 100) / 100} ${units}`;
   if ( isTotal ) {
       const totalArrow = (totalElevationIncrement > 0) ? "↑" :
                       (totalElevationIncrement < 0) ? "↓" :
                       "";
-      label += ` [${totalArrow}${Math.round(totalDistance * 100) / 100} ${units}]`;
+      label += ` [${totalArrow}${Math.round(totalElevationIncrement * 100) / 100} ${units}]`;
   }
   return label;
 },
@@ -211,7 +213,7 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
       continue;
     }
     segments.push({ray, label});
-    elevation_segments.push({ray_elevated, label});
+    elevation_segments.push({ray: ray_elevated, label: label});
   }
  
   log("Segments", segments);
@@ -224,6 +226,10 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
 
 	let totalDistance = 0;
 	let totalElevation = 0;
+
+   log("Elevation increment", this.elevation_increments);
+   log("Destination increment", this.destination_elevation_increment);
+
 	for ( let [i, d] of distances.entries() ) {
 		totalDistance += d;
 		
@@ -235,8 +241,9 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
 		s.text = this._getSegmentLabel(d, totalDistance, s.last);
 		
 		// add in elevation text if elevation has changed
-		if(this.elevation_increments[i + 1] != 0) {
-		  const elevation = this.elevation_increments[i + 1] * canvas.scene.data.gridDistance * canvas.scene.data.grid;
+		if(waypoints_elevation[i + 1] != 0) {
+                  log(`Elevation increment: ${waypoints_elevation[i + 1]}`, waypoints_elevation);
+		  const elevation = waypoints_elevation[i + 1] * canvas.scene.data.gridDistance;
 		  totalElevation += elevation;
 		  log(`Elevation ${elevation}; total elevation ${totalElevation}`);
 		  
@@ -317,9 +324,9 @@ export function elevationRulerUpdate(wrapped, ...args) {
 // adding waypoint should also add elevation info
 export function elevationRulerAddWaypoint(wrapped, ...args) {
   log("adding waypoint!");
-  
+
   this.elevation_increments.push(this.destination_elevation_increment);
-  this.destination_elevation_increment = 0;
+  this.destination_elevation_increment = 0;  
   
   return wrapped(...args);
 }
