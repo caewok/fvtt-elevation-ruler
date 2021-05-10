@@ -346,6 +346,8 @@ export function incrementElevation() {
   log("Trying to increment...", ruler);
   if(!ruler || !ruler.active) return;
   ruler.changeElevation(1);
+  
+  ruler.measure(ruler.destination);
 }
 
 export function decrementElevation() {
@@ -353,5 +355,7 @@ export function decrementElevation() {
   log("Trying to decrement...", ruler);
   if(!ruler || !ruler.active) return;
   ruler.changeElevation(-1);
+  
+  ruler.measure(ruler.destination);
 }
 
