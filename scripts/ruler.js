@@ -202,7 +202,7 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
     // first waypoint is origin; elevation increment is 0.
     // need to account for units of the grid
     // canvas.scene.data.grid e.g. 140; canvas.scene.data.gridDistance e.g. 5
-    const elevation = waypoints_elevation[i + 1] * canvas.scene.data.gridDistance * canvas.scene.data.grid; 
+    const elevation = waypoints_elevation[i + 1] * canvas.scene.data.grid; 
     log("Origin", origin);
     log("Destination", dest);
     log(`Elevation ${elevation} for i = ${i}.`);
