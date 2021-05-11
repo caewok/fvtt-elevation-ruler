@@ -203,10 +203,17 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
     // need to account for units of the grid
     // canvas.scene.data.grid e.g. 140; canvas.scene.data.gridDistance e.g. 5
     const elevation = waypoints_elevation[i + 1] * canvas.scene.data.gridDistance * canvas.scene.data.grid; 
+    log("Origin", origin);
+    log("Destination", dest);
     log(`Elevation ${elevation} for i = ${i}.`);
+
     
     const elevated_dest = ProjectElevatedPoint(origin, dest, elevation);
     const ray_elevated = new Ray(origin, elevated_dest);
+    
+    log("Elevated_dest", elevated_dest);
+    log("Ray", ray);
+    log("Elevated Ray", ray_elevated);
     
     if ( ray_elevated.distance < 10 ) {
       if ( label ) label.visible = false;
@@ -220,18 +227,24 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
   log("Elevation segments", elevation_segments);
  
   // Compute measured distance
-	const distances = canvas.grid.measureDistances(elevation_segments, {gridSpaces});
+	const distances = canvas.grid.measureDistances(segments, {gridSpaces});
+	const distances_elevation = canvas.grid.measureDistances(elevation_segments, {gridSpaces});
   log("Distances", distances);
+  log("distances_elevation", distances_elevation);
 
 
+  let totalFlatDistance = 0;
+  let totalElevationDistance = 0;
 	let totalDistance = 0;
 	let totalElevation = 0;
 
-   log("Elevation increment", this.elevation_increments);
-   log("Destination increment", this.destination_elevation_increment);
+  log("Elevation increment", this.elevation_increments);
+  log("Destination increment", this.destination_elevation_increment);
 
 	for ( let [i, d] of distances.entries() ) {
-		totalDistance += d;
+		totalFlatDistance += d;
+		totalElevationDistance +=
+		totalDistance += distances_elevation[i];
 		
     log(`Distance ${d}; total distance ${totalDistance}`);
 		
@@ -244,10 +257,14 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
 		if(waypoints_elevation[i + 1] != 0) {
                   log(`Elevation increment: ${waypoints_elevation[i + 1]}`, waypoints_elevation);
 		  const elevation = waypoints_elevation[i + 1] * canvas.scene.data.gridDistance;
-		  totalElevation += elevation;
+		  totalElevationDistance += elevation;
 		  log(`Elevation ${elevation}; total elevation ${totalElevation}`);
 		  
-		  s.text = s.text + "\n" + this._getSegmentElevationLabel(elevation, totalElevation, s.last);
+		  s.text = s.text + "\n" + this._getSegmentElevationLabel(elevation, totalElevationDistance, s.last);
+		  
+		  if(s.last) {
+		    s.text = s.text + "\n" + `[${Math.round(totalDistance * 100) / 100} ${canvas.scene.data.gridUnits}]`
+		  }
 		}
 	}
 	
