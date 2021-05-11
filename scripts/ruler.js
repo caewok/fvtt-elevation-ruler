@@ -254,7 +254,9 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
 		s.text = this._getSegmentLabel(d, totalDistance, s.last);
 		
 		// add in elevation text if elevation has changed
-		if(waypoints_elevation[i + 1] != 0) {
+		// or if elevation change previously and we are at the last point.
+		if(waypoints_elevation[i + 1] != 0 ||
+		   (s.last && waypoints_elevation.any(w => w != 0))) {
                   log(`Elevation increment: ${waypoints_elevation[i + 1]}`, waypoints_elevation);
 		  const elevation = waypoints_elevation[i + 1] * canvas.scene.data.gridDistance;
 		  totalElevationDistance += elevation;
