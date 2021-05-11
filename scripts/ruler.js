@@ -100,7 +100,7 @@ Object.defineProperty(Ruler.prototype, "_getSegmentElevationLabel", {
 function ProjectElevatedPoint(A, B, height) {
   const distance = CalculateDistance(A, B);
   const projected_x = B.x + ((height / distance) * (A.y - B.y));
-  const projected_y = B.y + ((height / distance) * (A.x - B.x));
+  const projected_y = B.y - ((height / distance) * (A.x - B.x));
 
   return new PIXI.Point(projected_x, projected_y);
 }
