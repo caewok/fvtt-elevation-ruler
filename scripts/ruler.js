@@ -243,7 +243,6 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
 
 	for ( let [i, d] of distances.entries() ) {
 		totalFlatDistance += d;
-		totalElevationDistance +=
 		totalDistance += distances_elevation[i];
 		
     log(`Distance ${d}; total distance ${totalDistance}`);
@@ -251,7 +250,7 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
 		let s = segments[i];
 		s.last = i === (segments.length - 1);
 		s.distance = d;
-		s.text = this._getSegmentLabel(d, totalDistance, s.last);
+		s.text = this._getSegmentLabel(d, totalFlatDistance, s.last);
 		
 		// add in elevation text if elevation has changed
 		// or if elevation change previously and we are at the last point.
