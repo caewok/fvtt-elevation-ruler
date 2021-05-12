@@ -346,8 +346,10 @@ export function elevationRulerToJSON(wrapped, ...args) {
 }
 
 // update will need to transfer relevant elevation data (probably?)
-export function elevationRulerUpdate(wrapped, ...args) {
+export function elevationRulerUpdate(wrapped, data) {
   log("we are updating!", this);
+  
+  // add in elevation data first, b/c the wrapped function will call measure
   
   // from Ruler.update
   if ( data.class !== "Ruler" ) throw new Error("Unable to recreate Ruler instance from provided data");
@@ -356,7 +358,7 @@ export function elevationRulerUpdate(wrapped, ...args) {
   this.destination_elevation_increment = data.destination_elevation_increment;
   this.elevation_increments = data.elevation_increments;
   
-  return wrapped(...args);
+  return wrapped(data);
 }
 
 // adding waypoint should also add elevation info
