@@ -18,15 +18,25 @@ Once elevation is changed, the ruler display will change to show three lines. Fi
 For dnd5e, the total distance along the diagonal will follow the chosen dnd5e measurement rule: 5-5-5, 5-10-5, or Euclidean. 
 
 For example, here is the measurement that is displayed in DnD 5e with the 5-5-5 rule, where a diagonal move counts as 5 feet:
-![Demonstrate DnD 5e 5-5-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_5-5-5.webm)
+![Video of DnD 5e 5-5-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_5-5-5.webm). The first waypoint is 15 feet east and 15 feet up from the origin. Because under this rule, a diagonal move is only 5 feet, this first waypoint can be reached by moving diagonally east and up a total of 3 squares, or 15 feet. 
+
+After the waypoint, the destination is another 15 feet away to the north, no further elevation change. Thus, the total distance is 15 feet from the first waypoint plus another 15 feet, for 30 feet total. 
 ![Screenshot DnD 5e 5-5-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/c7664c550b5da4afec07e6f7076f301513834d36/media/measurement_dnd_5-5-5.webp)
 
-Compare to the DnD 5e 5-10-5 rule, where a diagonal move counts as 5 or 10 feet, alternating: 
-![Demonstrate DnD 5e 5-10-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_5-10-5.webm)
+Compare to the DnD 5e 5-10-5 rule, where a diagonal move counts as 5 or 10 feet, alternating:
+![Video of DnD 5e 5-10-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_5-10-5.webm). The first waypoint is 15 feet east and 10 feet up. With a 5-10-5 rule, it would cost 5 feet for the first diagonal move, 10 feet for the second diagonal move (to 10 feet east, 10 feet up) and then another 5 feet for another move east. Total would be 20 feet. 
+
+After the waypoint, the destination is another 10 feet south and 10 feet up. This can be accomplished in a diagonal move of two squares, so 5 feet for the first and 10 feet for the second, for a total of 15 feet.
+
+Total movement along the plane is 25 feet (15 feet east plus 10 feet south). Total elevation change is 20 feet (10 feet for each waypoint). Total distance moved adds the two waypoint totals together: 20 feet plus 15 feet totals 35 feet.
+
 ![Screenshot DnD 5e 5-10-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/c7664c550b5da4afec07e6f7076f301513834d36/media/measurement_dnd_5-10-5.webp)
 
 Finally, the DnD Euclidean measurement rule, rounded to the nearest foot:
-![Demonstrate DnD 5e Euclidean](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_euclidian.webm)
+![Video of DnD 5e Euclidean](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_euclidian.webm). Here, the diagonal move at each waypoint is measured precisely and rounded to the nearest foot. The first waypoint moves 15 feet up and 15 feet east, which can be accomplished diagonally by moving, according to Pythagorean's Theorem, sqrt(15^2 + 15^2) ≅ 21 feet. 
+
+After the waypoint, there is a 10 foot move to the south with no additional elevation. So the total distance is 21 + 10 = 31 feet. 
+
 ![Screenshot DnD 5e Euclidean Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/c7664c550b5da4afec07e6f7076f301513834d36/media/measurement_dnd_euclidian.webp)
 
 ## FAQ
