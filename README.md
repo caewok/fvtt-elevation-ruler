@@ -17,6 +17,14 @@ Once elevation is changed, the ruler display will change to show three lines. Fi
 
 For dnd5e, the total distance along the diagonal will follow the chosen dnd5e measurement rule: 5-5-5, 5-10-5, or Euclidean. 
 
+## FAQ
+
+### How does the underlying measurement work?
+
+When measuring between origin point A and destination point B, incrementing elevation will move the destination to a point C 1 unit above (in the vertical direction) from B. Thus, the line between A and C is the hypotenuse of the right triangle formed by A, B, and C. That triangle is then projected back on the 2-D plane by rotating it 90 degrees, and the diagonal between A and C is measured using the underlying system measurement default. Thus, adding elevation will always cause a measurement along a diagonal.
+
+For each additional waypoint, elevation is measured between the waypoints. Thus, if waypoint 1 moves up 10 feet, and waypoint 2 then moves down 10 feet, the measured distance will assume a move up by 10 feet, and then a second move down by 10 feet—--in other words, distances between waypoints do not "cancel out."
+
 For example, here is the measurement that is displayed in DnD 5e with the 5-5-5 rule, where a diagonal move counts as 5 feet:
 ![Video of DnD 5e 5-5-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_5-5-5.webm). The first waypoint is 15 feet east and 15 feet up from the origin. Because under this rule, a diagonal move is only 5 feet, this first waypoint can be reached by moving diagonally east and up a total of 3 squares, or 15 feet. 
 
@@ -38,14 +46,6 @@ Finally, the DnD Euclidean measurement rule, rounded to the nearest foot:
 After the waypoint, there is a 10 foot move to the south with no additional elevation. So the total distance is 21 + 10 = 31 feet. 
 
 ![Screenshot DnD 5e Euclidean Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/c7664c550b5da4afec07e6f7076f301513834d36/media/measurement_dnd_euclidian.webp)
-
-## FAQ
-
-### How does the underlying measurement work?
-
-When measuring between origin point A and destination point B, incrementing elevation will move the destination to a point C 1 unit above (in the vertical direction) from B. Thus, the line between A and C is the hypotenuse of the right triangle formed by A, B, and C. That triangle is then projected back on the 2-D plane by rotating it 90 degrees, and the diagonal between A and C is measured using the underlying system measurement default. Thus, adding elevation will always cause a measurement along a diagonal.
-
-For each additional waypoint, elevation is measured between the waypoints. Thus, if waypoint 1 moves up 10 feet, and waypoint 2 then moves down 10 feet, the measured distance will assume a move up by 10 feet, and then a second move down by 10 feet—--in other words, distances between waypoints do not "cancel out."
 
 ### What systems does it work on? 
 
