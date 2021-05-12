@@ -333,9 +333,29 @@ export function elevationRulerClear(wrapped, ...args) {
   return wrapped(...args);
 }
 
+
+// need to save the relevant elevation data for the JSON
+export function elevationRulerToJSON(wrapped, ...args) {
+  log("Creating JSON!");
+  let obj = wrapped(...args);
+  
+  obj.destination_elevation_increment = this.destination_elevation_increment;
+  obj.elevation_increments = this.elevation_increments;
+  
+  return obj;
+}
+
 // update will need to transfer relevant elevation data (probably?)
 export function elevationRulerUpdate(wrapped, ...args) {
   log("we are updating!", this);
+  
+  // from Ruler.update
+  if ( data.class !== "Ruler" ) throw new Error("Unable to recreate Ruler instance from provided data");
+  
+  // add in new properties
+  this.destination_elevation_increment = data.destination_elevation_increment;
+  this.elevation_increments = data.elevation_increments;
+  
   return wrapped(...args);
 }
 
@@ -376,4 +396,5 @@ export function decrementElevation() {
   
   ruler.measure(ruler.destination);
 }
+
 
