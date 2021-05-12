@@ -18,13 +18,13 @@ Once elevation is changed, the ruler display will change to show three lines. Fi
 For dnd5e, the total distance along the diagonal will follow the chosen dnd5e measurement rule: 5-5-5, 5-10-5, or Euclidean. 
 
 For example, here is the measurement that is displayed in DnD 5e with the 5-5-5 rule, where a diagonal move counts as 5 feet:
-![Demonstrate DnD 5e 5-5-5 Measurement](https://github.com/caewok/fvtt-elevation-ruler/blob/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_5-5-5.webm)
+![Demonstrate DnD 5e 5-5-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_5-5-5.webm)
 
 Compare to the DnD 5e 5-10-5 rule, where a diagonal move counts as 5 or 10 feet, alternating: 
-![Demonstrate DnD 5e 5-10-5 Measurement](https://github.com/caewok/fvtt-elevation-ruler/blob/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_5-10-5.webm)
+![Demonstrate DnD 5e 5-10-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_5-10-5.webm)
 
 Finally, the DnD Euclidean measurement rule, rounded to the nearest foot:
-![Demonstrate DnD 5e Euclidean](https://github.com/caewok/fvtt-elevation-ruler/blob/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_euclidian.webm)
+![Demonstrate DnD 5e Euclidean](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_euclidian.webm)
 
 ## FAQ
 
