@@ -97,13 +97,22 @@ Object.defineProperty(Ruler.prototype, "_getSegmentElevationLabel", {
  * @param {{x: number, y: number}} A
  * @param {{x: number, y: number}} B
  */
-function ProjectElevatedPoint(A, B, height) {
+ 
+
+
+function projectElevatedPoint(A, B, height) {
   const distance = CalculateDistance(A, B);
   const projected_x = B.x + ((height / distance) * (A.y - B.y));
   const projected_y = B.y - ((height / distance) * (A.x - B.x));
 
   return new PIXI.Point(projected_x, projected_y);
 }
+
+Object.defineProperty(Ruler.prototype, "projectElevatedPoint", {
+  value: projectElevatedPoint,
+  writable: true,
+  configurable: true
+});
 
 function CalculateDistance(A, B) {
   const dx = B.x - A.x;
@@ -208,7 +217,7 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
     log(`Elevation ${elevation} for i = ${i}.`);
 
     
-    const elevated_dest = ProjectElevatedPoint(origin, dest, elevation);
+    const elevated_dest = this.projectElevatedPoint(origin, dest, elevation);
     const ray_elevated = new Ray(origin, elevated_dest);
     
     log("Elevated_dest", elevated_dest);
