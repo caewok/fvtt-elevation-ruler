@@ -2,7 +2,7 @@ import { registerSettings, registerHotkeys } from "./settings.js";
 import { registerRuler } from "./patching.js";
 
 export const MODULE_ID = 'elevation-ruler';
-const FORCE_DEBUG = true; // used for logging before dev mode is set up
+const FORCE_DEBUG = false; // used for logging before dev mode is set up
 
 
 export function log(...args) {
@@ -43,6 +43,11 @@ Hooks.once('setup', async function() {
 // ready is called once everything is loaded up and ready to go.
 Hooks.once('ready', async function() {
   log("Readying.");
+});
+
+// https://github.com/League-of-Foundry-Developers/foundryvtt-devMode
+Hooks.once('devModeReady', ({ registerPackageDebugFlag }) => {
+  registerPackageDebugFlag(MODULE_ID);
 });
 
 
