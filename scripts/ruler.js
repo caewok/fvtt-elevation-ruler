@@ -237,7 +237,6 @@ export function incrementElevation() {
   const ruler = canvas.controls.ruler;
   log("Trying to increment...", ruler);
   if(!ruler || !ruler.active) return;
-  ruler.changeElevation(1);
   
   const destination_elevation_increment = ruler.getFlag(MODULE_ID, "destination_elevation_increment") || 0;
   ruler.setFlag(MODULE_ID, "destination_elevation_increment", destination_elevation_increment + 1);
