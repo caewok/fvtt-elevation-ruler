@@ -29,8 +29,11 @@ export function registerSettings() {
  
 
   log("Registering hotkey menu.");
-  game.settings.registerMenu(MODULE_ID, {
-	  name: 'Elevation Ruler Hotkeys',
+  game.settings.registerMenu(MODULE_ID, "elevationRulerHotkeyMenu", {
+	  name: 'Hotkeys Settings',
+          label: "Set Hotkeys",
+          hint: "Select the hotkeys for incrementing and decrementing elevation when using a ruler.",
+          icon: "fa-bars",
 	  type: Hotkeys.createConfig('Elevation Ruler Hotkeys', [`${MODULE_ID}.change-elevation-group`]),
 	});
 
