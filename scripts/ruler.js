@@ -37,13 +37,13 @@ function segmentElevationLabel(segmentElevationIncrement, totalElevationIncremen
   
   // Take absolute value b/c segmentArrow will represent direction
   // * 100 / 100 is used in _getSegmentLabel; not sure whys
-  let label = `${Math.abs(Math.round(segmentElevationIncrement * 100) / 100)} ${units}${segmentArrow}`;
+  let label = `${Math.abs(Math.round(segmentElevationIncrement * 100) / 100)} ${canvas.scene.data.gridUnits}${segmentArrow}`;
   
   if ( isTotal ) {
       const totalArrow = (totalElevationIncrement > 0) ? "↑" :
                       (totalElevationIncrement < 0) ? "↓" :
                       "";
-      label += ` [${Math.round(totalElevationIncrement * 100) / 100} ${units}${totalArrow}]`;
+      label += ` [${Math.round(totalElevationIncrement * 100) / 100} ${canvas.scene.data.gridUnits}${totalArrow}]`;
   }
   return label;
 }
