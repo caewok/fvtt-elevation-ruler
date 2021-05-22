@@ -32,7 +32,7 @@ Hooks.once('setup', async function() {
   log("Setup.");
   if(!game.modules.get('lib-wrapper')?.active && game.user.isGM) ui.notifications.error("'Elevation Ruler' requires the 'libWrapper' module. Please install and activate this dependency.");
   if(!game.modules.get('lib-df-hotkeys')?.active && game.user.isGM) ui.notifications.error("'Elevation Ruler' requires the 'Library: DF Hotkeys' module. Please install and activate this dependency.");
-  if(!game.modules.get('lib-ruler')?.active && game.user.isGM) ui.notifications.error("'Elevation Ruler' requires the 'libRuler' module. Please install and activate this dependency.");)
+  if(!game.modules.get('lib-ruler')?.active && game.user.isGM) ui.notifications.error("'Elevation Ruler' requires the 'libRuler' module. Please install and activate this dependency.");
 
   registerRuler();
   registerHotkeys(); // should go before registering settings, so hotkey group is defined
