@@ -50,4 +50,9 @@ Hooks.once('devModeReady', ({ registerPackageDebugFlag }) => {
   registerPackageDebugFlag(MODULE_ID);
 });
 
+Hooks.once('libRulerReady', async function() {
+  log("libRuler is ready to go.");
+
+});
+
 
