@@ -256,7 +256,7 @@ export function decrementElevation() {
 }
 
 // When moving the token along the segments, update the token elevation
-export async function elevationRulerAnimateToken(wrapped, token, ray, segment_num) {
+export async function elevationRulerAnimateToken(wrapped, token, ray, dx, dy, segment_num) {
   // probably update first so the token is at elevation throughout the segment move.
   log(`Updating token elevation for segment ${segment_num}`, token);
   
@@ -269,7 +269,7 @@ export async function elevationRulerAnimateToken(wrapped, token, ray, segment_nu
   log(`Adding ${new_elevation} elevation to token.`);
   
   await token.update({ 'data.elevation': new_elevation });
-  return wrapped(token, ray, segment_num);
+  return wrapped(token, ray, dx, dy, segment_num);
 }
 
 
