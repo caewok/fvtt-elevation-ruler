@@ -7,7 +7,7 @@ const FORCE_DEBUG = true; // used for logging before dev mode is set up
 
 export function log(...args) {
   try {
-    const isDebugging = window.DEV?.getPackageDebugValue(CONSTANTS.MODULE_ID);
+    const isDebugging = window.DEV?.getPackageDebugValue(MODULE_ID);
     //console.log(MODULE_ID, '|', `isDebugging: ${isDebugging}.`);
 
     if (FORCE_DEBUG || isDebugging) {
