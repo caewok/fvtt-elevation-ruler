@@ -138,7 +138,7 @@ export function elevationRulerConstructSegmentDistanceRay(wrapped, origin, dest,
 	const destination_elevation_increment = this.getFlag(MODULE_ID, "destination_elevation_increment") || 0;
 	const elevation_increments = this.getFlag(MODULE_ID, "elevation_increments") || [];
 	const waypoints_elevation = elevation_increments.concat([destination_elevation_increment]);
-	if(waypoints_elevation[segment_num] == 0) { return wrapped(origin, dest, segment_num); }
+	if(waypoints_elevation[segment_num] === 0) { return wrapped(origin, dest, segment_num); }
   
   const elevation = waypoints_elevation[segment_num] * canvas.scene.data.grid; 
   const elevated_dest = ProjectElevatedPoint(origin, dest, elevation);
@@ -173,9 +173,9 @@ export function elevationRulerGetSegmentLabel(wrapped, segmentDistance, totalDis
   const waypoints_elevation = elevation_increments.concat([destination_elevation_increment]);  
   const elevation = waypoints_elevation[segment_num] * canvas.scene.data.gridDistance;
   
-  // first waypoint is origin with no incremental elevation; can be skipped
-  
-  const summedElevation = waypoints_elevation.slice(1, segment_num).reduce((acc, total) => acc + total, 0);
+  // first waypoint is origin with no incremental elevation; could be skipped
+  // slice takes start_point to end_point - 1, so need to increment here to capture the current segment
+  const summedElevation = waypoints_elevation.slice(0, segment_num + 1).reduce((acc, total) => acc + total, 0);
   const totalElevation = summedElevation * canvas.scene.data.gridDistance; 
   log(`summedElevation is ${summedElevation}; totalElevation is ${totalElevation}; elevation is ${elevation}`, waypoints_elevation);
   if(totalElevation === 0) { return orig_label }
