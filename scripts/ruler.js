@@ -268,7 +268,7 @@ export async function elevationRulerAnimateToken(wrapped, token, ray, dx, dy, se
   const new_elevation = current_elevation + (Math.round(elevation_increments[segment_num] *  canvas.scene.data.gridDistance * 100) / 100);
   log(`Adding ${new_elevation} elevation to token.`);
   
-  await token.update({ 'data.elevation': new_elevation });
+  await token.update({ 'elevation': new_elevation });
   return wrapped(token, ray, dx, dy, segment_num);
 }
 
