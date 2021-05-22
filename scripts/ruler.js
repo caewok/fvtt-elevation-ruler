@@ -20,69 +20,33 @@ import { MODULE_ID, log } from "./module.js";
  
 // wrapping the constructor appears not to work.
 // see https://github.com/ruipin/fvtt-lib-wrapper/issues/14
-
+ 
 /*
- * Track elevation increments for waypoints.
- * @type Array of integers
- */
-Object.defineProperty(Ruler.prototype, "elevation_increments", {
-  value: [],
-  writable: true,
-  configurable: true
-});
-
-/* 
- * Track the elevation increment for the destination
- * @type Integer
- */
-Object.defineProperty(Ruler.prototype, "destination_elevation_increment", {
-  value: 0,
-  writable: true,
-  configurable: true
-});
-
-/*
- * Modify the elevation and trigger updating accordingly.
- */
-Object.defineProperty(Ruler.prototype, "changeElevation", {
-  value: function changeElevation(elevation_increment) {
-    log(`we are changing elevation by ${elevation_increment}!`);
-    this.destination_elevation_increment += elevation_increment;
-  },
-  writable: true,
-  configurable: true
-});
-
-/* 
- * Get the text label for elevation for a segment of the measurement.
- * Compare _getSegmentLabel
- * @param {number} segmentElevationIncrement
- * @param {number} totalElevationIncrement
- * @param {boolean} isTotal
+ * Construct a label to represent elevation changes in the ruler.
+ * Waypoint version: 10 ft↑ or 10 ft↓
+ * Total version: 10 ft↑ [20 ft↓]
+ * @param {number} segmentElevationIncrement Incremental elevation for the segment.
+ * @param {number} totalElevationIncrement Total elevation for all segments to date.
+ * @param {boolean} isTotal Whether this is the label for the final segment
  * @return {string}
  */
-Object.defineProperty(Ruler.prototype, "_getSegmentElevationLabel", {
-  value: function _getSegmentElevationLabel(segmentElevationIncrement, totalElevationIncrement, isTotal) {
-   
-  log(`segmentElevationIncrement: ${segmentElevationIncrement}; totalElevationIncrement: ${totalElevationIncrement}`);
-  const units = canvas.scene.data.gridUnits;
-  
+function segmentElevationLabel(segmentElevationIncrement, totalElevationIncrement, isTotal) {
   const segmentArrow = (segmentElevationIncrement > 0) ? "↑" :
                       (segmentElevationIncrement < 0) ? "↓" :
                       "";
   
-  let label = `${segmentArrow}${Math.round(segmentElevationIncrement * 100) / 100} ${units}`;
+  // Take absolute value b/c segmentArrow will represent direction
+  // * 100 / 100 is used in _getSegmentLabel; not sure whys
+  let label = `${Math.abs(Math.round(segmentElevationIncrement * 100) / 100)} ${units}${segmentArrow}`;
+  
   if ( isTotal ) {
       const totalArrow = (totalElevationIncrement > 0) ? "↑" :
                       (totalElevationIncrement < 0) ? "↓" :
                       "";
-      label += ` [${totalArrow}${Math.round(totalElevationIncrement * 100) / 100} ${units}]`;
+      label += ` [${Math.round(totalElevationIncrement * 100) / 100} ${units}${totalArrow}]`;
   }
   return label;
-},
- writable: true,
- configurable: true
- });
+}
  
  
 /**
@@ -151,158 +115,62 @@ function CalculateDistance(A, B) {
 // Cy = By ± n/m * (Ax - Bx)
 
 
-
-
-
-// will need to update measuring to account for elevation
-export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}) {
-  log("we are measuring!");
-  log(`${this.waypoints.length} waypoints. ${this.destination_elevation_increment} elevation increments for destination. ${this.elevation_increments.length} elevation waypoints.`, this.elevation_increments);
+/* 
+ * Create a distance ray that is the hypotenuse of the triangle 
+ * origin, destination, elevated destination, projected (or rotated 90º)
+ * onto the canvas.
+ * @param {PIXI.Point} origin Where the segment starts on the canvas.
+ * @param {PIXI.Point} dest PIXI.Point Where the segment ends on the canvas.
+ * @param {integer} segment_num The segment number, where 1 is the
+ *    first segment between origin and the first waypoint (or destination),
+ *    2 is the segment between the first and second waypoints.
+ *
+ *    The segment_num can also be considered the waypoint number, equal to the index 
+ *    in the array this.waypoints.concat([this.destination]). Keep in mind that 
+ *    the first waypoint in this.waypoints is actually the origin 
+ *    and segment_num will never be 0.
+ */ 
+export function elevationRulerConstructSegmentDistanceRay(wrapped, origin, dest, segment_num) {
+	// first waypoint is origin; elevation increment is 0.
+	// need to account for units of the grid
+	// canvas.scene.data.grid e.g. 140; canvas.scene.data.gridDistance e.g. 5
+	// if there is no elevation increment to consider, use original function.
+	const waypoints_elevation = this.elevation_increments.concat([this.destination_elevation_increment]);
+	if(waypoints_elevation[segment_num] == 0) { return wrapped(origin, dest, segment_num); }
   
-  // if no elevation present, go with original function.
-  if(!this.destination_elevation_increment &&
-     (!this.elevation_increments ||
-       this.elevation_increments.every(i => i === 0))) { 
-    
-     log("Using original measure");
-     return wrapped(destination, gridSpaces);
-  }  
+  const elevation = waypoints_elevation[segment_num] * canvas.scene.data.grid; 
+  const elevated_dest = ProjectElevatedPoint(origin, dest, elevation);
   
-  // Mostly a copy from Ruler.measure, but adding in distance for elevation
-  // Original segments need to be retained so that the displayed path is correct.
-  // But the distances need to be modified to account for segment elevation.
-  // Project the elevated point back to the 2-D space, using a rotated right triangle.
-  // See, e.g. https://math.stackexchange.com/questions/927802/how-to-find-coordinates-of-3rd-vertex-of-a-right-angled-triangle-when-everything
+  return wrapped(origin, elevated_dest, segment_num);
+}
 
-  destination = new PIXI.Point(...canvas.grid.getCenter(destination.x, destination.y));
-  const waypoints = this.waypoints.concat([destination]);
-  const waypoints_elevation = this.elevation_increments.concat([this.destination_elevation_increment]);
+
+/* 
+ * @param {number} segmentDistance
+ * @param {number} totalDistance
+ * @param {boolean} isTotal
+ * @param {integer} segment_num The segment number, where 1 is the
+ *    first segment between origin and the first waypoint (or destination),
+ *    2 is the segment between the first and second waypoints.
+ *
+ *    The segment_num can also be considered the waypoint number, equal to the index 
+ *    in the array this.waypoints.concat([this.destination]). Keep in mind that 
+ *    the first waypoint in this.waypoints is actually the origin 
+ *    and segment_num will never be 0.
+ */ 
+export function elevationRulerGetSegmentLabel(wrapped, segmentDistance, totalDistance, totalDistance, segment_num) {
+  const orig_label = wrapped(segmentDistance, totalDistance, totalDistance, segment_num);
+
+  // if all waypoints to this point have no elevation change, ignore the elevation label
+  const waypoints_elevation = this.elevation_increments.concat([this.destination_elevation_increment]);  
+  const elevation = waypoints_elevation[segment_num] * canvas.scene.data.gridDistance;
   
-  const r = this.ruler;
-  this.destination = destination;
-
-  log("Measure ruler", r);
+  // first waypoint is origin with no incremental elevation; can be skipped
+  const totalElevation = waypoints_elevation.slice(1, segment_num).reduce((acc, total) => { acc + total }, 0) * canvas.scene.data.gridDistance; 
+  if(totalElevation === 0) { return orig_label}
   
-  // Iterate over waypoints and construct segment rays
-  // Also create elevation segments, adjusting segments for elevation
-  // waypoint 0 is added as the origin (see _onDragStart)
-  // so elevation_waypoint 0 should also be the origin, and so 0
-  // the for loop uses the next waypoint as destination. 
-  // for loop will count from 0 to waypoints.length - 1
-  
-  const segments = [];
-  const elevation_segments = [];
-  for ( let [i, dest] of waypoints.slice(1).entries() ) {
-    log(`Processing waypoint ${i}`, dest);
-  
-    const origin = waypoints[i];
-    const label = this.labels.children[i];
-    const ray = new Ray(origin, dest);
-    
-    // first waypoint is origin; elevation increment is 0.
-    // need to account for units of the grid
-    // canvas.scene.data.grid e.g. 140; canvas.scene.data.gridDistance e.g. 5
-    const elevation = waypoints_elevation[i + 1] * canvas.scene.data.grid; 
-    log("Origin", origin);
-    log("Destination", dest);
-    log(`Elevation ${elevation} for i = ${i}.`);
-
-    
-    const elevated_dest = ProjectElevatedPoint(origin, dest, elevation);
-    const ray_elevated = new Ray(origin, elevated_dest);
-    
-    log("Elevated_dest", elevated_dest);
-    log("Ray", ray);
-    log("Elevated Ray", ray_elevated);
-    
-    if ( ray_elevated.distance < 10 ) {
-      if ( label ) label.visible = false;
-      continue;
-    }
-    segments.push({ray, label});
-    elevation_segments.push({ray: ray_elevated, label: label});
-  }
- 
-  log("Segments", segments);
-  log("Elevation segments", elevation_segments);
- 
-  // Compute measured distance
-	const distances = canvas.grid.measureDistances(segments, {gridSpaces});
-	const distances_elevation = canvas.grid.measureDistances(elevation_segments, {gridSpaces});
-  log("Distances", distances);
-  log("distances_elevation", distances_elevation);
-
-
-  let totalFlatDistance = 0;
-  let totalElevationDistance = 0;
-	let totalDistance = 0;
-	let totalElevation = 0;
-
-  log("Elevation increment", this.elevation_increments);
-  log("Destination increment", this.destination_elevation_increment);
-
-	for ( let [i, d] of distances.entries() ) {
-		totalFlatDistance += d;
-		totalDistance += distances_elevation[i];
-		
-    log(`Distance ${d}; total distance ${totalDistance}`);
-		
-		let s = segments[i];
-		s.last = i === (segments.length - 1);
-		s.distance = d;
-		s.text = this._getSegmentLabel(d, totalFlatDistance, s.last);
-		
-		// add in elevation text if elevation has changed
-		// or if elevation change previously and we are at the last point.
-		if(waypoints_elevation[i + 1] != 0 ||
-		   (s.last && waypoints_elevation.some(w => w != 0))) {
-                  log(`Elevation increment: ${waypoints_elevation[i + 1]}`, waypoints_elevation);
-		  const elevation = waypoints_elevation[i + 1] * canvas.scene.data.gridDistance;
-		  totalElevationDistance += elevation;
-		  log(`Elevation ${elevation}; total elevation ${totalElevation}`);
-		  
-		  s.text = s.text + "\n" + this._getSegmentElevationLabel(elevation, totalElevationDistance, s.last);
-		  
-		  if(s.last) {
-		    s.text = s.text + "\n" + `[${Math.round(totalDistance * 100) / 100} ${canvas.scene.data.gridUnits}]`
-		  }
-		}
-	}
-	
-  log(`Total distance ${totalDistance}; total elevation ${totalElevation}`);
-
-	// Clear the grid highlight layer
-	const hlt = canvas.grid.highlightLayers[this.name];
-	hlt.clear();
-	// Draw measured path
-  log("Cleared grid highlight layer.", r);
-	r.clear();
-
-  log("Drawing line segments.");
-	for ( let s of segments ) {
-		const {ray, label, text, last} = s;
-		// Draw line segment
-		r.lineStyle(6, 0x000000, 0.5).moveTo(ray.A.x, ray.A.y).lineTo(ray.B.x, ray.B.y)
-		 .lineStyle(4, this.color, 0.25).moveTo(ray.A.x, ray.A.y).lineTo(ray.B.x, ray.B.y);
-		// Draw the distance label just after the endpoint of the segment
-		if ( label ) {
-			label.text = text;
-			label.alpha = last ? 1.0 : 0.5;
-			label.visible = true;
-			let labelPosition = ray.project((ray.distance + 50) / ray.distance);
-			label.position.set(labelPosition.x, labelPosition.y);
-		}
-		// Highlight grid positions
-		this._highlightMeasurement(ray);
-	}
-	// Draw endpoints
-
-  log("Drawing endpoints.");
-	for ( let p of waypoints ) {
-		r.lineStyle(2, 0x000000, 0.5).beginFill(this.color, 0.25).drawCircle(p.x, p.y, 8);
-	}
-	// Return the measured segments
-	return segments;
+  const elevation_label = segmentElevationLabel(elevation, totalElevation, orig_label)
+  return orig_label + "\n" + elevation_label;
 }
 
 // moveToken should modify token elevation 
@@ -319,55 +187,31 @@ export function elevationRulerClear(wrapped, ...args) {
    * The set of elevation increments corresponding to waypoints.
    * Note: waypoint 0 is origin and should be elevation 0 (no increment +/-)
    * type: Array of integers
-   */  
-  // setFlag not a function for Ruler object
-  this.elevation_increments = [];
+   */    
+  this.setFlag(MODULE_ID,  "elevation_increments", []);
   
   /**
    * The current destination point elevation increment relative to origin.
    * type: integer
    */ 
-  this.destination_elevation_increment = 0;
-  
+  this.setFlag(MODULE_ID,  "destination_elevation_increment", 0);
   
   return wrapped(...args);
-}
-
-
-// need to save the relevant elevation data for the JSON
-export function elevationRulerToJSON(wrapped, ...args) {
-  log("Creating JSON!");
-  let obj = wrapped(...args);
-  
-  obj.destination_elevation_increment = this.destination_elevation_increment;
-  obj.elevation_increments = this.elevation_increments;
-  
-  return obj;
-}
-
-// update will need to transfer relevant elevation data (probably?)
-export function elevationRulerUpdate(wrapped, data) {
-  log("we are updating!", this);
-  
-  // add in elevation data first, b/c the wrapped function will call measure
-  
-  // from Ruler.update
-  if ( data.class !== "Ruler" ) throw new Error("Unable to recreate Ruler instance from provided data");
-  
-  // add in new properties
-  this.destination_elevation_increment = data.destination_elevation_increment;
-  this.elevation_increments = data.elevation_increments;
-  
-  return wrapped(data);
 }
 
 // adding waypoint should also add elevation info
 export function elevationRulerAddWaypoint(wrapped, ...args) {
   log("adding waypoint!");
-
-  this.elevation_increments.push(this.destination_elevation_increment);
-  this.destination_elevation_increment = 0;  
   
+  // following || shouldn't happen, but worth a test?
+  const elevation_increments = this.getFlag(MODULE_ID, "elevation_increments") || [];
+  const destination_elevation_increment = this.getFlag(MODULE_ID, "destination_elevation_increment") || 0;
+   
+  elevation_increments.push(destination_elevation_increment);
+  
+  this.setFlag(MODULE_ID, "elevation_increments", elevation_increments);
+  this.setFlag(MODULE_ID, "destination_elevation_increment", 0);
+
   return wrapped(...args);
 }
 
@@ -375,8 +219,12 @@ export function elevationRulerAddWaypoint(wrapped, ...args) {
 export function elevationRulerRemoveWaypoint(wrapped, ...args) {
   log("removing waypoint!");
   
-  this.elevation_increments.pop();
-  this.destination_elevation_increment = 0;
+  // following || shouldn't happen, but worth a test?
+  const elevation_increments = this.getFlag(MODULE_ID, "elevation_increments") || [];
+  
+  elevation_increments.pop();
+  this.setFlag(MODULE_ID, "elevation_increments", elevation_increments);
+  this.setFlag(MODULE_ID, "destination_elevation_increment", 0);
   
   return wrapped(...args);
 }
@@ -387,6 +235,8 @@ export function incrementElevation() {
   if(!ruler || !ruler.active) return;
   ruler.changeElevation(1);
   
+  const destination_elevation_increment = ruler.getFlag(MODULE_ID, "destination_elevation_increment") || 0;
+  ruler.setFlag(MODULE_ID, "destination_elevation_increment", destination_elevation_increment + 1);
   ruler.measure(ruler.destination);
 }
 
@@ -394,8 +244,9 @@ export function decrementElevation() {
   const ruler = canvas.controls.ruler;
   log("Trying to decrement...", ruler);
   if(!ruler || !ruler.active) return;
-  ruler.changeElevation(-1);
-  
+
+  const destination_elevation_increment = ruler.getFlag(MODULE_ID, "destination_elevation_increment") || 0;
+  ruler.setFlag(MODULE_ID, "destination_elevation_increment", destination_elevation_increment - 1);
   ruler.measure(ruler.destination);
 }
 
