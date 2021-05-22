@@ -174,9 +174,10 @@ export function elevationRulerGetSegmentLabel(wrapped, segmentDistance, totalDis
   const elevation = waypoints_elevation[segment_num] * canvas.scene.data.gridDistance;
   
   // first waypoint is origin with no incremental elevation; can be skipped
-  const summedElevation = waypoints_elevation.slice(1, segment_num).reduce((acc, total) => { acc + total }, 0);
+  
+  const summedElevation = waypoints_elevation.slice(1, segment_num).reduce((acc, total) => acc + total, 0);
   const totalElevation = summedElevation * canvas.scene.data.gridDistance; 
-  log(`totalElevation is ${totalElevation}; elevation is ${elevation}`, waypoints_elevation);
+  log(`summedElevation is ${summedElevation}; totalElevation is ${totalElevation}; elevation is ${elevation}`, waypoints_elevation);
   if(totalElevation === 0) { return orig_label }
   
   const elevation_label = segmentElevationLabel(elevation, totalElevation, orig_label)
