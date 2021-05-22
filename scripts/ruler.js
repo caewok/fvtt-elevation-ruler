@@ -162,21 +162,25 @@ export function elevationRulerConstructSegmentDistanceRay(wrapped, origin, dest,
  */ 
 export function elevationRulerGetSegmentLabel(wrapped, segmentDistance, totalDistance, isTotal, segment_num) {
   const orig_label = wrapped(segmentDistance, totalDistance, isTotal, segment_num);
-  
+  log(`Constructing segment ${segment_num} label`, this);
   log(`orig_label is ${orig_label}`);
 
   // if all waypoints to this point have no elevation change, ignore the elevation label
   const destination_elevation_increment = this.getFlag(MODULE_ID, "destination_elevation_increment") || 0;
   const elevation_increments = this.getFlag(MODULE_ID, "elevation_increments") || [];
+  log(`destination_elevation_increment is ${destination_elevation_increment}, elevation_increments are ${elevation_increments}.`);
+  
   const waypoints_elevation = elevation_increments.concat([destination_elevation_increment]);  
   const elevation = waypoints_elevation[segment_num] * canvas.scene.data.gridDistance;
   
   // first waypoint is origin with no incremental elevation; can be skipped
-  const totalElevation = waypoints_elevation.slice(1, segment_num).reduce((acc, total) => { acc + total }, 0) * canvas.scene.data.gridDistance; 
+  const summedElevation = waypoints_elevation.slice(1, segment_num).reduce((acc, total) => { acc + total }, 0);
+  const totalElevation = summedElevation * canvas.scene.data.gridDistance; 
   log(`totalElevation is ${totalElevation}; elevation is ${elevation}`, waypoints_elevation);
   if(totalElevation === 0) { return orig_label }
   
   const elevation_label = segmentElevationLabel(elevation, totalElevation, orig_label)
+  log(`elevation_label is ${elevation_label}`);
   return orig_label + "\n" + elevation_label;
 }
 
