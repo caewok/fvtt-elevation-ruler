@@ -12,7 +12,7 @@ export function registerSettings() {
 	  name: 'Hotkeys Settings',
           label: "Set Hotkeys",
           hint: "Select the hotkeys for incrementing and decrementing elevation when using a ruler.",
-          icon: "fa-bars",
+          icon: "fas fa-arrows-alt-v",
 	  type: Hotkeys.createConfig('Elevation Ruler Hotkeys', [`${MODULE_ID}.change-elevation-group`]),
 	});
 
