@@ -135,7 +135,9 @@ export function elevationRulerConstructSegmentDistanceRay(wrapped, origin, dest,
 	// need to account for units of the grid
 	// canvas.scene.data.grid e.g. 140; canvas.scene.data.gridDistance e.g. 5
 	// if there is no elevation increment to consider, use original function.
-	const waypoints_elevation = this.elevation_increments.concat([this.destination_elevation_increment]);
+	const destination_elevation_increment = this.getFlag(MODULE_ID, "destination_elevation_increment") || 0;
+	const elevation_increments = this.getFlag(MODULE_ID, "elevation_increments") || [];
+	const waypoints_elevation = elevation_increments.concat([destination_elevation_increment]);
 	if(waypoints_elevation[segment_num] == 0) { return wrapped(origin, dest, segment_num); }
   
   const elevation = waypoints_elevation[segment_num] * canvas.scene.data.grid; 
@@ -162,7 +164,9 @@ export function elevationRulerGetSegmentLabel(wrapped, segmentDistance, totalDis
   const orig_label = wrapped(segmentDistance, totalDistance, isTotal, segment_num);
 
   // if all waypoints to this point have no elevation change, ignore the elevation label
-  const waypoints_elevation = this.elevation_increments.concat([this.destination_elevation_increment]);  
+  const destination_elevation_increment = this.getFlag(MODULE_ID, "destination_elevation_increment") || 0;
+  const elevation_increments = this.getFlag(MODULE_ID, "elevation_increments") || [];
+  const waypoints_elevation = elevation_increments.concat([destination_elevation_increment]);  
   const elevation = waypoints_elevation[segment_num] * canvas.scene.data.gridDistance;
   
   // first waypoint is origin with no incremental elevation; can be skipped
