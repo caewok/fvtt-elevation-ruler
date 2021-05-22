@@ -158,8 +158,8 @@ export function elevationRulerConstructSegmentDistanceRay(wrapped, origin, dest,
  *    the first waypoint in this.waypoints is actually the origin 
  *    and segment_num will never be 0.
  */ 
-export function elevationRulerGetSegmentLabel(wrapped, segmentDistance, totalDistance, totalDistance, segment_num) {
-  const orig_label = wrapped(segmentDistance, totalDistance, totalDistance, segment_num);
+export function elevationRulerGetSegmentLabel(wrapped, segmentDistance, totalDistance, isTotal, segment_num) {
+  const orig_label = wrapped(segmentDistance, totalDistance, isTotal, segment_num);
 
   // if all waypoints to this point have no elevation change, ignore the elevation label
   const waypoints_elevation = this.elevation_increments.concat([this.destination_elevation_increment]);  
