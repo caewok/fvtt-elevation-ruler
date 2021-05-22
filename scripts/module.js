@@ -37,6 +37,9 @@ Hooks.once('setup', async function() {
   registerRuler();
   registerHotkeys(); // should go before registering settings, so hotkey group is defined
   registerSettings();
+  
+  // tell modules that the elevationRuler is set up
+  Hooks.callAll('elevationRulerReady');
 });
 
 // modules ready
