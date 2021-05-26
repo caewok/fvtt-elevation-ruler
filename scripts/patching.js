@@ -1,6 +1,5 @@
 import { MODULE_ID, log } from "./module.js";
-import { elevationRulerConstructSegmentDistanceRay, 
-         elevationRulerGetSegmentLabel,
+import { elevationRulerGetSegmentLabel,
          
          elevationRulerClear,
          elevationRulerAddWaypoint,
@@ -20,7 +19,6 @@ export function registerRuler() {
   libWrapper.register(MODULE_ID, 'Segment.prototype.distanceFunction', elevationRulerDistanceFunction, 'WRAPPER');
 
   // measuring methods
-  libWrapper.register(MODULE_ID, 'Ruler.prototype.constructSegmentDistanceRay', elevationRulerConstructSegmentDistanceRay, 'WRAPPER');
   libWrapper.register(MODULE_ID, 'Ruler.prototype.getSegmentLabel', elevationRulerGetSegmentLabel, 'WRAPPER');
 
   // move token methods
