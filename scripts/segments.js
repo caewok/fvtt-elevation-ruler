@@ -77,11 +77,11 @@ export function elevationRulerDistanceFunction(wrapped, physical_path) {
   // may need more testing when there are multiple points in the physical path, rather
   // than just origin and destination...
   const projected_physical_path = [{x: projected_physical_path[0].x,
-                              y: projected_physical_path[0].y }];
+                                    y: projected_physical_path[0].y }];
   
-  for(let [i, dest] of physical_path.slice(1).entries()) {
-      const height = dest.z - physical_path[i - 1];
-      const elevated_destination = ProjectElevatedPoint(physical_path[i - 1], dest, height);      
+  for(let i = 1; i < physical_path.length; i++) {
+      const height = physical_path[i].z - physical_path[i - 1].z;
+      const elevated_destination = ProjectElevatedPoint(physical_path[i - 1], physical_path[i], height);      
       projected_physical_path.push(elevated_destination);      
     }
   
