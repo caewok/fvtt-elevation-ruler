@@ -146,6 +146,41 @@ export function elevationRulerConstructSegmentDistanceRay(wrapped, origin, dest,
   return wrapped(origin, elevated_dest, segment_num);
 }
 
+/*
+ *
+ * For Elevation Ruler: Elevate the segment destination and then project the elevated
+ *     point onto the canvas in order to measure the distance of the hypotenuse.  
+ *   
+ * This measurement indicates how much "distance" it costs to cover the segment.
+ * The returned value may or may not be equivalent to the length of the segment.
+ * @param {object} segment Represents the ruler path on the canvas between two waypoints.
+ * @param {integer} segment_num The segment number, where 0 is the
+ *    first segment between origin and the first waypoint (or destination),
+ *    2 is the segment between the first and second waypoints.
+ *
+ *    The start of segment_num X is waypoint X. 
+ *    So the start of segment_num 0 is waypoint 0 (origin);
+ *    segment_num 1 starts at waypoint 1, etc.  
+ * @param {boolean} gridSpaces      Restrict measurement only to grid spaces
+ * @return {numeric} The measured distance represented by the segment.
+ */
+export function libRulerMeasureDistance(segment, {gridSpaces=true}={}, segments) {
+  const elevation_increments = this.getFlag(MODULE_ID, "elevation_increments");
+  const destination_elevation_increment = this.getFlag(MODULE_ID, "destination_elevation_increment");
+  elevation_increments.push(destination_elevation_increment);
+  elevation_increments.shift(); //first increment is 0 for the origin waypoint
+
+  log(`Projecting segment ${segment.idx} using elevation increment ${elevation_increments[segment_num]}`);
+  
+  if(waypoints_elevation[segment_num] !== 0) {   
+		const elevation = waypoints_elevation[segment_num] * canvas.scene.data.grid; 
+		const elevated_dest = ProjectElevatedPoint(origin, dest, elevation);
+		segment.ray.B = elevated_dest; 
+  }
+  
+  return wrapped(segment, {gridSpaces: gridSpaces}, segments, segment_num); 
+}
+
 
 /* 
  * @param {number} segmentDistance
