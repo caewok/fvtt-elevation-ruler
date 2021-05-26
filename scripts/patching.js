@@ -7,8 +7,17 @@ import { elevationRulerConstructSegmentDistanceRay,
          elevationRulerRemoveWaypoint,
          
          elevationRulerAnimateToken } from "./ruler.js";
+         
+import { elevationRulerAddProperties,
+         elevationRulerConstructPhysicalPath,
+         elevationRulerDistanceFunction } from "./segments.js";
 
 export function registerRuler() {
+
+  // segment methods (for measuring)
+  libWrapper.register(MODULE_ID, 'Segment.prototype.addProperties', elevationRulerAddProperties, 'WRAPPER');
+  libWrapper.register(MODULE_ID, 'Segment.prototype.constructPhysicalPath', elevationRulerConstructPhysicalPath, 'WRAPPER');
+  libWrapper.register(MODULE_ID, 'Segment.prototype.distanceFunction', elevationRulerDistanceFunction, 'WRAPPER');
 
   // measuring methods
   libWrapper.register(MODULE_ID, 'Ruler.prototype.constructSegmentDistanceRay', elevationRulerConstructSegmentDistanceRay, 'WRAPPER');
