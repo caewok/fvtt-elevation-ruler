@@ -37,6 +37,9 @@ Hooks.once('setup', async function() {
   registerRuler();
   registerHotkeys(); // should go before registering settings, so hotkey group is defined
   registerSettings();
+  
+  // tell modules that the elevationRuler is set up
+  Hooks.callAll('elevationRulerReady');
 });
 
 // modules ready
@@ -48,6 +51,11 @@ Hooks.once('ready', async function() {
 // https://github.com/League-of-Foundry-Developers/foundryvtt-devMode
 Hooks.once('devModeReady', ({ registerPackageDebugFlag }) => {
   registerPackageDebugFlag(MODULE_ID);
+});
+
+Hooks.once('libRulerReady', async function() {
+  log("libRuler is ready to go.");
+
 });
 
 
