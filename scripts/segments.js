@@ -12,7 +12,7 @@ export function elevationRulerAddProperties(wrapped, ...args) {
     return;
   }
 
-  const elevation_increments = this.ruler.getFlag(MODULE_ID, "elevation_increments");
+  const elevation_increments = duplicate(this.ruler.getFlag(MODULE_ID, "elevation_increments"));
   log(`${elevation_increments.length} elevation increments for ruler flag.`)
   
   const destination_elevation_increment = this.ruler.getFlag(MODULE_ID, "destination_elevation_increment");
