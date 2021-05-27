@@ -3,7 +3,7 @@
   "title": "Elevation Ruler",
   "description": "Modify Foundry VTT ruler to adjust for relative elevation of the destination.",
   "version": "This is auto replaced",
-  "library": "false",
+  "library": false,
   "manifestPlusVersion": "1.0.0",
   "minimumCoreVersion": "0.7.9",
   "compatibleCoreVersion": "0.7.9",
