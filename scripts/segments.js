@@ -21,14 +21,14 @@ export function elevationRulerAddProperties(wrapped, ...args) {
   let starting_elevation = 0;
   if(this.segment_num === 0) {
     // starting elevation equals the token elevation 
-    const token = this._getMovementToken();
+    const token = this.ruler._getMovementToken();
     if(token) {
       starting_elevation = getProperty(token, "data.elevation");
     }
     
   } else {
     // starting elevation is the prior segment end elevation
-    starting_elevation = this.segments[segment_num - 1].getFlag(MODULE_ID, "ending_elevation");
+    starting_elevation = this.previous_segments[this.segment_num - 1].getFlag(MODULE_ID, "ending_elevation");
   }
   
   const ending_elevation = starting_elevation + incremental_elevation;
@@ -76,8 +76,8 @@ export function elevationRulerDistanceFunction(wrapped, physical_path) {
   // for each of the points, construct a 2-D path and send to the underlying function
   // may need more testing when there are multiple points in the physical path, rather
   // than just origin and destination...
-  const projected_physical_path = [{x: projected_physical_path[0].x,
-                                    y: projected_physical_path[0].y }];
+  const projected_physical_path = [{x: physical_path[0].x,
+                                    y: physical_path[0].y }];
   
   for(let i = 1; i < physical_path.length; i++) {
       const height = physical_path[i].z - physical_path[i - 1].z;

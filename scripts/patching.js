@@ -19,7 +19,7 @@ export function registerRuler() {
   libWrapper.register(MODULE_ID, 'window.libRuler.Segment.prototype.distanceFunction', elevationRulerDistanceFunction, 'WRAPPER');
 
   // measuring methods
-  libWrapper.register(MODULE_ID, 'Ruler.prototype.getSegmentLabel', elevationRulerGetSegmentLabel, 'WRAPPER');
+  libWrapper.register(MODULE_ID, 'Ruler.prototype._getSegmentLabel', elevationRulerGetSegmentLabel, 'WRAPPER');
 
   // move token methods
   libWrapper.register(MODULE_ID, 'Ruler.prototype.animateToken', elevationRulerAnimateToken, 'WRAPPER');
