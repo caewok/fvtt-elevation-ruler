@@ -1,18 +1,22 @@
 import { MODULE_ID, log } from "./module.js";
-import { elevationRulerConstructSegmentDistanceRay, 
-         elevationRulerGetSegmentLabel,
-         
-         elevationRulerClear,
+import { elevationRulerClear,
          elevationRulerAddWaypoint,
          elevationRulerRemoveWaypoint,
          
          elevationRulerAnimateToken } from "./ruler.js";
+         
+import { elevationRulerAddProperties,
+         elevationRulerConstructPhysicalPath,
+         elevationRulerDistanceFunction,
+         elevationRulerGetText } from "./segments.js";
 
 export function registerRuler() {
 
-  // measuring methods
-  libWrapper.register(MODULE_ID, 'Ruler.prototype.constructSegmentDistanceRay', elevationRulerConstructSegmentDistanceRay, 'WRAPPER');
-  libWrapper.register(MODULE_ID, 'Ruler.prototype.getSegmentLabel', elevationRulerGetSegmentLabel, 'WRAPPER');
+  // segment methods (for measuring)
+  libWrapper.register(MODULE_ID, 'window.libRuler.Segment.prototype.addProperties', elevationRulerAddProperties, 'WRAPPER');
+  libWrapper.register(MODULE_ID, 'window.libRuler.Segment.prototype.constructPhysicalPath', elevationRulerConstructPhysicalPath, 'WRAPPER');
+  libWrapper.register(MODULE_ID, 'window.libRuler.Segment.prototype.distanceFunction', elevationRulerDistanceFunction, 'WRAPPER');
+  libWrapper.register(MODULE_ID, 'window.libRuler.Segment.prototype.text', elevationRulerGetText, 'WRAPPER');
 
   // move token methods
   libWrapper.register(MODULE_ID, 'Ruler.prototype.animateToken', elevationRulerAnimateToken, 'WRAPPER');
