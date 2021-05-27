@@ -1,7 +1,5 @@
 import { MODULE_ID, log } from "./module.js";
-import { elevationRulerGetSegmentLabel,
-         
-         elevationRulerClear,
+import { elevationRulerClear,
          elevationRulerAddWaypoint,
          elevationRulerRemoveWaypoint,
          
@@ -9,7 +7,8 @@ import { elevationRulerGetSegmentLabel,
          
 import { elevationRulerAddProperties,
          elevationRulerConstructPhysicalPath,
-         elevationRulerDistanceFunction } from "./segments.js";
+         elevationRulerDistanceFunction,
+         elevationRulerGetText } from "./segments.js";
 
 export function registerRuler() {
 
@@ -17,9 +16,7 @@ export function registerRuler() {
   libWrapper.register(MODULE_ID, 'window.libRuler.Segment.prototype.addProperties', elevationRulerAddProperties, 'WRAPPER');
   libWrapper.register(MODULE_ID, 'window.libRuler.Segment.prototype.constructPhysicalPath', elevationRulerConstructPhysicalPath, 'WRAPPER');
   libWrapper.register(MODULE_ID, 'window.libRuler.Segment.prototype.distanceFunction', elevationRulerDistanceFunction, 'WRAPPER');
-
-  // measuring methods
-  libWrapper.register(MODULE_ID, 'Ruler.prototype._getSegmentLabel', elevationRulerGetSegmentLabel, 'WRAPPER');
+  libWrapper.register(MODULE_ID, 'window.libRuler.Segment.prototype.text', elevationRulerGetText, 'WRAPPER');
 
   // move token methods
   libWrapper.register(MODULE_ID, 'Ruler.prototype.animateToken', elevationRulerAnimateToken, 'WRAPPER');

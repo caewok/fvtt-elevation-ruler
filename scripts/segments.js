@@ -89,6 +89,59 @@ export function elevationRulerDistanceFunction(wrapped, physical_path) {
 }
 
 
+/* 
+ * @param {number} segmentDistance
+ * @param {number} totalDistance
+ * @param {boolean} isTotal
+ * @param {integer} segment_num The segment number, where 1 is the
+ *    first segment between origin and the first waypoint (or destination),
+ *    2 is the segment between the first and second waypoints.
+ *
+ *    The segment_num can also be considered the waypoint number, equal to the index 
+ *    in the array this.waypoints.concat([this.destination]). Keep in mind that 
+ *    the first waypoint in this.waypoints is actually the origin 
+ *    and segment_num will never be 0.
+ */ 
+export function elevationRulerGetText(wrapped, ...args) {
+  const orig_label = wrapped(...args);
+  log(`Adding to segment label ${orig_label}`, this);
+  
+  const ending_elevation = this.getFlag(MODULE_ID, "ending_elevation");
+  const incremental_elevation = this.getFlag(MODULE_ID, "incremental_elevation");
+
+  const elevation_label = segmentElevationLabel(incremental_elevation, ending_elevation, orig_label)
+  log(`elevation_label is ${elevation_label}`);
+  return orig_label + "\n" + elevation_label;
+}
+
+/*
+ * Construct a label to represent elevation changes in the ruler.
+ * Waypoint version: 10 ft↑ or 10 ft↓
+ * Total version: 10 ft↑ [20 ft↓]
+ * @param {number} segmentElevationIncrement Incremental elevation for the segment.
+ * @param {number} totalElevationIncrement Total elevation for all segments to date.
+ * @param {boolean} isTotal Whether this is the label for the final segment
+ * @return {string}
+ */
+function segmentElevationLabel(segmentElevationIncrement, totalElevationIncrement, isTotal) {
+  const segmentArrow = (segmentElevationIncrement > 0) ? "↑" :
+                      (segmentElevationIncrement < 0) ? "↓" :
+                      "";
+  
+  // Take absolute value b/c segmentArrow will represent direction
+  // * 100 / 100 is used in _getSegmentLabel; not sure whys
+  let label = `${Math.abs(Math.round(segmentElevationIncrement * 100) / 100)} ${canvas.scene.data.gridUnits}${segmentArrow}`;
+  
+  if ( isTotal ) {
+      const totalArrow = (totalElevationIncrement > 0) ? "↑" :
+                      (totalElevationIncrement < 0) ? "↓" :
+                      "";
+      label += ` [${Math.round(totalElevationIncrement * 100) / 100} ${canvas.scene.data.gridUnits}${totalArrow}]`;
+  }
+  return label;
+}
+
+
 // ----- MATH FOR MEASURING ELEVATION DISTANCE ----- //
 /**
  * Calculate a new point by projecting the elevated point back onto the 2-D surface

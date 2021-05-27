@@ -21,71 +21,9 @@ import { MODULE_ID, log } from "./module.js";
 // wrapping the constructor appears not to work.
 // see https://github.com/ruipin/fvtt-lib-wrapper/issues/14
  
-/*
- * Construct a label to represent elevation changes in the ruler.
- * Waypoint version: 10 ft↑ or 10 ft↓
- * Total version: 10 ft↑ [20 ft↓]
- * @param {number} segmentElevationIncrement Incremental elevation for the segment.
- * @param {number} totalElevationIncrement Total elevation for all segments to date.
- * @param {boolean} isTotal Whether this is the label for the final segment
- * @return {string}
- */
-function segmentElevationLabel(segmentElevationIncrement, totalElevationIncrement, isTotal) {
-  const segmentArrow = (segmentElevationIncrement > 0) ? "↑" :
-                      (segmentElevationIncrement < 0) ? "↓" :
-                      "";
-  
-  // Take absolute value b/c segmentArrow will represent direction
-  // * 100 / 100 is used in _getSegmentLabel; not sure whys
-  let label = `${Math.abs(Math.round(segmentElevationIncrement * 100) / 100)} ${canvas.scene.data.gridUnits}${segmentArrow}`;
-  
-  if ( isTotal ) {
-      const totalArrow = (totalElevationIncrement > 0) ? "↑" :
-                      (totalElevationIncrement < 0) ? "↓" :
-                      "";
-      label += ` [${Math.round(totalElevationIncrement * 100) / 100} ${canvas.scene.data.gridUnits}${totalArrow}]`;
-  }
-  return label;
-}
- 
- 
-/* 
- * @param {number} segmentDistance
- * @param {number} totalDistance
- * @param {boolean} isTotal
- * @param {integer} segment_num The segment number, where 1 is the
- *    first segment between origin and the first waypoint (or destination),
- *    2 is the segment between the first and second waypoints.
- *
- *    The segment_num can also be considered the waypoint number, equal to the index 
- *    in the array this.waypoints.concat([this.destination]). Keep in mind that 
- *    the first waypoint in this.waypoints is actually the origin 
- *    and segment_num will never be 0.
- */ 
-export function elevationRulerGetSegmentLabel(wrapped, segmentDistance, totalDistance, isTotal, segment_num) {
-  const orig_label = wrapped(segmentDistance, totalDistance, isTotal, segment_num);
-  log(`Constructing segment ${segment_num} label`, this);
-  log(`orig_label is ${orig_label}`);
 
-  // if all waypoints to this point have no elevation change, ignore the elevation label
-  const destination_elevation_increment = this.getFlag(MODULE_ID, "destination_elevation_increment") || 0;
-  const elevation_increments = this.getFlag(MODULE_ID, "elevation_increments") || [];
-  log(`destination_elevation_increment is ${destination_elevation_increment}, elevation_increments are ${elevation_increments}.`);
-  
-  const waypoints_elevation = elevation_increments.concat([destination_elevation_increment]);  
-  const elevation = waypoints_elevation[segment_num] * canvas.scene.data.gridDistance;
-  
-  // first waypoint is origin with no incremental elevation; could be skipped
-  // slice takes start_point to end_point - 1, so need to increment here to capture the current segment
-  const summedElevation = waypoints_elevation.slice(0, segment_num + 1).reduce((acc, total) => acc + total, 0);
-  const totalElevation = summedElevation * canvas.scene.data.gridDistance; 
-  log(`summedElevation is ${summedElevation}; totalElevation is ${totalElevation}; elevation is ${elevation}`, waypoints_elevation);
-  if(totalElevation === 0) { return orig_label }
-  
-  const elevation_label = segmentElevationLabel(elevation, totalElevation, orig_label)
-  log(`elevation_label is ${elevation_label}`);
-  return orig_label + "\n" + elevation_label;
-}
+ 
+ 
 
 // clear should reset elevation info
 export function elevationRulerClear(wrapped, ...args) {
