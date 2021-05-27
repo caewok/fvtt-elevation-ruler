@@ -34,12 +34,9 @@ Hooks.once('setup', async function() {
   if(!game.modules.get('lib-df-hotkeys')?.active && game.user.isGM) ui.notifications.error("'Elevation Ruler' requires the 'Library: DF Hotkeys' module. Please install and activate this dependency.");
   if(!game.modules.get('lib-ruler')?.active && game.user.isGM) ui.notifications.error("'Elevation Ruler' requires the 'libRuler' module. Please install and activate this dependency.");
 
-  registerRuler();
+  
   registerHotkeys(); // should go before registering settings, so hotkey group is defined
   registerSettings();
-  
-  // tell modules that the elevationRuler is set up
-  Hooks.callAll('elevationRulerReady');
 });
 
 // modules ready
@@ -55,6 +52,10 @@ Hooks.once('devModeReady', ({ registerPackageDebugFlag }) => {
 
 Hooks.once('libRulerReady', async function() {
   log("libRuler is ready to go.");
+  registerRuler();
+ 
+  // tell modules that the elevationRuler is set up
+  Hooks.callAll('elevationRulerReady');
 
 });
 

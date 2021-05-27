@@ -14,9 +14,9 @@ import { elevationRulerAddProperties,
 export function registerRuler() {
 
   // segment methods (for measuring)
-  libWrapper.register(MODULE_ID, 'Segment.prototype.addProperties', elevationRulerAddProperties, 'WRAPPER');
-  libWrapper.register(MODULE_ID, 'Segment.prototype.constructPhysicalPath', elevationRulerConstructPhysicalPath, 'WRAPPER');
-  libWrapper.register(MODULE_ID, 'Segment.prototype.distanceFunction', elevationRulerDistanceFunction, 'WRAPPER');
+  libWrapper.register(MODULE_ID, 'window.libRuler.Segment.prototype.addProperties', elevationRulerAddProperties, 'WRAPPER');
+  libWrapper.register(MODULE_ID, 'window.libRuler.Segment.prototype.constructPhysicalPath', elevationRulerConstructPhysicalPath, 'WRAPPER');
+  libWrapper.register(MODULE_ID, 'window.libRuler.Segment.prototype.distanceFunction', elevationRulerDistanceFunction, 'WRAPPER');
 
   // measuring methods
   libWrapper.register(MODULE_ID, 'Ruler.prototype.getSegmentLabel', elevationRulerGetSegmentLabel, 'WRAPPER');
