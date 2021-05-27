@@ -13,8 +13,13 @@ export function elevationRulerAddProperties(wrapped, ...args) {
   }
 
   const elevation_increments = this.ruler.getFlag(MODULE_ID, "elevation_increments");
+  log(`${elevation_increments.length} elevation increments for ruler flag.`)
+  
   const destination_elevation_increment = this.ruler.getFlag(MODULE_ID, "destination_elevation_increment");
   elevation_increments.push(destination_elevation_increment);
+  log(`${this.ruler.getFlag(MODULE_ID, "elevation_increments").length} elevation increments for ruler flag.`);
+  
+  
   elevation_increments.shift(); //first increment is 0 for the origin waypoint
   const incremental_elevation = (Math.round(elevation_increments[this.segment_num] *  canvas.scene.data.gridDistance * 100) / 100)
   
@@ -29,6 +34,7 @@ export function elevationRulerAddProperties(wrapped, ...args) {
   } else {
     // starting elevation is the prior segment end elevation
     starting_elevation = this.previous_segments[this.segment_num - 1].getFlag(MODULE_ID, "ending_elevation");
+    log(`Current ending elevation is ${this.getFlag(MODULE_ID, "ending_elevation")}; Prior segment ending elevation is ${starting_elevation}`);
   }
   
   const ending_elevation = starting_elevation + incremental_elevation;
