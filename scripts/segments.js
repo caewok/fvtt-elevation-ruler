@@ -114,7 +114,11 @@ export function elevationRulerGetText(wrapped, ...args) {
   
   const ending_elevation = this.getFlag(MODULE_ID, "ending_elevation");
   const incremental_elevation = this.getFlag(MODULE_ID, "incremental_elevation");
-
+  
+  // if no elevation change for any segment, then skip.
+  const prior_elevation = this.previous_segments.some(s => s.getFlag(MODULE_ID, "incremental_elevation") !== 0);
+  if(!prior_elevation && incremental_elevation === 0) { return orig_label; }
+  
   const elevation_label = segmentElevationLabel(incremental_elevation, ending_elevation, orig_label)
   log(`elevation_label is ${elevation_label}`);
   return orig_label + "\n" + elevation_label;
