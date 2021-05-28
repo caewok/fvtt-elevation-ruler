@@ -59,7 +59,7 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   // measure from the origin of the ruler movement, so that canvas = 0 and each segment
   // could in theory be connected in space
   //  --> this is done in AddProperties function
-
+  log("Constructing the physical path.");
   const default_path = wrapped(...args);
   
   const starting_elevation = this.getFlag(MODULE_ID, "starting_elevation");
@@ -80,12 +80,14 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
     return p;
   });
   
+  log("Default path", default_path);
+  
   return default_path;
 }
 
 export function elevationRulerDistanceFunction(wrapped, physical_path) {
   // Project the 3-D path to 2-D canvas
-  log(`Projecting physical_path from origin ${physical_path[0].x, physical_path[0].y, physical_path[0].z}`);
+  log(`Projecting physical_path from origin ${physical_path[0].x}, ${physical_path[0].y}, ${physical_path[0].z} to ${physical_path[1].x}, ${physical_path[1].y}, ${physical_path[1].z}`);
   
   // for each of the points, construct a 2-D path and send to the underlying function
   // may need more testing when there are multiple points in the physical path, rather
@@ -98,6 +100,10 @@ export function elevationRulerDistanceFunction(wrapped, physical_path) {
       const elevated_destination = ProjectElevatedPoint(physical_path[i - 1], physical_path[i], height);      
       projected_physical_path.push(elevated_destination);      
     }
+  
+    log(`Projected physical_path from origin ${physical_path[0].x}, ${physical_path[0].y} to dest
+          ${physical_path[1].x}, ${physical_path[1].y}`);
+
   
   return wrapped(projected_physical_path);
 }
