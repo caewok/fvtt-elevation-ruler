@@ -1,7 +1,7 @@
 
 # Elevation Ruler
 
-This module allows the default Foundry measurement ruler to track change in elevation. When you hit the specified hot key (default: '[' to increment and ']') while using the measurement ruler, the ruler display will update to display the incremental elevation change relative to the measured starting point. If you add a waypoint, elevation will be tracked at each waypoint.
+This module allows the default Foundry measurement ruler to track change in elevation. When you hit the specified hot key (default: ']' to increment and '[' to decrement) while using the measurement ruler, the ruler display will update to display the incremental elevation change relative to the measured starting point. If you add a waypoint, elevation will be tracked at each waypoint.
 
 <!--- Downloads @ Latest Badge -->
 [![License](https://img.shields.io/github/license/caewok/fvtt-elevation-ruler)](LICENSE)
