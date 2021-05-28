@@ -155,7 +155,7 @@ function segmentElevationLabel(segmentElevationIncrement, totalElevationIncremen
       const totalArrow = (totalElevationIncrement > 0) ? "↑" :
                       (totalElevationIncrement < 0) ? "↓" :
                       "";
-      label += ` [${Math.round(totalElevationIncrement * 100) / 100} ${canvas.scene.data.gridUnits}${totalArrow}]`;
+      label += ` [${Math.abs(Math.round(totalElevationIncrement * 100) / 100)} ${canvas.scene.data.gridUnits}${totalArrow}]`;
   }
   return label;
 }
