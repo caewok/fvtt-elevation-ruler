@@ -40,7 +40,11 @@ export function elevationRulerAddProperties(wrapped, ...args) {
   const ending_elevation = starting_elevation + incremental_elevation;
   
   // Track whether any elevation change has been request for ruler labeling.
-  const path_has_elevation_change = incremental_elevation !== 0 || this.prior_segment.getFlag(MODULE_ID, "path_has_elevation_change");
+  let path_has_elevation_change = incremental_elevation !== 0;
+  if("getFlag" in this.prior_segment) {
+    path_has_elevation_change = path_has_elevation_change || this.prior_segment.getFlag(MODULE_ID, "path_has_elevation_change");
+  }
+   
   
   this.setFlag(MODULE_ID, "starting_elevation", starting_elevation);
   this.setFlag(MODULE_ID, "ending_elevation", ending_elevation);
