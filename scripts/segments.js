@@ -87,7 +87,8 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
 
 export function elevationRulerDistanceFunction(wrapped, physical_path) {
   // Project the 3-D path to 2-D canvas
-  log(`Projecting physical_path from origin ${physical_path[0].x}, ${physical_path[0].y}, ${physical_path[0].z} to ${physical_path[1].x}, ${physical_path[1].y}, ${physical_path[1].z}`);
+  log(`Projecting physical_path from origin ${physical_path[0].x}, ${physical_path[0].y}, ${physical_path[0].z} 
+                                    to dest ${physical_path[1].x}, ${physical_path[1].y}, ${physical_path[1].z}`);
   
   // for each of the points, construct a 2-D path and send to the underlying function
   // may need more testing when there are multiple points in the physical path, rather
@@ -96,13 +97,12 @@ export function elevationRulerDistanceFunction(wrapped, physical_path) {
                                     y: physical_path[0].y }];
   
   for(let i = 1; i < physical_path.length; i++) {
-      const height = physical_path[i].z - physical_path[i - 1].z;
-      const elevated_destination = ProjectElevatedPoint(physical_path[i - 1], physical_path[i], height);      
+      const elevated_destination = ProjectElevatedPoint(physical_path[i - 1], physical_path[i]);      
       projected_physical_path.push(elevated_destination);      
     }
   
-    log(`Projected physical_path from origin ${physical_path[0].x}, ${physical_path[0].y} to dest
-          ${physical_path[1].x}, ${physical_path[1].y}`);
+    log(`Projected physical_path from origin ${physical_path[0].x}, ${physical_path[0].y} 
+                                     to dest ${physical_path[1].x}, ${physical_path[1].y}`);
 
   
   return wrapped(projected_physical_path);
@@ -180,7 +180,8 @@ function segmentElevationLabel(segmentElevationIncrement, totalElevationIncremen
  * @param {{x: number, y: number}} A
  * @param {{x: number, y: number}} B
  */
-function ProjectElevatedPoint(A, B, height) {
+function ProjectElevatedPoint(A, B) {
+  const height = B.z - A.z;
   const distance = CalculateDistance(A, B);
   const projected_x = B.x + ((height / distance) * (A.y - B.y));
   const projected_y = B.y - ((height / distance) * (A.x - B.x));
