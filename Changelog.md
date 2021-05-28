@@ -1,4 +1,12 @@
+## 0.0.2
+
+Incorporate previous segments change from libRuler.
+- Add a flag to track when any segment has an elevation change, for labeling.
+- Correct elevation measurement by switching to grid units for the elevation points.
+- Label total elevation using absolute value (arrow signifies up or down).
+
 ## 0.0.1
+
 Incorporate libRuler and various improvements.
 
 - Add flags to each Segment to track elevation during measurement.
