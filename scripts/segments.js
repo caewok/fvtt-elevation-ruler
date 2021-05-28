@@ -62,7 +62,7 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   log("Constructing the physical path.");
   const default_path = wrapped(...args);
   
-  const starting_elevation = this.getFlag(MODULE_ID, "starting_elevation") * ;
+  const starting_elevation = this.getFlag(MODULE_ID, "starting_elevation");
   const ending_elevation = this.getFlag(MODULE_ID, "ending_elevation");
   
   const starting_elevation_grid_units = starting_elevation / canvas.scene.data.gridDistance * canvas.scene.data.grid;
