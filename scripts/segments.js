@@ -33,15 +33,19 @@ export function elevationRulerAddProperties(wrapped, ...args) {
     
   } else {
     // starting elevation is the prior segment end elevation
-    starting_elevation = this.previous_segments[this.segment_num - 1].getFlag(MODULE_ID, "ending_elevation");
+    starting_elevation = this.prior_segment.getFlag(MODULE_ID, "ending_elevation");    
     log(`Current ending elevation is ${this.getFlag(MODULE_ID, "ending_elevation")}; Prior segment ending elevation is ${starting_elevation}`);
   }
   
   const ending_elevation = starting_elevation + incremental_elevation;
   
+  // Track whether any elevation change has been request for ruler labeling.
+  const path_has_elevation_change = incremental_elevation !== 0 || this.prior_segment.getFlag(MODULE_ID, "path_has_elevation_change");
+  
   this.setFlag(MODULE_ID, "starting_elevation", starting_elevation);
   this.setFlag(MODULE_ID, "ending_elevation", ending_elevation);
   this.setFlag(MODULE_ID, "incremental_elevation", incremental_elevation)
+  this.setFlag(MODULE_ID, "path_has_elevation_change", path_has_elevation_change);
   
   return wrapped(...args);
 }
@@ -116,8 +120,9 @@ export function elevationRulerGetText(wrapped, ...args) {
   const incremental_elevation = this.getFlag(MODULE_ID, "incremental_elevation");
   
   // if no elevation change for any segment, then skip.
-  const prior_elevation = this.previous_segments.some(s => s.getFlag(MODULE_ID, "incremental_elevation") !== 0);
-  if(!prior_elevation && incremental_elevation === 0) { return orig_label; }
+  const path_has_elevation_change = this.getFlag(MODULE_ID, "path_has_elevation_change");
+  
+  if(!path_has_elevation_change) { return orig_label; }
   
   const elevation_label = segmentElevationLabel(incremental_elevation, ending_elevation, orig_label)
   log(`elevation_label is ${elevation_label}`);
