@@ -62,20 +62,31 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   log("Constructing the physical path.");
   const default_path = wrapped(...args);
   
-  const starting_elevation = this.getFlag(MODULE_ID, "starting_elevation");
+  const starting_elevation = this.getFlag(MODULE_ID, "starting_elevation") * ;
   const ending_elevation = this.getFlag(MODULE_ID, "ending_elevation");
-  const elevation_delta = ending_elevation - starting_elevation;
+  
+  const starting_elevation_grid_units = starting_elevation / canvas.scene.data.gridDistance * canvas.scene.data.grid;
+  const ending_elevation_grid_units = ending_elevation / canvas.scene.data.gridDistance * canvas.scene.data.grid;
+  
+  log(`Elevation start: ${starting_elevation}; end ${ending_elevation}.
+            grid units: ${starting_elevation_grid_units}; end ${ending_elevation_grid_units}.`);
+  
+  const elevation_delta = ending_elevation_grid_units - starting_elevation_grid_units; 
+ 
   
   // For each point on the path, provide an elevation proportional to the distance
   //   compared to the ruler segment distance.
   // This accommodates situations where the destination to measure does not equal segment
   //   destination
+  // Need to apply canvas.scene.data.grid (140) and canvas.scene.data.gridDistance (5)
+  // 7350 (x1) - 6930 (x0) = 420 (delta_x) / 140 * 5 = move in canvas units (e.g. 15')
+  
   const ruler_distance = this.ray.distance;  
   default_path.map(p => {
     const simple_path_distance = CalculateDistance(default_path[0], p);
     const ratio = simple_path_distance / ruler_distance;
     
-    p.z = starting_elevation + elevation_delta * ratio;
+    p.z = starting_elevation_grid_units + elevation_delta * ratio;
     
     return p;
   });
