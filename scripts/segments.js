@@ -33,15 +33,23 @@ export function elevationRulerAddProperties(wrapped, ...args) {
     
   } else {
     // starting elevation is the prior segment end elevation
-    starting_elevation = this.previous_segments[this.segment_num - 1].getFlag(MODULE_ID, "ending_elevation");
+    starting_elevation = this.prior_segment.getFlag(MODULE_ID, "ending_elevation");    
     log(`Current ending elevation is ${this.getFlag(MODULE_ID, "ending_elevation")}; Prior segment ending elevation is ${starting_elevation}`);
   }
   
   const ending_elevation = starting_elevation + incremental_elevation;
   
+  // Track whether any elevation change has been request for ruler labeling.
+  let path_has_elevation_change = incremental_elevation !== 0;
+  if("getFlag" in this.prior_segment) {
+    path_has_elevation_change = path_has_elevation_change || this.prior_segment.getFlag(MODULE_ID, "path_has_elevation_change");
+  }
+   
+  
   this.setFlag(MODULE_ID, "starting_elevation", starting_elevation);
   this.setFlag(MODULE_ID, "ending_elevation", ending_elevation);
   this.setFlag(MODULE_ID, "incremental_elevation", incremental_elevation)
+  this.setFlag(MODULE_ID, "path_has_elevation_change", path_has_elevation_change);
   
   return wrapped(...args);
 }
@@ -51,33 +59,47 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   // measure from the origin of the ruler movement, so that canvas = 0 and each segment
   // could in theory be connected in space
   //  --> this is done in AddProperties function
-
+  log("Constructing the physical path.");
   const default_path = wrapped(...args);
   
   const starting_elevation = this.getFlag(MODULE_ID, "starting_elevation");
   const ending_elevation = this.getFlag(MODULE_ID, "ending_elevation");
-  const elevation_delta = ending_elevation - starting_elevation;
+  
+  const starting_elevation_grid_units = starting_elevation / canvas.scene.data.gridDistance * canvas.scene.data.grid;
+  const ending_elevation_grid_units = ending_elevation / canvas.scene.data.gridDistance * canvas.scene.data.grid;
+  
+  log(`Elevation start: ${starting_elevation}; end ${ending_elevation}.
+            grid units: ${starting_elevation_grid_units}; end ${ending_elevation_grid_units}.`);
+  
+  const elevation_delta = ending_elevation_grid_units - starting_elevation_grid_units; 
+ 
   
   // For each point on the path, provide an elevation proportional to the distance
   //   compared to the ruler segment distance.
   // This accommodates situations where the destination to measure does not equal segment
   //   destination
+  // Need to apply canvas.scene.data.grid (140) and canvas.scene.data.gridDistance (5)
+  // 7350 (x1) - 6930 (x0) = 420 (delta_x) / 140 * 5 = move in canvas units (e.g. 15')
+  
   const ruler_distance = this.ray.distance;  
   default_path.map(p => {
     const simple_path_distance = CalculateDistance(default_path[0], p);
     const ratio = simple_path_distance / ruler_distance;
     
-    p.z = starting_elevation + elevation_delta * ratio;
+    p.z = starting_elevation_grid_units + elevation_delta * ratio;
     
     return p;
   });
+  
+  log("Default path", default_path);
   
   return default_path;
 }
 
 export function elevationRulerDistanceFunction(wrapped, physical_path) {
   // Project the 3-D path to 2-D canvas
-  log(`Projecting physical_path from origin ${physical_path[0].x, physical_path[0].y, physical_path[0].z}`);
+  log(`Projecting physical_path from origin ${physical_path[0].x}, ${physical_path[0].y}, ${physical_path[0].z} 
+                                    to dest ${physical_path[1].x}, ${physical_path[1].y}, ${physical_path[1].z}`);
   
   // for each of the points, construct a 2-D path and send to the underlying function
   // may need more testing when there are multiple points in the physical path, rather
@@ -86,10 +108,13 @@ export function elevationRulerDistanceFunction(wrapped, physical_path) {
                                     y: physical_path[0].y }];
   
   for(let i = 1; i < physical_path.length; i++) {
-      const height = physical_path[i].z - physical_path[i - 1].z;
-      const elevated_destination = ProjectElevatedPoint(physical_path[i - 1], physical_path[i], height);      
+      const elevated_destination = ProjectElevatedPoint(physical_path[i - 1], physical_path[i]);      
       projected_physical_path.push(elevated_destination);      
     }
+  
+    log(`Projected physical_path from origin ${physical_path[0].x}, ${physical_path[0].y} 
+                                     to dest ${physical_path[1].x}, ${physical_path[1].y}`);
+
   
   return wrapped(projected_physical_path);
 }
@@ -116,8 +141,9 @@ export function elevationRulerGetText(wrapped, ...args) {
   const incremental_elevation = this.getFlag(MODULE_ID, "incremental_elevation");
   
   // if no elevation change for any segment, then skip.
-  const prior_elevation = this.previous_segments.some(s => s.getFlag(MODULE_ID, "incremental_elevation") !== 0);
-  if(!prior_elevation && incremental_elevation === 0) { return orig_label; }
+  const path_has_elevation_change = this.getFlag(MODULE_ID, "path_has_elevation_change");
+  
+  if(!path_has_elevation_change) { return orig_label; }
   
   const elevation_label = segmentElevationLabel(incremental_elevation, ending_elevation, orig_label)
   log(`elevation_label is ${elevation_label}`);
@@ -146,7 +172,7 @@ function segmentElevationLabel(segmentElevationIncrement, totalElevationIncremen
       const totalArrow = (totalElevationIncrement > 0) ? "↑" :
                       (totalElevationIncrement < 0) ? "↓" :
                       "";
-      label += ` [${Math.round(totalElevationIncrement * 100) / 100} ${canvas.scene.data.gridUnits}${totalArrow}]`;
+      label += ` [${Math.abs(Math.round(totalElevationIncrement * 100) / 100)} ${canvas.scene.data.gridUnits}${totalArrow}]`;
   }
   return label;
 }
@@ -165,7 +191,8 @@ function segmentElevationLabel(segmentElevationIncrement, totalElevationIncremen
  * @param {{x: number, y: number}} A
  * @param {{x: number, y: number}} B
  */
-function ProjectElevatedPoint(A, B, height) {
+function ProjectElevatedPoint(A, B) {
+  const height = B.z - A.z;
   const distance = CalculateDistance(A, B);
   const projected_x = B.x + ((height / distance) * (A.y - B.y));
   const projected_y = B.y - ((height / distance) * (A.x - B.x));
