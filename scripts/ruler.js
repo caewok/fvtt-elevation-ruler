@@ -110,7 +110,7 @@ export async function elevationRulerAnimateToken(wrapped, token, ray, dx, dy, se
   if(elevation_change !== 0) {
 		const new_elevation = current_elevation + elevation_change;
 		log(`Adding ${new_elevation} elevation to token.`);
-		await token.update({ 'elevation': new_elevation });
+		await token.document.update({ 'elevation': new_elevation });
   }
   
   

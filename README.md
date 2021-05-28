@@ -1,21 +1,28 @@
-![](https://img.shields.io/badge/Foundry-v0.7.9-informational)
 
 # Elevation Ruler
 
-This module allows the default Foundry measurement ruler to track change in elevation. When you hit the specified hot key (default: '[' to increment and ']') while using the measurement ruler, the ruler display will update to display the incremental elevation change relative to the measured starting point. If you add a waypoint, elevation will be tracked at each waypoint.
+This module allows the default Foundry measurement ruler to track change in elevation. When you hit the specified hot key (default: ']' to increment and '[' to decrement) while using the measurement ruler, the ruler display will update to display the incremental elevation change relative to the measured starting point. If you add a waypoint, elevation will be tracked at each waypoint.
+
+<!--- Downloads @ Latest Badge -->
+[![License](https://img.shields.io/github/license/caewok/fvtt-elevation-ruler)](LICENSE)
+
+[![Version (latest)](https://img.shields.io/github/v/release/caewok/fvtt-elevation-ruler)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
+
+[![Foundry Version](https://img.shields.io/badge/dynamic/json.svg?url=https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json&label=Foundry%20Version&query=$.compatibleCoreVersion&colorB=blueviolet)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
 
 ## Dependencies
 
 - [DF Hotkeys Module ](https://github.com/flamewave000/dragonflagon-fvtt/tree/master/lib-df-hotkeys)
 - [libWrapper Module](https://github.com/ruipin/fvtt-lib-wrapper)
+- [libRuler Module](https://github.com/caewok/fvtt-lib-ruler)
 
 ## Details
 
-To use, start measuring with the Foundry measurement ruler as normal. While doing so, hit '[' to increase the elevation at the destination by one step. A step is equal to the grid size (typically 5 feet). Hit ']' to decrease the elevation at the destination by one step. These hotkeys can be changed by going to the DF Hotkeys module setting.
+To use, start measuring with the Foundry measurement ruler as normal. While doing so, hit ']' to increase the elevation at the destination by one step. A step is equal to the grid size (typically 5 feet). Hit '[' to decrease the elevation at the destination by one step. These hotkeys can be changed by going to the DF Hotkeys module setting.
 
-Once elevation is changed, the ruler display will change to show three lines. First, the waypoint distance and total distance along the plane as with the default ruler. Second, the waypoint elevation and total elevation distance. Third, the total combined distance, assuming one moves diagonally in three-dimensions from origin to the elevated destination.
+Once elevation is changed, the ruler display will change to display the waypoint elevation and total elevation distance. The default distance and combined distance will be updated to reflect total movement with elevation. 
 
-For dnd5e, the total distance along the diagonal will follow the chosen dnd5e measurement rule: 5-5-5, 5-10-5, or Euclidean. 
+For dnd5e, the total distance along the diagonal will follow the chosen dnd5e measurement rule: 5-5-5, 5-10-5, or Euclidean. Note that this means for some configurations, incrementing or decrementing elevation may not immediately change the total calculated distance, because the actual path taken is assumed to be diagonally upwards or downwards toward the destination waypoint. 
 
 ## FAQ
 
