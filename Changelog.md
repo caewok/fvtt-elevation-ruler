@@ -1,3 +1,7 @@
+## 0.0.3
+Add compatibility for Foundry 0.8.5.
+- Change updating of the token elevation to use the Document class.
+
 ## 0.0.2
 
 Incorporate previous segments change from libRuler.
