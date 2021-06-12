@@ -61,6 +61,7 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   //  --> this is done in AddProperties function
   log("Constructing the physical path.");
   const default_path = wrapped(...args);
+  log("Default path", default_path);
   
   const starting_elevation = this.getFlag(MODULE_ID, "starting_elevation");
   const ending_elevation = this.getFlag(MODULE_ID, "ending_elevation");
