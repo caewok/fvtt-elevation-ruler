@@ -168,7 +168,7 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
     segments.push({ray, label});
     elevation_segments.push({ray: ray_elevated, label: label});
   }
- 
+}
  
 
 // clear should reset elevation info
