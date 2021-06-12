@@ -1,3 +1,7 @@
+## 0.0.4
+Add compatibility for libRuler 0.0.5.
+- Address the change to physical path (Object instead of Array).
+
 ## 0.0.3
 Add compatibility for Foundry 0.8.5.
 - Change updating of the token elevation to use the Document class.
