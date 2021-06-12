@@ -10,6 +10,13 @@ This module allows the default Foundry measurement ruler to track change in elev
 
 [![Foundry Version](https://img.shields.io/badge/dynamic/json.svg?url=https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json&label=Foundry%20Version&query=$.compatibleCoreVersion&colorB=blueviolet)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
 
+<!--- Downloads @ Latest Badge -->
+[![License](https://img.shields.io/github/license/caewok/fvtt-elevation-ruler)](LICENSE)
+
+[![Version (latest)](https://img.shields.io/github/v/release/caewok/fvtt-elevation-ruler)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
+
+[![Foundry Version](https://img.shields.io/badge/dynamic/json.svg?url=https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json&label=Foundry%20Version&query=$.compatibleCoreVersion&colorB=blueviolet)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
+
 ## Dependencies
 
 - [DF Hotkeys Module ](https://github.com/flamewave000/dragonflagon-fvtt/tree/master/lib-df-hotkeys)
