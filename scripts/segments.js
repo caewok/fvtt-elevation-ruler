@@ -71,25 +71,25 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   log(`Elevation start: ${starting_elevation}; end ${ending_elevation}.
             grid units: ${starting_elevation_grid_units}; end ${ending_elevation_grid_units}.`);
   
-  const elevation_delta = ending_elevation_grid_units - starting_elevation_grid_units; 
- 
-  
-  // For each point on the path, provide an elevation proportional to the distance
+  // For origin and destination, provide an elevation proportional to the distance
   //   compared to the ruler segment distance.
   // This accommodates situations where the destination to measure does not equal segment
   //   destination
   // Need to apply canvas.scene.data.grid (140) and canvas.scene.data.gridDistance (5)
   // 7350 (x1) - 6930 (x0) = 420 (delta_x) / 140 * 5 = move in canvas units (e.g. 15')
   
-  const ruler_distance = this.ray.distance;  
-  default_path.map(p => {
-    const simple_path_distance = CalculateDistance(default_path[0], p);
-    const ratio = simple_path_distance / ruler_distance;
-    
-    p.z = starting_elevation_grid_units + elevation_delta * ratio;
-    
-    return p;
-  });
+  // will need to address later if there are multiple points in the physical path, rather
+  // than just origin and destination...
+  const elevation_delta = ending_elevation_grid_units - starting_elevation_grid_units; 
+  const ruler_distance = this.ray.distance;
+  
+  // destination
+  const simple_path_distance = CalculateDistance(default_path.origin, default_path.destination);
+  const ratio = simple_path_distance / ruler_distance;
+  default_path.destination.z =   starting_elevation_grid_units + elevation_delta * ratio;
+  
+  // origin
+  default_path.origin.z = starting_elevation_grid_units;
   
   log("Default path", default_path);
   
@@ -98,25 +98,19 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
 
 export function elevationRulerDistanceFunction(wrapped, physical_path) {
   // Project the 3-D path to 2-D canvas
-  log(`Projecting physical_path from origin ${physical_path[0].x}, ${physical_path[0].y}, ${physical_path[0].z} 
-                                    to dest ${physical_path[1].x}, ${physical_path[1].y}, ${physical_path[1].z}`);
+  log(`Projecting physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y}, ${physical_path.origin.z} 
+                                    to dest ${physical_path.destination.x}, ${physical_path.destination.y}, ${physical_path.destination.z}`);
   
   // for each of the points, construct a 2-D path and send to the underlying function
-  // may need more testing when there are multiple points in the physical path, rather
+  // will need to address later if there are multiple points in the physical path, rather
   // than just origin and destination...
-  const projected_physical_path = [{x: physical_path[0].x,
-                                    y: physical_path[0].y }];
   
-  for(let i = 1; i < physical_path.length; i++) {
-      const elevated_destination = ProjectElevatedPoint(physical_path[i - 1], physical_path[i]);      
-      projected_physical_path.push(elevated_destination);      
-    }
-  
-    log(`Projected physical_path from origin ${physical_path[0].x}, ${physical_path[0].y} 
-                                     to dest ${physical_path[1].x}, ${physical_path[1].y}`);
-
-  
-  return wrapped(projected_physical_path);
+  physical_path.destination = ProjectElevatedPoint(physical_path.origin, physical_path.destination);
+  delete physical_path.origin.z;
+  log(`Projected physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y} 
+                                     to dest ${physical_path.destination.x}, ${physical_path.destination.y}`);
+                                     
+  return wrapped(physical_path);
 }
 
 
