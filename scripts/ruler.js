@@ -168,7 +168,7 @@ export function elevationRulerMeasure(wrapped, destination, {gridSpaces=true}={}
     segments.push({ray, label});
     elevation_segments.push({ray: ray_elevated, label: label});
   }
- 
+}
  
 
 // clear should reset elevation info
@@ -254,9 +254,9 @@ export async function elevationRulerAnimateToken(wrapped, token, ray, dx, dy, se
   const elevation_change = (Math.round(elevation_increments[segment_num] *  canvas.scene.data.gridDistance * 100) / 100);
   log(`Current token elevation is ${current_elevation}. Will be changed by ${elevation_change}.`);
   if(elevation_change !== 0) {
-		const new_elevation = current_elevation + elevation_change;
-		log(`Adding ${new_elevation} elevation to token.`);
-		await token.document.update({ 'elevation': new_elevation });
+    const new_elevation = current_elevation + elevation_change;
+    log(`Adding ${new_elevation} elevation to token.`);
+    await token.document.update({ 'elevation': new_elevation });
   }
   
   
