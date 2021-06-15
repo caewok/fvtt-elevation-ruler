@@ -15,6 +15,18 @@ export function registerSettings() {
           icon: "fas fa-arrows-alt-v",
     type: Hotkeys.createConfig('Elevation Ruler Hotkeys', [`${MODULE_ID}.change-elevation-group`]),
   });
+  
+  
+  log("Registering terrain layer settings.");
+  game.settings.register(MODULE_ID, "enable-terrain-elevation", {
+    name: 'Use Enhanced Terrain',
+    hint: 'Set starting ruler elevations when measuring based on terrain maximum elevation. Requires Enhanced Terrain Elevation module.',
+    scope: "world",
+    config: true,
+    default: game.modules.get("enhanced-terrain-layer")?.active),
+    type: Boolean
+  });
+  
 
   log("Done registering settings.");
 
