@@ -71,23 +71,23 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   log("Constructing the physical path.");
   const default_path = wrapped(...args);
   log("Default path", default_path);
-  
+
   const starting_elevation = this.getFlag(MODULE_ID, "starting_elevation");
   const ending_elevation = this.getFlag(MODULE_ID, "ending_elevation");
-  
+
   const starting_elevation_grid_units = starting_elevation / canvas.scene.data.gridDistance * canvas.scene.data.grid;
   const ending_elevation_grid_units = ending_elevation / canvas.scene.data.gridDistance * canvas.scene.data.grid;
-  
+
   log(`Elevation start: ${starting_elevation}; end ${ending_elevation}.
             grid units: ${starting_elevation_grid_units}; end ${ending_elevation_grid_units}.`);
-  
+
   // For origin and destination, provide an elevation proportional to the distance
   //   compared to the ruler segment distance.
   // This accommodates situations where the destination to measure does not equal segment
   //   destination
   // Need to apply canvas.scene.data.grid (140) and canvas.scene.data.gridDistance (5)
   // 7350 (x1) - 6930 (x0) = 420 (delta_x) / 140 * 5 = move in canvas units (e.g. 15')
-  
+
   // will need to address later if there are multiple points in the physical path, rather
   // than just origin and destination...
   const elevation_delta = ending_elevation_grid_units - starting_elevation_grid_units; 
@@ -183,15 +183,15 @@ function segmentElevationLabel(segmentElevationIncrement, totalElevationIncremen
 
 // ----- TERRAIN LAYER ELEVATION ----- //
 function TerrainElevationAtPoint(p) {
-  if(!game.modules.get("enhanced-terrain-layer")?.active) {
+  if(!game.settings.get(${MODULE_ID}, "enable-terrain-elevation") || !game.modules.get("enhanced-terrain-layer")?.active) {
     return(0);
   }
   
   // modified terrainAt to account for issue: https://github.com/ironmonk88/enhanced-terrain-layer/issues/38
    const hx = canvas.grid.w / 2;
    const hy = canvas.grid.h / 2;
-   const shifted_x = x + hx;
-   const shifted_y = y + hy;
+   const shifted_x = p.x + hx;
+   const shifted_y = p.y + hy;
         
    let terrains = this.placeables.filter(t => {
      const testX = shifted_x - t.data.x;
