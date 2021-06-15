@@ -183,7 +183,7 @@ function segmentElevationLabel(segmentElevationIncrement, totalElevationIncremen
 
 // ----- TERRAIN LAYER ELEVATION ----- //
 function TerrainElevationAtPoint(p) {
-  if(!game.settings.get(${MODULE_ID}, "enable-terrain-elevation") || !game.modules.get("enhanced-terrain-layer")?.active) {
+  if(!(game.settings.get(${MODULE_ID}, "enable-terrain-elevation")) || !(game.modules.get("enhanced-terrain-layer")?.active)) {
     return(0);
   }
   
