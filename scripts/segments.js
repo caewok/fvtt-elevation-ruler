@@ -26,9 +26,12 @@ export function elevationRulerAddProperties(wrapped, ...args) {
   let starting_elevation = 0;
   if(this.segment_num === 0) {
     // starting elevation equals the token elevation 
+    // if no token, starting elevation equals the terrain elevation if using
     const token = this.ruler._getMovementToken();
     if(token) {
       starting_elevation = getProperty(token, "data.elevation");
+    } else {
+      starting_elevation = TerrainElevationAtPoint(this.ray.A); // elevation at origin
     }
     
   } else {
@@ -37,9 +40,11 @@ export function elevationRulerAddProperties(wrapped, ...args) {
     log(`Current ending elevation is ${this.getFlag(MODULE_ID, "ending_elevation")}; Prior segment ending elevation is ${starting_elevation}`);
   }
   
-  const ending_elevation = starting_elevation + incremental_elevation;
+  const terrain_elevation =  TerrainElevationAtPoint(this.ray.B); // elevation at destination
   
-  // Track whether any elevation change has been request for ruler labeling.
+  const ending_elevation = starting_elevation + terrain_elevation + incremental_elevation;
+  
+  // Track whether any elevation change has been requested for ruler labeling.
   let path_has_elevation_change = incremental_elevation !== 0;
   if("getFlag" in this.prior_segment) {
     path_has_elevation_change = path_has_elevation_change || this.prior_segment.getFlag(MODULE_ID, "path_has_elevation_change");
@@ -53,6 +58,10 @@ export function elevationRulerAddProperties(wrapped, ...args) {
   
   return wrapped(...args);
 }
+
+
+
+
 
 export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   // elevate or lower the destination point in 3-D space
@@ -170,6 +179,42 @@ function segmentElevationLabel(segmentElevationIncrement, totalElevationIncremen
       label += ` [${Math.abs(Math.round(totalElevationIncrement * 100) / 100)} ${canvas.scene.data.gridUnits}${totalArrow}]`;
   }
   return label;
+}
+
+// ----- TERRAIN LAYER ELEVATION ----- //
+function TerrainElevationAtPoint(p) {
+  if(!game.modules.get("enhanced-terrain-layer")?.active) {
+    return(0);
+  }
+  
+  // modified terrainAt to account for issue: https://github.com/ironmonk88/enhanced-terrain-layer/issues/38
+   const hx = canvas.grid.w / 2;
+   const hy = canvas.grid.h / 2;
+   const shifted_x = x + hx;
+   const shifted_y = y + hy;
+        
+   let terrains = this.placeables.filter(t => {
+     const testX = shifted_x - t.data.x;
+     const testY = shifted_y - t.data.y;
+     return t.shape.contains(testX, testY);
+   });
+   
+   if(terrains.length === 0) return 0; // default to no elevation change at point without terrain.
+   
+   // get the maximum non-infinite elevation point using terrain max
+   // must account for possibility of 
+   // TO-DO: Allow user to ignore certain terrain types?
+   let terrain_max_elevation = terrains.reduce((total, t) => {
+     if(!isFinite(t.max)) return total;
+     return max(total, t.max);
+   }, Number.NEGATIVE_INFINITY);
+   
+   // in case all the terrain maximums are infinite.
+   terrain_max_elevation = isFinite(terrain_max_elevation) ? terrain_max_elevation : 0;
+   
+   log(`TerrainElevationAtPoint: Returning elevation ${terrain_max_elevation} for point ${p}`, terrains);
+   
+   return terrain_max_elevation;
 }
 
 
