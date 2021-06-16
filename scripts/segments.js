@@ -87,9 +87,42 @@ UX goals:
  * Helper function to calculate ending elevation, which is also needed when moving tokens.
  */
 export function calculateEndElevation(p, incremental_elevation) {
+  // check for tokens; take the highest one at a given position
+  let tokens = retrieveVisibleTokens();
+  const max_token_elevation = tokens.reduce((total, t) => {
+    // is the point within the token control area? 
+    if(!pointWithinToken(p, t)) return total;
+    return Math.max(t.data.elevation, total);
+  }, Number.NEGATIVE_INFINITY) || Number.NEGATIVE_INFINITY;
+  
+  log(`calculateEndElevation: ${tokens.length} tokens with maximum elevation ${max_token_elevation}`);
+  
+  // use tokens rather than elevation if available
+  if(isFinite(max_token_elevation)) return max_token_elevation + incremental_elevation;
+
   const terrain_elevation =  TerrainElevationAtPoint(p); // elevation at destination
   const ending_elevation = terrain_elevation + incremental_elevation;
   return ending_elevation;
+}
+
+/**
+ * Check if point is within the controlled area of the token
+ * (Recall that tokens may be wider than 1 square)
+ */
+function pointWithinToken(point, token) {
+  return point.x >= token.x && 
+         point.y >= token.y &&
+         point.x <= (token.x + token.w) &&
+         point.y <= (token.y + token.h); 
+}
+
+/**
+ * Retrieve visible tokens
+ * For GM, all will be visible unless 1 or more tokens are selected.
+ * Combined vision for all tokens selected.
+ */
+function retrieveVisibleTokens() {
+  return canvas.tokens.children[0].children.filter(c => c.visible);
 }
 
 /* 
