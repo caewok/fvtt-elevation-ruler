@@ -183,17 +183,18 @@ function segmentElevationLabel(segmentElevationIncrement, totalElevationIncremen
 
 // ----- TERRAIN LAYER ELEVATION ----- //
 function TerrainElevationAtPoint(p) {
-  if(!(game.settings.get(${MODULE_ID}, "enable-terrain-elevation")) || !(game.modules.get("enhanced-terrain-layer")?.active)) {
+  if(!game.settings.get(MODULE_ID, "enable-terrain-elevation") || !game.modules.get("enhanced-terrain-layer")?.active) {
     return(0);
   }
   
   // modified terrainAt to account for issue: https://github.com/ironmonk88/enhanced-terrain-layer/issues/38
+   const terrain_layer = canvas.layers.filter(l => l?.options?.objectClass?.name === "Terrain")[0];
    const hx = canvas.grid.w / 2;
    const hy = canvas.grid.h / 2;
    const shifted_x = p.x + hx;
    const shifted_y = p.y + hy;
         
-   let terrains = this.placeables.filter(t => {
+   let terrains = terrain_layer.placeables.filter(t => {
      const testX = shifted_x - t.data.x;
      const testY = shifted_y - t.data.y;
      return t.shape.contains(testX, testY);
@@ -206,7 +207,7 @@ function TerrainElevationAtPoint(p) {
    // TO-DO: Allow user to ignore certain terrain types?
    let terrain_max_elevation = terrains.reduce((total, t) => {
      if(!isFinite(t.max)) return total;
-     return max(total, t.max);
+     return Math.max(total, t.max);
    }, Number.NEGATIVE_INFINITY);
    
    // in case all the terrain maximums are infinite.
