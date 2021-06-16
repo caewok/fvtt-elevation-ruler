@@ -60,8 +60,8 @@ UX goals:
   
   
   const incremental_elevation = toGridDistance(elevation_increments[this.segment_num])
-  const terrain_elevation =  TerrainElevationAtPoint(this.ray.B); // elevation at destination
-  const ending_elevation = terrain_elevation + incremental_elevation;
+  const ending_elevation = calculateEndElevation(this.ray.B, incremental_elevation);
+  
   log(`elevationRulerAddProperties segment ${this.segment_num}: ${starting_elevation}[start]; ${terrain_elevation}[terrain] + ${incremental_elevation}[incremental] = ${ending_elevation}[end]`);
   
   // Track whether any elevation change has been requested for ruler labeling.
@@ -100,7 +100,7 @@ export function calculateEndElevation(p, incremental_elevation) {
   // use tokens rather than elevation if available
   if(isFinite(max_token_elevation)) return max_token_elevation + incremental_elevation;
 
-  const terrain_elevation =  TerrainElevationAtPoint(p); // elevation at destination
+  const terrain_elevation = TerrainElevationAtPoint(p); // elevation at destination
   const ending_elevation = terrain_elevation + incremental_elevation;
   return ending_elevation;
 }
