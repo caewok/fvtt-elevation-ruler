@@ -59,12 +59,12 @@ UX goals:
   }
   
   const terrain_elevation =  TerrainElevationAtPoint(this.ray.B); // elevation at destination
-  const ending_elevation = starting_elevation + terrain_elevation + incremental_elevation;
-  log(`elevationRulerAddProperties segment ${this.segment_num}: ${starting_elevation}[start] + ${terrain_elevation}[terrain] + ${incremental_elevation}[incremental] = ${ending_elevation}`);
+  const ending_elevation = terrain_elevation + incremental_elevation;
+  log(`elevationRulerAddProperties segment ${this.segment_num}: ${starting_elevation}[start]; ${terrain_elevation}[terrain] + ${incremental_elevation}[incremental] = ${ending_elevation}[end]`);
   
   // Track whether any elevation change has been requested for ruler labeling.
   // Also track whether ruler elevation has changed due to a shift in terrain elevation or starting token elevation.
-  let path_has_elevation_change = incremental_elevation !== 0 || (starting_elevation + terrain_elevation != 0);
+  let path_has_elevation_change = incremental_elevation !== 0 || starting_elevation !== ending_elevation;
   if("getFlag" in this.prior_segment) {
     path_has_elevation_change = path_has_elevation_change || this.prior_segment.getFlag(MODULE_ID, "path_has_elevation_change");
   }
