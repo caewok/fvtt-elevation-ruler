@@ -11,7 +11,25 @@ export function elevationRulerAddProperties(wrapped, ...args) {
     console.error(`${MODULE_ID}|libRulerAddProperties: this.segment_num is less than zero`, this);
     return;
   }
-
+  
+  /*
+UX goals:
+1. Ruler origin elevation is the starting token elevation, if any, or the terrain elevation.
+2. Dragging the ruler to the next space may cause it to drop if the token is elevated.
+- This is probably fine? If flying while everyone else is on the ground, the default should
+    account for that.
+- A bit cumbersome if measuring straight across elevated terrain, but (a) use terrain layer and
+    (b) other elevated tokens should change the destination elevation automatically. (see 3 below)
+3. If the destination space is an elevated token or terrain, use that elevation for destination.
+- So measuring that space will change the ruler elevation indicator accordingly.
+- This will cause the elevation indicator to change without other user input. This is probably fine?
+    User will be dragging the ruler, so that is appropriate feedback.
+4. User can at any time increment or decrement. This is absolute, in that it is added on top of any
+    default elevations from originating/destination tokens or terrain.
+- Meaning, origination could be 0, user increments 5 and then drags to a terrain space of 50; ruler
+    would go from 5 to 55. 
+  */
+  
   const elevation_increments = duplicate(this.ruler.getFlag(MODULE_ID, "elevation_increments"));
   log(`${elevation_increments.length} elevation increments for ruler flag.`)
   
@@ -41,8 +59,8 @@ export function elevationRulerAddProperties(wrapped, ...args) {
   }
   
   const terrain_elevation =  TerrainElevationAtPoint(this.ray.B); // elevation at destination
-  
   const ending_elevation = starting_elevation + terrain_elevation + incremental_elevation;
+  log(`elevationRulerAddProperties segment ${this.segment_num}: ${starting_elevation}[start] + ${terrain_elevation}[terrain] + ${incremental_elevation}[incremental] = ${ending_elevation}`);
   
   // Track whether any elevation change has been requested for ruler labeling.
   // Also track whether ruler elevation has changed due to a shift in terrain elevation or starting token elevation.
@@ -142,29 +160,31 @@ export function elevationRulerGetText(wrapped, ...args) {
   const orig_label = wrapped(...args);
   log(`Adding to segment label ${orig_label}`, this);
   
+  const starting_elevation = this.getFlag(MODULE_ID, "starting_elevation");
   const ending_elevation = this.getFlag(MODULE_ID, "ending_elevation");
-  const incremental_elevation = this.getFlag(MODULE_ID, "incremental_elevation");
+  //const incremental_elevation = this.getFlag(MODULE_ID, "incremental_elevation");
+
   
   // if no elevation change for any segment, then skip.
   const path_has_elevation_change = this.getFlag(MODULE_ID, "path_has_elevation_change");
   
   if(!path_has_elevation_change) { return orig_label; }
   
-  const elevation_label = segmentElevationLabel(incremental_elevation, ending_elevation, orig_label)
+  const elevation_label = segmentElevationLabel(ending_elevation - starting_elevation, ending_elevation);
   log(`elevation_label is ${elevation_label}`);
   return orig_label + "\n" + elevation_label;
 }
 
 /*
  * Construct a label to represent elevation changes in the ruler.
- * Waypoint version: 10 ft↑ or 10 ft↓
- * Total version: 10 ft↑ [20 ft↓]
+ * Waypoint version: 10 ft↑ [@10 ft]
+ * Total version: 10 ft↑ [@ 20 ft]
  * @param {number} segmentElevationIncrement Incremental elevation for the segment.
- * @param {number} totalElevationIncrement Total elevation for all segments to date.
+ * @param {number} segmentCurrentElevation Total elevation for all segments to date.
  * @param {boolean} isTotal Whether this is the label for the final segment
  * @return {string}
  */
-function segmentElevationLabel(segmentElevationIncrement, totalElevationIncrement, isTotal) {
+function segmentElevationLabel(segmentElevationIncrement, segmentCurrentElevation) {
   const segmentArrow = (segmentElevationIncrement > 0) ? "↑" :
                       (segmentElevationIncrement < 0) ? "↓" :
                       "";
@@ -173,12 +193,12 @@ function segmentElevationLabel(segmentElevationIncrement, totalElevationIncremen
   // * 100 / 100 is used in _getSegmentLabel; not sure whys
   let label = `${Math.abs(Math.round(segmentElevationIncrement * 100) / 100)} ${canvas.scene.data.gridUnits}${segmentArrow}`;
   
-  if ( isTotal ) {
-      const totalArrow = (totalElevationIncrement > 0) ? "↑" :
-                      (totalElevationIncrement < 0) ? "↓" :
-                      "";
-      label += ` [${Math.abs(Math.round(totalElevationIncrement * 100) / 100)} ${canvas.scene.data.gridUnits}${totalArrow}]`;
-  }
+ //  if ( this.last ) {
+//       const totalArrow = (totalElevationIncrement > 0) ? "↑" :
+//                       (totalElevationIncrement < 0) ? "↓" :
+//                       "";
+      label += ` [@${Math.abs(Math.round(segmentCurrentElevation * 100) / 100)} ${canvas.scene.data.gridUnits}]`;
+ //  }
   return label;
 }
 
