@@ -1,4 +1,5 @@
 import { MODULE_ID, log } from "./module.js";
+import { calculateEndElevation, toGridDistance } from "./segments.js";
 
 
 /**
@@ -202,7 +203,9 @@ export function elevationRulerAddWaypoint(wrapped, ...args) {
   elevation_increments.push(destination_elevation_increment);
   
   this.setFlag(MODULE_ID, "elevation_increments", elevation_increments);
-  this.setFlag(MODULE_ID, "destination_elevation_increment", 0);
+  
+  // Arguably more consistent interface to carry-over increments from the prior section.
+  this.setFlag(MODULE_ID, "destination_elevation_increment", elevation_increments[elevation_increments.length - 1]);
 
   return wrapped(...args);
 }
@@ -216,7 +219,10 @@ export function elevationRulerRemoveWaypoint(wrapped, ...args) {
   
   elevation_increments.pop();
   this.setFlag(MODULE_ID, "elevation_increments", elevation_increments);
-  this.setFlag(MODULE_ID, "destination_elevation_increment", 0);
+  
+  // Arguably more consistent interface to carry-over increments from the prior section.
+  // TO-DO: should the new destination increment be the prior waypoint increment, 0, or the current increment for the removed waypoint?
+  this.setFlag(MODULE_ID, "destination_elevation_increment", elevation_increments[elevation_increments.length - 1]);
   
   return wrapped(...args);
 }

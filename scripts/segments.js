@@ -39,7 +39,7 @@ UX goals:
   
   
   elevation_increments.shift(); //first increment is 0 for the origin waypoint
-  const incremental_elevation = (Math.round(elevation_increments[this.segment_num] *  canvas.scene.data.gridDistance * 100) / 100)
+  
   
   let starting_elevation = 0;
   if(this.segment_num === 0) {
@@ -58,6 +58,8 @@ UX goals:
     log(`Current ending elevation is ${this.getFlag(MODULE_ID, "ending_elevation")}; Prior segment ending elevation is ${starting_elevation}`);
   }
   
+  
+  const incremental_elevation = toGridDistance(elevation_increments[this.segment_num])
   const terrain_elevation =  TerrainElevationAtPoint(this.ray.B); // elevation at destination
   const ending_elevation = terrain_elevation + incremental_elevation;
   log(`elevationRulerAddProperties segment ${this.segment_num}: ${starting_elevation}[start]; ${terrain_elevation}[terrain] + ${incremental_elevation}[incremental] = ${ending_elevation}[end]`);
@@ -78,6 +80,24 @@ UX goals:
   return wrapped(...args);
 }
 
+
+
+
+/*
+ * Helper function to calculate ending elevation, which is also needed when moving tokens.
+ */
+export function calculateEndElevation(p, incremental_elevation) {
+  const terrain_elevation =  TerrainElevationAtPoint(p); // elevation at destination
+  const ending_elevation = terrain_elevation + incremental_elevation;
+  return ending_elevation;
+}
+
+/* 
+ * Helper function to convert absolute increments to grid distance
+ */
+export function toGridDistance(increment) {
+  return Math.round(increment * canvas.scene.data.gridDistance * 100) / 100;
+}
 
 
 
