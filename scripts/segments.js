@@ -89,6 +89,9 @@ UX goals:
 export function calculateEndElevation(p, incremental_elevation) {
   // check for tokens; take the highest one at a given position
   let tokens = retrieveVisibleTokens();
+  
+  // TO DO: Somehow catch this information so we don't keep revisiting the same tokens over and over? 
+  //        Would it be reasonable to cache per ruler? Or cache visible tokens? 
   const max_token_elevation = tokens.reduce((total, t) => {
     // is the point within the token control area? 
     if(!pointWithinToken(p, t)) return total;
