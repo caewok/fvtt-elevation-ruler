@@ -1,3 +1,9 @@
+## 0.1.0
+Add terrain measurement feature. 
+- Use destination token elevation to automatically change ruler elevation.
+- Use Enhanced Terrain Layer to automatically change ruler elevation.
+- Change ruler display to show elevation change and current elevation at each waypoint.
+
 ## 0.0.4
 Add compatibility for libRuler 0.0.5.
 - Address the change to physical path (Object instead of Array).

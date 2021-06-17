@@ -16,6 +16,18 @@ export function registerSettings() {
     type: Hotkeys.createConfig('Elevation Ruler Hotkeys', [`${MODULE_ID}.change-elevation-group`]),
   });
 
+
+  log("Registering terrain layer settings.");
+  game.settings.register(MODULE_ID, "enable-terrain-elevation", {
+    name: 'Use Enhanced Terrain',
+    hint: 'Set starting ruler elevations when measuring based on terrain maximum elevation. Requires Enhanced Terrain Elevation module.',
+    scope: "world",
+    config: true,
+    default: game.modules.get("enhanced-terrain-layer")?.active,
+    type: Boolean
+  });
+
+
   log("Done registering settings.");
 
 }
@@ -39,8 +51,8 @@ export function registerHotkeys() {
 //    set: async value => await game.settings.set(MODULE_ID, `increment-elevation-hotkey`, "ArrowUp"),
     default: () => { return { key: Hotkeys.keys.BracketRight, alt: false, ctrl: false, shift: false }; },
     onKeyDown: incrementElevation,
-  }); 
-  
+  });
+
   log("Registering decrement elevation hotkey.");
   Hotkeys.registerShortcut({
     name: `${MODULE_ID}.decrement-elevation-hotkey`, // <- Must be unique
@@ -51,6 +63,6 @@ export function registerHotkeys() {
 //    set: async value => await game.settings.set(MODULE_ID, `${MODULE_ID}.decrement-elevation-hotkey`, "ArrowDown"),
     default: () => { return { key: Hotkeys.keys.BracketLeft, alt: false, ctrl: false, shift: false }; },
     onKeyDown: decrementElevation,
-  }); 
+  });
 
 }
