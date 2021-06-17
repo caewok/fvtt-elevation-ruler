@@ -1,3 +1,6 @@
+## 0.1.1
+Correct display of negative current elevation in ruler. 
+
 ## 0.1.0
 Add terrain measurement feature. 
 - Use destination token elevation to automatically change ruler elevation.
