@@ -1,72 +1,94 @@
+[![License](https://img.shields.io/github/license/caewok/fvtt-elevation-ruler)](LICENSE)
+
+[![Version (latest)](https://img.shields.io/github/v/release/caewok/fvtt-elevation-ruler)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
+
+[![Foundry Version](https://img.shields.io/badge/dynamic/json.svg?url=https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json&label=Foundry%20Version&query=$.compatibleCoreVersion&colorB=blueviolet)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
 
 # Elevation Ruler
 
-This module allows the default Foundry measurement ruler to track change in elevation. When you hit the specified hot key (default: ']' to increment and '[' to decrement) while using the measurement ruler, the ruler display will update to display the incremental elevation change relative to the measured starting point. If you add a waypoint, elevation will be tracked at each waypoint.
+This module allows the default Foundry measurement ruler to track change in elevation. Elevation can be changed while using the ruler in three ways:
+1. Manually. Hit the specified hot key (default: '[' to increment and ']' to decrement).
+2. Token. When hovering over a token with the ruler, the origin or destination elevation (as applicable) will update. 
+3. Enhanced Terrain Layer. If a terrain layer is present with a finite max elevation, that max elevation will be used for the elevation.
 
-<!--- Downloads @ Latest Badge -->
-[![License](https://img.shields.io/github/license/caewok/fvtt-elevation-ruler)](LICENSE)
+The distance calculation updates based on the distance measured, assuming a straight line in three dimensions between origin and destination, taking into account elevation change.
 
-[![Version (latest)](https://img.shields.io/github/v/release/caewok/fvtt-elevation-ruler)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
+If you add a waypoint, elevation will be tracked at each waypoint.
 
-[![Foundry Version](https://img.shields.io/badge/dynamic/json.svg?url=https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json&label=Foundry%20Version&query=$.compatibleCoreVersion&colorB=blueviolet)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
-
-<!--- Downloads @ Latest Badge -->
-[![License](https://img.shields.io/github/license/caewok/fvtt-elevation-ruler)](LICENSE)
-
-[![Version (latest)](https://img.shields.io/github/v/release/caewok/fvtt-elevation-ruler)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
-
-[![Foundry Version](https://img.shields.io/badge/dynamic/json.svg?url=https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json&label=Foundry%20Version&query=$.compatibleCoreVersion&colorB=blueviolet)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
+If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint. 
 
 ## Dependencies
+- [DF Hotkeys ](https://github.com/flamewave000/dragonflagon-fvtt/tree/master/lib-df-hotkeys)
+- [libWrapper](https://github.com/ruipin/fvtt-lib-wrapper)
+- [libRuler](https://github.com/caewok/fvtt-lib-ruler)
 
-- [DF Hotkeys Module ](https://github.com/flamewave000/dragonflagon-fvtt/tree/master/lib-df-hotkeys)
-- [libWrapper Module](https://github.com/ruipin/fvtt-lib-wrapper)
-- [libRuler Module](https://github.com/caewok/fvtt-lib-ruler)
+## Modules that add functionality
+- [Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer)
+
+## Known conflicts
+- [Terrain Ruler](https://github.com/manuelVo/foundryvtt-terrain-ruler)
+- [Drag Ruler](https://github.com/manuelVo/foundryvtt-drag-ruler)
+
+I hope to have a future compatibility fix, based in libRuler, that allows Terrain Ruler and Drag Ruler to play nicely with Elevation Ruler.
+
+In general, modules that overwrite or extend the Ruler Class may cause the elevation ruler module to fail to display or calculate correctly. 
+
+## What systems does it work on? 
+
+It has been tested on dnd5e 1.3.3. Because it adds to the functionality of the underlying Foundry measurement ruler, it may work on other systems as well, unless the system overrides key Foundry measurement functions in the Ruler Class.
 
 ## Details
 
-To use, start measuring with the Foundry measurement ruler as normal. While doing so, hit ']' to increase the elevation at the destination by one step. A step is equal to the grid size (typically 5 feet). Hit '[' to decrease the elevation at the destination by one step. These hotkeys can be changed by going to the DF Hotkeys module setting.
+To use, start measuring with the Foundry measurement ruler as normal. While doing so, hit '[' to increase the elevation at the destination by one step. A step is equal to the grid size (typically 5 feet). Hit ']' to decrease the elevation at the destination by one step. 
 
-Once elevation is changed, the ruler display will change to display the waypoint elevation and total elevation distance. The default distance and combined distance will be updated to reflect total movement with elevation. 
+## Settings
+- Change the elevation increment hotkeys
+- Toggle using terrain for elevation measurement. Requires Enhanced Terrain Layer.
 
-For dnd5e, the total distance along the diagonal will follow the chosen dnd5e measurement rule: 5-5-5, 5-10-5, or Euclidean. Note that this means for some configurations, incrementing or decrementing elevation may not immediately change the total calculated distance, because the actual path taken is assumed to be diagonally upwards or downwards toward the destination waypoint. 
+# Details
 
-## FAQ
-
-### How does the underlying measurement work?
-
-When measuring between origin point A and destination point B, incrementing elevation will move the destination to a point C 1 unit above (in the vertical direction) from B. Thus, the line between A and C is the hypotenuse of the right triangle formed by A, B, and C. That triangle is then projected back on the 2-D plane by rotating it 90 degrees, and the diagonal between A and C is measured using the underlying system measurement default. Thus, adding elevation will always cause a measurement along a diagonal.
-
-For each additional waypoint, elevation is measured between the waypoints. Thus, if waypoint 1 moves up 10 feet, and waypoint 2 then moves down 10 feet, the measured distance will assume a move up by 10 feet, and then a second move down by 10 feet—--in other words, distances between waypoints do not "cancel out."
+## Measuring diagonals
+Nearly every elevation measurement creates a diagonal path from the origin to the elevated or decremented altitude. Elevation Ruler attempts to use the default system measurement to measure these diagonals. For dnd5e, the total distance along the diagonal will follow the chosen dnd5e measurement rule: 5-5-5, 5-10-5, or Euclidean. 
 
 For example, here is the measurement that is displayed in DnD 5e with the 5-5-5 rule, where a diagonal move counts as 5 feet:
-![Video of DnD 5e 5-5-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_5-5-5.webm). The first waypoint is 15 feet east and 15 feet up from the origin. Because under this rule, a diagonal move is only 5 feet, this first waypoint can be reached by moving diagonally east and up a total of 3 squares, or 15 feet. 
 
-After the waypoint, the destination is another 15 feet away to the north, no further elevation change. Thus, the total distance is 15 feet from the first waypoint plus another 15 feet, for 30 feet total. 
-![Screenshot DnD 5e 5-5-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/c7664c550b5da4afec07e6f7076f301513834d36/media/measurement_dnd_5-5-5.webp)
+![Screenshot DnD 5e 5-5-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/measurement_dnd_5-5-5.jpg)
 
-Compare to the DnD 5e 5-10-5 rule, where a diagonal move counts as 5 or 10 feet, alternating:
-![Video of DnD 5e 5-10-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_5-10-5.webm). The first waypoint is 15 feet east and 10 feet up. With a 5-10-5 rule, it would cost 5 feet for the first diagonal move, 10 feet for the second diagonal move (to 10 feet east, 10 feet up) and then another 5 feet for another move east. Total would be 20 feet. 
+The token would move two squares left and two squares "up".  This first move can be accomplished by moving diagonally up and to the left twice. This totals 10 feet under the DnD 5e 5-5-5 rule (same as if moving two squares left). Moving down two squares then adds a
 
-After the waypoint, the destination is another 10 feet south and 10 feet up. This can be accomplished in a diagonal move of two squares, so 5 feet for the first and 10 feet for the second, for a total of 15 feet.
+The token would then moves two squares down in 2-D and down one square in elevation. Similarly to the first move, the second can be accomplished by moving diagonally down 1 square and then down one more square in 2-D, or 10 feet total.  
 
-Total movement along the plane is 25 feet (15 feet east plus 10 feet south). Total elevation change is 20 feet (10 feet for each waypoint). Total distance moved adds the two waypoint totals together: 20 feet plus 15 feet totals 35 feet.
+In contrast, using the 5-10-5 rule, the first move incurs an extra 5-foot penalty because moving twice diagonally costs 15 feet.
 
-![Screenshot DnD 5e 5-10-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/c7664c550b5da4afec07e6f7076f301513834d36/media/measurement_dnd_5-10-5.webp)
+![Screenshot DnD 5e 5-10-5 Measurement](https://github.com/caewok/fvtt-elevation-ruler/raw/feature/media/media/measurement_dnd_5-10-5.jpg)
 
-Finally, the DnD Euclidean measurement rule, rounded to the nearest foot:
-![Video of DnD 5e Euclidean](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/6cc09a53f49973eb03dbf9581104a3ea7ffe9561/media/measurement_dnd_euclidian.webm). Here, the diagonal move at each waypoint is measured precisely and rounded to the nearest foot. The first waypoint moves 15 feet up and 15 feet east, which can be accomplished diagonally by moving, according to Pythagorean's Theorem, sqrt(15^2 + 15^2) ≅ 21 feet. 
+Finally, the DnD Euclidean rule relies on Pythagorean's Theorem, rounded to the nearsest foot. Here the token is first elevated 10 feet (14 feet of movement total along the diagonal in 3-D) and then lowered 5 feet (11 feet of movement total).
 
-After the waypoint, there is a 10 foot move to the south with no additional elevation. So the total distance is 21 + 10 = 31 feet. 
+![Screenshot DnD 5e Euclidean Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/measurement_dnd_euclidean.jpg)
 
-![Screenshot DnD 5e Euclidean Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/c7664c550b5da4afec07e6f7076f301513834d36/media/measurement_dnd_euclidian.webp)
+## Terrain measurement  
 
-### What systems does it work on? 
+To use terrain measurement, first set up one or more terrains using Enhanced Terrain Layer. Set a maximum value for the terrain layer. 
 
-It has been tested on dnd5e 1.2.4. Because it adds to the functionality of the underlying Foundry measurement ruler, it may work on other systems as well, unless the system overrides key Foundry measurement functions in the Ruler Class.
+![Screenshot Terrain Setup](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/terrain-setup.jpg)
 
-### Does it conflict with any modules?
+Now when you drag the ruler over a terrain area, the ruler will automatically adjust the elevation based on the terrain maximum height. Note that this is based on the center-point of the current ruler position. You can still increment the values up or down manually, and those values will persist as you move the ruler around. 
 
-Modules that overwrite or extend the Ruler Class may cause the elevation ruler module to fail to display or calculate correctly. In particular, there are known incompatibilities with [Drag Ruler](https://github.com/manuelVo/foundryvtt-drag-ruler) and will likely not work with [Terrain Ruler](https://github.com/manuelVo/foundryvtt-terrain-ruler). 
+![Screenshot Terrain Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/terrain-measure.jpg)
+
+## Token measurement 
+
+Similarly, as you can see in the previous screenshot, if you drag the ruler over a token that has been elevated or lowered, the ruler will reflect the elevation of that token (plus or minus manually incremented values).
+
+This is particularly useful where you have an elevated character at the origin, and want to fire or move downwards. Or vice-versa where you are aiming at an elevated token and need total distance to the elevated target.
+
+This video shows both terrain and token measurement in action.
+
+![Video Terrain Measurement](https://github.com/caewok/fvtt-elevation-ruler/raw/feature/media/media/terrain-measure.mov)
+
+
+
+
+
 
 
