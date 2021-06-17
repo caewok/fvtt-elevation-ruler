@@ -256,7 +256,7 @@ function segmentElevationLabel(segmentElevationIncrement, segmentCurrentElevatio
 //       const totalArrow = (totalElevationIncrement > 0) ? "↑" :
 //                       (totalElevationIncrement < 0) ? "↓" :
 //                       "";
-      label += ` [@${Math.abs(Math.round(segmentCurrentElevation * 100) / 100)} ${canvas.scene.data.gridUnits}]`;
+      label += ` [@${Math.round(segmentCurrentElevation * 100) / 100} ${canvas.scene.data.gridUnits}]`;
  //  }
   return label;
 }
