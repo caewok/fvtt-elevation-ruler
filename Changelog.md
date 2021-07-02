@@ -1,3 +1,6 @@
+## 0.1.2
+Update the module.json to use a name without special characters to conform to Foundry requirements. Update Foundry compatibility to 0.8.8.
+
 ## 0.1.1
 Correct display of negative current elevation in ruler. 
 
