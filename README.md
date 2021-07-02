@@ -1,8 +1,6 @@
-[![License](https://img.shields.io/github/license/caewok/fvtt-elevation-ruler)](LICENSE)
-
 [![Version (latest)](https://img.shields.io/github/v/release/caewok/fvtt-elevation-ruler)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
-
 [![Foundry Version](https://img.shields.io/badge/dynamic/json.svg?url=https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json&label=Foundry%20Version&query=$.compatibleCoreVersion&colorB=blueviolet)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
+[![License](https://img.shields.io/github/license/caewok/fvtt-elevation-ruler)](LICENSE)
 
 # Elevation Ruler
 
@@ -16,6 +14,9 @@ The distance calculation updates based on the distance measured, assuming a stra
 If you add a waypoint, elevation will be tracked at each waypoint.
 
 If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint. 
+
+# Installation
+Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json) in Foundry to install.
 
 ## Dependencies
 - [DF Hotkeys ](https://github.com/flamewave000/dragonflagon-fvtt/tree/master/lib-df-hotkeys)
@@ -35,9 +36,9 @@ In general, modules that overwrite or extend the Ruler Class may cause the eleva
 
 ## What systems does it work on? 
 
-It has been tested on dnd5e 1.3.3. Because it adds to the functionality of the underlying Foundry measurement ruler, it may work on other systems as well, unless the system overrides key Foundry measurement functions in the Ruler Class.
+It has been tested on dnd5e 1.3.3 to 1.3.6. Because it adds to the functionality of the underlying Foundry measurement ruler, it may work on other systems as well, unless the system overrides key Foundry measurement functions in the Ruler Class.
 
-## Details
+# Details
 
 To use, start measuring with the Foundry measurement ruler as normal. While doing so, hit '[' to increase the elevation at the destination by one step. A step is equal to the grid size (typically 5 feet). Hit ']' to decrease the elevation at the destination by one step. 
 
