@@ -26,7 +26,7 @@
     },
     
     {
-      "name": "libruler"
+      "name": "libruler",
       "manifest": "https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json"
     }
 
