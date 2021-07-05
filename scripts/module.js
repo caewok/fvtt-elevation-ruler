@@ -1,7 +1,7 @@
 import { registerSettings, registerHotkeys } from "./settings.js";
 import { registerRuler } from "./patching.js";
 
-export const MODULE_ID = 'elevation-ruler';
+export const MODULE_ID = 'elevationruler';
 const FORCE_DEBUG = false; // used for logging before dev mode is set up
 
 
@@ -30,10 +30,6 @@ Hooks.once('init', async function() {
 // but before entities, packs, UI, canvas, etc. has been initialized
 Hooks.once('setup', async function() {
   log("Setup.");
-  if(!game.modules.get('lib-wrapper')?.active && game.user.isGM) ui.notifications.error("'Elevation Ruler' requires the 'libWrapper' module. Please install and activate this dependency.");
-  if(!game.modules.get('lib-df-hotkeys')?.active && game.user.isGM) ui.notifications.error("'Elevation Ruler' requires the 'Library: DF Hotkeys' module. Please install and activate this dependency.");
-  if(!game.modules.get('lib-ruler')?.active && game.user.isGM) ui.notifications.error("'Elevation Ruler' requires the 'libRuler' module. Please install and activate this dependency.");
-
   
   registerHotkeys(); // should go before registering settings, so hotkey group is defined
   registerSettings();
@@ -43,6 +39,11 @@ Hooks.once('setup', async function() {
 // ready is called once everything is loaded up and ready to go.
 Hooks.once('ready', async function() {
   log("Readying.");
+  if(game?.user?.isGM === undefined || game.user.isGM) {
+    if(!game.modules.get('lib-wrapper')?.active) ui.notifications.error("'Elevation Ruler' requires the 'libWrapper' module. Please install and activate this dependency.");
+    if(!game.modules.get('lib-df-hotkeys')?.active) ui.notifications.error("'Elevation Ruler' requires the 'Library: DF Hotkeys' module. Please install and activate this dependency.");
+    if(!game.modules.get('libruler')?.active) ui.notifications.error("'Elevation Ruler' requires the 'libRuler' module. Please install and activate this dependency.");
+  }
 });
 
 // https://github.com/League-of-Foundry-Developers/foundryvtt-devMode
