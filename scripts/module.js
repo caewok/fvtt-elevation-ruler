@@ -1,7 +1,7 @@
 import { registerSettings, registerHotkeys } from "./settings.js";
 import { registerRuler } from "./patching.js";
 
-export const MODULE_ID = 'elevation-ruler';
+export const MODULE_ID = 'elevationruler';
 const FORCE_DEBUG = false; // used for logging before dev mode is set up
 
 
@@ -33,7 +33,7 @@ Hooks.once('setup', async function() {
   if(game?.user?.isGM === undefined || game.user.isGM) {
     if(!game.modules.get('lib-wrapper')?.active) ui.notifications.error("'Elevation Ruler' requires the 'libWrapper' module. Please install and activate this dependency.");
     if(!game.modules.get('lib-df-hotkeys')?.active) ui.notifications.error("'Elevation Ruler' requires the 'Library: DF Hotkeys' module. Please install and activate this dependency.");
-    if(!game.modules.get('lib-ruler')?.active) ui.notifications.error("'Elevation Ruler' requires the 'libRuler' module. Please install and activate this dependency.");
+    if(!game.modules.get('libruler')?.active) ui.notifications.error("'Elevation Ruler' requires the 'libRuler' module. Please install and activate this dependency.");
   }
 
   
