@@ -1,3 +1,6 @@
+## 0.1.3
+Catch case where game.users.isGM is undefined.
+
 ## 0.1.2
 Update the module.json to use a name without special characters to conform to Foundry requirements. Update Foundry compatibility to 0.8.8.
 
