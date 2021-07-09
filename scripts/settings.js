@@ -26,6 +26,16 @@ export function registerSettings() {
     default: game.modules.get("enhanced-terrain-layer")?.active,
     type: Boolean
   });
+  
+  log("Registering levels settings.");
+  game.settings.register(MODULE_ID, "enable-levels-elevation", {
+    name: 'Use Levels',
+    hint: 'Take into account Levels elevation when measuring. Requires Levels module.',
+    scope: "world",
+    config: true,
+    default: game.modules.get("levels")?.active,
+    type: Boolean
+  });
 
 
   log("Done registering settings.");
