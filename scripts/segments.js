@@ -44,14 +44,9 @@ UX goals:
   let starting_elevation = 0;
   if(this.segment_num === 0) {
     // starting elevation equals the token elevation 
-    // if no token, starting elevation equals the terrain elevation if using
-    const token = this.ruler._getMovementToken();
-    if(token) {
-      starting_elevation = getProperty(token, "data.elevation");
-    } else {
-      starting_elevation = TerrainElevationAtPoint(this.ray.A); // elevation at origin
-    }
-    
+    // if no token, use elevation at the point. 
+    starting_elevation = ElevationAtPoint(p, this.ruler._getMovementToken(), 0) // 0 starting elevation otherwise
+
   } else {
     // starting elevation is the prior segment end elevation
     starting_elevation = this.prior_segment.getFlag(MODULE_ID, "ending_elevation");    
@@ -59,10 +54,11 @@ UX goals:
   }
   
   
-  const incremental_elevation = toGridDistance(elevation_increments[this.segment_num])
-  const ending_elevation = calculateEndElevation(this.ray.B, incremental_elevation);
-  
-  log(`elevationRulerAddProperties segment ${this.segment_num}: ${starting_elevation}[start]; ${incremental_elevation}[incremental]; ${ending_elevation}[end]`);
+  const incremental_elevation = toGridDistance(elevation_increments[this.segment_num]);
+  const current_point_elevation = ElevationAtPoint(this.ray.B, undefined, starting_elevation); // no starting token; assume we are at the elevation from the last segment
+  const ending_elevation = current_point_elevation + incremental_elevation;
+   
+  log(`elevationRulerAddProperties segment ${this.segment_num}: ${starting_elevation}[start]; ${incremental_elevation}[incremental]; ${current_point_elevation}[current point]`);
   
   // Track whether any elevation change has been requested for ruler labeling.
   // Also track whether ruler elevation has changed due to a shift in terrain elevation or starting token elevation.
@@ -80,36 +76,6 @@ UX goals:
   return wrapped(...args);
 }
 
-
-
-
-/*
- * Helper function to calculate ending elevation, which is also needed when moving tokens.
- */
-export function calculateEndElevation(p, incremental_elevation) {
-  // check for tokens; take the highest one at a given position
-  let tokens = retrieveVisibleTokens();
-  
-  // TO DO: Somehow catch this information so we don't keep revisiting the same tokens over and over? 
-  //        Would it be reasonable to cache per ruler? Or cache visible tokens? 
-  const max_token_elevation = tokens.reduce((total, t) => {
-    // is the point within the token control area? 
-    if(!pointWithinToken(p, t)) return total;
-    return Math.max(t.data.elevation, total);
-  }, Number.NEGATIVE_INFINITY) || Number.NEGATIVE_INFINITY;
-  
-  log(`calculateEndElevation: ${tokens.length} tokens with maximum elevation ${max_token_elevation}`);
-  
-  // use tokens rather than elevation if available
-  if(isFinite(max_token_elevation)) return max_token_elevation + incremental_elevation;
-
-  const terrain_elevation = TerrainElevationAtPoint(p); // elevation at destination
-  const ending_elevation = terrain_elevation + incremental_elevation;
-  
-  log(`calculateEndElevation segment: ${terrain_elevation}[terrain] + ${incremental_elevation}[incremental] = ${ending_elevation}[end]`);
-
-  return ending_elevation;
-}
 
 /**
  * Check if point is within the controlled area of the token
@@ -137,8 +103,6 @@ function retrieveVisibleTokens() {
 export function toGridDistance(increment) {
   return Math.round(increment * canvas.scene.data.gridDistance * 100) / 100;
 }
-
-
 
 
 export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
@@ -234,6 +198,8 @@ export function elevationRulerGetText(wrapped, ...args) {
   return orig_label + "\n" + elevation_label;
 }
 
+
+
 /*
  * Construct a label to represent elevation changes in the ruler.
  * Waypoint version: 10 ft↑ [@10 ft]
@@ -261,41 +227,139 @@ function segmentElevationLabel(segmentElevationIncrement, segmentCurrentElevatio
   return label;
 }
 
+/*
+ * Measure elevation at a given point.
+ * Prioritize:
+ *   1. Token object, if provided.
+ *   2. Other token at point, if found.
+ *   3. Levels, if any
+ *   4. Terrain, if any
+ * @param {PIXI.Point} p    Point to measure, in {x, y} format
+ * @param {Object} token    Token to use, if any
+ * @return {Number} Elevation for the given point.
+ */
+// also needed to move tokens in Ruler class
+export function ElevationAtPoint(p, token, starting_elevation = 0) {
+  if(token) { return getProperty(token, "data.elevation"); }
+  
+  // check for tokens; take the highest one at a given position
+  let tokens = retrieveVisibleTokens();
+  const max_token_elevation = tokens.reduce((total, t) => {
+    // is the point within the token control area? 
+    if(!pointWithinToken(p, t)) return total;
+    return Math.max(t.data.elevation, total);
+  }, Number.NEGATIVE_INFINITY) || Number.NEGATIVE_INFINITY;
+  
+  log(`calculateEndElevation: ${tokens.length} tokens with maximum elevation ${max_token_elevation}`);
+  
+  // use tokens rather than elevation if available
+  if(isFinite(max_token_elevation)) { return max_token_elevation; }
+
+  // try levels
+  const levels_elevation = LevelsElevationAtPoint(p, starting_elevation);
+  if(levels_elevation !== undefined) { return levels_elevation; }
+  
+  // try terrain
+  const terrain_elevation = TerrainElevationAtPoint(p);
+  if(terrain_elevation !== undefined) { return terrain_elevation; }
+  
+  // default to 0 elevation for the point
+  return 0;
+}
+  
+
 // ----- TERRAIN LAYER ELEVATION ----- //
+/* 
+ * Measure the terrain elevation at a given point. 
+ * Elevation should be the maximum terrain elevation.
+ * @param {PIXI.Point} p    Point to measure, in {x, y} format.
+ * @return {Number|undefined} Point elevation or undefined if terrain layer is inactive or no terrain found.
+ */
 function TerrainElevationAtPoint(p) {
   if(!game.settings.get(MODULE_ID, "enable-terrain-elevation") || !game.modules.get("enhanced-terrain-layer")?.active) {
-    return(0);
+    return undefined;
   }
+     
+  const terrains = canvas.terrain.terrainsFromPixels(p.x, p.y); 
+  if(terrains.length === 0) return undefined; // no terrains found at the point.
+
+  // get the maximum non-infinite elevation point using terrain max
+  // must account for possibility of 
+  // TO-DO: Allow user to ignore certain terrain types?
+  let terrain_max_elevation = terrains.reduce((total, t) => {
+   if(!isFinite(t.max)) return total;
+   return Math.max(total, t.max);
+  }, Number.NEGATIVE_INFINITY);
+
+  // in case all the terrain maximums are infinite.
+  terrain_max_elevation = isFinite(terrain_max_elevation) ? terrain_max_elevation : 0;
+
+  log(`TerrainElevationAtPoint: Returning elevation ${terrain_max_elevation} for point ${p}`, terrains);
+
+  return terrain_max_elevation;
+}
+
+// ----- LEVELS ELEVATION ----- //
+// use cases:
+// generally:
+// - if over a level-enabled object, use the bottom of that level.
+// - if multiple, use the bottom
+// - if hole, use the bottom
+// starting point of the ruler is a token: 
+// - if the same level is present, stay at that level 
+//   (elevation should be found from the token, so no issue)
+// - if a hole, go to bottom of the hole
+// - display level as labeled in the levels object flag?
+
+/*
+ * Measure the elevation of any levels tiles at the point.
+ * If the point is within a hole, return the bottom of that hole.
+ * If the point is within a level, return the bottom of the level.
+ * @param {PIXI.Point} p    Point to measure, in {x, y} format.
+ * @return {Number|undefined} Levels elevation or undefined if levels is inactive or no levels found.
+ */
+function LevelsElevationAtPoint(p, starting_elevation) {
+  if(!game.settings.get(MODULE_ID, "enable-levels-elevation") || !game.modules.get("levels")?.active) {
+    return undefined;
+  }
+
+  // if in a hole, use that
+  const hole_elevation = checkForHole(p, current_elevation);
+  if(hole_elevation !== undefined) return hole_elevation;
   
-  // modified terrainAt to account for issue: https://github.com/ironmonk88/enhanced-terrain-layer/issues/38
-   const terrain_layer = canvas.layers.filter(l => l?.options?.objectClass?.name === "Terrain")[0];
-   const hx = canvas.grid.w / 2;
-   const hy = canvas.grid.h / 2;
-   const shifted_x = p.x + hx;
-   const shifted_y = p.y + hy;
-        
-   let terrains = terrain_layer.placeables.filter(t => {
-     const testX = shifted_x - t.data.x;
-     const testY = shifted_y - t.data.y;
-     return t.shape.contains(testX, testY);
-   });
-   
-   if(terrains.length === 0) return 0; // default to no elevation change at point without terrain.
-   
-   // get the maximum non-infinite elevation point using terrain max
-   // must account for possibility of 
-   // TO-DO: Allow user to ignore certain terrain types?
-   let terrain_max_elevation = terrains.reduce((total, t) => {
-     if(!isFinite(t.max)) return total;
-     return Math.max(total, t.max);
-   }, Number.NEGATIVE_INFINITY);
-   
-   // in case all the terrain maximums are infinite.
-   terrain_max_elevation = isFinite(terrain_max_elevation) ? terrain_max_elevation : 0;
-   
-   log(`TerrainElevationAtPoint: Returning elevation ${terrain_max_elevation} for point ${p}`, terrains);
-   
-   return terrain_max_elevation;
+  // use levels if found
+  const levels_objects = _levels.getFloorsForPoint(p); // @returns {Object[]} returns an array of object each containing {tile,range,poly}
+  log("LevelsElevationAtPoint levels_objects", levels_objects);
+  return checkForLevel(p, starting_elevation); 
+}
+
+
+// Check for level; return bottom elevation
+function checkForLevel(intersectionPT, zz) {
+  const levels_objects = _levels.getFloorsForPoint(point); // @returns {Object[]} returns an array of object each containing {tile,range,poly}
+  for(let level of levels_objects) {
+    const hbottom = level.range[0];
+    const htop = level.range[1];
+    if(zz > htop || zz < hbottom) continue;
+    if(level.poly.contains(intersectionPt.x, intersectionPt.y)) {
+      return hbottom;
+    }
+  }
+  return undefined;
+}
+
+// Check if a floor is hollowed by a hole
+// Based on Levels function, modified to return bottom elevation of the hole.
+function checkForHole(intersectionPT, zz) {
+  for(let hole of _levels.levelsHoles) {
+    const hbottom = hole.range[0];
+    const htop = hole.range[1];
+    if (zz > htop || zz < hbottom) continue;
+    if (hole.poly.contains(intersectionPT.x, intersectionPT.y)) {
+      return hbottom;
+    }
+  }
+  return undefined;
 }
 
 
