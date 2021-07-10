@@ -1,3 +1,6 @@
+## 0.2.1
+Catch when no Levels tiles are present under the ruler position, so that Levels floor labels do not appear unnecessarily.
+
 ## 0.2.0
 Add levels measurement function
 - When over a levels tile, default to the bottom elevation of that tile.
