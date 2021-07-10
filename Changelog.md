@@ -1,3 +1,9 @@
+## 0.2.0
+Add levels measurement function
+- When over a levels tile, default to the bottom elevation of that tile.
+- When over a levels hole, default to the bottom elevation of that hole.
+Switch to using `canvas.terrain.terrainsFromPixels` (requires Enhanced Terrain Layer 1.0.30+).
+
 ## 0.1.3
 Catch case where game.users.isGM is undefined.
 
