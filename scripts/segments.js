@@ -68,7 +68,7 @@ UX goals:
   }
   
   if(game.settings.get(MODULE_ID, "enable-levels-floor-label")) {
-    this.setFlag(MODULE_ID, "elevation_level_name", LevelNameAtPoint(this_ray.B, ending_elevation)); 
+    this.setFlag(MODULE_ID, "elevation_level_name", LevelNameAtPoint(this.ray.B, ending_elevation)); 
   } 
   this.setFlag(MODULE_ID, "starting_elevation", starting_elevation);
   this.setFlag(MODULE_ID, "ending_elevation", ending_elevation);
@@ -195,7 +195,14 @@ export function elevationRulerGetText(wrapped, ...args) {
   
   if(!path_has_elevation_change) { return orig_label; }
   
-  const elevation_label = segmentElevationLabel(ending_elevation - starting_elevation, ending_elevation);
+  let elevation_label = segmentElevationLabel(ending_elevation - starting_elevation, ending_elevation);
+  if(game.settings.get(MODULE_ID, "enable-levels-floor-label")) {
+    const level_name = this.getFlag(MODULE_ID, "elevation_level_name");
+    if(level_name) {
+      elevation_label += `\n${level_name}`;
+    }
+  } 
+ 
   log(`elevation_label is ${elevation_label}`);
   return orig_label + "\n" + elevation_label;
 }
@@ -220,13 +227,6 @@ function segmentElevationLabel(segmentElevationIncrement, segmentCurrentElevatio
   // * 100 / 100 is used in _getSegmentLabel; not sure whys
   let label = `${Math.abs(Math.round(segmentElevationIncrement * 100) / 100)} ${canvas.scene.data.gridUnits}${segmentArrow}`;
   label += ` [@${Math.round(segmentCurrentElevation * 100) / 100} ${canvas.scene.data.gridUnits}]`;
- 
-  if(game.settings.get(MODULE_ID, "enable-levels-floor-label")) {
-    const level_name = this.getFlag(MODULE_ID, "elevation_level_name");
-    if(level_name) {
-      label += `\n<i>${level_name}</i>`;
-    }
-  } 
  
   return label;
 }
@@ -342,12 +342,12 @@ function LevelNameAtPoint(p, zz) {
     return undefined;
   }
 
-  const floors = _levels.getFloorsForPoint(intersectionPT);
+  const floors = _levels.getFloorsForPoint(p);
   if(!floors) { return undefined; }
   
   const levels_data = canvas.scene.getFlag("levels", "sceneLevels") // array with [0]: bottom; [1]: top; [2]: name
   for(let l of levels_data) {
-     if (elevation <= l[1] && elevation >= l[0])
+     if (zz <= l[1] && zz >= l[0])
        return l[2];
   }
   return undefined; 
