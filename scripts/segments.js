@@ -348,7 +348,7 @@ function LevelNameAtPoint(p, zz) {
   }
 
   const floors = _levels.getFloorsForPoint(p);
-  if(!floors) { return undefined; }
+  if(!floors || floors.length < 1) { return undefined; }
   
   const levels_data = canvas.scene.getFlag("levels", "sceneLevels") // array with [0]: bottom; [1]: top; [2]: name
   for(let l of levels_data) {
