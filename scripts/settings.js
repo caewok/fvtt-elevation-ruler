@@ -36,6 +36,15 @@ export function registerSettings() {
     default: game.modules.get("levels")?.active,
     type: Boolean
   });
+  
+  game.settings.register(MODULE_ID, "enable-levels-floor-label", {
+    name: 'Levels Floor Label',
+    hint: 'Label the ruler with the current floor. Requires Levels module.',
+    scope: "world",
+    config: true,
+    default: game.modules.get("levels")?.active,
+    type: Boolean
+  });
 
 
   log("Done registering settings.");
