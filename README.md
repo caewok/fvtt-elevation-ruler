@@ -4,10 +4,11 @@
 
 # Elevation Ruler
 
-This module allows the default Foundry measurement ruler to track change in elevation. Elevation can be changed while using the ruler in three ways:
+This module allows the default Foundry measurement ruler to track change in elevation. Elevation can be changed while using the ruler in four ways:
 1. Manually. Hit the specified hot key (default: '[' to increment and ']' to decrement).
 2. Token. When hovering over a token with the ruler, the origin or destination elevation (as applicable) will update. 
 3. Enhanced Terrain Layer. If a terrain layer is present with a finite max elevation, that max elevation will be used for the elevation.
+4. Levels. If the Levels module is present, the ruler will look for Levels-enabled tiles or holes and default to the bottom elevation of that tile or hole.
 
 The distance calculation updates based on the distance measured, assuming a straight line in three dimensions between origin and destination, taking into account elevation change.
 
@@ -25,6 +26,8 @@ Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/
 
 ## Modules that add functionality
 - [Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer)
+- [Levels](https://github.com/theripper93/Levels)
+- [Wall Height](https://github.com/erithtotl/FVTT-Wall-Height)
 
 ## Known conflicts
 - [Terrain Ruler](https://github.com/manuelVo/foundryvtt-terrain-ruler)
@@ -38,7 +41,7 @@ In general, modules that overwrite or extend the Ruler Class may cause the eleva
 
 It has been tested on dnd5e 1.3.3 to 1.3.6. Because it adds to the functionality of the underlying Foundry measurement ruler, it may work on other systems as well, unless the system overrides key Foundry measurement functions in the Ruler Class.
 
-# Details
+# How to Use
 
 To use, start measuring with the Foundry measurement ruler as normal. While doing so, hit '[' to increase the elevation at the destination by one step. A step is equal to the grid size (typically 5 feet). Hit ']' to decrease the elevation at the destination by one step. 
 
@@ -87,7 +90,19 @@ This video shows both terrain and token measurement in action.
 
 ![Video Terrain Measurement](https://github.com/caewok/fvtt-elevation-ruler/raw/feature/media/media/terrain-measure.mov)
 
+## Levels measurement
 
+For a multi-level scene using the Levels module, the ruler will pick up on holes and Levels-enabled tiles. 
+
+In general, when the ruler endpoint is within a Levels-enabled tile, the bottom-most elevation of the bottom tile will be displayed. 
+
+If you start the ruler on a token, the ruler will stay at the bottom-most elevation of the current floor for that token, unless it encounters a hole, a token, or an area that is not within a Levels-enabled tile.
+
+Hitting spacebar can move the token between levels if you start the ruler measurement at your token. Note that this may allow players to move between levels at points other than at stairs, holes, or elevators, just as directly adjusting a token's elevation would. 
+
+## Elevation changes when moving the token with spacebar
+
+As with the normal Foundry ruler, if you begin a measurement at your token, you can hit spacebar to move the token. Elevation is modified at the end of each waypoint segment move. This may allow you, for example, to jump over a wall if that wall has a maximum height under your current elevation as can be set up using the Wall Height module (or Levels + Wall Height).
 
 
 
