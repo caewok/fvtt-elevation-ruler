@@ -66,8 +66,10 @@ UX goals:
   if("getFlag" in this.prior_segment) {
     path_has_elevation_change = path_has_elevation_change || this.prior_segment.getFlag(MODULE_ID, "path_has_elevation_change");
   }
-   
   
+  if(game.settings.get(MODULE_ID, "enable-levels-floor-label")) {
+    this.setFlag(MODULE_ID, "elevation_level_name", LevelNameAtPoint(this_ray.B, ending_elevation)); 
+  } 
   this.setFlag(MODULE_ID, "starting_elevation", starting_elevation);
   this.setFlag(MODULE_ID, "ending_elevation", ending_elevation);
   this.setFlag(MODULE_ID, "incremental_elevation", incremental_elevation)
@@ -217,13 +219,15 @@ function segmentElevationLabel(segmentElevationIncrement, segmentCurrentElevatio
   // Take absolute value b/c segmentArrow will represent direction
   // * 100 / 100 is used in _getSegmentLabel; not sure whys
   let label = `${Math.abs(Math.round(segmentElevationIncrement * 100) / 100)} ${canvas.scene.data.gridUnits}${segmentArrow}`;
-  
- //  if ( this.last ) {
-//       const totalArrow = (totalElevationIncrement > 0) ? "↑" :
-//                       (totalElevationIncrement < 0) ? "↓" :
-//                       "";
-      label += ` [@${Math.round(segmentCurrentElevation * 100) / 100} ${canvas.scene.data.gridUnits}]`;
- //  }
+  label += ` [@${Math.round(segmentCurrentElevation * 100) / 100} ${canvas.scene.data.gridUnits}]`;
+ 
+  if(game.settings.get(MODULE_ID, "enable-levels-floor-label")) {
+    const level_name = this.getFlag(MODULE_ID, "elevation_level_name");
+    if(level_name) {
+      label += `\n<i>${level_name}</i>`;
+    }
+  } 
+ 
   return label;
 }
 
@@ -331,6 +335,22 @@ function LevelsElevationAtPoint(p, starting_elevation) {
   const levels_objects = _levels.getFloorsForPoint(p); // @returns {Object[]} returns an array of object each containing {tile,range,poly}
   log("LevelsElevationAtPoint levels_objects", levels_objects);
   return checkForLevel(p, starting_elevation); 
+}
+
+function LevelNameAtPoint(p, zz) {
+  if(!game.settings.get(MODULE_ID, "enable-levels-elevation") || !game.modules.get("levels")?.active) {
+    return undefined;
+  }
+
+  const floors = _levels.getFloorsForPoint(intersectionPT);
+  if(!floors) { return undefined; }
+  
+  const levels_data = canvas.scene.getFlag("levels", "sceneLevels") // array with [0]: bottom; [1]: top; [2]: name
+  for(let l of levels_data) {
+     if (elevation <= l[1] && elevation >= l[0])
+       return l[2];
+  }
+  return undefined; 
 }
 
 
