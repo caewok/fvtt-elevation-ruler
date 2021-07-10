@@ -68,7 +68,10 @@ UX goals:
   }
   
   if(game.settings.get(MODULE_ID, "enable-levels-floor-label")) {
-    this.setFlag(MODULE_ID, "elevation_level_name", LevelNameAtPoint(this.ray.B, ending_elevation)); 
+    const level_name = LevelNameAtPoint(this.ray.B, ending_elevation);
+    log(`Level name for segment ${this.segment_num} is ${level_name}`);
+  
+    this.setFlag(MODULE_ID, "elevation_level_name", level_name); 
   } 
   this.setFlag(MODULE_ID, "starting_elevation", starting_elevation);
   this.setFlag(MODULE_ID, "ending_elevation", ending_elevation);
@@ -198,6 +201,8 @@ export function elevationRulerGetText(wrapped, ...args) {
   let elevation_label = segmentElevationLabel(ending_elevation - starting_elevation, ending_elevation);
   if(game.settings.get(MODULE_ID, "enable-levels-floor-label")) {
     const level_name = this.getFlag(MODULE_ID, "elevation_level_name");
+    log(`elevationRulerGetText: Level name is ${level_name}`);
+    
     if(level_name) {
       elevation_label += `\n${level_name}`;
     }
