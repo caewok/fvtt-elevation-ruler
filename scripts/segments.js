@@ -45,7 +45,7 @@ UX goals:
   if(this.segment_num === 0) {
     // starting elevation equals the token elevation 
     // if no token, use elevation at the point. 
-    starting_elevation = ElevationAtPoint(p, this.ruler._getMovementToken(), 0) // 0 starting elevation otherwise
+    starting_elevation = ElevationAtPoint(this.ray.A, this.ruler._getMovementToken(), 0) // 0 starting elevation otherwise
 
   } else {
     // starting elevation is the prior segment end elevation
@@ -280,7 +280,7 @@ function TerrainElevationAtPoint(p) {
     return undefined;
   }
      
-  const terrains = canvas.terrain.terrainsFromPixels(p.x, p.y); 
+  const terrains = canvas.terrain.terrainFromPixels(p.x, p.y); 
   if(terrains.length === 0) return undefined; // no terrains found at the point.
 
   // get the maximum non-infinite elevation point using terrain max
@@ -324,7 +324,7 @@ function LevelsElevationAtPoint(p, starting_elevation) {
   }
 
   // if in a hole, use that
-  const hole_elevation = checkForHole(p, current_elevation);
+  const hole_elevation = checkForHole(p, starting_elevation);
   if(hole_elevation !== undefined) return hole_elevation;
   
   // use levels if found
@@ -336,17 +336,23 @@ function LevelsElevationAtPoint(p, starting_elevation) {
 
 // Check for level; return bottom elevation
 function checkForLevel(intersectionPT, zz) {
-  const levels_objects = _levels.getFloorsForPoint(point); // @returns {Object[]} returns an array of object each containing {tile,range,poly}
-  for(let level of levels_objects) {
-    const hbottom = level.range[0];
-    const htop = level.range[1];
-    if(zz > htop || zz < hbottom) continue;
-    if(level.poly.contains(intersectionPt.x, intersectionPt.y)) {
-      return hbottom;
-    }
-  }
-  return undefined;
+  // poly undefined for tiles.
+  const floors = _levels.getFloorsForPoint(intersectionPT); // @returns {Object[]} returns an array of object each containing {tile,range,poly} 
+  log(`checkForLevel floors`, floors);
+  //const floor_range = _levels.findCurrentFloorForElevation(zz, floors); // broken
+  const floor_range = findCurrentFloorForElevation(zz, floors);
+  log(`checkForLevel current floor range for elevation ${zz}: ${floor_range[0]} ${floor_range[1]}`);
+  if(!floor_range) return undefined;
+  return floor_range[0];
 }
+
+function findCurrentFloorForElevation(elevation, floors) {
+   for(let floor of floors) {
+     if (elevation <= floor.range[1] && elevation >= floor.range[0])
+       return floor.range;
+   }
+   return false;
+  }
 
 // Check if a floor is hollowed by a hole
 // Based on Levels function, modified to return bottom elevation of the hole.

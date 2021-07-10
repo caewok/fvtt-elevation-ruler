@@ -250,29 +250,25 @@ export function decrementElevation() {
 // When moving the token along the segments, update the token elevation to the destination + increment
 // update the token after the move.
 export async function elevationRulerAnimateToken(wrapped, token, ray, dx, dy, segment_num) {
-  const res = wrapped(token, ray, dx, dy, segment_num);
 
   log(`Updating token elevation for segment ${segment_num}`, token);
-  const token_current_elevation = getProperty(token, "data.elevation");
   
   const elevation_increments = duplicate(this.getFlag(MODULE_ID, "elevation_increments"));
   const destination_elevation_increment = this.getFlag(MODULE_ID, "destination_elevation_increment");
   elevation_increments.push(destination_elevation_increment);
   
   const incremental_elevation = toGridDistance(elevation_increments[segment_num]);
-  const current_point_elevation = ElevationAtPoint(this.ray.B, undefined, token_current_elevation); 
-  const ending_elevation = current_point_elevation + incremental_elevation;
-  
-  
-  const end_elevation = calculateEndElevation(ray.B, incremental_elevation);
   
   const current_elevation = getProperty(token, "data.elevation");
+  const destination_point_elevation = ElevationAtPoint(ray.B, undefined, current_elevation); 
+  const end_elevation = destination_point_elevation + incremental_elevation;
+  
   log(`Current token elevation is ${current_elevation}. Will be changed to ${end_elevation}.`);
   if(current_elevation !== end_elevation) {
     await token.document.update({ 'elevation': end_elevation });
   }
-  
-  return res;
+
+  return wrapped(token, ray, dx, dy, segment_num);
 }
 
 
