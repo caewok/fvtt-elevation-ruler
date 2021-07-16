@@ -1,3 +1,6 @@
+## 0.2.2
+Update manifest for libruler dependency to point to correct JSON URL. Fixes #2.
+
 ## 0.2.1
 Catch when no Levels tiles are present under the ruler position, so that Levels floor labels do not appear unnecessarily.
 
