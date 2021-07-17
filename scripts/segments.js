@@ -171,7 +171,7 @@ export function elevationRulerDistanceFunction(wrapped, physical_path) {
   // depending on cardinality of the move, as rounding will increase/decrease to the nearest gridspace
   if(this.measure_distance_options?.gridSpaces) {
     // canvas.grid.getCenter returns an array [x, y];
-    const snapped = canvas.grid.getCenter(physical_path.destination)
+    const snapped = canvas.grid.getCenter(physical_path.destination.x, physical_path.destination.y);
     log(`Snapping ${physical_path.destination.x}, ${physical_path.destination.y} to ${snapped[0]}, ${snapped[1]}`);
     physical_path.destination = { x: snapped[0], y: snapped[1] };
   }
