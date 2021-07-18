@@ -7,6 +7,8 @@ import { MODULE_ID, log } from "./module.js";
  * - ending elevation of the segment 
  */
 export function elevationRulerAddProperties(wrapped, ...args) {
+  log(`elevationRulerAddProperties: this`, this);
+
   if(this.segment_num < 0) {
     console.error(`${MODULE_ID}|libRulerAddProperties: this.segment_num is less than zero`, this);
     return;
@@ -46,6 +48,7 @@ UX goals:
     // starting elevation equals the token elevation 
     // if no token, use elevation at the point. 
     starting_elevation = ElevationAtPoint(this.ray.A, this.ruler._getMovementToken(), 0) // 0 starting elevation otherwise
+    log(`Starting elevation using origin ${this.ray.A.x}, ${this.ray.A.y}`, this.ruler._getMovementToken());
 
   } else {
     // starting elevation is the prior segment end elevation
@@ -57,6 +60,7 @@ UX goals:
   const incremental_elevation = toGridDistance(elevation_increments[this.segment_num]);
   const current_point_elevation = ElevationAtPoint(this.ray.B, undefined, starting_elevation); // no starting token; assume we are at the elevation from the last segment
   const ending_elevation = current_point_elevation + incremental_elevation;
+  log(`Current elevation using point ${this.ray.B.x}, ${this.ray.B.y}`);
    
   log(`elevationRulerAddProperties segment ${this.segment_num}: ${starting_elevation}[start]; ${incremental_elevation}[incremental]; ${current_point_elevation}[current point]`);
   
