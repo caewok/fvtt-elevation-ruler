@@ -32,12 +32,12 @@ UX goals:
     would go from 5 to 55. 
   */
   
-  const elevation_increments = duplicate(this.ruler.getFlag(MODULE_ID, "elevation_increments"));
+  const elevation_increments = duplicate(this.ruler.getFlag(MODULE_ID, "elevation_increments") || []);
   log(`${elevation_increments.length} elevation increments for ruler flag.`)
   
-  const destination_elevation_increment = this.ruler.getFlag(MODULE_ID, "destination_elevation_increment");
+  const destination_elevation_increment = this.ruler.getFlag(MODULE_ID, "destination_elevation_increment") || 0;
   elevation_increments.push(destination_elevation_increment);
-  log(`${this.ruler.getFlag(MODULE_ID, "elevation_increments").length} elevation increments for ruler flag.`);
+  log(`${this.ruler.getFlag(MODULE_ID, "elevation_increments").length} destination elevation increments for ruler flag.`);
   
   
   elevation_increments.shift(); //first increment is 0 for the origin waypoint
