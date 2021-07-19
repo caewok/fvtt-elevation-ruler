@@ -32,7 +32,11 @@ UX goals:
     would go from 5 to 55. 
   */
   
-  const elevation_increments = duplicate(this.ruler.getFlag(MODULE_ID, "elevation_increments") || []);
+  let elevation_increments = duplicate(this.ruler.getFlag(MODULE_ID, "elevation_increments"));
+  if(!elevation_increments || elevation_increments.length < 1) {
+    elevation_increments = [0];
+  } 
+  
   log(`${elevation_increments.length} elevation increments for ruler flag.`)
   
   const destination_elevation_increment = this.ruler.getFlag(MODULE_ID, "destination_elevation_increment") || 0;
