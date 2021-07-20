@@ -158,7 +158,7 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
     } else if(idx === last_idx || !("z" in p)) {
       // destination or intermediate p without a z dimension.
       const p_origin = arr[idx - 1];
-      const simple_path_distance = RulerSegment.CalculateDistance(p_origin, p);
+      const simple_path_distance = this.calculateDistance(p_origin, p);
       const ratio = simple_path_distance / ruler_distance;
       p.z = starting_elevation_grid_units + elevation_delta * ratio;
     }   
