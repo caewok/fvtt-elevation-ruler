@@ -1,3 +1,6 @@
+# 0.2.4
+Minor update with additional checks on presence of elevation increment flag. Additional logging. 
+
 # 0.2.3
 Fix #3. When a grid is present, snap the projected destination point to the center of the grid. This keeps the distances consistent for different cardinalities. Rounding still occurs with grid measurements such that adjacent squares may have the same measured 3-D distance despite appearing to be closer/further from the origin point. 
 
