@@ -1,3 +1,9 @@
+# 0.3.0
+Move to libRuler 0.1 compatibility. 
+Breaking changes due to libRuler changes:
+- `Segment` class is now `RulerSegment`
+- libRuler now handles the measurement from a 3-D path; Elevation Ruler only creates the path.
+
 # 0.2.4
 Minor update with additional checks on presence of elevation increment flag. Additional logging. 
 
