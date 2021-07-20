@@ -142,53 +142,33 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   //   destination
   // Need to apply canvas.scene.data.grid (140) and canvas.scene.data.gridDistance (5)
   // 7350 (x1) - 6930 (x0) = 420 (delta_x) / 140 * 5 = move in canvas units (e.g. 15')
-
-  // will need to address later if there are multiple points in the physical path, rather
-  // than just origin and destination...
   const elevation_delta = ending_elevation_grid_units - starting_elevation_grid_units; 
   const ruler_distance = this.ray.distance;
   
-  // destination
-  const simple_path_distance = CalculateDistance(default_path.origin, default_path.destination);
-  const ratio = simple_path_distance / ruler_distance;
-  default_path.destination.z =   starting_elevation_grid_units + elevation_delta * ratio;
-  
-  // origin
-  default_path.origin.z = starting_elevation_grid_units;
+  // Assume there could be multiple points in the path, represented by an array.
+  // The starting point must have the pre-determined starting elevation.
+  // The ending point must have the calculated elevation.
+  // Any points in-between should have a ratio unless they already have a z dimension.
+  const last_idx = default_path.length - 1;  
+  default_path.map((p, idx, arr) => { 
+    if(idx === 0) {
+      // origin
+      p.z = starting_elevation_grid_units;
+      return p;
+    } else if(idx === last_idx || !("z" in p)) {
+      // destination or intermediate p without a z dimension.
+      const p_origin = arr[idx - 1];
+      const simple_path_distance = RulerSegment.CalculateDistance(p_origin, p);
+      const ratio = simple_path_distance / ruler_distance;
+      p.z = starting_elevation_grid_units + elevation_delta * ratio;
+    }   
+    
+    return p;  
+  });
   
   log("Default path", default_path);
   
   return default_path;
-}
-
-export function elevationRulerDistanceFunction(wrapped, physical_path) {
-  // Project the 3-D path to 2-D canvas
-  log(`Projecting physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y}, ${physical_path.origin.z} 
-                                    to dest ${physical_path.destination.x}, ${physical_path.destination.y}, ${physical_path.destination.z}`);
-  
-  // for each of the points, construct a 2-D path and send to the underlying function
-  // will need to address later if there are multiple points in the physical path, rather
-  // than just origin and destination...
-  
-  physical_path.destination = ProjectElevatedPoint(physical_path.origin, physical_path.destination);
-  delete physical_path.origin.z;
-  delete physical_path.destination.z;
-  
-  // if we are using grid spaces, the destination needs to be re-centered to the grid.
-  // otherwise, when a token moves in 2-D diagonally, the 3-D measure will be inconsistent
-  // depending on cardinality of the move, as rounding will increase/decrease to the nearest gridspace
-  if(this.measure_distance_options?.gridSpaces) {
-    // canvas.grid.getCenter returns an array [x, y];
-    const snapped = canvas.grid.getCenter(physical_path.destination.x, physical_path.destination.y);
-    log(`Snapping ${physical_path.destination.x}, ${physical_path.destination.y} to ${snapped[0]}, ${snapped[1]}`);
-    physical_path.destination = { x: snapped[0], y: snapped[1] };
-  }
-  
-  
-  log(`Projected physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y} 
-                                     to dest ${physical_path.destination.x}, ${physical_path.destination.y}`);
-                                     
-  return wrapped(physical_path);
 }
 
 /* 
@@ -414,69 +394,3 @@ function checkForHole(intersectionPT, zz) {
 }
 
 
-// ----- MATH FOR MEASURING ELEVATION DISTANCE ----- //
-/**
- * Calculate a new point by projecting the elevated point back onto the 2-D surface
- * If the movement on the plane is represented by moving from point A to point B,
- *   and you also move 'height' distance orthogonal to the plane, the distance is the
- *   hypotenuse of the triangle formed by A, B, and C, where C is orthogonal to B.
- *   Project by rotating the vertical triangle 90º, then calculate the new point C. 
- *
- * Cx = { height * (By - Ay) / dist(A to B) } + Bx
- * Cy = { height * (Bx - Ax) / dist(A to B) } + By
- * @param {{x: number, y: number}} A
- * @param {{x: number, y: number}} B
- */
-function ProjectElevatedPoint(A, B) {
-  const height = B.z - A.z;
-  const distance = CalculateDistance(A, B);
-  const projected_x = B.x + ((height / distance) * (A.y - B.y));
-  const projected_y = B.y - ((height / distance) * (A.x - B.x));
-
-  return new PIXI.Point(projected_x, projected_y);
-}
-
-function CalculateDistance(A, B) {
-  const dx = B.x - A.x;
-  const dy = B.y - A.y;
-  return Math.hypot(dy, dx);
-}
-
-// console.log(Math.hypot(3, 4));
-// // expected output: 5
-// 
-// console.log(Math.hypot(5, 12));
-// // expected output: 13
-// 
-// let m;
-// let o = {x:0, y:0}
-// m = ProjectElevatedPoint(o, {x:1, y:0}, 1);
-// CalculateDistance(o, m) // 1.414
-// 
-// m = ProjectElevatedPoint(o, {x:3, y:0}, 4);
-// CalculateDistance(o, m) // 5
-// 
-// m = ProjectElevatedPoint(o, {x:0, y:3}, 4);
-// CalculateDistance(o, m) // 5 
-// 
-// m = ProjectElevatedPoint(o, {x:0, y:3}, 4);
-
-// m = distance
-// n = height
-// A = origin ()
-// B = destination (1)
-// C = destination with height (2)
-// |Ay - By| / m = |Bx - Cx| / n
-// |Ax - Bx| / m = |Cy - By| / n
-// 
-// |Bx - Cx| / n = |Ay - By| / m
-// |Cy - By| / n = |Ax - Bx| / m
-// 
-// |Bx - Cx| = |Ay - By| * n/m
-// |Cy - By| = |Ax - Bx| * n/m
-// 
-// Bx - Cx = ± n/m * (Ay - By)
-// Cy - By = ± n/m * (Ax - Bx)
-// 
-// Cx = Bx ± n/m * (Ay - By)
-// Cy = By ± n/m * (Ax - Bx)
