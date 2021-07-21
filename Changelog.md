@@ -1,3 +1,6 @@
+# 0.2.5
+For conceptual consistency, switch to projecting the origin point for the token so that the projected path goes from the token at a given height to the destination point. May not result in a different outcome in most cases, but may be different for edge cases when measuring diagonals. 
+
 # 0.2.4
 Minor update with additional checks on presence of elevation increment flag. Additional logging. 
 
