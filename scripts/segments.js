@@ -206,7 +206,7 @@ export function elevationRulerMeasurePhysicalPath(wrapped, physical_path) {
       if(this.distance_function_options?.gridSpaces) {
         // canvas.grid.getCenter returns an array [x, y];
     const snapped = canvas.grid.getCenter(physical_path.origin.x, physical_path.origin.y);
-    log(`Snapping ${physical_path.destination.x}, ${physical_path.destination.y} to ${snapped[0]}, ${snapped[1]}`);
+    log(`Snapping ${physical_path.origin.x}, ${physical_path.origin.y} to ${snapped[0]}, ${snapped[1]}`);
     physical_path.origin = { x: snapped[0], y: snapped[1] };
       log(`Projected physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y} to dest ${physical_path.destination.x}, ${physical_path.destination.y}`); 
   }
