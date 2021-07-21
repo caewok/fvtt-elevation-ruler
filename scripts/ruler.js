@@ -266,7 +266,7 @@ export async function elevationRulerAnimateToken(wrapped, token, ray, dx, dy, se
   log(`Current token elevation is ${current_elevation}. Will be changed to ${end_elevation}.`);
   
   // move the token first.
-  let res = wrapped(token, ray, dx, dy, segment_num);
+  let res = await wrapped(token, ray, dx, dy, segment_num);
   
   if(current_elevation !== end_elevation) {
     await token.document.update({ 'elevation': end_elevation });
