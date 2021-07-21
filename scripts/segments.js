@@ -170,18 +170,18 @@ export function elevationRulerDistanceFunction(wrapped, physical_path) {
   // will need to address later if there are multiple points in the physical path, rather
   // than just origin and destination...
   
-  physical_path.destination = ProjectElevatedPoint(physical_path.origin, physical_path.destination);
+  physical_path.origin = ProjectElevatedPoint(physical_path.origin, physical_path.destination);
   delete physical_path.origin.z;
   delete physical_path.destination.z;
   
-  // if we are using grid spaces, the destination needs to be re-centered to the grid.
+  // if we are using grid spaces, the projected origin needs to be re-centered to the grid.
   // otherwise, when a token moves in 2-D diagonally, the 3-D measure will be inconsistent
   // depending on cardinality of the move, as rounding will increase/decrease to the nearest gridspace
   if(this.measure_distance_options?.gridSpaces) {
     // canvas.grid.getCenter returns an array [x, y];
-    const snapped = canvas.grid.getCenter(physical_path.destination.x, physical_path.destination.y);
+    const snapped = canvas.grid.getCenter(physical_path.origin.x, physical_path.origin.y);
     log(`Snapping ${physical_path.destination.x}, ${physical_path.destination.y} to ${snapped[0]}, ${snapped[1]}`);
-    physical_path.destination = { x: snapped[0], y: snapped[1] };
+    physical_path.origin = { x: snapped[0], y: snapped[1] };
   }
   
   
@@ -427,11 +427,11 @@ function checkForHole(intersectionPT, zz) {
  * @param {{x: number, y: number}} A
  * @param {{x: number, y: number}} B
  */
-function ProjectElevatedPoint(A, B) {
-  const height = B.z - A.z;
+export function ProjectElevatedPoint(A, B) {
+  const height = A.z - B.z;
   const distance = CalculateDistance(A, B);
-  const projected_x = B.x + ((height / distance) * (A.y - B.y));
-  const projected_y = B.y - ((height / distance) * (A.x - B.x));
+  const projected_x = A.x + ((height / distance) * (B.y - A.y));
+  const projected_y = A.y - ((height / distance) * (B.x - A.x));
 
   return new PIXI.Point(projected_x, projected_y);
 }
