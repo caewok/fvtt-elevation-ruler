@@ -117,7 +117,29 @@ export function toGridDistance(increment) {
   return Math.round(increment * canvas.scene.data.gridDistance * 100) / 100;
 }
 
-
+ /*
+  * Construct a physical path for the segment that represents how the measured item 
+  *   actually would move within the segment.
+  *
+  * This patch adds the 3rd dimension as z.
+  * 
+  * The constructed path is an object with an origin and destination. 
+  *   By convention, each point should have at least x and y. If 3d, it should have z. 
+  * The physical path object may have other properties, but these may be ignored by 
+  *   other modules.
+  *
+  * If you intend to create deviations from a line, you may want to include 
+  *   additional properties in the segment or in the path to represent those deviations. 
+  *   For example, a property for a formula to represent a curve.
+  *   In such a case, modifying measurePhysicalPath distanceFunction methods may be necessary.   
+  *
+  * @param {Segment} destination_point If provided, this should be either a Segment class or an object
+  *     with the properties ray containing a Ray object. 
+  * @return {Object} An object that contains {origin, destination}. 
+  *   It may contain other properties related to the physical path to be handled by specific modules.
+  *   Default origin and destination will contain {x, y}. By convention, elevation should
+  *   be represented by a {z} property.
+  */
 export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   // elevate or lower the destination point in 3-D space
   // measure from the origin of the ruler movement, so that canvas = 0 and each segment
@@ -145,26 +167,10 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   const elevation_delta = ending_elevation_grid_units - starting_elevation_grid_units; 
   const ruler_distance = this.ray.distance;
   
-  // Assume there could be multiple points in the path, represented by an array.
-  // The starting point must have the pre-determined starting elevation.
-  // The ending point must have the calculated elevation.
-  // Any points in-between should have a ratio unless they already have a z dimension.
-  const last_idx = default_path.length - 1;  
-  default_path.map((p, idx, arr) => { 
-    if(idx === 0) {
-      // origin
-      p.z = starting_elevation_grid_units;
-      return p;
-    } else if(idx === last_idx || !("z" in p)) {
-      // destination or intermediate p without a z dimension.
-      const p_origin = arr[idx - 1];
-      const simple_path_distance = window.libRuler.RulerUtilities.calculateDistance(p_origin, p);
-      const ratio = simple_path_distance / ruler_distance;
-      p.z = starting_elevation_grid_units + elevation_delta * ratio;
-    }   
-    
-    return p;  
-  });
+  const simple_path_distance = window.libRuler.RulerUtilities.calculateDistance(default_path.origin, default_path.destination);
+  const ratio = simple_path_distance / ruler_distance;
+  default_path.origin.z = starting_elevation_grid_units;
+  default_path.destination.z = starting_elevation_grid_units + elevation_delta * ratio;
   
   log("Default path", default_path);
   
