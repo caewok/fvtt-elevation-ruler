@@ -428,10 +428,10 @@ function checkForHole(intersectionPT, zz) {
  * @param {{x: number, y: number}} B
  */
 export function ProjectElevatedPoint(A, B) {
-  const height = B.z - A.z;
+  const height = A.z - B.z;
   const distance = CalculateDistance(A, B);
-  const projected_x = B.x + ((height / distance) * (A.y - B.y));
-  const projected_y = B.y - ((height / distance) * (A.x - B.x));
+  const projected_x = A.x + ((height / distance) * (B.y - A.y));
+  const projected_y = A.y - ((height / distance) * (B.x - A.x));
 
   return new PIXI.Point(projected_x, projected_y);
 }

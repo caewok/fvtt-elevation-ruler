@@ -1,6 +1,6 @@
 import { registerSettings, registerHotkeys } from "./settings.js";
 import { registerRuler } from "./patching.js";
-import { ProjectElevatedPoint } from segments.js;
+import { ProjectElevatedPoint } from "./segments.js";
 
 export const MODULE_ID = 'elevationruler';
 const FORCE_DEBUG = false; // used for logging before dev mode is set up
