@@ -171,6 +171,70 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   return default_path;
 }
 
+ /*
+  * Extend libRuler measurePhysicalPath to measure in 3 dimensions.
+  * Project the z dimension back to the 2-D canvas and measure using the default 
+  *   distanceFunction method. 
+  * Projection is accomplished by imagining a right triangle with the hypotenuse between 
+  *   p0 and p1,
+  *   where p0 is the origin in 3d
+  *         p1 is the destination in 3d
+  *   and the two sides of the triangle are orthogonal in 3d space. 
+  * @param {Object} physical_path  An object that contains {origin, destination}. 
+  *                                Each has {x, y, z} where z is optional.
+  * @return {Number} Total distance for the path
+  */
+export function elevationRulerMeasurePhysicalPath(wrapped, physical_path) {
+  if("z" in physical_path.origin || "z" in physical_path.destination) {
+      if(!("z" in physical_path.origin)) physical_path.origin.z = 0;
+      if(!("z" in physical_path.destination)) physical_path.destination.z = 0;
+      
+      // Project the 3-D path to 2-D canvas
+      log(`Projecting physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y}, ${physical_path.origin.z} to dest ${physical_path.destination.x}, ${physical_path.destination.y}, ${physical_path.destination.z}`);
+
+      physical_path.destination = projectElevatedPoint(physical_path.origin, physical_path.destination);
+      
+      // if we are using grid spaces, the destination needs to be re-centered to the grid.
+      // otherwise, when a token moves in 2-D diagonally, the 3-D measure will be inconsistent
+      // depending on cardinality of the move, as rounding will increase/decrease to the nearest gridspace
+      if(this.distance_function_options?.gridSpaces) {
+        // canvas.grid.getCenter returns an array [x, y];
+        const snapped = canvas.grid.getCenter(physical_path.destination.x, physical_path.destination.y);
+        log(`Snapping ${destination.x}, ${destination.y} to ${snapped[0]}, ${snapped[1]}`);
+        physical_path.destination = { x: snapped[0], y: snapped[1] };
+      }
+      delete physical_path.origin.z
+      delete physical_path.destination.z;
+      
+      log(`Projected physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y} to dest ${physical_path.destination.x}, ${physical_path.destination.y}`); 
+  }
+  
+  return wrapped(physical_path);
+}
+
+ /*
+  * Calculate a new point by projecting the elevated point back onto the 2-D surface
+  * If the movement on the plane is represented by moving from point A to point B,
+  *   and you also move 'height' distance orthogonal to the plane, the distance is the
+  *   hypotenuse of the triangle formed by A, B, and C, where C is orthogonal to B.
+  *   Project by rotating the vertical triangle 90º, then calculate the new point C. 
+  *
+  * Cx = { height * (By - Ay) / dist(A to B) } + Bx
+  * Cy = { height * (Bx - Ax) / dist(A to B) } + By
+  * @param {{x: number, y: number}} A
+  * @param {{x: number, y: number}} B
+  */
+function projectElevatedPoint(A, B) {
+  const height = B.z - A.z;
+  const distance = window.libRuler.RulerUtilities.calculateDistance(A, B);
+  const projected_x = B.x + ((height / distance) * (A.y - B.y));
+  const projected_y = B.y - ((height / distance) * (A.x - B.x));
+
+  return new PIXI.Point(projected_x, projected_y);
+}
+
+
+
 /* 
  * @param {number} segmentDistance
  * @param {number} totalDistance

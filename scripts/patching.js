@@ -6,6 +6,7 @@ import { elevationRulerClear,
          
 import { elevationRulerAddProperties,
          elevationRulerConstructPhysicalPath,
+         elevationRulerMeasurePhysicalPath,
          elevationRulerGetText } from "./segments.js";
 
 export function registerRuler() {
@@ -13,6 +14,7 @@ export function registerRuler() {
   // segment methods (for measuring)
   libWrapper.register(MODULE_ID, 'window.libRuler.RulerSegment.prototype.addProperties', elevationRulerAddProperties, 'WRAPPER');
   libWrapper.register(MODULE_ID, 'window.libRuler.RulerSegment.prototype.constructPhysicalPath', elevationRulerConstructPhysicalPath, 'WRAPPER');
+  libWrapper.register(MODULE_ID, 'window.libRuler.RulerSegment.prototype.measurePhysicalPath', elevationRulerMeasurePhysicalPath, 'WRAPPER');
   libWrapper.register(MODULE_ID, 'window.libRuler.RulerSegment.prototype.text', elevationRulerGetText, 'WRAPPER');
 
   // move token methods
