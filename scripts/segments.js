@@ -427,7 +427,7 @@ function checkForHole(intersectionPT, zz) {
  * @param {{x: number, y: number}} A
  * @param {{x: number, y: number}} B
  */
-function ProjectElevatedPoint(A, B) {
+export function ProjectElevatedPoint(A, B) {
   const height = B.z - A.z;
   const distance = CalculateDistance(A, B);
   const projected_x = B.x + ((height / distance) * (A.y - B.y));
