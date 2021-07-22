@@ -198,7 +198,7 @@ export function elevationRulerMeasurePhysicalPath(wrapped, physical_path) {
       if(!window.libRuler.RulerUtilities.almostEqual(physical_path.origin.z, physical_path.destination.z)) {
         // Project the 3-D path to 2-D canvas
         log(`Projecting physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y}, ${physical_path.origin.z} to dest ${physical_path.destination.x}, ${physical_path.destination.y}, ${physical_path.destination.z}`);
-        physical_path.origin = ProjectElevatedPoint(physical_path.origin, physical_path.destination);
+        physical_path.origin = projectElevatedPoint(physical_path.origin, physical_path.destination);
       
         // if we are using grid spaces, the destination needs to be re-centered to the grid.
         // otherwise, when a token moves in 2-D diagonally, the 3-D measure will be inconsistent
@@ -210,6 +210,7 @@ export function elevationRulerMeasurePhysicalPath(wrapped, physical_path) {
           physical_path.origin = { x: snapped[0], y: snapped[1] };
           log(`Projected physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y} to dest ${physical_path.destination.x}, ${physical_path.destination.y}`); 
         }
+     }
   }
   
   return wrapped(physical_path);
@@ -227,7 +228,7 @@ export function elevationRulerMeasurePhysicalPath(wrapped, physical_path) {
   * @param {{x: number, y: number}} A
   * @param {{x: number, y: number}} B
   */
-function projectElevatedPoint(A, B) {
+export function projectElevatedPoint(A, B) {
   const height = A.z - B.z;
   const distance = window.libRuler.RulerUtilities.calculateDistance(A, B);
   const projected_x = A.x + ((height / distance) * (B.y - A.y));
