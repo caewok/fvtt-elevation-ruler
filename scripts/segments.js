@@ -203,7 +203,7 @@ export function elevationRulerMeasurePhysicalPath(wrapped, physical_path) {
         // if we are using grid spaces, the destination needs to be re-centered to the grid.
         // otherwise, when a token moves in 2-D diagonally, the 3-D measure will be inconsistent
         // depending on cardinality of the move, as rounding will increase/decrease to the nearest gridspace
-        if(this.distance_function_options?.gridSpaces) {
+        if(this.options?.gridSpaces) {
           // canvas.grid.getCenter returns an array [x, y];
           const snapped = canvas.grid.getCenter(physical_path.origin.x, physical_path.origin.y);
           log(`Snapping ${physical_path.origin.x}, ${physical_path.origin.y} to ${snapped[0]}, ${snapped[1]}`);
