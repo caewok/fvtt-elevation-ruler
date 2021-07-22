@@ -229,7 +229,7 @@ export function elevationRulerMeasurePhysicalPath(wrapped, physical_path) {
   */
 function projectElevatedPoint(A, B) {
   const height = A.z - B.z;
-  const distance = CalculateDistance(A, B);
+  const distance = window.libRuler.RulerUtilities.calculateDistance(A, B);
   const projected_x = A.x + ((height / distance) * (B.y - A.y));
   const projected_y = A.y - ((height / distance) * (B.x - A.x));
 
