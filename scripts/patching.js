@@ -10,7 +10,7 @@ import { elevationRulerAddProperties,
          elevationRulerGetText } from "./segments.js";
 
 import { calculate3dDistance,
-         iterateGridUnder3dLine } from "./utility.js";
+         iterateGridUnder3dLine_wrapper } from "./utility.js";
 
 export function registerRuler() {
 
@@ -30,7 +30,7 @@ export function registerRuler() {
   
   // utilities
   libWrapper.register(MODULE_ID, 'window.libRuler.RulerUtilities.calculateDistance', calculate3dDistance, 'MIXED');
-  libWrapper.register(MODULE_ID, 'window.libRuler.RulerUtilities.iterateGridUnderLine', iterateGridUnder3dLine, 'WRAPPER');
+  libWrapper.register(MODULE_ID, 'window.libRuler.RulerUtilities.iterateGridUnderLine', iterateGridUnder3dLine_wrapper, 'WRAPPER');
 
   
   log("registerRuler finished!");

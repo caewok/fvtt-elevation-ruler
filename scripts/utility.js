@@ -7,15 +7,13 @@
  * @return Iterator, which in turn 
  *   returns [row, col, elevation] for each grid point under the line.
  */
-export function * iterateGridUnder3dLine(wrapped, origin, destination) {
-  const gridIter2d = wrapped(origin, destination);
-  
+function * iterateGridUnder3dLine(generator, origin, destination) {  
   let prior_elevation = origin.z || 0;
   const end_elevation = destination.z || 0;
   const direction = prior_elevation <= end_elevation ? 1 : -1;
   const elevation_increment = canvas.grid.grid.options.dimensions.distance;
   
-  for(const [row, col] of gridIter2d) {
+  for(const [row, col] of generator) {
     // step down in elevation if necessary
     if(prior_elevation != end_elevation) {
       const remainder = Math.abs(prior_elevation - end_elevation);
@@ -39,6 +37,10 @@ export function * iterateGridUnder3dLine(wrapped, origin, destination) {
   } 
 }
 
+// needed for libWrapper
+export function iterateGridUnder3dLine_wrapper(wrapped, origin, destination) {
+  return iterateGridUnder3dLine(wrapped(origin, destination), origin, destination);
+}
 
  /*
   * Calculate a new point by projecting the elevated point back onto the 2-D surface
