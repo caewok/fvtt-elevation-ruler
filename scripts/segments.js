@@ -148,7 +148,7 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   //  --> this is done in AddProperties function
   log("Constructing the physical path.");
   const default_path = wrapped(...args);
-  log("Default path", default_path);
+  log("Default path: (${default_path.origin.x}, ${default_path.origin.y}), (${default_path.destination.x}, ${default_path.destination.y})", default_path);
 
   const starting_elevation = this.getFlag(MODULE_ID, "starting_elevation");
   const ending_elevation = this.getFlag(MODULE_ID, "ending_elevation");
@@ -171,9 +171,9 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   const simple_path_distance = window.libRuler.RulerUtilities.calculateDistance(default_path.origin, default_path.destination);
   const ratio = simple_path_distance / ruler_distance;
   default_path.origin.z = starting_elevation_grid_units;
-  default_path.destination.z = starting_elevation_grid_units + elevation_delta * ratio;
+  default_path.destination.z = (starting_elevation_grid_units + elevation_delta) * ratio;
   
-  log("Default path", default_path);
+  log("Default path: (${default_path.origin.x}, ${default_path.origin.y}, ${default_path.origin.z}), (${default_path.destination.x}, ${default_path.destination.y}, ${default_path.destination.z})", default_path);
   
   return default_path;
 }

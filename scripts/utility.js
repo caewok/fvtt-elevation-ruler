@@ -1,3 +1,5 @@
+import { log } from "./module.js";
+
 /*
  * Generator to iterate grid points under a line.
  * This version handles lines in 3d.
@@ -11,12 +13,17 @@ export function * iterateGridUnder3dLine(generator, origin, destination) {
   let prior_elevation = origin.z || 0;
   const end_elevation = destination.z || 0;
   const direction = prior_elevation <= end_elevation ? 1 : -1;
-  const elevation_increment = canvas.grid.grid.options.dimensions.distance;
-  
+  const elevation_increment = canvas.scene.data.gridDistance * canvas.scene.data.grid;
+  log(`elevation: ${prior_elevation}[prior], ${end_elevation}[end], ${direction}[direction], ${elevation_increment}[increment]`);
+  //log(generator);
+  let last_row, last_col;  
+
   for(const res of generator) {
     // step down in elevation if necessary
-    const {value, done} = res;
-    const [row, col] = value;
+    log(res);
+    //const {value, done} = res;
+    const [row, col] = res;
+    [last_row, last_col] = res;
     
     if(prior_elevation != end_elevation) {
       const remainder = Math.abs(prior_elevation - end_elevation);
@@ -34,17 +41,17 @@ export function * iterateGridUnder3dLine(generator, origin, destination) {
     iteration += 1;
     const remainder = Math.abs(prior_elevation - end_elevation);
     const step_elevation = Math.min(remainder, elevation_increment);
+    log(`elevation: ${prior_elevation}[prior], ${end_elevation}[end], ${step_elevation}[step]`);
     prior_elevation += step_elevation * direction;
     
-    yield [row, col, elevation];
+    yield [last_row, last_col, prior_elevation];
   } 
 }
 
 // needed for libWrapper
 export function iterateGridUnder3dLine_wrapper(wrapped, origin, destination) {
-  yield* base_gen = wrapped(origin, destination);
-
-  return iterateGridUnder3dLine(base_gen, origin, destination);
+  log(`iterateGrid origin, destination`, origin, destination);
+  return iterateGridUnder3dLine(wrapped(origin, destination), origin, destination);
 }
 
  /*
