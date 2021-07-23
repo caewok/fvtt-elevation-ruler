@@ -10,13 +10,12 @@
 export function * iterateGridUnder3dLine(wrapped, origin, destination) {
   const gridIter2d = wrapped(origin, destination);
   
-  const ray2d = new Ray(origin, destination);  
   let prior_elevation = origin.z || 0;
   const end_elevation = destination.z || 0;
   const direction = prior_elevation <= end_elevation ? 1 : -1;
   const elevation_increment = canvas.grid.grid.options.dimensions.distance;
   
-  for(const [row, col] of gridIter) {
+  for(const [row, col] of gridIter2d) {
     // step down in elevation if necessary
     if(prior_elevation != end_elevation) {
       const remainder = Math.abs(prior_elevation - end_elevation);
