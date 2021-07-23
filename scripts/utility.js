@@ -80,10 +80,10 @@ export function calculate3dDistance(wrapped, A, B, EPSILON = 1e-6) {
   if(dz < EPSILON) { return wrapped(A, B, EPSILON); }
   
   const dy = Math.abs(B.y - A.y);
-  if(dy < EPSILON) { return wrapped({x: A.x, y: A.z}, {x: B.x, y: B.z}, EPSILON);
+  if(dy < EPSILON) { return wrapped({x: A.x, y: A.z}, {x: B.x, y: B.z}, EPSILON); }
     
   const dx = Math.abs(B.x - A.x);
-  if(dx < EPSILON) { return wrapped({x: A.z, y: A.y}, {x: B.z, y: B.y}, EPSILON)
+  if(dx < EPSILON) { return wrapped({x: A.z, y: A.y}, {x: B.z, y: B.y}, EPSILON); }
   
   return Math.hypot(dz, dy, dx);
 }
