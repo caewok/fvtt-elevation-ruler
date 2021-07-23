@@ -1,4 +1,5 @@
 import { MODULE_ID, log } from "./module.js";
+import { projectElevatedPoint } from "./utility.js";
 
 /*
  * Add flags to the segment specific to elevation:
@@ -215,28 +216,6 @@ export function elevationRulerMeasurePhysicalPath(wrapped, physical_path) {
   
   return wrapped(physical_path);
 }
-
- /*
-  * Calculate a new point by projecting the elevated point back onto the 2-D surface
-  * If the movement on the plane is represented by moving from point A to point B,
-  *   and you also move 'height' distance orthogonal to the plane, the distance is the
-  *   hypotenuse of the triangle formed by A, B, and C, where C is orthogonal to B.
-  *   Project by rotating the vertical triangle 90º, then calculate the new point C. 
-  *
-  * Cx = { height * (By - Ay) / dist(A to B) } + Bx
-  * Cy = { height * (Bx - Ax) / dist(A to B) } + By
-  * @param {{x: number, y: number}} A
-  * @param {{x: number, y: number}} B
-  */
-export function projectElevatedPoint(A, B) {
-  const height = A.z - B.z;
-  const distance = window.libRuler.RulerUtilities.calculateDistance(A, B);
-  const projected_x = A.x + ((height / distance) * (B.y - A.y));
-  const projected_y = A.y - ((height / distance) * (B.x - A.x));
-
-  return new PIXI.Point(projected_x, projected_y);
-}
-
 
 
 /* 
