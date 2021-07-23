@@ -7,7 +7,7 @@
  * @return Iterator, which in turn 
  *   returns [row, col, elevation] for each grid point under the line.
  */
-function * iterateGridUnder3dLine(generator, origin, destination) {  
+export function * iterateGridUnder3dLine(generator, origin, destination) {  
   let prior_elevation = origin.z || 0;
   const end_elevation = destination.z || 0;
   const direction = prior_elevation <= end_elevation ? 1 : -1;
