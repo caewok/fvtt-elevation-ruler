@@ -8,10 +8,9 @@
  *   returns [row, col, elevation] for each grid point under the line.
  */
 export function * iterateGridUnder3dLine(wrapped, origin, destination) {
+  const gridIter2d = wrapped(origin, destination);
   
-  const ray2d = new Ray(origin, destination);
-  const gridIter2d = window.libRuler.RulerUtilities.iterateGridUnderLine(ray2d);
-  
+  const ray2d = new Ray(origin, destination);  
   let prior_elevation = origin.z || 0;
   const end_elevation = destination.z || 0;
   const direction = prior_elevation <= end_elevation ? 1 : -1;
