@@ -13,8 +13,11 @@ function * iterateGridUnder3dLine(generator, origin, destination) {
   const direction = prior_elevation <= end_elevation ? 1 : -1;
   const elevation_increment = canvas.grid.grid.options.dimensions.distance;
   
-  for(const [row, col] of generator) {
+  for(const res of generator) {
     // step down in elevation if necessary
+    const {value, done} = res;
+    const [row, col] = value;
+    
     if(prior_elevation != end_elevation) {
       const remainder = Math.abs(prior_elevation - end_elevation);
       const step_elevation = Math.min(remainder, elevation_increment);
@@ -39,7 +42,9 @@ function * iterateGridUnder3dLine(generator, origin, destination) {
 
 // needed for libWrapper
 export function iterateGridUnder3dLine_wrapper(wrapped, origin, destination) {
-  return iterateGridUnder3dLine(wrapped(origin, destination), origin, destination);
+  yield* base_gen = wrapped(origin, destination);
+
+  return iterateGridUnder3dLine(base_gen, origin, destination);
 }
 
  /*
