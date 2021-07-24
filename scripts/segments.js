@@ -1,4 +1,5 @@
 import { MODULE_ID, log } from "./module.js";
+import { projectElevatedPoint } from "./utility.js";
 
 /*
  * Add flags to the segment specific to elevation:
@@ -117,7 +118,29 @@ export function toGridDistance(increment) {
   return Math.round(increment * canvas.scene.data.gridDistance * 100) / 100;
 }
 
-
+ /*
+  * Construct a physical path for the segment that represents how the measured item 
+  *   actually would move within the segment.
+  *
+  * This patch adds the 3rd dimension as z.
+  * 
+  * The constructed path is an object with an origin and destination. 
+  *   By convention, each point should have at least x and y. If 3d, it should have z. 
+  * The physical path object may have other properties, but these may be ignored by 
+  *   other modules.
+  *
+  * If you intend to create deviations from a line, you may want to include 
+  *   additional properties in the segment or in the path to represent those deviations. 
+  *   For example, a property for a formula to represent a curve.
+  *   In such a case, modifying measurePhysicalPath distanceFunction methods may be necessary.   
+  *
+  * @param {Segment} destination_point If provided, this should be either a Segment class or an object
+  *     with the properties ray containing a Ray object. 
+  * @return {Object} An object that contains {origin, destination}. 
+  *   It may contain other properties related to the physical path to be handled by specific modules.
+  *   Default origin and destination will contain {x, y}. By convention, elevation should
+  *   be represented by a {z} property.
+  */
 export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   // elevate or lower the destination point in 3-D space
   // measure from the origin of the ruler movement, so that canvas = 0 and each segment
@@ -125,7 +148,7 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   //  --> this is done in AddProperties function
   log("Constructing the physical path.");
   const default_path = wrapped(...args);
-  log("Default path", default_path);
+  log("Default path: (${default_path.origin.x}, ${default_path.origin.y}), (${default_path.destination.x}, ${default_path.destination.y})", default_path);
 
   const starting_elevation = this.getFlag(MODULE_ID, "starting_elevation");
   const ending_elevation = this.getFlag(MODULE_ID, "ending_elevation");
@@ -142,54 +165,58 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   //   destination
   // Need to apply canvas.scene.data.grid (140) and canvas.scene.data.gridDistance (5)
   // 7350 (x1) - 6930 (x0) = 420 (delta_x) / 140 * 5 = move in canvas units (e.g. 15')
-
-  // will need to address later if there are multiple points in the physical path, rather
-  // than just origin and destination...
   const elevation_delta = ending_elevation_grid_units - starting_elevation_grid_units; 
   const ruler_distance = this.ray.distance;
   
-  // destination
-  const simple_path_distance = CalculateDistance(default_path.origin, default_path.destination);
+  const simple_path_distance = window.libRuler.RulerUtilities.calculateDistance(default_path.origin, default_path.destination);
   const ratio = simple_path_distance / ruler_distance;
-  default_path.destination.z =   starting_elevation_grid_units + elevation_delta * ratio;
-  
-  // origin
   default_path.origin.z = starting_elevation_grid_units;
+  default_path.destination.z = (starting_elevation_grid_units + elevation_delta) * ratio;
   
-  log("Default path", default_path);
+  log("Default path: (${default_path.origin.x}, ${default_path.origin.y}, ${default_path.origin.z}), (${default_path.destination.x}, ${default_path.destination.y}, ${default_path.destination.z})", default_path);
   
   return default_path;
 }
 
-export function elevationRulerDistanceFunction(wrapped, physical_path) {
-  // Project the 3-D path to 2-D canvas
-  log(`Projecting physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y}, ${physical_path.origin.z} 
-                                    to dest ${physical_path.destination.x}, ${physical_path.destination.y}, ${physical_path.destination.z}`);
-  
-  // for each of the points, construct a 2-D path and send to the underlying function
-  // will need to address later if there are multiple points in the physical path, rather
-  // than just origin and destination...
-  
-  physical_path.origin = ProjectElevatedPoint(physical_path.origin, physical_path.destination);
-  delete physical_path.origin.z;
-  delete physical_path.destination.z;
-  
-  // if we are using grid spaces, the projected origin needs to be re-centered to the grid.
-  // otherwise, when a token moves in 2-D diagonally, the 3-D measure will be inconsistent
-  // depending on cardinality of the move, as rounding will increase/decrease to the nearest gridspace
-  if(this.measure_distance_options?.gridSpaces) {
-    // canvas.grid.getCenter returns an array [x, y];
-    const snapped = canvas.grid.getCenter(physical_path.origin.x, physical_path.origin.y);
-    log(`Snapping ${physical_path.destination.x}, ${physical_path.destination.y} to ${snapped[0]}, ${snapped[1]}`);
-    physical_path.origin = { x: snapped[0], y: snapped[1] };
+ /*
+  * Extend libRuler measurePhysicalPath to measure in 3 dimensions.
+  * Project the z dimension back to the 2-D canvas and measure using the default 
+  *   distanceFunction method. 
+  * Projection is accomplished by imagining a right triangle with the hypotenuse between 
+  *   p0 and p1,
+  *   where p0 is the origin in 3d
+  *         p1 is the destination in 3d
+  * @param {Object} physical_path  An object that contains {origin, destination}. 
+  *   and the two sides of the triangle are orthogonal in 3d space. 
+  *                                Each has {x, y, z} where z is optional.
+  * @return {Number} Total distance for the path
+  */
+export function elevationRulerMeasurePhysicalPath(wrapped, physical_path) {
+  if("z" in physical_path.origin || "z" in physical_path.destination) {
+      if(!("z" in physical_path.origin)) physical_path.origin.z = 0;
+      if(!("z" in physical_path.destination)) physical_path.destination.z = 0;
+      
+      if(!window.libRuler.RulerUtilities.almostEqual(physical_path.origin.z, physical_path.destination.z)) {
+        // Project the 3-D path to 2-D canvas
+        log(`Projecting physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y}, ${physical_path.origin.z} to dest ${physical_path.destination.x}, ${physical_path.destination.y}, ${physical_path.destination.z}`);
+        physical_path.origin = projectElevatedPoint(physical_path.origin, physical_path.destination);
+      
+        // if we are using grid spaces, the destination needs to be re-centered to the grid.
+        // otherwise, when a token moves in 2-D diagonally, the 3-D measure will be inconsistent
+        // depending on cardinality of the move, as rounding will increase/decrease to the nearest gridspace
+        if(this.options?.gridSpaces) {
+          // canvas.grid.getCenter returns an array [x, y];
+          const snapped = canvas.grid.getCenter(physical_path.origin.x, physical_path.origin.y);
+          log(`Snapping ${physical_path.origin.x}, ${physical_path.origin.y} to ${snapped[0]}, ${snapped[1]}`);
+          physical_path.origin = { x: snapped[0], y: snapped[1] };
+          log(`Projected physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y} to dest ${physical_path.destination.x}, ${physical_path.destination.y}`); 
+        }
+     }
   }
   
-  
-  log(`Projected physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y} 
-                                     to dest ${physical_path.destination.x}, ${physical_path.destination.y}`);
-                                     
   return wrapped(physical_path);
 }
+
 
 /* 
  * @param {number} segmentDistance
@@ -412,71 +439,3 @@ function checkForHole(intersectionPT, zz) {
   }
   return undefined;
 }
-
-
-// ----- MATH FOR MEASURING ELEVATION DISTANCE ----- //
-/**
- * Calculate a new point by projecting the elevated point back onto the 2-D surface
- * If the movement on the plane is represented by moving from point A to point B,
- *   and you also move 'height' distance orthogonal to the plane, the distance is the
- *   hypotenuse of the triangle formed by A, B, and C, where C is orthogonal to B.
- *   Project by rotating the vertical triangle 90º, then calculate the new point C. 
- *
- * Cx = { height * (By - Ay) / dist(A to B) } + Bx
- * Cy = { height * (Bx - Ax) / dist(A to B) } + By
- * @param {{x: number, y: number}} A
- * @param {{x: number, y: number}} B
- */
-export function ProjectElevatedPoint(A, B) {
-  const height = A.z - B.z;
-  const distance = CalculateDistance(A, B);
-  const projected_x = A.x + ((height / distance) * (B.y - A.y));
-  const projected_y = A.y - ((height / distance) * (B.x - A.x));
-
-  return new PIXI.Point(projected_x, projected_y);
-}
-
-function CalculateDistance(A, B) {
-  const dx = B.x - A.x;
-  const dy = B.y - A.y;
-  return Math.hypot(dy, dx);
-}
-
-// console.log(Math.hypot(3, 4));
-// // expected output: 5
-// 
-// console.log(Math.hypot(5, 12));
-// // expected output: 13
-// 
-// let m;
-// let o = {x:0, y:0}
-// m = ProjectElevatedPoint(o, {x:1, y:0}, 1);
-// CalculateDistance(o, m) // 1.414
-// 
-// m = ProjectElevatedPoint(o, {x:3, y:0}, 4);
-// CalculateDistance(o, m) // 5
-// 
-// m = ProjectElevatedPoint(o, {x:0, y:3}, 4);
-// CalculateDistance(o, m) // 5 
-// 
-// m = ProjectElevatedPoint(o, {x:0, y:3}, 4);
-
-// m = distance
-// n = height
-// A = origin ()
-// B = destination (1)
-// C = destination with height (2)
-// |Ay - By| / m = |Bx - Cx| / n
-// |Ax - Bx| / m = |Cy - By| / n
-// 
-// |Bx - Cx| / n = |Ay - By| / m
-// |Cy - By| / n = |Ax - Bx| / m
-// 
-// |Bx - Cx| = |Ay - By| * n/m
-// |Cy - By| = |Ax - Bx| * n/m
-// 
-// Bx - Cx = ± n/m * (Ay - By)
-// Cy - By = ± n/m * (Ax - Bx)
-// 
-// Cx = Bx ± n/m * (Ay - By)
-// Cy = By ± n/m * (Ax - Bx)
