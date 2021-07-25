@@ -201,7 +201,7 @@ export function projectGridless(A, B, height, distance) {
   const projected_x = A.x + ((height / distance) * (B.y - A.y));
   const projected_y = A.y - ((height / distance) * (B.x - A.x));
   
-  log(`Projecting Gridless: A: (${A.x}, ${A.y}, ${A.z})->(${projected_A.x}, ${projected_A.y}); B: (${B.x}, ${B.y}, ${B.z})->(${projected_B.x}, ${projected_B.y})`);
+  log(`Projecting Gridless: A: (${A.x}, ${A.y}, ${A.z})->(${projected_x}, ${projected_y}); B: (${B.x}, ${B.y}, ${B.z})->(${B.x}, ${B.y})`);
   
 
   return [{ x: projected_x, y: projected_y },
