@@ -173,7 +173,7 @@ function gridDistance(A, B) {
   
   if(use_grid) {
     const distance_segments = [{ray: new Ray(A, B)}];
-    return canvas.grid.measureDistances(distance_segments, { gridSpaces: true })[0];
+    return canvas.grid.measureDistances(distance_segments, { gridSpaces: true })[0] * canvas.scene.data.grid / canvas.scene.data.gridDistance;
   }
   
   return window.libRuler.RulerUtilities.calculateDistance({x: A.x, y: A.y}, 
