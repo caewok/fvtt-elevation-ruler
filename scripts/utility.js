@@ -126,9 +126,7 @@ function projectSquareGrid(A, B) {
 
 function projectSouth(A, B, height, distance) {
   if(height === undefined) height = A.z - B.z;
-    
-  if(distance === undefined) distance = window.libRuler.RulerUtilities.calculateDistance({x: A.x, y: A.y}, 
-                                                                {x: B.x, y: B.y}); 
+  if(distance === undefined) distance = gridDistance(A, B); 
                                                                 
   // set A pointing south; B pointing west
   const projected_A = {x: A.x, y: A.y + height};
@@ -138,19 +136,18 @@ function projectSouth(A, B, height, distance) {
          
   // if dnd5e 5-5-5 or 5-10-5, snap to nearest grid point
   // origin should be fine if elevation is in increments. Otherwise, may need to be snapped. Leave for now. 
-  if((canvas.grid.diagonalRule === "555" || canvas.grid.diagonalRule === "5105" || game.system.id === "pf2e")) {
-    log(`Snapping ${projected_B.x}, ${projected_B.y}`);
-    [projected_B.x, projected_B.y] = canvas.grid.getCenter(projected_B.x, projected_B.y);
-    log(`Snapped to ${projected_B.x}, ${projected_B.y}`);
-  }                                                  
-  
+ //  if((canvas.grid.diagonalRule === "555" || canvas.grid.diagonalRule === "5105" || game.system.id === "pf2e")) {
+//     log(`Snapping ${projected_B.x}, ${projected_B.y}`);
+//     [projected_B.x, projected_B.y] = canvas.grid.getCenter(projected_B.x, projected_B.y);
+//     log(`Snapped to ${projected_B.x}, ${projected_B.y}`);
+//   }                                                  
+//   
   return [projected_A, projected_B];
 }
 
 function projectEast(A, B, height, distance) {
   if(height === undefined) height = A.z - B.z;
-  if(distance === undefined) distance = window.libRuler.RulerUtilities.calculateDistance({x: A.x, y: A.y}, 
-                                                                {x: B.x, y: B.y}); 
+  if(distance === undefined) distance = gridDistance(A, B);
                                                                 
   // set A pointing east; B pointing south
   const projected_A = {x: A.x + height, y: A.y};
@@ -160,13 +157,27 @@ function projectEast(A, B, height, distance) {
                                                             
   // if dnd5e 5-5-5 or 5-10-5, snap to nearest grid point
   // origin should be fine if elevation is in increments. Otherwise, may need to be snapped. Leave for now. 
-  if((canvas.grid.diagonalRule === "555" || canvas.grid.diagonalRule === "5105" || game.system.id === "pf2e")) {
-    log(`Snapping ${projected_B.x}, ${projected_B.y}`);
-    [projected_B.x, projected_B.y] = canvas.grid.getCenter(projected_B.x, projected_B.y);
-    log(`Snapped to ${projected_B.x}, ${projected_B.y}`);
-  }
+  // if((canvas.grid.diagonalRule === "555" || canvas.grid.diagonalRule === "5105" || game.system.id === "pf2e")) {
+//     log(`Snapping ${projected_B.x}, ${projected_B.y}`);
+//     [projected_B.x, projected_B.y] = canvas.grid.getCenter(projected_B.x, projected_B.y);
+//     log(`Snapped to ${projected_B.x}, ${projected_B.y}`);
+//   }
 
   return [projected_A, projected_B];
+}
+
+function gridDistance(A, B) {
+  const use_grid = canvas.grid.diagonalRule === "555" || 
+                   canvas.grid.diagonalRule === "5105" || 
+                   game.system.id === "pf2e";
+  
+  if(use_grid) {
+    const distance_segments = [{ray: new Ray(A, B)}];
+    return canvas.grid.measureDistances(distance_segments, { gridSpaces: true })[0];
+  }
+  
+  return window.libRuler.RulerUtilities.calculateDistance({x: A.x, y: A.y}, 
+                                                          {x: B.x, y: B.y})
 }
 
 
