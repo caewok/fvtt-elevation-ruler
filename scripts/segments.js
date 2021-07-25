@@ -148,7 +148,7 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   //  --> this is done in AddProperties function
   log("Constructing the physical path.");
   const default_path = wrapped(...args);
-  log("Default path: (${default_path.origin.x}, ${default_path.origin.y}), (${default_path.destination.x}, ${default_path.destination.y})", default_path);
+  log(`Default path: (${default_path.origin.x}, ${default_path.origin.y}), (${default_path.destination.x}, ${default_path.destination.y})`, default_path);
 
   const starting_elevation = this.getFlag(MODULE_ID, "starting_elevation");
   const ending_elevation = this.getFlag(MODULE_ID, "ending_elevation");
@@ -173,7 +173,7 @@ export function elevationRulerConstructPhysicalPath(wrapped, ...args) {
   default_path.origin.z = starting_elevation_grid_units;
   default_path.destination.z = (starting_elevation_grid_units + elevation_delta) * ratio;
   
-  log("Default path: (${default_path.origin.x}, ${default_path.origin.y}, ${default_path.origin.z}), (${default_path.destination.x}, ${default_path.destination.y}, ${default_path.destination.z})", default_path);
+  log(`Default path: (${default_path.origin.x}, ${default_path.origin.y}, ${default_path.origin.z}), (${default_path.destination.x}, ${default_path.destination.y}, ${default_path.destination.z})`, default_path);
   
   return default_path;
 }
@@ -196,22 +196,10 @@ export function elevationRulerMeasurePhysicalPath(wrapped, physical_path) {
       if(!("z" in physical_path.origin)) physical_path.origin.z = 0;
       if(!("z" in physical_path.destination)) physical_path.destination.z = 0;
       
-      if(!window.libRuler.RulerUtilities.almostEqual(physical_path.origin.z, physical_path.destination.z)) {
-        // Project the 3-D path to 2-D canvas
-        log(`Projecting physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y}, ${physical_path.origin.z} to dest ${physical_path.destination.x}, ${physical_path.destination.y}, ${physical_path.destination.z}`);
-        physical_path.origin = projectElevatedPoint(physical_path.origin, physical_path.destination);
-      
-        // if we are using grid spaces, the destination needs to be re-centered to the grid.
-        // otherwise, when a token moves in 2-D diagonally, the 3-D measure will be inconsistent
-        // depending on cardinality of the move, as rounding will increase/decrease to the nearest gridspace
-        if(this.options?.gridSpaces) {
-          // canvas.grid.getCenter returns an array [x, y];
-          const snapped = canvas.grid.getCenter(physical_path.origin.x, physical_path.origin.y);
-          log(`Snapping ${physical_path.origin.x}, ${physical_path.origin.y} to ${snapped[0]}, ${snapped[1]}`);
-          physical_path.origin = { x: snapped[0], y: snapped[1] };
-          log(`Projected physical_path from origin ${physical_path.origin.x}, ${physical_path.origin.y} to dest ${physical_path.destination.x}, ${physical_path.destination.y}`); 
-        }
-     }
+      // Project the 3-D path to 2-D canvas
+      // projectElevatedPoint will return origin/destination w/o z.
+      // projectElevatedPoint will not modify unless necessary.
+      [physical_path.origin, physical_path.destination] = projectElevatedPoint(physical_path.origin, physical_path.destination);
   }
   
   return wrapped(physical_path);
