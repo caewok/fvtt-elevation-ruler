@@ -66,10 +66,11 @@ export function iterateGridUnder3dLine_wrapper(wrapped, origin, destination) {
   
   */
 export function projectElevatedPoint(A, B) {
-  if(window.libRuler.RulerUtilities.pointsAlmostEqual(A, B)) return {A: A, B: B};
-  if(B.z === undefined || B.z === NaN) B.z = A.z;
-  if(A.z === undefined || A.z === NaN) A.z = B.z;
-  if(A.z === B.z) return {A: A, B: B};
+  if(window.libRuler.RulerUtilities.pointsAlmostEqual(A, B)) { return [{ x: A.x, y: A.y }, { x: B.x, y: B.y }]; }
+  if(B.z === undefined || B.z === NaN) { B.z = A.z; }
+  if(A.z === undefined || A.z === NaN) { A.z = B.z; }
+  if(A.z === B.z) { return [{ x: A.x, y: A.y }, { x: B.x, y: B.y }]; }
+  if(window.libRuler.RulerUtilities.almostEqual(A.z, B.z)) { return [{ x: A.x, y: A.y }, { x: B.x, y: B.y }]; }
 
   switch(canvas.grid.type) {
     case CONST.GRID_TYPES.GRIDLESS: return projectGridless(A, B);
@@ -92,35 +93,35 @@ export function projectElevatedPoint(A, B) {
   * Otherwise, set A to the east and B to the south.
   * Represents the 90º rotation of the right triangle from height
   */
-projectSquareGrid(A, B) {
+function projectSquareGrid(A, B) {
   // if the points are already on a line, don't change B.
   // Otherwise, set A to the east and B to the south
   // Represents the 90º rotation of the right triangle from height
   const height = Math.abs(A.z - B.z);
   let projected_A, projected_B;
     
-  if(almostEqual(A.x, B.x)) {
+  if(window.libRuler.RulerUtilities.almostEqual(A.x, B.x)) {
     // points are on vertical line
     // set A to the east
     // B is either north or south from A
     // (quicker than calling projectEast b/c no distance calc req'd)
     projected_A = {x: A.x + height, y: A.y}; // east
-    projected_B = B;
-  } else if(almostEqual(A.y, B.y)) {
+    projected_B = {x: B.x, y: B.y};
+  } else if(window.libRuler.RulerUtilities.almostEqual(A.y, B.y)) {
     // points are on horizontal line
     // B is either west or east from A
     // set A to the south
     // (quicker than calling projectSouth b/c no distance calc req'd)
     projected_A = {x: A.x, y: A.y + height}; // south
-    projected_B = B;
+    projected_B = {x: B.x, y: B.y};
   } else {
     // set B to point south, A pointing east
-    { projected_A, projected_B } = projectEast(A, B, height);
+    [projected_A, projected_B] = projectEast(A, B, height);
   }
   
   log(`Projecting Square: A: (${A.x}, ${A.y}, ${A.z})->(${projected_A.x}, ${projected_A.y}); B: (${B.x}, ${B.y}, ${B.z})->(${projected_B.x}, ${projected_B.y})`);
   
-  return {A: projected_A, B: projected_B};
+  return [projected_A, projected_B];
 }
 
 function projectSouth(A, B, height, distance) {
@@ -130,13 +131,20 @@ function projectSouth(A, B, height, distance) {
                                                                 {x: B.x, y: B.y}); 
                                                                 
   // set A pointing south; B pointing west
-  projected_A = {x: A.x, y: A.y + height};
-  projected_B = {x: A.x - distance, y: A.y};    
+  const projected_A = {x: A.x, y: A.y + height};
+  const projected_B = {x: A.x - distance, y: A.y};    
   
   log(`Projecting South: A: (${A.x}, ${A.y}, ${A.z})->(${projected_A.x}, ${projected_A.y}); B: (${B.x}, ${B.y}, ${B.z})->(${projected_B.x}, ${projected_B.y})`);
-                                                           
+         
+  // if dnd5e 5-5-5 or 5-10-5, snap to nearest grid point
+  // origin should be fine if elevation is in increments. Otherwise, may need to be snapped. Leave for now. 
+  if((canvas.grid.diagonalRule === "555" || canvas.grid.diagonalRule === "5105" || game.system.id === "pf2e")) {
+    log(`Snapping ${projected_B.x}, ${projected_B.y}`);
+    [projected_B.x, projected_B.y] = canvas.grid.getCenter(projected_B.x, projected_B.y);
+    log(`Snapped to ${projected_B.x}, ${projected_B.y}`);
+  }                                                  
   
-  return {A: projected_A, B: projected_B};
+  return [projected_A, projected_B];
 }
 
 function projectEast(A, B, height, distance) {
@@ -145,13 +153,20 @@ function projectEast(A, B, height, distance) {
                                                                 {x: B.x, y: B.y}); 
                                                                 
   // set A pointing east; B pointing south
-  projected_A = {x: A.x + height, y: A.y};
-  projected_B = {x: A.x, y: A.y + distance};   
+  const projected_A = {x: A.x + height, y: A.y};
+  const projected_B = {x: A.x, y: A.y + distance};   
   
   log(`Projecting East: A: (${A.x}, ${A.y}, ${A.z})->(${projected_A.x}, ${projected_A.y}); B: (${B.x}, ${B.y}, ${B.z})->(${projected_B.x}, ${projected_B.y})`);
                                                             
-  
-  return {A: projected_A, B: projected_B};
+  // if dnd5e 5-5-5 or 5-10-5, snap to nearest grid point
+  // origin should be fine if elevation is in increments. Otherwise, may need to be snapped. Leave for now. 
+  if((canvas.grid.diagonalRule === "555" || canvas.grid.diagonalRule === "5105" || game.system.id === "pf2e")) {
+    log(`Snapping ${projected_B.x}, ${projected_B.y}`);
+    [projected_B.x, projected_B.y] = canvas.grid.getCenter(projected_B.x, projected_B.y);
+    log(`Snapped to ${projected_B.x}, ${projected_B.y}`);
+  }
+
+  return [projected_A, projected_B];
 }
 
 
@@ -178,8 +193,8 @@ export function projectGridless(A, B, height, distance) {
   log(`Projecting Gridless: A: (${A.x}, ${A.y}, ${A.z})->(${projected_A.x}, ${projected_A.y}); B: (${B.x}, ${B.y}, ${B.z})->(${projected_B.x}, ${projected_B.y})`);
   
 
-  return { A: { x: projected_x, y: projected_y },
-           B: { x: B.x, y: B.y };
+  return [{ x: projected_x, y: projected_y },
+          { x: B.x, y: B.y }];
 }
 
  /*
@@ -212,8 +227,8 @@ export function calculate3dDistance(wrapped, A, B, EPSILON = 1e-6) {
   * @return {Boolean} True if the points are within the error of each other 
   */
 export function points3dAlmostEqual(wrapped, p1, p2, EPSILON = 1e-6) {
-  const 2d_equal = wrapped(p1, p2, EPSILON);
-  if(!2d_equal) return false;
+  const equal2d = wrapped(p1, p2, EPSILON);
+  if(!equal2d) return false;
   
   if(p1.z === undefined || 
      p2.z === undefined || 
