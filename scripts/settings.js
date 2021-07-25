@@ -15,6 +15,16 @@ export function registerSettings() {
           icon: "fas fa-arrows-alt-v",
     type: Hotkeys.createConfig('Elevation Ruler Hotkeys', [`${MODULE_ID}.change-elevation-group`]),
   });
+  
+  log("Registering Elevation Ruler settings.");
+  game.settings.register(MODULE_ID, "prefer-token-elevation", {
+    name: 'Prefer Token Elevation',
+    hint: "If unset, dragging the ruler over the canvas will default to the elevation of the terrain (0 if none). If set, the ruler will remain at the token's elevation if the token is higher (for example, if the token is flying), unless the ruler is over another token.",
+    scope: "user",
+    config: true,
+    default: false,
+    type: Boolean
+  });
 
 
   log("Registering terrain layer settings.");
