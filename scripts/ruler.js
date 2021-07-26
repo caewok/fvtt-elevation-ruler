@@ -112,7 +112,7 @@ export async function elevationRulerAnimateToken(wrapped, token, ray, dx, dy, se
   const current_elevation = getProperty(token, "data.elevation");
   
   const ignore_below = game.settings.get(MODULE_ID, "prefer-token-elevation") ? 
-                         this.ruler.getFlag(MODULE_ID, "starting_token_elevation") :
+                         this.getFlag(MODULE_ID, "starting_token_elevation") :
                          undefined; 
   
   const destination_point_elevation = ElevationAtPoint(ray.B, current_elevation, ignore_below); 
