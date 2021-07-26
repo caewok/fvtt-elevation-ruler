@@ -1,3 +1,13 @@
+# 0.3.0
+Move to libRuler 0.1 compatibility. 
+Improvements:
+- Wraps libRuler RulerUtilities functions to 3d versions: `iterateGridUnderLine`, `calculateDistance`, `pointsAlmostEqual`.
+- Adds user setting to prefer the starting token elevation when measuring.
+- Revamps the projection from 3-D to 2-D to account for specific grid types and diagonal rules. This should more closely correspond to user expectations concerning vertical movement in a grid.
+
+Breaking changes due to libRuler changes:
+- Relies on the libRuler RulerUtilities functions
+
 # 0.2.5
 Correct "jumping token" issue where when the token is moved, it will appear to drift off the path and move twice.
 

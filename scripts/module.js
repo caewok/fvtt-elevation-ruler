@@ -1,7 +1,7 @@
 import { registerSettings, registerHotkeys } from "./settings.js";
 import { registerRuler } from "./patching.js";
-import { ProjectElevatedPoint } from "./segments.js";
-
+import { iterateGridUnder3dLine, projectElevatedPoint, projectGridless } from "./utility.js";
+ 
 export const MODULE_ID = 'elevationruler';
 const FORCE_DEBUG = false; // used for logging before dev mode is set up
 
@@ -24,7 +24,9 @@ export function log(...args) {
 Hooks.once('init', async function() {
   log("Initializing Elevation Ruler Options.");
   
-  window['elevationRuler'] = { ProjectElevatedPoint: ProjectElevatedPoint };
+  window['elevationRuler'] = { projectElevatedPoint: projectElevatedPoint,
+                               projectGridless: projectGridless,
+                               iterateGridUnder3dLine: iterateGridUnder3dLine };
   
 });
 
