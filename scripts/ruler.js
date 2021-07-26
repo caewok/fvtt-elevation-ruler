@@ -110,7 +110,12 @@ export async function elevationRulerAnimateToken(wrapped, token, ray, dx, dy, se
   const incremental_elevation = toGridDistance(elevation_increments[segment_num]);
   
   const current_elevation = getProperty(token, "data.elevation");
-  const destination_point_elevation = ElevationAtPoint(ray.B, undefined, current_elevation); 
+  
+  const ignore_below = game.settings.get(MODULE_ID, "prefer-token-elevation") ? 
+                         this.getFlag(MODULE_ID, "starting_token_elevation") :
+                         undefined; 
+  
+  const destination_point_elevation = ElevationAtPoint(ray.B, current_elevation, ignore_below); 
   const end_elevation = destination_point_elevation + incremental_elevation;
   
   log(`Current token elevation is ${current_elevation}. Will be changed to ${end_elevation}.`);

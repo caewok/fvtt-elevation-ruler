@@ -52,8 +52,12 @@ UX goals:
   if(this.segment_num === 0) {
     // starting elevation equals the token elevation 
     // if no token, use elevation at the point. 
-    starting_elevation = ElevationAtPoint(this.ray.A, this.ruler._getMovementToken(), 0) // 0 starting elevation otherwise
-    log(`Starting elevation using origin ${this.ray.A.x}, ${this.ray.A.y}`, this.ruler._getMovementToken());
+    const t = this.ruler._getMovementToken();
+    const starting_token_elevation = t ? getProperty(t, "data.elevation") : undefined;    
+    this.ruler.setFlag(MODULE_ID, "starting_token_elevation", starting_token_elevation);
+  
+    starting_elevation = t ? starting_token_elevation : ElevationAtPoint(this.ray.A, 0);
+    log(`Starting elevation using origin ${this.ray.A.x}, ${this.ray.A.y} is ${starting_elevation}`, this.ruler._getMovementToken());
 
   } else {
     // starting elevation is the prior segment end elevation
@@ -61,11 +65,13 @@ UX goals:
     log(`Current ending elevation is ${this.getFlag(MODULE_ID, "ending_elevation")}; Prior segment ending elevation is ${starting_elevation}`);
   }
   
-  
   const incremental_elevation = toGridDistance(elevation_increments[this.segment_num]);
-  const current_point_elevation = ElevationAtPoint(this.ray.B, undefined, starting_elevation); // no starting token; assume we are at the elevation from the last segment
+  const ignore_below = game.settings.get(MODULE_ID, "prefer-token-elevation") ? 
+                         this.ruler.getFlag(MODULE_ID, "starting_token_elevation") :
+                         undefined;  
+  const current_point_elevation = ElevationAtPoint(this.ray.B, starting_elevation, ignore_below); // no starting token; assume we are at the elevation from the last segment
   const ending_elevation = current_point_elevation + incremental_elevation;
-  log(`Current elevation using point ${this.ray.B.x}, ${this.ray.B.y}`);
+  log(`Current elevation using point ${this.ray.B.x}, ${this.ray.B.y} is ${current_point_elevation}`);
    
   log(`elevationRulerAddProperties segment ${this.segment_num}: ${starting_elevation}[start]; ${incremental_elevation}[incremental]; ${current_point_elevation}[current point]`);
   
@@ -283,32 +289,34 @@ function segmentElevationLabel(segmentElevationIncrement, segmentCurrentElevatio
  * @return {Number} Elevation for the given point.
  */
 // also needed to move tokens in Ruler class
-export function ElevationAtPoint(p, token, starting_elevation = 0) {
-  if(token) { return getProperty(token, "data.elevation"); }
-  
+export function ElevationAtPoint(p, starting_elevation = 0, ignore_below) {  
+  if(ignore_below === undefined) ignore_below = Number.NEGATIVE_INFINITY;
+
+  log(`Checking Elevation at (${p.x}, ${p.y}, ${p.z}) with starting elevation ${starting_elevation}, ignoring below ${ignore_below}`);
+
   // check for tokens; take the highest one at a given position
   let tokens = retrieveVisibleTokens();
-  const max_token_elevation = tokens.reduce((total, t) => {
+  const max_token_elevation = tokens.reduce((e, t) => {
     // is the point within the token control area? 
-    if(!pointWithinToken(p, t)) return total;
-    return Math.max(t.data.elevation, total);
-  }, Number.NEGATIVE_INFINITY) || Number.NEGATIVE_INFINITY;
+    if(!pointWithinToken(p, t)) return e;
+    return Math.max(t.data.elevation, e);
+  }, Number.NEGATIVE_INFINITY);
   
-  log(`calculateEndElevation: ${tokens.length} tokens with maximum elevation ${max_token_elevation}`);
+  log(`calculateEndElevation: ${tokens.length} tokens at (${p.x}, ${p.y}, ${p.z}) with maximum elevation ${max_token_elevation}`);
   
   // use tokens rather than elevation if available
   if(isFinite(max_token_elevation)) { return max_token_elevation; }
 
   // try levels
   const levels_elevation = LevelsElevationAtPoint(p, starting_elevation);
-  if(levels_elevation !== undefined) { return levels_elevation; }
+  if(levels_elevation !== undefined && levels_elevation > ignore_below) { return levels_elevation; }
   
   // try terrain
   const terrain_elevation = TerrainElevationAtPoint(p);
-  if(terrain_elevation !== undefined) { return terrain_elevation; }
+  if(terrain_elevation !== undefined && terrain_elevation > ignore_below) { return terrain_elevation; }
   
   // default to 0 elevation for the point
-  return 0;
+  return Math.max(ignore_below, 0);
 }
   
 
