@@ -1,3 +1,6 @@
+# 0.3.1
+Correct module.json link to DragonFlagon Hotkeys Library. 
+
 # 0.3.0
 Move to libRuler 0.1 compatibility. 
 Improvements:
