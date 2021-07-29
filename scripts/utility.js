@@ -66,8 +66,6 @@ export function iterateGridUnder3dLine_wrapper(wrapped, origin, destination) {
   
   */
 export function projectElevatedPoint(A, B) {
-  log("projectElevatedPoint this", this);
-
   if(window.libRuler.RulerUtilities.pointsAlmostEqual(A, B)) { return [{ x: A.x, y: A.y }, { x: B.x, y: B.y }]; }
   if(B.z === undefined || B.z === NaN) { B.z = A.z; }
   if(A.z === undefined || A.z === NaN) { A.z = B.z; }
@@ -169,14 +167,13 @@ function projectEast(A, B, height, distance) {
 }
 
 function gridDistance(A, B) {
-  log("gridDistance this", this);
   const use_grid = canvas.grid.diagonalRule === "555" || 
                    canvas.grid.diagonalRule === "5105" || 
                    game.system.id === "pf2e";
   
   if(use_grid) {
     const distance_segments = [{ray: new Ray(A, B)}];
-    return canvas.grid.measureDistances(distance_segments, { gridSpaces: true })[0] * canvas.scene.data.grid / canvas.scene.data.gridDistance;
+    return RulerSegment.distanceFunction(distance_segments, { gridSpaces: true }) * canvas.scene.data.grid / canvas.scene.data.gridDistance; // revert to pixel distance
   }
   
   return window.libRuler.RulerUtilities.calculateDistance({x: A.x, y: A.y}, 
