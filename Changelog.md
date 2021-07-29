@@ -1,3 +1,7 @@
+# 0.3.2
+Fix repeated warnings when using devMode for logging.
+Call the libRuler distance function when projecting on a grid, to accommodate modules that might modify the distance function.
+
 # 0.3.1
 Correct module.json link to DragonFlagon Hotkeys Library. 
 
