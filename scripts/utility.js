@@ -66,6 +66,8 @@ export function iterateGridUnder3dLine_wrapper(wrapped, origin, destination) {
   
   */
 export function projectElevatedPoint(A, B) {
+  log("projectElevatedPoint this", this);
+
   if(window.libRuler.RulerUtilities.pointsAlmostEqual(A, B)) { return [{ x: A.x, y: A.y }, { x: B.x, y: B.y }]; }
   if(B.z === undefined || B.z === NaN) { B.z = A.z; }
   if(A.z === undefined || A.z === NaN) { A.z = B.z; }
@@ -167,6 +169,7 @@ function projectEast(A, B, height, distance) {
 }
 
 function gridDistance(A, B) {
+  log("gridDistance this", this);
   const use_grid = canvas.grid.diagonalRule === "555" || 
                    canvas.grid.diagonalRule === "5105" || 
                    game.system.id === "pf2e";
