@@ -1,3 +1,6 @@
+# 0.3.3
+Fix issue #5 (levels_data undefined).
+
 # 0.3.2
 Fix repeated warnings when using devMode for logging.
 Call the libRuler distance function when projecting on a grid, to accommodate modules that might modify the distance function.
