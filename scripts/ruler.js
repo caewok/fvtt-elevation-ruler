@@ -1,3 +1,11 @@
+/* globals
+canvas,
+duplicate,
+getProperty,
+game
+*/
+'use strict'
+
 import { MODULE_ID, log } from "./module.js";
 import { ElevationAtPoint, toGridDistance } from "./segments.js";
 

@@ -1,3 +1,10 @@
+/* globals
+game,
+Hooks,
+ui
+*/
+'use strict'
+
 import { registerSettings, registerKeybindings } from "./settings.js";
 import { registerRuler } from "./patching.js";
 import { iterateGridUnder3dLine, projectElevatedPoint, projectGridless } from "./utility.js";
@@ -14,7 +21,9 @@ export function log(...args) {
     if (FORCE_DEBUG || isDebugging) {
       console.log(MODULE_ID, '|', ...args);
     }
-  } catch (e) {}
+  } catch (e) {
+    // empty 
+  }
 }
 
 // https://discord.com/channels/732325252788387980/754127569246355477/819710580784234506

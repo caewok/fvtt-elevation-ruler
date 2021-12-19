@@ -1,3 +1,8 @@
+/* globals
+game,
+*/
+'use strict'
+
 import { MODULE_ID, log } from "./module.js";
 import { incrementElevation, decrementElevation } from "./ruler.js";
 
@@ -7,14 +12,6 @@ export function getSetting(settingName) {
 
 
 export function registerSettings() {
-  log("Registering hotkey menu.");
-  game.settings.registerMenu(MODULE_ID, "elevationRulerHotkeyMenu", {
-    name: 'Hotkeys Settings',
-          label: "Set Hotkeys",
-          hint: "Select the hotkeys for incrementing and decrementing elevation when using a ruler.",
-          icon: "fas fa-arrows-alt-v",
-    type: Hotkeys.createConfig('Elevation Ruler Hotkeys', [`${MODULE_ID}.change-elevation-group`]),
-  });
   
   log("Registering Elevation Ruler settings.");
   game.settings.register(MODULE_ID, "prefer-token-elevation", {
@@ -68,7 +65,8 @@ export function registerKeybindings() {
     editable: [
       { key: "["}
     ],
-    onDown: decrementElevation
+    onDown: decrementElevation,
+    precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
   });
   
   game.keybindings.register(MODULE_ID, "incrementElevation", {
@@ -77,6 +75,7 @@ export function registerKeybindings() {
     editable: [
       { key: "]"}
     ],
-    onDown: incrementElevation
+    onDown: incrementElevation,
+    precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
   });
 }
