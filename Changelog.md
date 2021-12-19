@@ -1,3 +1,6 @@
+# 0.4.0
+Require Foundry v9; replace df-hotkeys module dependency with Foundry keybindings.
+
 # 0.3.3
 Fix issue #5 (levels_data undefined).
 
