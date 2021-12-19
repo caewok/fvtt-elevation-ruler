@@ -20,9 +20,10 @@ If you choose to move the origin token (by hitting spacebar) after measuring, th
 Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json) in Foundry to install.
 
 ## Dependencies
-- [DF Hotkeys ](https://github.com/flamewave000/dragonflagon-fvtt/tree/master/lib-df-hotkeys)
 - [libWrapper](https://github.com/ruipin/fvtt-lib-wrapper)
 - [libRuler](https://github.com/caewok/fvtt-lib-ruler)
+
+(Elevation Ruler 0.4+ requires Foundry v9 because it replaces the DF Hotkeys dependency with the Foundry keybindings introduced in v9.)
 
 ## Modules that add functionality
 - [Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer)
@@ -34,6 +35,8 @@ Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/
 - [Drag Ruler](https://github.com/manuelVo/foundryvtt-drag-ruler)
 
 I hope to have a future compatibility fix, based in libRuler, that allows Terrain Ruler and Drag Ruler to play nicely with Elevation Ruler.
+
+In the meantime, you can use [my fork of Drag Ruler](https://github.com/caewok/foundryvtt-drag-ruler), which is compatible with libRuler.
 
 In general, modules that overwrite or extend the Ruler Class may cause the elevation ruler module to fail to display or calculate correctly. 
 
