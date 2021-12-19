@@ -1,3 +1,8 @@
+/* globals
+libWrapper
+*/
+'use strict'
+
 import { MODULE_ID, log } from "./module.js";
 import { elevationRulerClear,
          elevationRulerAddWaypoint,

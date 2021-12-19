@@ -1,3 +1,11 @@
+/* globals
+canvas,
+CONST,
+game,
+Ray
+*/
+'use strict'
+
 import { log } from "./module.js";
 
 /*
@@ -67,8 +75,8 @@ export function iterateGridUnder3dLine_wrapper(wrapped, origin, destination) {
   */
 export function projectElevatedPoint(A, B) {
   if(window.libRuler.RulerUtilities.pointsAlmostEqual(A, B)) { return [{ x: A.x, y: A.y }, { x: B.x, y: B.y }]; }
-  if(typeof B.z === "undefined" || B.z === NaN) { B.z = A.z; }
-  if(typeof A.z === "undefined" || A.z === NaN) { A.z = B.z; }
+  if(typeof B.z === "undefined" || isNaN(B.z)) { B.z = A.z; }
+  if(typeof A.z === "undefined" || isNaN(A.z)) { A.z = B.z; }
   if(A.z === B.z) { return [{ x: A.x, y: A.y }, { x: B.x, y: B.y }]; }
   if(window.libRuler.RulerUtilities.almostEqual(A.z, B.z)) { return [{ x: A.x, y: A.y }, { x: B.x, y: B.y }]; }
 

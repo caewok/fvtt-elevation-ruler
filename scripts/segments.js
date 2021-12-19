@@ -1,3 +1,12 @@
+/* globals
+duplicate,
+getProperty,
+game,
+canvas,
+_levels
+*/
+'use strict'
+
 import { MODULE_ID, log } from "./module.js";
 import { projectElevatedPoint } from "./utility.js";
 
