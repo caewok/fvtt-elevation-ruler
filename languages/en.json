@@ -1,3 +1,7 @@
 {
-    "MODULE.hello": "hello"
+    "elevationruler.keybindings.decrementElevation.name": "Decrement Ruler Elevation",
+    "elevationruler.keybindings.decrementElevation.hint": "Decrease the elevation in grid increments when using the ruler.",
+    
+    "elevationruler.keybindings.incrementElevation.name": "Increment Ruler Elevation",
+    "elevationruler.keybindings.incrementElevation.hint": "Increase the elevation in grid increments when using the ruler."
 }

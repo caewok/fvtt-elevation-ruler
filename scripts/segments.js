@@ -1,3 +1,12 @@
+/* globals
+duplicate,
+getProperty,
+game,
+canvas,
+_levels
+*/
+'use strict'
+
 import { MODULE_ID, log } from "./module.js";
 import { projectElevatedPoint } from "./utility.js";
 
@@ -290,7 +299,7 @@ function segmentElevationLabel(segmentElevationIncrement, segmentCurrentElevatio
  */
 // also needed to move tokens in Ruler class
 export function ElevationAtPoint(p, starting_elevation = 0, ignore_below) {  
-  if(ignore_below === undefined) ignore_below = Number.NEGATIVE_INFINITY;
+  if(typeof ignore_below === "undefined") ignore_below = Number.NEGATIVE_INFINITY;
 
   log(`Checking Elevation at (${p.x}, ${p.y}, ${p.z}) with starting elevation ${starting_elevation}, ignoring below ${ignore_below}`);
 

@@ -1,4 +1,11 @@
-import { registerSettings, registerHotkeys } from "./settings.js";
+/* globals
+game,
+Hooks,
+ui
+*/
+'use strict'
+
+import { registerSettings, registerKeybindings } from "./settings.js";
 import { registerRuler } from "./patching.js";
 import { iterateGridUnder3dLine, projectElevatedPoint, projectGridless } from "./utility.js";
  
@@ -14,7 +21,9 @@ export function log(...args) {
     if (FORCE_DEBUG || isDebugging) {
       console.log(MODULE_ID, '|', ...args);
     }
-  } catch (e) {}
+  } catch (e) {
+    // empty 
+  }
 }
 
 // https://discord.com/channels/732325252788387980/754127569246355477/819710580784234506
@@ -36,7 +45,7 @@ Hooks.once('init', async function() {
 Hooks.once('setup', async function() {
   log("Setup.");
   
-  registerHotkeys(); // should go before registering settings, so hotkey group is defined
+  registerKeybindings(); // should go before registering settings, so hotkey group is defined
   registerSettings();
 });
 
@@ -44,9 +53,8 @@ Hooks.once('setup', async function() {
 // ready is called once everything is loaded up and ready to go.
 Hooks.once('ready', async function() {
   log("Readying.");
-  if(game?.user?.isGM === undefined || game.user.isGM) {
+  if(typeof game?.user?.isGM === "undefined" || game.user.isGM) {
     if(!game.modules.get('lib-wrapper')?.active) ui.notifications.error("'Elevation Ruler' requires the 'libWrapper' module. Please install and activate this dependency.");
-    if(!game.modules.get('lib-df-hotkeys')?.active) ui.notifications.error("'Elevation Ruler' requires the 'Library: DF Hotkeys' module. Please install and activate this dependency.");
     if(!game.modules.get('libruler')?.active) ui.notifications.error("'Elevation Ruler' requires the 'libRuler' module. Please install and activate this dependency.");
   }
 });
