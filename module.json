@@ -5,8 +5,8 @@
   "version": "This is auto replaced",
   "library": false,
   "manifestPlusVersion": "1.0.0",
-  "minimumCoreVersion": "0.8.5",
-  "compatibleCoreVersion": "0.8.8",
+  "minimumCoreVersion": "9",
+  "compatibleCoreVersion": "9",
   "authors": [
     {
       "name": "caewok",
@@ -19,12 +19,7 @@
       "name": "lib-wrapper",
       "manifest": "https://raw.githubusercontent.com/ruipin/fvtt-lib-wrapper/master/module.json"
     },
-    
-    {
-      "name": "lib-df-hotkeys",
-      "manifest": "https://dragonflagon.cafe/mods/man/lib-df-hotkeys"
-    },
-    
+        
     {
       "name": "libruler",
       "manifest": "https://github.com/caewok/fvtt-lib-ruler/releases/latest/download/module.json"
