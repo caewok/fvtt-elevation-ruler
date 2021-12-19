@@ -67,8 +67,8 @@ export function iterateGridUnder3dLine_wrapper(wrapped, origin, destination) {
   */
 export function projectElevatedPoint(A, B) {
   if(window.libRuler.RulerUtilities.pointsAlmostEqual(A, B)) { return [{ x: A.x, y: A.y }, { x: B.x, y: B.y }]; }
-  if(B.z === undefined || B.z === NaN) { B.z = A.z; }
-  if(A.z === undefined || A.z === NaN) { A.z = B.z; }
+  if(typeof B.z === "undefined" || B.z === NaN) { B.z = A.z; }
+  if(typeof A.z === "undefined" || A.z === NaN) { A.z = B.z; }
   if(A.z === B.z) { return [{ x: A.x, y: A.y }, { x: B.x, y: B.y }]; }
   if(window.libRuler.RulerUtilities.almostEqual(A.z, B.z)) { return [{ x: A.x, y: A.y }, { x: B.x, y: B.y }]; }
 
@@ -125,8 +125,8 @@ function projectSquareGrid(A, B) {
 }
 
 function projectSouth(A, B, height, distance) {
-  if(height === undefined) height = A.z - B.z;
-  if(distance === undefined) distance = gridDistance(A, B); 
+  if(typeof height === "undefined") height = A.z - B.z;
+  if(typeof distance === "undefined") distance = gridDistance(A, B); 
                                                                 
   // set A pointing south; B pointing west
   const projected_A = {x: A.x, y: A.y + height};
@@ -146,8 +146,8 @@ function projectSouth(A, B, height, distance) {
 }
 
 function projectEast(A, B, height, distance) {
-  if(height === undefined) height = A.z - B.z;
-  if(distance === undefined) distance = gridDistance(A, B);
+  if(typeof height === "undefined") height = A.z - B.z;
+  if(typeof distance === "undefined") distance = gridDistance(A, B);
                                                                 
   // set A pointing east; B pointing south
   const projected_A = {x: A.x + height, y: A.y};
@@ -194,8 +194,8 @@ function gridDistance(A, B) {
  * @param {{x: number, y: number}} B
  */
 export function projectGridless(A, B, height, distance) {
-  if(height === undefined) height = A.z - B.z;
-  if(distance === undefined) distance = window.libRuler.RulerUtilities.calculateDistance({x: A.x, y: A.y}, 
+  if(typeof height === "undefined") height = A.z - B.z;
+  if(typeof distance === "undefined") distance = window.libRuler.RulerUtilities.calculateDistance({x: A.x, y: A.y}, 
                                                                 {x: B.x, y: B.y}); 
 
   const projected_x = A.x + ((height / distance) * (B.y - A.y));
@@ -215,8 +215,8 @@ export function projectGridless(A, B, height, distance) {
   * @return The distance between the two points.
   */
 export function calculate3dDistance(wrapped, A, B, EPSILON = 1e-6) {
-  if(A.z === undefined) A.z = 0;
-  if(B.z === undefined) B.z = 0;
+  if(typeof A.z === "undefined") A.z = 0;
+  if(typeof B.z === "undefined") B.z = 0;
   
   const dz = Math.abs(B.z - A.z);  
   if(dz < EPSILON) { return wrapped(A, B, EPSILON); }
@@ -241,10 +241,10 @@ export function points3dAlmostEqual(wrapped, p1, p2, EPSILON = 1e-6) {
   const equal2d = wrapped(p1, p2, EPSILON);
   if(!equal2d) return false;
   
-  if(p1.z === undefined || 
-     p2.z === undefined || 
-     p1.z === NaN || 
-     p2.z === NaN) return true;
+  if(typeof p1.z === "undefined" || 
+     typeof p2.z === "undefined" || 
+     p1.z.isNaN() || 
+     p2.z.isNaN()) return true;
   
   return window.libRuler.RulerUtilities.almostEqual(p1.z, p2.z, EPSILON);
 }
