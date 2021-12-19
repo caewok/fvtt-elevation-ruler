@@ -44,7 +44,7 @@ Hooks.once('setup', async function() {
 // ready is called once everything is loaded up and ready to go.
 Hooks.once('ready', async function() {
   log("Readying.");
-  if(game?.user?.isGM === undefined || game.user.isGM) {
+  if(typeof game?.user?.isGM === "undefined" || game.user.isGM) {
     if(!game.modules.get('lib-wrapper')?.active) ui.notifications.error("'Elevation Ruler' requires the 'libWrapper' module. Please install and activate this dependency.");
     if(!game.modules.get('lib-df-hotkeys')?.active) ui.notifications.error("'Elevation Ruler' requires the 'Library: DF Hotkeys' module. Please install and activate this dependency.");
     if(!game.modules.get('libruler')?.active) ui.notifications.error("'Elevation Ruler' requires the 'libRuler' module. Please install and activate this dependency.");
