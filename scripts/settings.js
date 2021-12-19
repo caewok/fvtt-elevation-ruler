@@ -1,5 +1,6 @@
 /* globals
 game,
+CONST,
 */
 'use strict'
 
@@ -63,7 +64,7 @@ export function registerKeybindings() {
     name: game.i18n.localize("elevationruler.keybindings.decrementElevation.name"),
     hint: game.i18n.localize("elevationruler.keybindings.decrementElevation.hint"),
     editable: [
-      { key: "["}
+      { key: "BracketLeft"}
     ],
     onDown: decrementElevation,
     precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
@@ -73,7 +74,7 @@ export function registerKeybindings() {
     name: game.i18n.localize("elevationruler.keybindings.incrementElevation.name"),
     hint: game.i18n.localize("elevationruler.keybindings.incrementElevation.hint"),
     editable: [
-      { key: "]"}
+      { key: "BracketRight"}
     ],
     onDown: incrementElevation,
     precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
