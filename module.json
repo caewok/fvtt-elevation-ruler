@@ -1,12 +1,16 @@
 {
   "name": "elevationruler",
+  "minimumCoreVersion": "10",
   "title": "Elevation Ruler",
+  "id": "elevationruler",
   "description": "Modify Foundry VTT ruler to adjust for relative elevation of the destination.",
   "version": "This is auto replaced",
   "library": false,
   "manifestPlusVersion": "1.0.0",
-  "minimumCoreVersion": "9",
-  "compatibleCoreVersion": "9",
+  "compatibility": {
+    "minimum": "10",
+    "verified": "10.284"
+  },
   "authors": [
     {
       "name": "caewok",
@@ -14,21 +18,15 @@
       "discord": "caewok#9192"
     }
   ],
-  "dependencies": [
-    {
-      "name": "lib-wrapper",
-      "manifest": "https://raw.githubusercontent.com/ruipin/fvtt-lib-wrapper/master/module.json"
-    },
-        
-    {
-      "name": "libruler",
-      "manifest": "https://github.com/caewok/fvtt-lib-ruler/releases/latest/download/module.json"
-    }
-
-  ],
-  "conflicts": [
-    
-  ],
+  "relationships": {
+    "requires": [
+      {
+        "id": "lib-wrapper",
+        "type": "module",
+        "manifest": "https://raw.githubusercontent.com/ruipin/fvtt-lib-wrapper/master/module.json"
+      }
+    ]
+  },
   "esmodules": [
     "/scripts/module.js"
   ],
@@ -42,10 +40,6 @@
   "url": "This is auto replaced",
   "manifest": "This is auto replaced",
   "download": "This is auto replaced",
-  "media": [
-    {
-      "type": "icon",
-      "url": "https://avatars2.githubusercontent.com/u/71292812?s=400&u=ccdb4eeb7abf551ca8f314e5a9bfd0479a4d3d41&v=4"
-    }
-  ]
+  "license": "LICENSE",
+  "readme": "README.md"
 }
