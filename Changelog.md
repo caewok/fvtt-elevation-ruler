@@ -1,3 +1,6 @@
+# 0.5.0-alpha
+Foundry v10 testing.
+
 # 0.4.0
 Require Foundry v9; replace df-hotkeys module dependency with Foundry keybindings.
 
@@ -9,10 +12,10 @@ Fix repeated warnings when using devMode for logging.
 Call the libRuler distance function when projecting on a grid, to accommodate modules that might modify the distance function.
 
 # 0.3.1
-Correct module.json link to DragonFlagon Hotkeys Library. 
+Correct module.json link to DragonFlagon Hotkeys Library.
 
 # 0.3.0
-Move to libRuler 0.1 compatibility. 
+Move to libRuler 0.1 compatibility.
 Improvements:
 - Wraps libRuler RulerUtilities functions to 3d versions: `iterateGridUnderLine`, `calculateDistance`, `pointsAlmostEqual`.
 - Adds user setting to prefer the starting token elevation when measuring.
@@ -24,13 +27,13 @@ Breaking changes due to libRuler changes:
 # 0.2.5
 Correct "jumping token" issue where when the token is moved, it will appear to drift off the path and move twice.
 
-For conceptual consistency, switch to projecting the origin point for the token so that the projected path goes from the token at a given height to the destination point. This was the intended approach, but the origin/destination got flipped in the projection code. May not result in a different outcome in most cases, but may be different for edge cases when measuring diagonals. 
+For conceptual consistency, switch to projecting the origin point for the token so that the projected path goes from the token at a given height to the destination point. This was the intended approach, but the origin/destination got flipped in the projection code. May not result in a different outcome in most cases, but may be different for edge cases when measuring diagonals.
 
 # 0.2.4
-Minor update with additional checks on presence of elevation increment flag. Additional logging. 
+Minor update with additional checks on presence of elevation increment flag. Additional logging.
 
 # 0.2.3
-Fix #3. When a grid is present, snap the projected destination point to the center of the grid. This keeps the distances consistent for different cardinalities. Rounding still occurs with grid measurements such that adjacent squares may have the same measured 3-D distance despite appearing to be closer/further from the origin point. 
+Fix #3. When a grid is present, snap the projected destination point to the center of the grid. This keeps the distances consistent for different cardinalities. Rounding still occurs with grid measurements such that adjacent squares may have the same measured 3-D distance despite appearing to be closer/further from the origin point.
 
 ## 0.2.2
 Update manifest for libruler dependency to point to correct JSON URL. Fixes #2.
@@ -53,10 +56,10 @@ Catch case where game.users.isGM is undefined.
 Update the module.json to use a name without special characters to conform to Foundry requirements. Update Foundry compatibility to 0.8.8.
 
 ## 0.1.1
-Correct display of negative current elevation in ruler. 
+Correct display of negative current elevation in ruler.
 
 ## 0.1.0
-Add terrain measurement feature. 
+Add terrain measurement feature.
 - Use destination token elevation to automatically change ruler elevation.
 - Use Enhanced Terrain Layer to automatically change ruler elevation.
 - Change ruler display to show elevation change and current elevation at each waypoint.
@@ -82,7 +85,7 @@ Incorporate libRuler and various improvements.
 
 - Add flags to each Segment to track elevation during measurement.
 - Change elevation on the moved token.
-- Correct issue with displaying hotkey in the preferences for Elevation Ruler. 
+- Correct issue with displaying hotkey in the preferences for Elevation Ruler.
 
 ## 0.0.1.alpha2
 

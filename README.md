@@ -1,12 +1,15 @@
 [![Version (latest)](https://img.shields.io/github/v/release/caewok/fvtt-elevation-ruler)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
-[![Foundry Version](https://img.shields.io/badge/dynamic/json.svg?url=https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json&label=Foundry%20Version&query=$.compatibleCoreVersion&colorB=blueviolet)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
+[![Foundry Version](https://img.shields.io/badge/dynamic/json.svg?url=https://github.com/caewok/fvtt-manhattan-ruler/releases/latest/download/module.json&label=Foundry%20Version&query=$.compatibility.minimum&colorB=blueviolet)](https://github.com/caewok/fvtt-elevation-ruler/releases/latest)
 [![License](https://img.shields.io/github/license/caewok/fvtt-elevation-ruler)](LICENSE)
+![Latest Release Download Count](https://img.shields.io/github/downloads/caewok/fvtt-elevation-ruler/latest/module.zip)
+![Forge Installs](https://img.shields.io/badge/dynamic/json?label=Forge%20Installs&query=package.installs&suffix=%25&url=https%3A%2F%2Fforge-vtt.com%2Fapi%2Fbazaar%2Fpackage%2Felevationruler&colorB=4aa94a)
 
 # Elevation Ruler
 
 This module allows the default Foundry measurement ruler to track change in elevation. Elevation can be changed while using the ruler in four ways:
 1. Manually. Hit the specified hot key (default: '[' to increment and ']' to decrement).
-2. Token. When hovering over a token with the ruler, the origin or destination elevation (as applicable) will update. 
+2. Token. When hovering over a token with the ruler, the origin or destination elevation (as applicable) will update.
+3. Elevated Vision. If the Elevated Vision module is present, it will use that elevation information. (Elevation Ruler v.0.5+)
 3. Enhanced Terrain Layer. If a terrain layer is present with a finite max elevation, that max elevation will be used for the elevation.
 4. Levels. If the Levels module is present, the ruler will look for Levels-enabled tiles or holes and default to the bottom elevation of that tile or hole.
 
@@ -14,18 +17,20 @@ The distance calculation updates based on the distance measured, assuming a stra
 
 If you add a waypoint, elevation will be tracked at each waypoint.
 
-If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint. 
+If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint.
 
 # Installation
 Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json) in Foundry to install.
 
 ## Dependencies
 - [libWrapper](https://github.com/ruipin/fvtt-lib-wrapper)
-- [libRuler](https://github.com/caewok/fvtt-lib-ruler)
+- [libRuler](https://github.com/caewok/fvtt-lib-ruler) (deprecated as of v10; no longer required)
 
 (Elevation Ruler 0.4+ requires Foundry v9 because it replaces the DF Hotkeys dependency with the Foundry keybindings introduced in v9.)
+(Elevation Ruler 0.5+ requires Foundry v10 due to improvements in the Foundry Ruler API.)
 
 ## Modules that add functionality
+- [Elevated Vision](https://github.com/caewok/fvtt-elevated-vision)
 - [Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer)
 - [Levels](https://github.com/theripper93/Levels)
 - [Wall Height](https://github.com/erithtotl/FVTT-Wall-Height)
@@ -34,19 +39,17 @@ Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/
 - [Terrain Ruler](https://github.com/manuelVo/foundryvtt-terrain-ruler)
 - [Drag Ruler](https://github.com/manuelVo/foundryvtt-drag-ruler)
 
-I hope to have a future compatibility fix, based in libRuler, that allows Terrain Ruler and Drag Ruler to play nicely with Elevation Ruler.
+Once Terrain Ruler and Drag Ruler migrate to Foundry v10, I can re-evaluate the conflicts. Elevation Ruler 0.5.0 depends on libWrapper and only uses "wraps", to ensure maximum compatibility with other modules.
 
-In the meantime, you can use [my fork of Drag Ruler](https://github.com/caewok/foundryvtt-drag-ruler), which is compatible with libRuler.
+In general, modules that overwrite or extend the Ruler Class may cause the elevation ruler module to fail to display or calculate correctly.
 
-In general, modules that overwrite or extend the Ruler Class may cause the elevation ruler module to fail to display or calculate correctly. 
+## What systems does it work on?
 
-## What systems does it work on? 
-
-It has been tested on dnd5e 1.3.3 to 1.3.6. Because it adds to the functionality of the underlying Foundry measurement ruler, it may work on other systems as well, unless the system overrides key Foundry measurement functions in the Ruler Class.
+It has been tested on dnd5e. Because it adds to the functionality of the underlying Foundry measurement ruler, it may work on other systems as well, unless the system overrides key Foundry measurement functions in the Ruler Class. Please submit an issue in this GitHub if you experience issues when running on your preferred system!
 
 # How to Use
 
-To use, start measuring with the Foundry measurement ruler as normal. While doing so, hit '[' to increase the elevation at the destination by one step. A step is equal to the grid size (typically 5 feet). Hit ']' to decrease the elevation at the destination by one step. 
+To use, start measuring with the Foundry measurement ruler as normal. While doing so, hit '[' to increase the elevation at the destination by one step. A step is equal to the grid size (typically 5 feet). Hit ']' to decrease the elevation at the destination by one step.
 
 ## Settings
 - Change the elevation increment hotkeys
@@ -55,7 +58,7 @@ To use, start measuring with the Foundry measurement ruler as normal. While doin
 # Details
 
 ## Measuring diagonals
-Nearly every elevation measurement creates a diagonal path from the origin to the elevated or decremented altitude. Elevation Ruler attempts to use the default system measurement to measure these diagonals. For dnd5e, the total distance along the diagonal will follow the chosen dnd5e measurement rule: 5-5-5, 5-10-5, or Euclidean. 
+Nearly every elevation measurement creates a diagonal path from the origin to the elevated or decremented altitude. Elevation Ruler attempts to use the default system measurement to measure these diagonals. For dnd5e, the total distance along the diagonal will follow the chosen dnd5e measurement rule: 5-5-5, 5-10-5, or Euclidean.
 
 For example, here is the measurement that is displayed in DnD 5e with the 5-5-5 rule, where a diagonal move counts as 5 feet:
 
@@ -63,7 +66,7 @@ For example, here is the measurement that is displayed in DnD 5e with the 5-5-5 
 
 The token would move two squares left and two squares "up".  This first move can be accomplished by moving diagonally up and to the left twice. This totals 10 feet under the DnD 5e 5-5-5 rule (same as if moving two squares left). Moving down two squares then adds a
 
-The token would then moves two squares down in 2-D and down one square in elevation. Similarly to the first move, the second can be accomplished by moving diagonally down 1 square and then down one more square in 2-D, or 10 feet total.  
+The token would then moves two squares down in 2-D and down one square in elevation. Similarly to the first move, the second can be accomplished by moving diagonally down 1 square and then down one more square in 2-D, or 10 feet total.
 
 In contrast, using the 5-10-5 rule, the first move incurs an extra 5-foot penalty because moving twice diagonally costs 15 feet.
 
@@ -73,17 +76,17 @@ Finally, the DnD Euclidean rule relies on Pythagorean's Theorem, rounded to the 
 
 ![Screenshot DnD 5e Euclidean Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/measurement_dnd_euclidean.jpg)
 
-## Terrain measurement  
+## Terrain measurement
 
-To use terrain measurement, first set up one or more terrains using Enhanced Terrain Layer. Set a maximum value for the terrain layer. 
+To use terrain measurement, first set up one or more terrains using Enhanced Terrain Layer. Set a maximum value for the terrain layer.
 
 ![Screenshot Terrain Setup](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/terrain-setup.jpg)
 
-Now when you drag the ruler over a terrain area, the ruler will automatically adjust the elevation based on the terrain maximum height. Note that this is based on the center-point of the current ruler position. You can still increment the values up or down manually, and those values will persist as you move the ruler around. 
+Now when you drag the ruler over a terrain area, the ruler will automatically adjust the elevation based on the terrain maximum height. Note that this is based on the center-point of the current ruler position. You can still increment the values up or down manually, and those values will persist as you move the ruler around.
 
 ![Screenshot Terrain Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/terrain-measure.jpg)
 
-## Token measurement 
+## Token measurement
 
 Similarly, as you can see in the previous screenshot, if you drag the ruler over a token that has been elevated or lowered, the ruler will reflect the elevation of that token (plus or minus manually incremented values).
 
@@ -95,13 +98,13 @@ This video shows both terrain and token measurement in action.
 
 ## Levels measurement
 
-For a multi-level scene using the Levels module, the ruler will pick up on holes and Levels-enabled tiles. 
+For a multi-level scene using the Levels module, the ruler will pick up on holes and Levels-enabled tiles.
 
-In general, when the ruler endpoint is within a Levels-enabled tile, the bottom-most elevation of the bottom tile will be displayed. 
+In general, when the ruler endpoint is within a Levels-enabled tile, the bottom-most elevation of the bottom tile will be displayed.
 
 If you start the ruler on a token, the ruler will stay at the bottom-most elevation of the current floor for that token, unless it encounters a hole, a token, or an area that is not within a Levels-enabled tile.
 
-Hitting spacebar can move the token between levels if you start the ruler measurement at your token. Note that this may allow players to move between levels at points other than at stairs, holes, or elevators, just as directly adjusting a token's elevation would. 
+Hitting spacebar can move the token between levels if you start the ruler measurement at your token. Note that this may allow players to move between levels at points other than at stairs, holes, or elevators, just as directly adjusting a token's elevation would.
 
 ## Elevation changes when moving the token with spacebar
 
