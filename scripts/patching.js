@@ -1,46 +1,84 @@
 /* globals
-libWrapper
+libWrapper,
+Ruler
 */
-'use strict'
+"use strict";
 
 import { MODULE_ID, log } from "./module.js";
-import { elevationRulerClear,
-         elevationRulerAddWaypoint,
-         elevationRulerRemoveWaypoint,
-         elevationRulerAnimateToken } from "./ruler.js";
-         
-import { elevationRulerAddProperties,
-         elevationRulerConstructPhysicalPath,
-         elevationRulerMeasurePhysicalPath,
-         elevationRulerGetText } from "./segments.js";
+import {
+  clearRuler,
+  _addWaypointRuler,
+  _removeWaypointRuler,
+  incrementElevation,
+  decrementElevation } from "./ruler.js";
 
-import { calculate3dDistance,
-         iterateGridUnder3dLine_wrapper,
-         points3dAlmostEqual } from "./utility.js";
+import {
+  _getMeasurementSegmentsRuler,
+  measureDistancesGridLayer,
+  _getSegmentLabelRuler,
+  _animateSegmentRuler } from "./segments.js";
+
+import {
+  terrainElevationAtPoint,
+  terrainElevationAtDestination,
+  elevationAtOrigin } from "./terrain_elevation.js";
 
 export function registerRuler() {
 
-  // segment methods (for measuring)
-  libWrapper.register(MODULE_ID, 'window.libRuler.RulerSegment.prototype.addProperties', elevationRulerAddProperties, 'WRAPPER');
-  libWrapper.register(MODULE_ID, 'window.libRuler.RulerSegment.prototype.constructPhysicalPath', elevationRulerConstructPhysicalPath, 'WRAPPER');
-  libWrapper.register(MODULE_ID, 'window.libRuler.RulerSegment.prototype.measurePhysicalPath', elevationRulerMeasurePhysicalPath, 'WRAPPER');
-  libWrapper.register(MODULE_ID, 'window.libRuler.RulerSegment.prototype.text', elevationRulerGetText, 'WRAPPER');
+  // Basic ruler methods
+  libWrapper.register(MODULE_ID, "Ruler.prototype.clear", clearRuler, libWrapper.WRAPPER);
+  libWrapper.register(MODULE_ID, "Ruler.prototype._addWaypoint", _addWaypointRuler, libWrapper.WRAPPER);
+  libWrapper.register(MODULE_ID, "Ruler.prototype._removeWaypoint", _removeWaypointRuler, libWrapper.WRAPPER);
 
-  // move token methods
-  libWrapper.register(MODULE_ID, 'Ruler.prototype.animateToken', elevationRulerAnimateToken, 'WRAPPER');
-  
-  // other methods
-  libWrapper.register(MODULE_ID, 'Ruler.prototype.clear', elevationRulerClear, 'WRAPPER');
-  libWrapper.register(MODULE_ID, 'Ruler.prototype._addWaypoint', elevationRulerAddWaypoint, 'WRAPPER');
-  libWrapper.register(MODULE_ID, 'Ruler.prototype._removeWaypoint', elevationRulerRemoveWaypoint, 'WRAPPER');
-  
-  // utilities
-  libWrapper.register(MODULE_ID, 'window.libRuler.RulerUtilities.calculateDistance', calculate3dDistance, 'MIXED');
-  libWrapper.register(MODULE_ID, 'window.libRuler.RulerUtilities.pointsAlmostEqual', points3dAlmostEqual, 'WRAPPER');  
-  libWrapper.register(MODULE_ID, 'window.libRuler.RulerUtilities.iterateGridUnderLine', iterateGridUnder3dLine_wrapper, 'WRAPPER');
+  // Ruler methods related to ruler segments
+  libWrapper.register(MODULE_ID, "Ruler.prototype._getMeasurementSegments", _getMeasurementSegmentsRuler, libWrapper.WRAPPER);
+  libWrapper.register(MODULE_ID, "GridLayer.prototype.measureDistances", measureDistancesGridLayer, libWrapper.WRAPPER);
+  libWrapper.register(MODULE_ID, "Ruler.prototype._getSegmentLabel", _getSegmentLabelRuler, libWrapper.WRAPPER);
 
-  
+  // Move token methods
+  libWrapper.register(MODULE_ID, "Ruler.prototype._animateSegment", _animateSegmentRuler, libWrapper.WRAPPER);
+
+  Object.defineProperty(Ruler.prototype, "terrainElevationAtPoint", {
+    value: terrainElevationAtPoint,
+    writable: true,
+    configurable: true
+  });
+
+  Object.defineProperty(Ruler.prototype, "terrainElevationAtDestination", {
+    value: terrainElevationAtDestination,
+    writable: true,
+    configurable: true
+  });
+
+  Object.defineProperty(Ruler.prototype, "incrementElevation", {
+    value: incrementElevation,
+    writable: true,
+    configurable: true
+  });
+
+  Object.defineProperty(Ruler.prototype, "decrementElevation", {
+    value: decrementElevation,
+    writable: true,
+    configurable: true
+  });
+
+  Object.defineProperty(Ruler.prototype, "terrainElevationAtPoint", {
+    value: terrainElevationAtPoint,
+    writable: true,
+    configurable: true
+  });
+
+  Object.defineProperty(Ruler.prototype, "terrainElevationAtDestination", {
+    value: terrainElevationAtDestination,
+    writable: true,
+    configurable: true
+  });
+
+  Object.defineProperty(Ruler.prototype, "elevationAtOrigin", {
+    value: elevationAtOrigin,
+    writable: true,
+    configurable: true
+  });
+
   log("registerRuler finished!");
 }
-
-

@@ -2,7 +2,7 @@
 game,
 CONST,
 */
-'use strict'
+"use strict";
 
 import { MODULE_ID, log } from "./module.js";
 import { incrementElevation, decrementElevation } from "./ruler.js";
@@ -11,52 +11,46 @@ export function getSetting(settingName) {
   return game.settings.get(MODULE_ID, settingName);
 }
 
-
 export function registerSettings() {
-  
-  log("Registering Elevation Ruler settings.");
-  game.settings.register(MODULE_ID, "prefer-token-elevation", {
-    name: 'Prefer Token Elevation',
-    hint: "If unset, dragging the ruler over the canvas will default to the elevation of the terrain (0 if none). If set, the ruler will remain at the token's elevation if the token is higher (for example, if the token is flying), unless the ruler is over another token.",
-    scope: "user",
-    config: true,
-    default: false,
+  log("Registering settings.");
+
+  game.settings.register(MODULE_ID, "enable-elevated-vision-elevation", {
+    name: "Use Elevated Vision",
+    hint: "Set starting ruler elevations when measuring based on Elevated Vision module.",
+    scope: "world",
+    config: Boolean(game.modules.get("elevatedvision")),
+    default: game.modules.get("elevatedvision")?.active,
     type: Boolean
   });
 
-
-  log("Registering terrain layer settings.");
   game.settings.register(MODULE_ID, "enable-terrain-elevation", {
-    name: 'Use Enhanced Terrain',
-    hint: 'Set starting ruler elevations when measuring based on terrain maximum elevation. Requires Enhanced Terrain Elevation module.',
+    name: "Use Enhanced Terrain",
+    hint: "Set starting ruler elevations when measuring based on terrain maximum elevation. Requires Enhanced Terrain Elevation module.",
     scope: "world",
-    config: true,
+    config: Boolean(game.modules.get("enhanced-terrain-layer")),
     default: game.modules.get("enhanced-terrain-layer")?.active,
     type: Boolean
   });
-  
-  log("Registering levels settings.");
+
   game.settings.register(MODULE_ID, "enable-levels-elevation", {
-    name: 'Use Levels',
-    hint: 'Take into account Levels elevation when measuring. Requires Levels module.',
+    name: "Use Levels",
+    hint: "Take into account Levels elevation when measuring. Requires Levels module.",
     scope: "world",
-    config: true,
-    default: game.modules.get("levels")?.active,
-    type: Boolean
-  });
-  
-  game.settings.register(MODULE_ID, "enable-levels-floor-label", {
-    name: 'Levels Floor Label',
-    hint: 'Label the ruler with the current floor. Requires Levels module.',
-    scope: "world",
-    config: true,
+    config: Boolean(game.modules.get("levels")),
     default: game.modules.get("levels")?.active,
     type: Boolean
   });
 
+  game.settings.register(MODULE_ID, "enable-levels-floor-label", {
+    name: "Levels Floor Label",
+    hint: "Label the ruler with the current floor. Requires Levels module.",
+    scope: "world",
+    config: Boolean(game.modules.get("levels")),
+    default: game.modules.get("levels")?.active,
+    type: Boolean
+  });
 
   log("Done registering settings.");
-
 }
 
 export function registerKeybindings() {
@@ -69,7 +63,7 @@ export function registerKeybindings() {
     onDown: decrementElevation,
     precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
   });
-  
+
   game.keybindings.register(MODULE_ID, "incrementElevation", {
     name: game.i18n.localize("elevationruler.keybindings.incrementElevation.name"),
     hint: game.i18n.localize("elevationruler.keybindings.incrementElevation.hint"),
