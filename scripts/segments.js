@@ -149,8 +149,9 @@ function segmentElevationLabel(s) {
     : (increment < 0) ? "↓" : "";
 
   // Take absolute value b/c segmentArrow will represent direction
-  let label = `${Math.abs(Math.round(elevationCoordinateToUnit(increment)))} ${units}${segmentArrow}`;
-  label += ` [@${Math.round(elevationCoordinateToUnit(Bz))} ${units}]`;
+  // Allow decimals to tenths ( Math.round(x * 10) / 10).
+  let label = `${Math.abs(Math.round(elevationCoordinateToUnit(increment) * 10) / 10)} ${units}${segmentArrow}`;
+  label += ` [@${Math.round(elevationCoordinateToUnit(Bz) * 10) / 10} ${units}]`;
 
   return label;
 }
