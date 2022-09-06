@@ -17,7 +17,13 @@ import {
  */
 export function _getMeasurementSegmentsRuler(wrapped) {
   const segments = wrapped();
+
+  // Add destination as the final waypoint
+  this.destination._terrainElevation = this.terrainElevationAtDestination();
+  this.destination._userElevationIncrements = this._userElevationIncrements;
+
   const waypoints = this.waypoints.concat([this.destination]);
+
   const { distance, size } = canvas.dimensions;
   const gridUnits = size / distance;
 
@@ -40,8 +46,8 @@ export function _getMeasurementSegmentsRuler(wrapped) {
     // Could add z coordinate to the ray but other modules could mess with the Ray info.
     segment._elevation = { A: 0, B: 0 };
 
-    segment._elevation.A = j === 0 ? this.elevationAtOrigin() : elevationAtWaypoint(p0);
-    segment._elevation.B = elevationAtWaypoint(p0);
+    segment._elevation.A = elevationAtWaypoint(p0);
+    segment._elevation.B = elevationAtWaypoint(p1);
 
     segment._elevation.A *= gridUnits;
     segment._elevation.B *= gridUnits;
@@ -59,7 +65,6 @@ export function _getMeasurementSegmentsRuler(wrapped) {
 function elevationAtWaypoint(waypoint) {
   return waypoint._terrainElevation + (waypoint._userElevationIncrements * canvas.dimensions.distance);
 }
-
 /**
  * Wrap GridLayer.prototype.measureDistances
  * Called by Ruler.prototype._computeDistance
@@ -83,9 +88,19 @@ export function measureDistancesGridLayer(wrapped, segments, options = {}) {
     const B = { x: s.ray.B.x, y: s.ray.B.y, z: s._elevation.B };
     const [newA, newB] = projectElevatedPoint(A, B);
     newSegment.ray = new Ray(newA, newB);
+    newSegments.push(newSegment);
   }
 
   return wrapped(newSegments, options);
+}
+
+/**
+ * Should Levels floor labels be used?
+ * @returns {boolean}
+ */
+function useLevelsLabels() {
+  return game.modules.get("levels")?.active
+    && game.settings.get(MODULE_ID, "enable-levels-floor-label");
 }
 
 /**
@@ -96,16 +111,26 @@ export function _getSegmentLabelRuler(wrapped, segment, totalDistance) {
   const orig_label = wrapped(segment, totalDistance);
 
   let elevation_label = segmentElevationLabel(segment);
-
-  if ( game.settings.get(MODULE_ID, "enable-levels-floor-label") ) {
-    const level_name = this.getFlag(MODULE_ID, "elevation_level_name");
-    if ( level_name ) {
-      elevation_label += `\n${level_name}`;
-    }
-  }
+  const level_name = LevelNameAtPoint(segment.ray.B, segment._elevation.B);
+  if ( level_name ) elevation_label += `\n${level_name}`;
 
   return `${orig_label}\n${elevation_label}`;
 }
+
+function LevelNameAtPoint(p, zz) {
+  if ( !useLevelsLabels() ) return undefined;
+
+  const floors = _levels.getFloorsForPoint(p);
+  if(!floors || floors.length < 1) { return undefined; }
+
+  const levels_data = canvas.scene.getFlag("levels", "sceneLevels") // array with [0]: bottom; [1]: top; [2]: name
+  if ( !levels_data ) return undefined;
+  for ( let l of levels_data ) {
+     if ( zz <= l[1] && zz >= l[0] ) return l[2];
+  }
+  return undefined;
+}
+
 
 /*
  * Construct a label to represent elevation changes in the ruler.

@@ -10,10 +10,11 @@ Used by ruler to get elevation at waypoints and at the end of the ruler.
 */
 
 import { log, MODULE_ID } from "./module.js";
+import { SETTINGS, getSetting } from "./settings.js";
 
 /**
  * Retrieve the elevation at the current ruler origin.
- * This is either token elevation or terrain elevation or 0.
+ * This is either the measuring token elevation or terrain elevation or 0.
  */
 export function elevationAtOrigin() {
   const measuringToken = this._getMovementToken();
@@ -31,17 +32,27 @@ export function elevationAtOrigin() {
  * @returns {number}
  */
 function tokenElevation(token) {
-  return token.document?.elevation ?? 0;
+  return token?.document?.elevation ?? 0;
+}
+
+/**
+ * Determine if token elevation should be preferred
+ * @returns {boolean}
+ */
+function preferTokenElevation() {
+  if ( !getSetting(SETTINGS.PREFER_TOKEN_ELEVATION) ) return false;
+  const token_controls = ui.controls.controls.find(elem => elem.name === "token");
+  const prefer_token_control = token_controls.tools.find(elem => elem.name === SETTINGS.PREFER_TOKEN_ELEVATION);
+  return prefer_token_control.active;
 }
 
 /**
  * Retrieve the terrain elevation at the current ruler destination
+ * @param {object} [options]  Options that modify the calculation
+ * @param {boolean} [options.considerTokens]    Consider token elevations at that point.
  */
-export function terrainElevationAtDestination({
-  startingElevation = 0,
-  considerTokens = true,
-  ignoreBelow = Number.NEGATIVE_INFINITY } = {}) {
-  return this.terrainElevationAtPoint(this.destination, { startingElevation, considerTokens, ignoreBelow });
+export function terrainElevationAtDestination({ considerTokens = true } = {}) {
+  return this.terrainElevationAtPoint(this.destination, { considerTokens });
 }
 
 /**
@@ -54,39 +65,40 @@ export function terrainElevationAtDestination({
  *
  * @param {Point} p      Point to measure, in {x, y} format
  * @param {object} [options]  Options that modify the calculation
- * @param {number} [options.startingElevation]  The elevation of the ruler or measuring token, used for Levels
  * @param {boolean} [options.considerTokens]    Consider token elevations at that point.
- * @param {number} [options.ignoreBelow]        If elevation of a given source is below this number, ignore
  * @returns {number} Elevation for the given point.
  */
-export function terrainElevationAtPoint({x, y}, {
-  startingElevation = 0,
-  considerTokens = true,
-  ignoreBelow = Number.NEGATIVE_INFINITY } = {}) {
-  log(`Checking Elevation at (${x}, ${y}) ${(considerTokens ? "" : "not ") + "considering tokens"}; ignoring below ${ignoreBelow}`);
+export function terrainElevationAtPoint(p, { considerTokens = true } = {}) {
+
+  const measuringToken = this._getMovementToken();
+  const startingElevation = tokenElevation(measuringToken);
+  const ignoreBelow = ( measuringToken && preferTokenElevation() ) ? startingElevation : Number.NEGATIVE_INFINITY;
+
+  log(`Checking Elevation at (${p.x}, ${p.y}) ${(considerTokens ? "" : "not ") + "considering tokens"}\n\tstarting elevation ${startingElevation}\n\tignoring below ${ignoreBelow}`);
 
   if ( considerTokens ) {  // Check for tokens; take the highest one at a given position
     const tokens = retrieveVisibleTokens();
     const max_token_elevation = tokens.reduce((e, t) => {
       // Is the point within the token control area?
-      if ( !t.hitArea.contains(x, y) ) return e;
-      return Math.max(t.data.elevation, e);
+      if ( !t.bounds.contains(p.x, p.y) ) return e;
+      return Math.max(tokenElevation(t), e);
     }, Number.NEGATIVE_INFINITY);
-    log(`calculateEndElevation: ${tokens.length} tokens at (${x}, ${y}) with maximum elevation ${max_token_elevation}`);
+    log(`calculateEndElevation: ${tokens.length} tokens at (${p.x}, ${p.y}) with maximum elevation ${max_token_elevation}`);
 
     // Use tokens rather than elevation if available
     if ( isFinite(max_token_elevation) && max_token_elevation >= ignoreBelow ) return max_token_elevation;
   }
 
-  const ev_elevation = EVElevationAtPoint({x, y});
-  if ( levels_elevation !== undefined && levels_elevation > ignoreBelow ) return ev_elevation;
-
-  // Try levels
-  const levels_elevation = LevelsElevationAtPoint({x, y}, startingElevation);
+  // Try Levels
+  const levels_elevation = LevelsElevationAtPoint(p, startingElevation);
   if ( levels_elevation !== undefined && levels_elevation > ignoreBelow ) return levels_elevation;
 
-  // Try terrain
-  const terrain_elevation = TerrainLayerElevationAtPoint({x, y});
+  // Try Elevated Vision
+  const ev_elevation = EVElevationAtPoint(p);
+  if ( ev_elevation !== undefined && levels_elevation > ignoreBelow ) return ev_elevation;
+
+  // Try Enhanced Terrain Layer
+  const terrain_elevation = TerrainLayerElevationAtPoint(p);
   if ( terrain_elevation !== undefined && terrain_elevation > ignoreBelow ) return terrain_elevation;
 
   // Default to 0 elevation for the point
@@ -97,6 +109,34 @@ function retrieveVisibleTokens() {
   return canvas.tokens.children[0].children.filter(c => c.visible);
 }
 
+// ----- HELPERS TO TRIGGER ELEVATION MEASURES ---- //
+/**
+ * Should Elevated Vision module be used?
+ * @returns {boolean}
+ */
+function useElevatedVision() {
+  return game.modules.get("elevatedvision")?.active
+    && game.settings.get(MODULE_ID, "enable-elevated-vision-elevation");
+}
+
+/**
+ * Should Terrain Layers module be used?
+ * @returns {boolean}
+ */
+function useTerrainLayer() {
+  return game.modules.get("enhanced-terrain-layer")?.active
+    && game.settings.get(MODULE_ID, "enable-enhanced-terrain-elevation");
+}
+
+/**
+ * Should Levels module be used?
+ * @returns {boolean}
+ */
+function useLevels() {
+  return game.modules.get("levels")?.active
+    && game.settings.get(MODULE_ID, "enable-levels-elevation");
+}
+
 // ----- ELEVATED VISION ELEVATION ----- //
 /**
  * Measure the terrain elevation at a given point using Elevated Vision.
@@ -104,10 +144,9 @@ function retrieveVisibleTokens() {
  * @returns {Number|undefined} Point elevation or undefined if elevated vision layer is inactive
  */
 function EVElevationAtPoint({x, y}) {
-  if ( !game.modules.get("elevatedvision")?.active ) return undefined;
+  if ( !useElevatedVision() ) return undefined;
   return canvas.elevation.elevationAt(x, y);
 }
-
 
 // ----- TERRAIN LAYER ELEVATION ----- //
 /**
@@ -117,8 +156,7 @@ function EVElevationAtPoint({x, y}) {
  * @return {Number|undefined} Point elevation or undefined if terrain layer is inactive or no terrain found.
  */
 function TerrainLayerElevationAtPoint({x, y}) {
-  if ( !game.settings.get(MODULE_ID, "enable-terrain-elevation")
-    || !game.modules.get("enhanced-terrain-layer")?.active ) return undefined;
+  if ( !useTerrainLayer() ) return undefined;
 
   const terrains = canvas.terrain.terrainFromPixels(x, y);
   if ( terrains.length === 0 ) return undefined; // No terrains found at the point.
@@ -159,9 +197,7 @@ function TerrainLayerElevationAtPoint({x, y}) {
  * @return {Number|undefined} Levels elevation or undefined if levels is inactive or no levels found.
  */
 function LevelsElevationAtPoint(p, starting_elevation) {
-  if ( !game.settings.get(MODULE_ID, "enable-levels-elevation") || !game.modules.get("levels")?.active ) {
-    return undefined;
-  }
+  if ( !useLevels() ) return undefined;
 
   // If in a hole, use that
   const hole_elevation = checkForHole(p, starting_elevation);
