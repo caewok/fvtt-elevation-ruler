@@ -14,21 +14,37 @@ export function getSetting(settingName) {
 export function registerSettings() {
   log("Registering settings.");
 
+  const evActive = game.modules.get("elevatedvision")?.active;
+  const terrainLayerActive = game.modules.get("enhanced-terrain-layer")?.active
+  const levelsActive = game.modules.get("levels")?.active
+
+  if ( !evActive && !terrainLayerActive && !levelsActive ) {
+    game.settings.register(MODULE_ID, "no-modules-message", {
+      name: "No elevation-related modules found.",
+      hint: "Additional settings will be available here if Elevated Vision, Enhanced Terrain Layer, or Levels modules are active.",
+      scope: "world",
+      config: true,
+      enabled: false,
+      default: true,
+      type: Boolean
+    });
+  }
+
   game.settings.register(MODULE_ID, "enable-elevated-vision-elevation", {
     name: "Use Elevated Vision",
     hint: "Set starting ruler elevations when measuring based on Elevated Vision module.",
     scope: "world",
-    config: Boolean(game.modules.get("elevatedvision")),
-    default: game.modules.get("elevatedvision")?.active,
+    config: evActive,
+    default: evActive,
     type: Boolean
   });
 
-  game.settings.register(MODULE_ID, "enable-terrain-elevation", {
+  game.settings.register(MODULE_ID, "enable-enhanced-terrain-elevation", {
     name: "Use Enhanced Terrain",
     hint: "Set starting ruler elevations when measuring based on terrain maximum elevation. Requires Enhanced Terrain Elevation module.",
     scope: "world",
-    config: Boolean(game.modules.get("enhanced-terrain-layer")),
-    default: game.modules.get("enhanced-terrain-layer")?.active,
+    config: terrainLayerActive,
+    default: terrainLayerActive,
     type: Boolean
   });
 
@@ -36,8 +52,8 @@ export function registerSettings() {
     name: "Use Levels",
     hint: "Take into account Levels elevation when measuring. Requires Levels module.",
     scope: "world",
-    config: Boolean(game.modules.get("levels")),
-    default: game.modules.get("levels")?.active,
+    config: levelsActive,
+    default: levelsActive,
     type: Boolean
   });
 
@@ -45,8 +61,8 @@ export function registerSettings() {
     name: "Levels Floor Label",
     hint: "Label the ruler with the current floor. Requires Levels module.",
     scope: "world",
-    config: Boolean(game.modules.get("levels")),
-    default: game.modules.get("levels")?.active,
+    config: levelsActive,
+    default: levelsActive,
     type: Boolean
   });
 
@@ -60,7 +76,7 @@ export function registerKeybindings() {
     editable: [
       { key: "BracketLeft"}
     ],
-    onDown: decrementElevation,
+    onDown: canvas.controls.ruler.decrementElevation,
     precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
   });
 
@@ -70,7 +86,7 @@ export function registerKeybindings() {
     editable: [
       { key: "BracketRight"}
     ],
-    onDown: incrementElevation,
+    onDown: canvas.controls.rulerincrementElevation,
     precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
   });
 }

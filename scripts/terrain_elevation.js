@@ -78,14 +78,15 @@ export function terrainElevationAtPoint({x, y}, {
     if ( isFinite(max_token_elevation) && max_token_elevation >= ignoreBelow ) return max_token_elevation;
   }
 
+  // Try Elevated Vision
   const ev_elevation = EVElevationAtPoint({x, y});
-  if ( levels_elevation !== undefined && levels_elevation > ignoreBelow ) return ev_elevation;
+  if ( ev_elevation !== undefined && levels_elevation > ignoreBelow ) return ev_elevation;
 
-  // Try levels
+  // Try Levels
   const levels_elevation = LevelsElevationAtPoint({x, y}, startingElevation);
   if ( levels_elevation !== undefined && levels_elevation > ignoreBelow ) return levels_elevation;
 
-  // Try terrain
+  // Try Enhanced Terrain Layer
   const terrain_elevation = TerrainLayerElevationAtPoint({x, y});
   if ( terrain_elevation !== undefined && terrain_elevation > ignoreBelow ) return terrain_elevation;
 
@@ -97,6 +98,34 @@ function retrieveVisibleTokens() {
   return canvas.tokens.children[0].children.filter(c => c.visible);
 }
 
+// ----- HELPERS TO TRIGGER ELEVATION MEASURES ---- //
+/**
+ * Should Elevated Vision module be used?
+ * @returns {boolean}
+ */
+function useElevatedVision() {
+  return game.modules.get("elevatedvision")?.active
+    && game.settings.get(MODULE_ID, "enable-elevated-vision-elevation");
+}
+
+/**
+ * Should Terrain Layers module be used?
+ * @returns {boolean}
+ */
+function useTerrainLayer() {
+  return game.modules.get("enhanced-terrain-layer")?.active
+    && game.settings.get(MODULE_ID, "enable-enhanced-terrain-elevation");
+}
+
+/**
+ * Should Levels module be used?
+ * @returns {boolean}
+ */
+function useLevels() {
+  return game.modules.get("levels")?.active
+    && game.settings.get(MODULE_ID, "enable-levels-elevation");
+}
+
 // ----- ELEVATED VISION ELEVATION ----- //
 /**
  * Measure the terrain elevation at a given point using Elevated Vision.
@@ -104,10 +133,9 @@ function retrieveVisibleTokens() {
  * @returns {Number|undefined} Point elevation or undefined if elevated vision layer is inactive
  */
 function EVElevationAtPoint({x, y}) {
-  if ( !game.modules.get("elevatedvision")?.active ) return undefined;
+  if ( !useElevatedVision() ) return undefined;
   return canvas.elevation.elevationAt(x, y);
 }
-
 
 // ----- TERRAIN LAYER ELEVATION ----- //
 /**
@@ -117,8 +145,7 @@ function EVElevationAtPoint({x, y}) {
  * @return {Number|undefined} Point elevation or undefined if terrain layer is inactive or no terrain found.
  */
 function TerrainLayerElevationAtPoint({x, y}) {
-  if ( !game.settings.get(MODULE_ID, "enable-terrain-elevation")
-    || !game.modules.get("enhanced-terrain-layer")?.active ) return undefined;
+  if ( !useTerrainLayer() ) return undefined;
 
   const terrains = canvas.terrain.terrainFromPixels(x, y);
   if ( terrains.length === 0 ) return undefined; // No terrains found at the point.
@@ -159,9 +186,7 @@ function TerrainLayerElevationAtPoint({x, y}) {
  * @return {Number|undefined} Levels elevation or undefined if levels is inactive or no levels found.
  */
 function LevelsElevationAtPoint(p, starting_elevation) {
-  if ( !game.settings.get(MODULE_ID, "enable-levels-elevation") || !game.modules.get("levels")?.active ) {
-    return undefined;
-  }
+  if ( !useLevels() ) return undefined;
 
   // If in a hole, use that
   const hole_elevation = checkForHole(p, starting_elevation);
