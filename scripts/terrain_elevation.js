@@ -17,13 +17,28 @@ import { SETTINGS, getSetting } from "./settings.js";
 /**
  * Retrieve the elevation at the current ruler origin.
  * This is either the measuring token elevation or terrain elevation or 0.
+ * Cached during a ruler movement
  */
 export function elevationAtOrigin() {
   const measuringToken = this._getMovementToken();
   const origin = this.waypoints[0];
-  return measuringToken
-    ? tokenElevation(measuringToken)
-    : this.terrainElevationAtPoint(origin, { considerTokens: false });
+  if ( !origin ) return undefined;
+  if ( origin._terrainElevation ) return origin._terrainElevation;
+
+  let value = 0;
+
+  // Use the measuring token's elevation, if any, as the starting point.
+  if ( measuringToken ) value = tokenElevation(measuringToken);
+
+  // If the Levels UI is enabled, start at the bottom of the current layer.
+  else if ( useLevels() && CONFIG.Levels.UI.rangeEnabled ) value = parseFloat(CONFIG.Levels.UI.range[0]);
+
+  // Otherwise, get the elevation for this origin point.
+  else value = this.terrainElevationAtPoint(origin, { considerTokens: false });
+
+  origin._terrainElevation = value;
+  origin._userElevationIncrements = 0;
+  return value;
 }
 
 /**
@@ -73,7 +88,7 @@ export function terrainElevationAtDestination({ considerTokens = true } = {}) {
 export function terrainElevationAtPoint(p, { considerTokens = true } = {}) {
 
   const measuringToken = this._getMovementToken();
-  const startingElevation = tokenElevation(measuringToken);
+  const startingElevation = this.elevationAtOrigin();
   const ignoreBelow = ( measuringToken && preferTokenElevation() ) ? startingElevation : Number.NEGATIVE_INFINITY;
 
   log(`Checking Elevation at (${p.x}, ${p.y}) ${(considerTokens ? "" : "not ") + "considering tokens"}\n\tstarting elevation ${startingElevation}\n\tignoring below ${ignoreBelow}`);

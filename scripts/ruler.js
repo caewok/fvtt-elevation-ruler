@@ -83,17 +83,13 @@ export function _addWaypointRuler(wrapper, point) {
   const newWaypoint = this.waypoints[ln - 1];
 
   if ( ln === 1) {
-    // Origin waypoint
-    newWaypoint._terrainElevation = this.elevationAtOrigin();
-    newWaypoint._userElevationIncrements = 0;
+    // Origin waypoint -- cache using elevationAtOrigin
+    this.elevationAtOrigin();
     this._userElevationIncrements = 0;
   } else {
     newWaypoint._terrainElevation = this.terrainElevationAtPoint(point);
     newWaypoint._userElevationIncrements = this._userElevationIncrements;
   }
-
-  // Carry-over previous increments
-//   this._userElevationIncrements;
 }
 
 /**
