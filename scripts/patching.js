@@ -10,7 +10,9 @@ import {
   _addWaypointRuler,
   _removeWaypointRuler,
   incrementElevation,
-  decrementElevation } from "./ruler.js";
+  decrementElevation,
+  toJSONRuler,
+  updateRuler } from "./ruler.js";
 
 import {
   _getMeasurementSegmentsRuler,
@@ -29,6 +31,10 @@ export function registerRuler() {
   libWrapper.register(MODULE_ID, "Ruler.prototype.clear", clearRuler, libWrapper.WRAPPER);
   libWrapper.register(MODULE_ID, "Ruler.prototype._addWaypoint", _addWaypointRuler, libWrapper.WRAPPER);
   libWrapper.register(MODULE_ID, "Ruler.prototype._removeWaypoint", _removeWaypointRuler, libWrapper.WRAPPER);
+
+  // Pass needed variables across the sockets
+  libWrapper.register(MODULE_ID, "Ruler.prototype.toJSON", toJSONRuler, libWrapper.WRAPPER);
+  libWrapper.register(MODULE_ID, "Ruler.prototype.update", updateRuler, libWrapper.WRAPPER);
 
   // Ruler methods related to ruler segments
   libWrapper.register(MODULE_ID, "Ruler.prototype._getMeasurementSegments", _getMeasurementSegmentsRuler, libWrapper.WRAPPER);

@@ -50,9 +50,25 @@ export function clearRuler(wrapper) {
 
   // User increments/decrements to the elevation for the current destination
   this.destination._userElevationIncrements = 0;
-  this.destination._terrainElevation = () => this.terrainElevationAtDestination();
-
   return wrapper();
+}
+
+/**
+ * Wrap Ruler.prototype.toJSON
+ * Store the current userElevationIncrements for the destination.
+ */
+export function toJSONRuler(wrapper) {
+  const obj = wrapper();
+  obj._userElevationIncrements = this._userElevationIncrements;
+}
+
+/**
+ * Wrap Ruler.prototype.update
+ * Retrieve the current _userElevationIncrements
+ */
+export function updateRuler(wrapper, data) {
+  this._userElevationIncrements = data._userElevationIncrements;
+  wrapper(data);
 }
 
 /**
@@ -63,11 +79,17 @@ export function _addWaypointRuler(wrapper, point) {
   log("adding waypoint!");
   wrapper(point);
 
-  const newWaypoint = this.waypoints[this.waypoints.length - 1];
-  newWaypoint._terrainElevation = this.terrainElevationAtPoint(point);
-  newWaypoint._userElevationIncrements = this.destination._userElevationIncrements;
+  const ln = this.waypoints.length;
+  const newWaypoint = this.waypoints[ln - 1];
 
-  this.destination._userElevationIncrements = 0;
+  if ( ln === 1) {
+    // Origin waypoint -- cache using elevationAtOrigin
+    this.elevationAtOrigin();
+    this._userElevationIncrements = 0;
+  } else {
+    newWaypoint._terrainElevation = this.terrainElevationAtPoint(point);
+    newWaypoint._userElevationIncrements = this._userElevationIncrements;
+  }
 }
 
 /**
@@ -76,7 +98,7 @@ export function _addWaypointRuler(wrapper, point) {
  */
 export function _removeWaypointRuler(wrapper, point, { snap = true } = {}) {
   log("removing waypoint!");
-  this.destination._userElevationIncrements = 0;
+  this._userElevationIncrements = 0;
   wrapper(point, { snap });
 }
 
@@ -85,7 +107,10 @@ export function incrementElevation() {
   log("Trying to increment...", ruler);
   if ( !ruler || !ruler.active ) return;
 
-  this.destination._userElevationIncrements += 1;
+  ruler._userElevationIncrements += 1;
+
+  // Weird, but slightly change the destination to trigger a measure
+  this.destination.x -= 1;
   ruler.measure(ruler.destination);
 }
 
@@ -94,6 +119,9 @@ export function decrementElevation() {
   log("Trying to decrement...", ruler);
   if ( !ruler || !ruler.active ) return;
 
-  this.destination._userElevationIncrements -= 1;
+  ruler._userElevationIncrements -= 1;
+
+  // Weird, but slightly change the destination to trigger a measure
+  this.destination.x -= 1;
   ruler.measure(ruler.destination);
 }

@@ -1,3 +1,11 @@
+# 0.5.0
+Foundry v10 compatibility. v9 only supported in 0.4 versions.
+Due to various improvements in Foundry v10 Ruler class, libRuler is now deprecated; only libWrapper is required as a dependency.
+
+- Updated Levels module support.
+- Updated code for Enhanced Terrain module but a bug with that module is preventing testing.
+- Added Elevated Vision module support.
+
 # 0.5.0-alpha
 Foundry v10 testing.
 

@@ -9,9 +9,9 @@
 This module allows the default Foundry measurement ruler to track change in elevation. Elevation can be changed while using the ruler in four ways:
 1. Manually. Hit the specified hot key (default: '[' to increment and ']' to decrement).
 2. Token. When hovering over a token with the ruler, the origin or destination elevation (as applicable) will update.
-3. Elevated Vision. If the Elevated Vision module is present, it will use that elevation information. (Elevation Ruler v.0.5+)
-3. Enhanced Terrain Layer. If a terrain layer is present with a finite max elevation, that max elevation will be used for the elevation.
-4. Levels. If the Levels module is present, the ruler will look for Levels-enabled tiles or holes and default to the bottom elevation of that tile or hole.
+3. Elevated Vision. If the Elevated Vision module is present, it will use that elevation information. (Elevation Ruler v0.5+)
+4. Enhanced Terrain Layer. If a terrain layer is present with a finite max elevation, that max elevation will be used for the elevation.
+5. Levels. If the Levels module is present, the ruler will look for Levels-enabled tiles  and default to the bottom elevation of that tile. In Elevation Ruler v0.5+, it will also originate elevation at the bottom of the active layer if the Levels layers UI is active.
 
 The distance calculation updates based on the distance measured, assuming a straight line in three dimensions between origin and destination, taking into account elevation change.
 
@@ -31,9 +31,11 @@ Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/
 
 ## Modules that add functionality
 - [Elevated Vision](https://github.com/caewok/fvtt-elevated-vision)
-- [Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer)
+- *[Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer)
 - [Levels](https://github.com/theripper93/Levels)
 - [Wall Height](https://github.com/erithtotl/FVTT-Wall-Height)
+
+*[Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer) has an [issue](https://github.com/ironmonk88/enhanced-terrain-layer/issues/98) in v10 that may need to be resolved before it will function with this module.
 
 ## Known conflicts
 - [Terrain Ruler](https://github.com/manuelVo/foundryvtt-terrain-ruler)

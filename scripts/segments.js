@@ -17,17 +17,20 @@ import {
  */
 export function _getMeasurementSegmentsRuler(wrapped) {
   const segments = wrapped();
+
+  // Add destination as the final waypoint
+  this.destination._terrainElevation = this.terrainElevationAtDestination();
+  this.destination._userElevationIncrements = this._userElevationIncrements;
+
   const waypoints = this.waypoints.concat([this.destination]);
+
   const { distance, size } = canvas.dimensions;
   const gridUnits = size / distance;
 
   const ln = waypoints.length;
-  for ( let i = 0, j = 0; i < ln; i += 1, j += 1 ) {
+  // Skip the first waypoint, which will (likely) end up as p0.
+  for ( let i = 1, j = 0; i < ln; i += 1, j += 1 ) {
     const segment = segments[j];
-    if ( i === 0 ) {
-      j -= 1; // Stay on this segment and skip this waypoint
-      continue;
-    }
 
     const p0 = waypoints[i - 1];
     const p1 = waypoints[i];
@@ -40,8 +43,8 @@ export function _getMeasurementSegmentsRuler(wrapped) {
     // Could add z coordinate to the ray but other modules could mess with the Ray info.
     segment._elevation = { A: 0, B: 0 };
 
-    segment._elevation.A = j === 0 ? this.elevationAtOrigin() : elevationAtWaypoint(p0);
-    segment._elevation.B = elevationAtWaypoint(p0);
+    segment._elevation.A = elevationAtWaypoint(p0);
+    segment._elevation.B = elevationAtWaypoint(p1);
 
     segment._elevation.A *= gridUnits;
     segment._elevation.B *= gridUnits;
@@ -59,7 +62,6 @@ export function _getMeasurementSegmentsRuler(wrapped) {
 function elevationAtWaypoint(waypoint) {
   return waypoint._terrainElevation + (waypoint._userElevationIncrements * canvas.dimensions.distance);
 }
-
 /**
  * Wrap GridLayer.prototype.measureDistances
  * Called by Ruler.prototype._computeDistance
@@ -83,9 +85,19 @@ export function measureDistancesGridLayer(wrapped, segments, options = {}) {
     const B = { x: s.ray.B.x, y: s.ray.B.y, z: s._elevation.B };
     const [newA, newB] = projectElevatedPoint(A, B);
     newSegment.ray = new Ray(newA, newB);
+    newSegments.push(newSegment);
   }
 
   return wrapped(newSegments, options);
+}
+
+/**
+ * Should Levels floor labels be used?
+ * @returns {boolean}
+ */
+function useLevelsLabels() {
+  return game.modules.get("levels")?.active
+    && game.settings.get(MODULE_ID, "enable-levels-floor-label");
 }
 
 /**
@@ -96,16 +108,27 @@ export function _getSegmentLabelRuler(wrapped, segment, totalDistance) {
   const orig_label = wrapped(segment, totalDistance);
 
   let elevation_label = segmentElevationLabel(segment);
-
-  if ( game.settings.get(MODULE_ID, "enable-levels-floor-label") ) {
-    const level_name = this.getFlag(MODULE_ID, "elevation_level_name");
-    if ( level_name ) {
-      elevation_label += `\n${level_name}`;
-    }
-  }
+  const level_name = levelNameAtElevation(elevationCoordinateToUnit(segment._elevation.B));
+  if ( level_name ) elevation_label += `\n${level_name}`;
 
   return `${orig_label}\n${elevation_label}`;
 }
+
+/**
+ * Find the name of the level, if any, at a given elevation.
+ * @param {number} e    Elevation to use.
+ * @returns First elevation found that is named and has e within its range.
+ */
+function levelNameAtElevation(e) {
+  if ( !useLevelsLabels() ) return undefined;
+  const sceneLevels = canvas.scene.getFlag("levels", "sceneLevels"); // Array with [0]: bottom; [1]: top; [2]: name
+  if ( !sceneLevels ) return undefined;
+
+  // Just get the first labeled
+  const lvl = sceneLevels.find(arr => arr[2] !== "" && e >= arr[0] && e <= arr[1]);
+  return lvl ? lvl[2] : undefined;
+}
+
 
 /*
  * Construct a label to represent elevation changes in the ruler.
@@ -124,8 +147,9 @@ function segmentElevationLabel(s) {
     : (increment < 0) ? "↓" : "";
 
   // Take absolute value b/c segmentArrow will represent direction
-  let label = `${Math.abs(Math.round(elevationCoordinateToUnit(increment)))} ${units}${segmentArrow}`;
-  label += ` [@${Math.round(elevationCoordinateToUnit(Bz))} ${units}]`;
+  // Allow decimals to tenths ( Math.round(x * 10) / 10).
+  let label = `${Math.abs(Math.round(elevationCoordinateToUnit(increment) * 10) / 10)} ${units}${segmentArrow}`;
+  label += ` [@${Math.round(elevationCoordinateToUnit(Bz) * 10) / 10} ${units}]`;
 
   return label;
 }
@@ -137,8 +161,8 @@ function segmentElevationLabel(s) {
  */
 export async function _animateSegmentRuler(wrapped, token, segment, destination) {
   log(`Updating token elevation for segment with destination ${destination.x},${destination.y},${destination.z} from elevation ${segment._elevation.A} --> ${segment._elevation.B}`, token, segment);
-  destination.elevation = segment._elevation.A; // Just in case
-  const res = wrapped(token, segment, destination);
+  destination.elevation = elevationCoordinateToUnit(segment._elevation.A); // Just in case
+  const res = await wrapped(token, segment, destination);
 
   // Update elevation after the token move.
   if ( segment._elevation.A !== segment._elevation.B ) {

@@ -4,7 +4,7 @@ Hooks
 */
 "use strict";
 
-import { registerSettings, registerKeybindings } from "./settings.js";
+import { registerSettings, registerKeybindings, SETTINGS, getSetting } from "./settings.js";
 import { registerRuler } from "./patching.js";
 
 export const MODULE_ID = "elevationruler";
@@ -37,4 +37,16 @@ Hooks.once("devModeReady", ({ registerPackageDebugFlag }) => {
 Hooks.once("libWrapper.Ready", async function() {
   log("libWrapper is ready to go.");
   registerRuler();
+});
+
+Hooks.on("getSceneControlButtons", (controls) => {
+  if ( !getSetting(SETTINGS.PREFER_TOKEN_ELEVATION) ) return;
+
+  const tokenTools = controls.find(c => c.name === "token");
+  tokenTools.tools.push({
+    name: SETTINGS.PREFER_TOKEN_ELEVATION,
+    title: game.i18n.localize(`${MODULE_ID}.controls.${SETTINGS.PREFER_TOKEN_ELEVATION}.name`),
+    icon: "fa-solid fa-user-lock",
+    toggle: true
+  });
 });
