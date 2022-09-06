@@ -95,7 +95,7 @@ export function terrainElevationAtPoint(p, { considerTokens = true } = {}) {
 
   // Try Elevated Vision
   const ev_elevation = EVElevationAtPoint(p);
-  if ( ev_elevation !== undefined && levels_elevation > ignoreBelow ) return ev_elevation;
+  if ( ev_elevation !== undefined && ev_elevation > ignoreBelow ) return ev_elevation;
 
   // Try Enhanced Terrain Layer
   const terrain_elevation = TerrainLayerElevationAtPoint(p);

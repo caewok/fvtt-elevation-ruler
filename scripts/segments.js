@@ -162,8 +162,8 @@ function segmentElevationLabel(s) {
  */
 export async function _animateSegmentRuler(wrapped, token, segment, destination) {
   log(`Updating token elevation for segment with destination ${destination.x},${destination.y},${destination.z} from elevation ${segment._elevation.A} --> ${segment._elevation.B}`, token, segment);
-  destination.elevation = segment._elevation.A; // Just in case
-  const res = wrapped(token, segment, destination);
+  destination.elevation = elevationCoordinateToUnit(segment._elevation.A); // Just in case
+  const res = await wrapped(token, segment, destination);
 
   // Update elevation after the token move.
   if ( segment._elevation.A !== segment._elevation.B ) {
