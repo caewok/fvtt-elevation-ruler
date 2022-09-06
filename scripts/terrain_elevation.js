@@ -36,6 +36,17 @@ function tokenElevation(token) {
 }
 
 /**
+ * Determine if token elevation should be preferred
+ * @returns {boolean}
+ */
+function preferTokenElevation() {
+  if ( !getSetting(SETTINGS.PREFER_TOKEN_ELEVATION) ) return false;
+  const token_controls = ui.controls.controls.find(elem => elem.name === "token");
+  const prefer_token_control = token_controls.tools.find(elem => elem.name === SETTINGS.PREFER_TOKEN_ELEVATION);
+  return prefer_token_control.active;
+}
+
+/**
  * Retrieve the terrain elevation at the current ruler destination
  * @param {object} [options]  Options that modify the calculation
  * @param {boolean} [options.considerTokens]    Consider token elevations at that point.
@@ -61,7 +72,7 @@ export function terrainElevationAtPoint(p, { considerTokens = true } = {}) {
 
   const measuringToken = this._getMovementToken();
   const startingElevation = tokenElevation(measuringToken);
-  const ignoreBelow = (getSetting(SETTINGS.PREFER_TOKEN_ELEVATION) && measuringToken) ? startingElevation : Number.NEGATIVE_INFINITY;
+  const ignoreBelow = ( measuringToken && preferTokenElevation() ) ? startingElevation : Number.NEGATIVE_INFINITY;
 
   log(`Checking Elevation at (${p.x}, ${p.y}) ${(considerTokens ? "" : "not ") + "considering tokens"}\n\tstarting elevation ${startingElevation}\n\tignoring below ${ignoreBelow}`);
 
