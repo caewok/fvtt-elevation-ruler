@@ -28,12 +28,9 @@ export function _getMeasurementSegmentsRuler(wrapped) {
   const gridUnits = size / distance;
 
   const ln = waypoints.length;
-  for ( let i = 0, j = 0; i < ln; i += 1, j += 1 ) {
+  // Skip the first waypoint, which will (likely) end up as p0.
+  for ( let i = 1, j = 0; i < ln; i += 1, j += 1 ) {
     const segment = segments[j];
-    if ( i === 0 ) {
-      j -= 1; // Stay on this segment and skip this waypoint
-      continue;
-    }
 
     const p0 = waypoints[i - 1];
     const p1 = waypoints[i];
@@ -111,24 +108,25 @@ export function _getSegmentLabelRuler(wrapped, segment, totalDistance) {
   const orig_label = wrapped(segment, totalDistance);
 
   let elevation_label = segmentElevationLabel(segment);
-  const level_name = LevelNameAtPoint(segment.ray.B, segment._elevation.B);
+  const level_name = levelNameAtElevation(elevationCoordinateToUnit(segment._elevation.B));
   if ( level_name ) elevation_label += `\n${level_name}`;
 
   return `${orig_label}\n${elevation_label}`;
 }
 
-function LevelNameAtPoint(p, zz) {
+/**
+ * Find the name of the level, if any, at a given elevation.
+ * @param {number} e    Elevation to use.
+ * @returns First elevation found that is named and has e within its range.
+ */
+function levelNameAtElevation(e) {
   if ( !useLevelsLabels() ) return undefined;
+  const sceneLevels = canvas.scene.getFlag("levels", "sceneLevels"); // Array with [0]: bottom; [1]: top; [2]: name
+  if ( !sceneLevels ) return undefined;
 
-  const floors = _levels.getFloorsForPoint(p);
-  if(!floors || floors.length < 1) { return undefined; }
-
-  const levels_data = canvas.scene.getFlag("levels", "sceneLevels") // array with [0]: bottom; [1]: top; [2]: name
-  if ( !levels_data ) return undefined;
-  for ( let l of levels_data ) {
-     if ( zz <= l[1] && zz >= l[0] ) return l[2];
-  }
-  return undefined;
+  // Just get the first labeled
+  const lvl = sceneLevels.find(arr => arr[2] !== "" && e >= arr[0] && e <= arr[1]);
+  return lvl ? lvl[2] : undefined;
 }
 
 

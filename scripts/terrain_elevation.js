@@ -1,7 +1,9 @@
 /* globals
 canvas,
 game,
-_levels
+CONFIG,
+ui,
+PIXI
 */
 "use strict";
 
@@ -90,7 +92,7 @@ export function terrainElevationAtPoint(p, { considerTokens = true } = {}) {
   }
 
   // Try Levels
-  const levels_elevation = LevelsElevationAtPoint(p, startingElevation);
+  const levels_elevation = LevelsElevationAtPoint(p, { startingElevation });
   if ( levels_elevation !== undefined && levels_elevation > ignoreBelow ) return levels_elevation;
 
   // Try Elevated Vision
@@ -181,13 +183,10 @@ function TerrainLayerElevationAtPoint({x, y}) {
 // use cases:
 // generally:
 // - if over a level-enabled object, use the bottom of that level.
-// - if multiple, use the bottom
-// - if hole, use the bottom
+// - if multiple, use the closest to the starting elevation
 // starting point of the ruler is a token:
 // - if the same level is present, stay at that level
 //   (elevation should be found from the token, so no issue)
-// - if a hole, go to bottom of the hole
-// - display level as labeled in the levels object flag?
 
 /*
  * Measure the elevation of any levels tiles at the point.
@@ -196,63 +195,36 @@ function TerrainLayerElevationAtPoint({x, y}) {
  * @param {PIXI.Point} p    Point to measure, in {x, y} format.
  * @return {Number|undefined} Levels elevation or undefined if levels is inactive or no levels found.
  */
-function LevelsElevationAtPoint(p, starting_elevation) {
+function LevelsElevationAtPoint(p, { startingElevation = 0 } = {}) {
   if ( !useLevels() ) return undefined;
 
-  // If in a hole, use that
-  const hole_elevation = checkForHole(p, starting_elevation);
-  if ( hole_elevation !== undefined ) return hole_elevation;
+  let tiles = [...levelsTilesAtPoint(p)];
+  if ( !tiles.length ) return undefined;
 
-  // Use levels if found
-  const levels_objects = _levels.getFloorsForPoint(p); // @returns {Object[]} returns an array of object each containing {tile,range,poly}
-  log("LevelsElevationAtPoint levels_objects", levels_objects);
-  return checkForLevel(p, starting_elevation);
+  tiles = tiles
+    .filter(t => startingElevation >= t.document.flags.levels.rangeBottom && startingElevation < t.document.flags.levels.rangeTop)
+    .sort((a, b) => a.document.flags.levels.rangeBottom - b.document.flags.levels.rangeBottom);
+
+  const ln = tiles.length;
+  if ( !ln ) return undefined;
+  return tiles[ln - 1].document.flags.levels.rangeBottom;
 }
 
-// function levelNameAtPoint(p, zz) {
-//   if ( !game.settings.get(MODULE_ID, "enable-levels-elevation") || !game.modules.get("levels")?.active ) {
-//     return undefined;
-//   }
-//
-//   const floors = _levels.getFloorsForPoint(p);
-//   if ( !floors || floors.length < 1 ) { return undefined; }
-//
-//   const levels_data = canvas.scene.getFlag("levels", "sceneLevels"); // Array with [0]: bottom; [1]: top; [2]: name
-//   if ( !levels_data ) { return undefined; }
-//   for ( let l of levels_data ) {
-//     if ( zz <= l[1] && zz >= l[0] ) return l[2];
-//   }
-//   return undefined;
-// }
 
+/**
+ * Get all tiles that have a levels range
+ * @param {Point} {x, y}
+ * @returns {Set<Tile>}
+ */
+function levelsTilesAtPoint({x, y}) {
+  const bounds = new PIXI.Rectangle(x, y, 1, 1);
+  const collisionTest = (o, rect) => { // eslint-disable-line no-unused-vars
+    // The object o constains n (Quadtree node), r (rect), t (object to test)
+    const flags = o.t.document?.flags?.levels;
+    if ( !flags ) return false;
+    if ( !isFinite(flags.rangeTop) || !isFinite(flags.rangeBottom) ) return false;
+    return true;
+  };
 
-// Check for level; return bottom elevation
-function checkForLevel(intersectionPT, zz) {
-  // Poly undefined for tiles.
-  const floors = _levels.getFloorsForPoint(intersectionPT); // @returns {Object[]} returns an array of object each containing {tile,range,poly}
-  log("checkForLevel floors", floors);
-  const floor_range = findCurrentFloorForElevation(zz, floors);
-  log(`checkForLevel current floor range for elevation ${zz}: ${floor_range[0]} ${floor_range[1]}`);
-  if ( !floor_range ) return undefined;
-  return floor_range[0];
-}
-
-function findCurrentFloorForElevation(elevation, floors) {
-  for ( let floor of floors ) {
-  if ( elevation <= floor.range[1] && elevation >= floor.range[0] )
-    return floor.range;
-  }
-  return false;
-}
-
-// Check if a floor is hollowed by a hole
-// Based on Levels function, modified to return bottom elevation of the hole.
-function checkForHole(intersectionPT, zz) {
-  for ( let hole of _levels.levelsHoles ) {
-    const hbottom = hole.range[0];
-    const htop = hole.range[1];
-    if ( zz > htop || zz < hbottom ) continue;
-    if ( hole.poly.contains(intersectionPT.x, intersectionPT.y) ) return hbottom;
-  }
-  return undefined;
+  return canvas.tiles.quadtree.getObjects(bounds, { collisionTest });
 }
