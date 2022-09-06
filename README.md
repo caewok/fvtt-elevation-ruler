@@ -6,7 +6,7 @@
 
 # Elevation Ruler
 
-This module allows the default Foundry measurement ruler to track change in elevation. Elevation can be changed while using the ruler in four ways:
+This module allows the default Foundry measurement ruler to track change in elevation. Elevation can be changed while using the ruler in five ways:
 1. Manually. Hit the specified hot key (default: '[' to increment and ']' to decrement).
 2. Token. When hovering over a token with the ruler, the origin or destination elevation (as applicable) will update.
 3. Elevated Vision. If the Elevated Vision module is present, it will use that elevation information. (Elevation Ruler v0.5+)
@@ -24,7 +24,7 @@ Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/
 
 ## Dependencies
 - [libWrapper](https://github.com/ruipin/fvtt-lib-wrapper)
-- [libRuler](https://github.com/caewok/fvtt-lib-ruler) (deprecated as of v10; no longer required)
+- [libRuler](https://github.com/caewok/fvtt-lib-ruler) (deprecated as of Foundry v10; no longer required)
 
 (Elevation Ruler 0.4+ requires Foundry v9 because it replaces the DF Hotkeys dependency with the Foundry keybindings introduced in v9.)
 (Elevation Ruler 0.5+ requires Foundry v10 due to improvements in the Foundry Ruler API.)
