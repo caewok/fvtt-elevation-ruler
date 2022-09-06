@@ -1,11 +1,11 @@
 /* globals
 game,
 CONST,
+canvas
 */
 "use strict";
 
 import { MODULE_ID, log } from "./module.js";
-import { incrementElevation, decrementElevation } from "./ruler.js";
 
 export const SETTINGS = {
   PREFER_TOKEN_ELEVATION: "prefer-token-elevation",
@@ -14,12 +14,12 @@ export const SETTINGS = {
   USE_LEVELS: "enable-levels-elevation",
   USE_LEVELS_LABEL: "enable-levels-floor-label",
   NO_MODS: "no-modules-message"
-}
+};
 
 const KEYBINDINGS = {
   INCREMENT: "incrementElevation",
   DECREMENT: "decrementElevation"
-}
+};
 
 export function getSetting(settingName) {
   return game.settings.get(MODULE_ID, settingName);
@@ -29,13 +29,13 @@ export function registerSettings() {
   log("Registering settings.");
 
   const evActive = game.modules.get("elevatedvision")?.active;
-  const terrainLayerActive = game.modules.get("enhanced-terrain-layer")?.active
-  const levelsActive = game.modules.get("levels")?.active
+  const terrainLayerActive = game.modules.get("enhanced-terrain-layer")?.active;
+  const levelsActive = game.modules.get("levels")?.active;
 
   if ( !evActive && !terrainLayerActive && !levelsActive ) {
     game.settings.register(MODULE_ID, SETTINGS.NO_MODS, {
-      name: "No elevation-related modules found.",
-      hint: "Additional settings will be available here if Elevated Vision, Enhanced Terrain Layer, or Levels modules are active.",
+      name: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.NO_MODS}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.NO_MODS}.hint`),
       scope: "world",
       config: true,
       enabled: false,
@@ -45,8 +45,8 @@ export function registerSettings() {
   }
 
   game.settings.register(MODULE_ID, SETTINGS.USE_EV, {
-    name: "Use Elevated Vision",
-    hint: "Set starting ruler elevations when measuring based on Elevated Vision module.",
+    name: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_EV}.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_EV}.hint`),
     scope: "world",
     config: evActive,
     default: evActive,
@@ -54,17 +54,17 @@ export function registerSettings() {
   });
 
   game.settings.register(MODULE_ID, SETTINGS.USE_TERRAIN, {
-    name: "Use Enhanced Terrain",
-    hint: "Set starting ruler elevations when measuring based on terrain maximum elevation. Requires Enhanced Terrain Elevation module.",
+    name: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_TERRAIN}.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_TERRAIN}.hint`),
     scope: "world",
     config: terrainLayerActive,
     default: terrainLayerActive,
     type: Boolean
   });
 
-  game.settings.register(MODULE_ID, SETTINGS.USE_LEVELS) {
-    name: "Use Levels",
-    hint: "Take into account Levels elevation when measuring. Requires Levels module.",
+  game.settings.register(MODULE_ID, SETTINGS.USE_LEVELS, {
+    name: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_LEVELS}.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_LEVELS}.hint`),
     scope: "world",
     config: levelsActive,
     default: levelsActive,
@@ -72,12 +72,22 @@ export function registerSettings() {
   });
 
   game.settings.register(MODULE_ID, SETTINGS.USE_LEVELS_LABEL, {
-    name: "Levels Floor Label",
-    hint: "Label the ruler with the current floor. Requires Levels module.",
+    name: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_LEVELS_LABEL}.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_LEVELS_LABEL}.hint`),
     scope: "world",
     config: levelsActive,
     default: levelsActive,
     type: Boolean
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.PREFER_TOKEN_ELEVATION, {
+    name: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.PREFER_TOKEN_ELEVATION}.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.PREFER_TOKEN_ELEVATION}.hint`),
+    scope: "user",
+    config: true,
+    default: false,
+    type: Boolean,
+    requiresReload: true
   });
 
   log("Done registering settings.");
@@ -88,17 +98,17 @@ export function registerKeybindings() {
     name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.name`),
     hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.hint`),
     editable: [
-      { key: "BracketLeft"}
+      { key: "BracketLeft" }
     ],
     onDown: () => canvas.controls.ruler.decrementElevation(),
     precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
   });
 
   game.keybindings.register(MODULE_ID, KEYBINDINGS.INCREMENT, {
-    name: game.i18n.localize("${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.name"),
-    hint: game.i18n.localize("${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.hint"),
+    name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.hint`),
     editable: [
-      { key: "BracketRight"}
+      { key: "BracketRight" }
     ],
     onDown: () => canvas.controls.ruler.incrementElevation(),
     precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL

@@ -1,7 +1,27 @@
 {
     "elevationruler.keybindings.decrementElevation.name": "Decrement Ruler Elevation",
     "elevationruler.keybindings.decrementElevation.hint": "Decrease the elevation in grid increments when using the ruler.",
-    
+
     "elevationruler.keybindings.incrementElevation.name": "Increment Ruler Elevation",
-    "elevationruler.keybindings.incrementElevation.hint": "Increase the elevation in grid increments when using the ruler."
+    "elevationruler.keybindings.incrementElevation.hint": "Increase the elevation in grid increments when using the ruler.",
+
+    "elevationruler.settings.no-modules-message.name": "No elevation-related modules found.",
+    "elevationruler.settings.no-modules-message.hint": "Additional settings will be available here if Elevated Vision, Enhanced Terrain Layer, or Levels modules are active.",
+
+    "elevationruler.settings.enable-elevated-vision-elevation.name": "Use Elevated Vision",
+    "elevationruler.settings.enable-elevated-vision-elevation.hint": "Take into account elevation data from the Elevated Vision module when measuring.",
+
+    "elevationruler.settings.enable-enhanced-terrain-elevation.name": "Use Enhanced Terrain",
+    "elevationruler.settings.enable-enhanced-terrain-elevation.hint": "Take into account  terrain maximum elevation from the Enhanced Terrain Layer module when measuring.",
+
+    "elevationruler.settings.enable-levels-elevation.name": "Use Levels",
+    "elevationruler.settings.enable-levels-elevation.hint": "Take into account elevation information from the Levels module when measuring.",
+
+    "elevationruler.settings.enable-levels-floor-label.name": "Levels Floor Label",
+    "elevationruler.settings.enable-levels-floor-label.hint": "Label the ruler with the current floor, as provided by the Levels module.",
+
+    "elevationruler.settings.prefer-token-elevation.name": "Add token elevation control",
+    "elevationruler.settings.prefer-token-elevation.hint": "Add a control to the token toolbar to prefer the token elevation when measuring. When toggled on, the control will keep the ruler at the elevation of the measuring token unless another token is encountered or the grid space is at a higher elevation than the token. Otherwise, the ruler will assume the elevation of the grid space or the token encountered.",
+
+    "elevationruler.controls.prefer-token-elevation.name": "Prefer Token Elevation"
 }
