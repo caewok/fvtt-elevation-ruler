@@ -7,6 +7,20 @@ CONST,
 import { MODULE_ID, log } from "./module.js";
 import { incrementElevation, decrementElevation } from "./ruler.js";
 
+export const SETTINGS = {
+  PREFER_TOKEN_ELEVATION: "prefer-token-elevation",
+  USE_EV: "enable-elevated-vision-elevation",
+  USE_TERRAIN: "enable-enhanced-terrain-elevation",
+  USE_LEVELS: "enable-levels-elevation",
+  USE_LEVELS_LABEL: "enable-levels-floor-label",
+  NO_MODS: "no-modules-message"
+}
+
+const KEYBINDINGS = {
+  INCREMENT: "incrementElevation",
+  DECREMENT: "decrementElevation"
+}
+
 export function getSetting(settingName) {
   return game.settings.get(MODULE_ID, settingName);
 }
@@ -19,7 +33,7 @@ export function registerSettings() {
   const levelsActive = game.modules.get("levels")?.active
 
   if ( !evActive && !terrainLayerActive && !levelsActive ) {
-    game.settings.register(MODULE_ID, "no-modules-message", {
+    game.settings.register(MODULE_ID, SETTINGS.NO_MODS, {
       name: "No elevation-related modules found.",
       hint: "Additional settings will be available here if Elevated Vision, Enhanced Terrain Layer, or Levels modules are active.",
       scope: "world",
@@ -30,7 +44,7 @@ export function registerSettings() {
     });
   }
 
-  game.settings.register(MODULE_ID, "enable-elevated-vision-elevation", {
+  game.settings.register(MODULE_ID, SETTINGS.USE_EV, {
     name: "Use Elevated Vision",
     hint: "Set starting ruler elevations when measuring based on Elevated Vision module.",
     scope: "world",
@@ -39,7 +53,7 @@ export function registerSettings() {
     type: Boolean
   });
 
-  game.settings.register(MODULE_ID, "enable-enhanced-terrain-elevation", {
+  game.settings.register(MODULE_ID, SETTINGS.USE_TERRAIN, {
     name: "Use Enhanced Terrain",
     hint: "Set starting ruler elevations when measuring based on terrain maximum elevation. Requires Enhanced Terrain Elevation module.",
     scope: "world",
@@ -48,7 +62,7 @@ export function registerSettings() {
     type: Boolean
   });
 
-  game.settings.register(MODULE_ID, "enable-levels-elevation", {
+  game.settings.register(MODULE_ID, SETTINGS.USE_LEVELS) {
     name: "Use Levels",
     hint: "Take into account Levels elevation when measuring. Requires Levels module.",
     scope: "world",
@@ -57,7 +71,7 @@ export function registerSettings() {
     type: Boolean
   });
 
-  game.settings.register(MODULE_ID, "enable-levels-floor-label", {
+  game.settings.register(MODULE_ID, SETTINGS.USE_LEVELS_LABEL, {
     name: "Levels Floor Label",
     hint: "Label the ruler with the current floor. Requires Levels module.",
     scope: "world",
@@ -70,9 +84,9 @@ export function registerSettings() {
 }
 
 export function registerKeybindings() {
-  game.keybindings.register(MODULE_ID, "decrementElevation", {
-    name: game.i18n.localize("elevationruler.keybindings.decrementElevation.name"),
-    hint: game.i18n.localize("elevationruler.keybindings.decrementElevation.hint"),
+  game.keybindings.register(MODULE_ID, KEYBINDINGS.DECREMENT, {
+    name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.hint`),
     editable: [
       { key: "BracketLeft"}
     ],
@@ -80,9 +94,9 @@ export function registerKeybindings() {
     precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
   });
 
-  game.keybindings.register(MODULE_ID, "incrementElevation", {
-    name: game.i18n.localize("elevationruler.keybindings.incrementElevation.name"),
-    hint: game.i18n.localize("elevationruler.keybindings.incrementElevation.hint"),
+  game.keybindings.register(MODULE_ID, KEYBINDINGS.INCREMENT, {
+    name: game.i18n.localize("${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.name"),
+    hint: game.i18n.localize("${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.hint"),
     editable: [
       { key: "BracketRight"}
     ],
