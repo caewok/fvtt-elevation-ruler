@@ -23,7 +23,7 @@ export function elevationAtOrigin() {
   const measuringToken = this._getMovementToken();
   const origin = this.waypoints[0];
   if ( !origin ) return undefined;
-  if ( origin._terrainElevation ) return origin._terrainElevation;
+  if ( typeof origin._terrainElevation !== "undefined" ) return origin._terrainElevation;
 
   let value = 0;
 
@@ -34,7 +34,8 @@ export function elevationAtOrigin() {
   else if ( useLevels() && CONFIG.Levels.UI.rangeEnabled ) value = parseFloat(CONFIG.Levels.UI.range[0]);
 
   // Otherwise, get the elevation for this origin point.
-  else value = this.terrainElevationAtPoint(origin, { considerTokens: false });
+  // Pass startingElevation to avoid a loop.
+  else value = this.terrainElevationAtPoint(origin, { considerTokens: false, startingElevation: 0 });
 
   origin._terrainElevation = value;
   origin._userElevationIncrements = 0;
@@ -85,10 +86,9 @@ export function terrainElevationAtDestination({ considerTokens = true } = {}) {
  * @param {boolean} [options.considerTokens]    Consider token elevations at that point.
  * @returns {number} Elevation for the given point.
  */
-export function terrainElevationAtPoint(p, { considerTokens = true } = {}) {
+export function terrainElevationAtPoint(p, { considerTokens = true, startingElevation = this.elevationAtOrigin() } = {}) {
 
   const measuringToken = this._getMovementToken();
-  const startingElevation = this.elevationAtOrigin();
   const ignoreBelow = ( measuringToken && preferTokenElevation() ) ? startingElevation : Number.NEGATIVE_INFINITY;
 
   log(`Checking Elevation at (${p.x}, ${p.y}) ${(considerTokens ? "" : "not ") + "considering tokens"}\n\tstarting elevation ${startingElevation}\n\tignoring below ${ignoreBelow}`);
