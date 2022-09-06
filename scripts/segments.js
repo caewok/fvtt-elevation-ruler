@@ -149,8 +149,9 @@ function segmentElevationLabel(s) {
     : (increment < 0) ? "↓" : "";
 
   // Take absolute value b/c segmentArrow will represent direction
-  let label = `${Math.abs(Math.round(elevationCoordinateToUnit(increment)))} ${units}${segmentArrow}`;
-  label += ` [@${Math.round(elevationCoordinateToUnit(Bz))} ${units}]`;
+  // Allow decimals to tenths ( Math.round(x * 10) / 10).
+  let label = `${Math.abs(Math.round(elevationCoordinateToUnit(increment) * 10) / 10)} ${units}${segmentArrow}`;
+  label += ` [@${Math.round(elevationCoordinateToUnit(Bz) * 10) / 10} ${units}]`;
 
   return label;
 }
@@ -162,8 +163,8 @@ function segmentElevationLabel(s) {
  */
 export async function _animateSegmentRuler(wrapped, token, segment, destination) {
   log(`Updating token elevation for segment with destination ${destination.x},${destination.y},${destination.z} from elevation ${segment._elevation.A} --> ${segment._elevation.B}`, token, segment);
-  destination.elevation = segment._elevation.A; // Just in case
-  const res = wrapped(token, segment, destination);
+  destination.elevation = elevationCoordinateToUnit(segment._elevation.A); // Just in case
+  const res = await wrapped(token, segment, destination);
 
   // Update elevation after the token move.
   if ( segment._elevation.A !== segment._elevation.B ) {
