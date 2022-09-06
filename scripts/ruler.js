@@ -86,12 +86,14 @@ export function _addWaypointRuler(wrapper, point) {
     // Origin waypoint
     newWaypoint._terrainElevation = this.elevationAtOrigin();
     newWaypoint._userElevationIncrements = 0;
+    this._userElevationIncrements = 0;
   } else {
     newWaypoint._terrainElevation = this.terrainElevationAtPoint(point);
     newWaypoint._userElevationIncrements = this._userElevationIncrements;
   }
 
-  this._userElevationIncrements = 0;
+  // Carry-over previous increments
+//   this._userElevationIncrements;
 }
 
 /**
@@ -110,6 +112,9 @@ export function incrementElevation() {
   if ( !ruler || !ruler.active ) return;
 
   ruler._userElevationIncrements += 1;
+
+  // Weird, but slightly change the destination to trigger a measure
+  this.destination.x -= 1;
   ruler.measure(ruler.destination);
 }
 
@@ -119,5 +124,8 @@ export function decrementElevation() {
   if ( !ruler || !ruler.active ) return;
 
   ruler._userElevationIncrements -= 1;
+
+  // Weird, but slightly change the destination to trigger a measure
+  this.destination.x -= 1;
   ruler.measure(ruler.destination);
 }

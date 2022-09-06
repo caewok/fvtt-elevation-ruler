@@ -76,7 +76,7 @@ export function registerKeybindings() {
     editable: [
       { key: "BracketLeft"}
     ],
-    onDown: canvas.controls.ruler.decrementElevation,
+    onDown: () => canvas.controls.ruler.decrementElevation(),
     precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
   });
 
@@ -86,7 +86,7 @@ export function registerKeybindings() {
     editable: [
       { key: "BracketRight"}
     ],
-    onDown: canvas.controls.rulerincrementElevation,
+    onDown: () => canvas.controls.ruler.incrementElevation(),
     precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
   });
 }
