@@ -34,7 +34,7 @@ export function _getMeasurementSegmentsRuler(wrapped) {
 export function _getMeasurementSegmentsDragRulerRuler(wrapped) {
   const segments = wrapped();
 
-  if ( !this.isDragRuler ) return; // Drag Ruler calls super in this situation
+  if ( !this.isDragRuler ) return segments; // Drag Ruler calls super in this situation
 
   // Add destination as the final waypoint
   this.destination._terrainElevation = this.terrainElevationAtDestination();
@@ -160,13 +160,12 @@ function segmentElevationLabel(s) {
  * for the given segment.
  */
 export async function _animateSegmentRuler(wrapped, token, segment, destination) {
-  log(`Updating token elevation for segment with destination ${destination.x},${destination.y},${destination.z} from elevation ${segment._elevation.A} --> ${segment._elevation.B}`, token, segment);
-  destination.elevation = elevationCoordinateToUnit(segment._elevation.A); // Just in case
+  log(`Updating token elevation for segment with destination ${destination.x},${destination.y},${destination.z} from elevation ${segment.ray.A.z} --> ${segment.ray.B.z}`, token, segment);
   const res = await wrapped(token, segment, destination);
 
   // Update elevation after the token move.
-  if ( segment._elevation.A !== segment._elevation.B ) {
-    await token.document.update({ elevation: elevationCoordinateToUnit(segment._elevation.B) });
+  if ( segment.ray.A.z !== segment.ray.B.z ) {
+    await token.document.update({ elevation: elevationCoordinateToUnit(segment.ray.B.z) });
   }
 
   return res;
