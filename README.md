@@ -19,6 +19,8 @@ If you add a waypoint, elevation will be tracked at each waypoint.
 
 If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint.
 
+As of v0.6.0, Elevation Ruler works with [Drag Ruler](https://github.com/manuelVo/foundryvtt-drag-ruler).
+
 # Installation
 Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json) in Foundry to install.
 
@@ -34,14 +36,13 @@ Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/
 - *[Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer)
 - [Levels](https://github.com/theripper93/Levels)
 - [Wall Height](https://github.com/erithtotl/FVTT-Wall-Height)
+- [Drag Ruler](https://github.com/manuelVo/foundryvtt-drag-ruler)
 
 *[Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer) has an [issue](https://github.com/ironmonk88/enhanced-terrain-layer/issues/98) in v10 that may need to be resolved before it will function with this module.
 
 ## Known conflicts
 - [Terrain Ruler](https://github.com/manuelVo/foundryvtt-terrain-ruler)
-- [Drag Ruler](https://github.com/manuelVo/foundryvtt-drag-ruler)
-
-Once Terrain Ruler and Drag Ruler migrate to Foundry v10, I can re-evaluate the conflicts. Elevation Ruler 0.5.0 depends on libWrapper and only uses "wraps", to ensure maximum compatibility with other modules.
+- [Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer) See above.
 
 In general, modules that overwrite or extend the Ruler Class may cause the elevation ruler module to fail to display or calculate correctly.
 
