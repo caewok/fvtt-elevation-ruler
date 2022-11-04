@@ -60,6 +60,7 @@ export function clearRuler(wrapper) {
 export function toJSONRuler(wrapper) {
   const obj = wrapper();
   obj._userElevationIncrements = this._userElevationIncrements;
+  return obj;
 }
 
 /**
