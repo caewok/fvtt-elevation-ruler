@@ -10,6 +10,8 @@ import { log } from "./util.js";
 import {
   clearRuler,
   _addWaypointRuler,
+  dragRulerAddWaypointDragRulerRuler,
+  dragRulerClearWaypointsDragRuleRuler,
   _removeWaypointRuler,
   incrementElevation,
   decrementElevation,
@@ -94,4 +96,6 @@ export function registerRuler() {
 
 export function registerDragRuler() {
   libWrapper.register(MODULE_ID, "CONFIG.Canvas.rulerClass.prototype._getMeasurementSegments", _getMeasurementSegmentsDragRulerRuler, libWrapper.WRAPPER);
+  libWrapper.register(MODULE_ID, "CONFIG.Canvas.rulerClass.prototype.dragRulerClearWaypoints", dragRulerClearWaypointsDragRuleRuler, libWrapper.WRAPPER);
+  libWrapper.register(MODULE_ID, "CONFIG.Canvas.rulerClass.prototype.dragRulerAddWaypoint", dragRulerAddWaypointDragRulerRuler, libWrapper.WRAPPER);
 }
