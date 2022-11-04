@@ -11,7 +11,8 @@ PIXI
 Used by ruler to get elevation at waypoints and at the end of the ruler.
 */
 
-import { log, MODULE_ID } from "./module.js";
+import { MODULE_ID } from "./const.js";
+import { log } from "./util.js";
 import { SETTINGS, getSetting } from "./settings.js";
 
 /**
@@ -86,12 +87,14 @@ export function terrainElevationAtDestination({ considerTokens = true } = {}) {
  * @param {boolean} [options.considerTokens]    Consider token elevations at that point.
  * @returns {number} Elevation for the given point.
  */
-export function terrainElevationAtPoint(p, { considerTokens = true, startingElevation = this.elevationAtOrigin() } = {}) {
+export function terrainElevationAtPoint(p, {
+  considerTokens = true,
+  startingElevation = this.elevationAtOrigin() } = {}) {
 
   const measuringToken = this._getMovementToken();
   const ignoreBelow = ( measuringToken && preferTokenElevation() ) ? startingElevation : Number.NEGATIVE_INFINITY;
 
-  log(`Checking Elevation at (${p.x}, ${p.y}) ${(considerTokens ? "" : "not ") + "considering tokens"}\n\tstarting elevation ${startingElevation}\n\tignoring below ${ignoreBelow}`);
+  log(`Checking Elevation at (${p.x}, ${p.y}) ${considerTokens ? "" : "not "} considering tokens\n\tstarting elevation ${startingElevation}\n\tignoring below ${ignoreBelow}`);
 
   if ( considerTokens ) {  // Check for tokens; take the highest one at a given position
     const tokens = retrieveVisibleTokens();
@@ -217,7 +220,8 @@ function LevelsElevationAtPoint(p, { startingElevation = 0 } = {}) {
   if ( !tiles.length ) return undefined;
 
   tiles = tiles
-    .filter(t => startingElevation >= t.document.flags.levels.rangeBottom && startingElevation < t.document.flags.levels.rangeTop)
+    .filter(t => startingElevation >= t.document.flags.levels.rangeBottom
+      && startingElevation < t.document.flags.levels.rangeTop)
     .sort((a, b) => a.document.flags.levels.rangeBottom - b.document.flags.levels.rangeBottom);
 
   const ln = tiles.length;

@@ -1,9 +1,10 @@
 /* globals
-canvas
+canvas,
+game
 */
 "use strict";
 
-import { log } from "./module.js";
+import { log } from "./util.js";
 
 
 /**
@@ -58,7 +59,8 @@ export function clearRuler(wrapper) {
  * Store the current userElevationIncrements for the destination.
  */
 export function toJSONRuler(wrapper) {
-//   console.log("constructing ruler json!")
+  // If debugging, log will not display on user's console
+  // console.log("constructing ruler json!")
   const obj = wrapper();
   obj._userElevationIncrements = this._userElevationIncrements;
   return obj;
@@ -69,7 +71,8 @@ export function toJSONRuler(wrapper) {
  * Retrieve the current _userElevationIncrements
  */
 export function updateRuler(wrapper, data) {
-//   console.log("updating ruler!")
+  // If debugging, log will not display on user's console
+  // console.log("updating ruler!")
 
   // Fix for displaying user elevation increments as they happen.
   const triggerMeasure = this._userElevationIncrements !== data._userElevationIncrements;
@@ -90,28 +93,55 @@ export function updateRuler(wrapper, data) {
 export function _addWaypointRuler(wrapper, point) {
   log("adding waypoint!");
   wrapper(point);
+  addWaypointElevationIncrements(this, point);
+}
 
-  const ln = this.waypoints.length;
-  const newWaypoint = this.waypoints[ln - 1];
+/**
+ * Wrap DragRulerRuler.prototype.dragRulerAddWaypoint
+ * Add elevation increments
+ */
+export function dragRulerAddWaypointDragRulerRuler(wrapper, point, options = {}) {
+  log("adding drag ruler waypoint!");
+  wrapper(point, options);
+  addWaypointElevationIncrements(this, point);
+}
+
+/**
+ * Helper to add elevation increments to waypoint
+ */
+function addWaypointElevationIncrements(ruler, point) {
+  const ln = ruler.waypoints.length;
+  const newWaypoint = ruler.waypoints[ln - 1];
 
   if ( ln === 1) {
     // Origin waypoint -- cache using elevationAtOrigin
-    this.elevationAtOrigin();
-    this._userElevationIncrements = 0;
+    ruler.elevationAtOrigin();
+    ruler._userElevationIncrements = 0;
   } else {
-    newWaypoint._terrainElevation = this.terrainElevationAtPoint(point);
-    newWaypoint._userElevationIncrements = this._userElevationIncrements;
+    newWaypoint._terrainElevation = ruler.terrainElevationAtPoint(point);
+    newWaypoint._userElevationIncrements = ruler._userElevationIncrements;
   }
 }
 
 /**
  * Wrap Ruler.prototype.removeWaypoint
  * Remove elevation increments.
+ * (Note: also called by DragRulerRuler.prototype.dragRulerDeleteWaypoint)
  */
 export function _removeWaypointRuler(wrapper, point, { snap = true } = {}) {
   log("removing waypoint!");
   this._userElevationIncrements = 0;
   wrapper(point, { snap });
+}
+
+/**
+ * Wrap DragRulerRuler.prototype.dragRulerClearWaypoints
+ * Remove elevation increments
+ */
+export function dragRulerClearWaypointsDragRuleRuler(wrapper) {
+  log("clearing drag ruler waypoints");
+  wrapper();
+  this._userElevationIncrements = 0;
 }
 
 export function incrementElevation() {
