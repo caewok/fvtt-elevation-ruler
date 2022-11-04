@@ -1,6 +1,7 @@
 /* globals
 libWrapper,
-Ruler
+Ruler,
+game
 */
 "use strict";
 
@@ -17,6 +18,7 @@ import {
 
 import {
   _getMeasurementSegmentsRuler,
+  _getMeasurementSegmentsDragRulerRuler,
   measureDistancesGridLayer,
   _getSegmentLabelRuler,
   _animateSegmentRuler } from "./segments.js";
@@ -88,4 +90,8 @@ export function registerRuler() {
   });
 
   log("registerRuler finished!");
+}
+
+export function registerDragRuler() {
+  libWrapper.register(MODULE_ID, "CONFIG.Canvas.rulerClass.prototype._getMeasurementSegments", _getMeasurementSegmentsDragRulerRuler, libWrapper.WRAPPER);
 }

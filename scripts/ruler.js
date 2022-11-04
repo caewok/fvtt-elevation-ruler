@@ -1,5 +1,6 @@
 /* globals
-canvas
+canvas,
+game
 */
 "use strict";
 
@@ -58,7 +59,8 @@ export function clearRuler(wrapper) {
  * Store the current userElevationIncrements for the destination.
  */
 export function toJSONRuler(wrapper) {
-//   console.log("constructing ruler json!")
+  // If debugging, log will not display on user's console
+  // console.log("constructing ruler json!")
   const obj = wrapper();
   obj._userElevationIncrements = this._userElevationIncrements;
   return obj;
@@ -69,7 +71,8 @@ export function toJSONRuler(wrapper) {
  * Retrieve the current _userElevationIncrements
  */
 export function updateRuler(wrapper, data) {
-//   console.log("updating ruler!")
+  // If debugging, log will not display on user's console
+  // console.log("updating ruler!")
 
   // Fix for displaying user elevation increments as they happen.
   const triggerMeasure = this._userElevationIncrements !== data._userElevationIncrements;

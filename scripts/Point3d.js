@@ -391,9 +391,9 @@ export class Point3d extends PIXI.Point {
    * @returns {Point3d}
    */
   cross(other, outPoint = new Point3d()) {
-    outPoint.x = this.y * other.z - this.z * other.y;
-    outPoint.y = this.z * other.x - this.x * other.z;
-    outPoint.z = this.x * other.y - this.y * other.x;
+    outPoint.x = (this.y * other.z) - (this.z * other.y);
+    outPoint.y = (this.z * other.x) - (this.x * other.z);
+    outPoint.z = (this.x * other.y) - (this.y * other.x);
 
     return outPoint;
   }

@@ -8,9 +8,10 @@ Ray
 import { MODULE_ID } from "./const.js";
 import {
   log,
-  projectElevatedPoint,
   distance2dSquared,
   elevationCoordinateToUnit } from "./util.js";
+
+import { Ray3d } from "./Ray3d.js";
 
 /**
  * Wrap Ruler.prototype._getMeasurementSegments
@@ -23,7 +24,27 @@ export function _getMeasurementSegmentsRuler(wrapped) {
   this.destination._terrainElevation = this.terrainElevationAtDestination();
   this.destination._userElevationIncrements = this._userElevationIncrements;
 
-  const waypoints = this.waypoints.concat([this.destination]);
+  return elevateSegments(this, segments);
+}
+
+/**
+ * Wrap DragRulerRuler.prototype._getMeasurementSegments
+ * Add elevation information to the segments
+ */
+export function _getMeasurementSegmentsDragRulerRuler(wrapped) {
+  const segments = wrapped();
+
+  if ( !this.isDragRuler ) return; // Drag Ruler calls super in this situation
+
+  // Add destination as the final waypoint
+  this.destination._terrainElevation = this.terrainElevationAtDestination();
+  this.destination._userElevationIncrements = this._userElevationIncrements;
+
+  return elevateSegments(this, segments);
+}
+
+function elevateSegments(ruler, segments) {  // Add destination as the final waypoint
+  const waypoints = ruler.waypoints.concat([ruler.destination]);
 
   const { distance, size } = canvas.dimensions;
   const gridUnits = size / distance;
@@ -41,24 +62,14 @@ export function _getMeasurementSegmentsRuler(wrapped) {
       continue;
     }
 
-    // Could add z coordinate to the ray but other modules could mess with the Ray info.
-    segment._elevation = { A: 0, B: 0 };
-
-    segment._elevation.A = elevationAtWaypoint(p0);
-    segment._elevation.B = elevationAtWaypoint(p1);
-
-    segment._elevation.A *= gridUnits;
-    segment._elevation.B *= gridUnits;
+    // Convert to 3d Rays
+    const Az = elevationAtWaypoint(p0) * gridUnits;
+    const Bz = elevationAtWaypoint(p1) * gridUnits;
+    segment.ray = Ray3d.from2d(segment.ray, { Az, Bz });
   }
 
   return segments;
 }
-
-
-/**
- * Wrap DragRulerRuler.prototype._getMeasurementSegments
- * Add elevation information to the segments
-
 
 /**
  * Calculate the elevation for a given waypoint.
@@ -78,34 +89,8 @@ function elevationAtWaypoint(waypoint) {
  * hypotenuse to do the measurement.
  */
 export function measureDistancesGridLayer(wrapped, segments, options = {}) {
-  const newSegments = elevateSegments(segments);
-  return wrapped(newSegments, options);
-}
-
-/**
- * Helper to add elevation points to the segments.
- * @param {object[]} segments
- * @returns {object[]} The new segments array
- */
-function elevateSegments(segments) {
-  const newSegments = [];
-  for ( const s of segments ) {
-    if ( !s._elevation?.A && !s._elevation?.B ) {
-      newSegments.push(s);
-      continue;
-    }
-
-    // Shallow-copy the segments so as not to affect the original segment.ray
-    const newSegment = {...s};
-
-    // Project the 3d path onto the 2d canvas
-    const A = { x: s.ray.A.x, y: s.ray.A.y, z: s._elevation.A };
-    const B = { x: s.ray.B.x, y: s.ray.B.y, z: s._elevation.B };
-    const [newA, newB] = projectElevatedPoint(A, B);
-    newSegment.ray = new Ray(newA, newB);
-    newSegments.push(newSegment);
-  }
-  return newSegments;
+  if ( segments[0] instanceof Ray ) return segments.map(s => s.gameDistance(options.gridSpaces));
+  return wrapped(segments, options);
 }
 
 /**
@@ -123,14 +108,8 @@ function useLevelsLabels() {
  */
 export function _getSegmentLabelRuler(wrapped, segment, totalDistance) {
   const orig_label = wrapped(segment, totalDistance);
-
-  if ( typeof segment?._elevation.A === "undefined" || typeof segment?._elevation.B === "undefined" ) {
-    log("_getSegmentLabelRuler elevating segments");
-    return orig_label;
-  }
-
   let elevation_label = segmentElevationLabel(segment);
-  const level_name = levelNameAtElevation(elevationCoordinateToUnit(segment._elevation.B));
+  const level_name = levelNameAtElevation(elevationCoordinateToUnit(segment.ray.B.z));
   if ( level_name ) elevation_label += `\n${level_name}`;
 
   return `${orig_label}\n${elevation_label}`;
@@ -160,10 +139,9 @@ function levelNameAtElevation(e) {
  * @return {string}
  */
 function segmentElevationLabel(s) {
-  const Az = s._elevation.A;
-  const Bz = s._elevation.B;
   const units = canvas.scene.grid.units;
-  const increment = Bz - Az;
+  const increment = s.ray.dz;
+  const Bz = s.ray.B.z;
 
   const segmentArrow = (increment > 0) ? "↑"
     : (increment < 0) ? "↓" : "";
