@@ -6,27 +6,28 @@ Hooks
 
 import { registerSettings, registerKeybindings, SETTINGS, getSetting } from "./settings.js";
 import { registerRuler } from "./patching.js";
+import { MODULE_ID } from "./const.js";
 
-export const MODULE_ID = "elevationruler";
+// For API
+import { Point3d, registerPIXIPointMethods } from "./Point3d.js";
+import { Ray3d, registerRayMethods } from "./Ray3d.js";
 
-export function log(...args) {
-  try {
-    const isDebugging = game.modules.get("_dev-mode")?.api?.getPackageDebugValue(MODULE_ID);
-    if (isDebugging) console.log(MODULE_ID, "|", ...args);
-
-  } catch(e) {
-    // Empty
-  }
-}
+// For Drag Ruler
+import { registerDragRuler } from "./patching.js";
 
 // Setup is after init; before ready.
 // setup is called after settings and localization have been initialized,
 // but before entities, packs, UI, canvas, etc. has been initialized
 Hooks.once("setup", async function() {
-  log("Setup.");
-
   registerKeybindings(); // Should go before registering settings, so hotkey group is defined
   registerSettings();
+  registerPIXIPointMethods();
+  registerRayMethods();
+
+  game.modules.get(MODULE_ID).api = {
+    Point3d,
+    Ray3d
+  };
 });
 
 // For https://github.com/League-of-Foundry-Developers/foundryvtt-devMode
@@ -35,11 +36,10 @@ Hooks.once("devModeReady", ({ registerPackageDebugFlag }) => {
 });
 
 Hooks.once("libWrapper.Ready", async function() {
-  log("libWrapper is ready to go.");
   registerRuler();
 });
 
-Hooks.on("getSceneControlButtons", (controls) => {
+Hooks.on("getSceneControlButtons", controls => {
   if ( !getSetting(SETTINGS.PREFER_TOKEN_ELEVATION) ) return;
 
   const tokenTools = controls.find(c => c.name === "token");
@@ -50,3 +50,9 @@ Hooks.on("getSceneControlButtons", (controls) => {
     toggle: true
   });
 });
+
+Hooks.on("dragRuler.ready", function() {
+  registerDragRuler();
+});
+
+

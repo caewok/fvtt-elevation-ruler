@@ -1,3 +1,8 @@
+# 0.6.0
+Drag Ruler compatibility! Some under-the-hood changes extending Ray to a Ray3d class to make segment distance measurements easier to accomplish.
+
+Fix issue #1 (Ruler updating for other users)
+
 # 0.5.0
 Foundry v10 compatibility. v9 only supported in 0.4 versions.
 Due to various improvements in Foundry v10 Ruler class, libRuler is now deprecated; only libWrapper is required as a dependency.

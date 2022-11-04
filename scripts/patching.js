@@ -1,13 +1,17 @@
 /* globals
 libWrapper,
-Ruler
+Ruler,
+game
 */
 "use strict";
 
-import { MODULE_ID, log } from "./module.js";
+import { MODULE_ID } from "./const.js";
+import { log } from "./util.js";
 import {
   clearRuler,
   _addWaypointRuler,
+  dragRulerAddWaypointDragRulerRuler,
+  dragRulerClearWaypointsDragRuleRuler,
   _removeWaypointRuler,
   incrementElevation,
   decrementElevation,
@@ -16,9 +20,11 @@ import {
 
 import {
   _getMeasurementSegmentsRuler,
+  _getMeasurementSegmentsDragRulerRuler,
   measureDistancesGridLayer,
   _getSegmentLabelRuler,
-  _animateSegmentRuler } from "./segments.js";
+  _animateSegmentRuler,
+  _onDragLeftDropToken } from "./segments.js";
 
 import {
   terrainElevationAtPoint,
@@ -87,4 +93,11 @@ export function registerRuler() {
   });
 
   log("registerRuler finished!");
+}
+
+export function registerDragRuler() {
+  libWrapper.register(MODULE_ID, "CONFIG.Canvas.rulerClass.prototype._getMeasurementSegments", _getMeasurementSegmentsDragRulerRuler, libWrapper.WRAPPER);
+  libWrapper.register(MODULE_ID, "CONFIG.Canvas.rulerClass.prototype.dragRulerClearWaypoints", dragRulerClearWaypointsDragRuleRuler, libWrapper.WRAPPER);
+  libWrapper.register(MODULE_ID, "CONFIG.Canvas.rulerClass.prototype.dragRulerAddWaypoint", dragRulerAddWaypointDragRulerRuler, libWrapper.WRAPPER);
+  libWrapper.register(MODULE_ID, "Token.prototype._onDragLeftDrop", _onDragLeftDropToken, libWrapper.WRAPPER);
 }
