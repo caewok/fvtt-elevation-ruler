@@ -58,6 +58,7 @@ export function clearRuler(wrapper) {
  * Store the current userElevationIncrements for the destination.
  */
 export function toJSONRuler(wrapper) {
+  console.log("constructing ruler json!")
   const obj = wrapper();
   obj._userElevationIncrements = this._userElevationIncrements;
   return obj;
@@ -68,8 +69,18 @@ export function toJSONRuler(wrapper) {
  * Retrieve the current _userElevationIncrements
  */
 export function updateRuler(wrapper, data) {
+  console.log("updating ruler!")
+
+  // Fix for displaying user elevation increments as they happen.
+  const triggerMeasure = this._userElevationIncrements !== data._userElevationIncrements;
   this._userElevationIncrements = data._userElevationIncrements;
   wrapper(data);
+
+  if ( triggerMeasure ) {
+    const ruler = canvas.controls.ruler;
+    this.destination.x -= 1;
+    ruler.measure(this.destination);
+  }
 }
 
 /**
@@ -112,7 +123,10 @@ export function incrementElevation() {
 
   // Weird, but slightly change the destination to trigger a measure
   this.destination.x -= 1;
-  ruler.measure(ruler.destination);
+  ruler.measure(this.destination);
+
+  // Broadcast the activity (see ControlsLayer.prototype._onMouseMove)
+  game.user.broadcastActivity({ ruler: ruler.toJSON() });
 }
 
 export function decrementElevation() {
@@ -124,5 +138,8 @@ export function decrementElevation() {
 
   // Weird, but slightly change the destination to trigger a measure
   this.destination.x -= 1;
-  ruler.measure(ruler.destination);
+  ruler.measure(this.destination);
+
+  // Broadcast the activity (see ControlsLayer.prototype._onMouseMove)
+  game.user.broadcastActivity({ ruler: ruler.toJSON() });
 }
