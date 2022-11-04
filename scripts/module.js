@@ -54,3 +54,5 @@ Hooks.on("getSceneControlButtons", controls => {
 Hooks.on("dragRuler.ready", function() {
   registerDragRuler();
 });
+
+

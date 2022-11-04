@@ -23,7 +23,8 @@ import {
   _getMeasurementSegmentsDragRulerRuler,
   measureDistancesGridLayer,
   _getSegmentLabelRuler,
-  _animateSegmentRuler } from "./segments.js";
+  _animateSegmentRuler,
+  _onDragLeftDropToken } from "./segments.js";
 
 import {
   terrainElevationAtPoint,
@@ -98,4 +99,5 @@ export function registerDragRuler() {
   libWrapper.register(MODULE_ID, "CONFIG.Canvas.rulerClass.prototype._getMeasurementSegments", _getMeasurementSegmentsDragRulerRuler, libWrapper.WRAPPER);
   libWrapper.register(MODULE_ID, "CONFIG.Canvas.rulerClass.prototype.dragRulerClearWaypoints", dragRulerClearWaypointsDragRuleRuler, libWrapper.WRAPPER);
   libWrapper.register(MODULE_ID, "CONFIG.Canvas.rulerClass.prototype.dragRulerAddWaypoint", dragRulerAddWaypointDragRulerRuler, libWrapper.WRAPPER);
+  libWrapper.register(MODULE_ID, "Token.prototype._onDragLeftDrop", _onDragLeftDropToken, libWrapper.WRAPPER);
 }

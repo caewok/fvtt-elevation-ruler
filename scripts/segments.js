@@ -171,3 +171,36 @@ export async function _animateSegmentRuler(wrapped, token, segment, destination)
 
   return res;
 }
+
+/**
+ * Wrap Token.prototype._onDragLeftDrop
+ * If Drag Ruler is active, use this to update token(s) after movement has completed.
+ * Callback actions which occur on a mouse-move operation.
+ * @see MouseInteractionManager#_handleDragDrop
+ * @param {PIXI.InteractionEvent} event  The triggering canvas interaction event
+ * @returns {Promise<*>}
+ */
+export async function _onDragLeftDropToken(wrapped, event) {
+  // Assume the destination elevation is the desired elevation if dragging multiple tokens.
+  // (Likely more useful than having a bunch of tokens move down 10'?)
+  const ruler = canvas.controls.ruler;
+  if ( !ruler.isDragRuler ) return wrapped(event);
+
+  log("ending token drag");
+
+  // Do before calling wrapper b/c ruler may get cleared.
+  const elevation = elevationAtWaypoint(ruler.destination);
+  const selectedTokens = [...canvas.tokens.controlled];
+  if ( !selectedTokens.length ) selectedTokens.push(ruler.draggedEntity);
+
+  const result = wrapped(event);
+  if ( result === false ) return false; // drag did not happen
+
+  const updates = selectedTokens.map(t => {
+    return { _id: t.id, elevation };
+  });
+
+  const t0 = selectedTokens[0]
+  await t0.scene.updateEmbeddedDocuments(t0.constructor.embeddedName, updates);
+  return true;
+}
