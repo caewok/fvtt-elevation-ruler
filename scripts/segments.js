@@ -5,11 +5,12 @@ Ray
 */
 "use strict";
 
-import { MODULE_ID, log } from "./module.js";
+import { MODULE_ID } from "./const.js";
 import {
+  log,
   projectElevatedPoint,
   distance2dSquared,
-  elevationCoordinateToUnit } from "./utility.js";
+  elevationCoordinateToUnit } from "./util.js";
 
 /**
  * Wrap Ruler.prototype._getMeasurementSegments
@@ -53,6 +54,12 @@ export function _getMeasurementSegmentsRuler(wrapped) {
   return segments;
 }
 
+
+/**
+ * Wrap DragRulerRuler.prototype._getMeasurementSegments
+ * Add elevation information to the segments
+
+
 /**
  * Calculate the elevation for a given waypoint.
  * Terrain elevation + user increment
@@ -62,6 +69,7 @@ export function _getMeasurementSegmentsRuler(wrapped) {
 function elevationAtWaypoint(waypoint) {
   return waypoint._terrainElevation + (waypoint._userElevationIncrements * canvas.dimensions.distance);
 }
+
 /**
  * Wrap GridLayer.prototype.measureDistances
  * Called by Ruler.prototype._computeDistance
@@ -70,6 +78,16 @@ function elevationAtWaypoint(waypoint) {
  * hypotenuse to do the measurement.
  */
 export function measureDistancesGridLayer(wrapped, segments, options = {}) {
+  const newSegments = elevateSegments(segments);
+  return wrapped(newSegments, options);
+}
+
+/**
+ * Helper to add elevation points to the segments.
+ * @param {object[]} segments
+ * @returns {object[]} The new segments array
+ */
+function elevateSegments(segments) {
   const newSegments = [];
   for ( const s of segments ) {
     if ( !s._elevation?.A && !s._elevation?.B ) {
@@ -87,8 +105,7 @@ export function measureDistancesGridLayer(wrapped, segments, options = {}) {
     newSegment.ray = new Ray(newA, newB);
     newSegments.push(newSegment);
   }
-
-  return wrapped(newSegments, options);
+  return newSegments;
 }
 
 /**
@@ -106,6 +123,11 @@ function useLevelsLabels() {
  */
 export function _getSegmentLabelRuler(wrapped, segment, totalDistance) {
   const orig_label = wrapped(segment, totalDistance);
+
+  if ( typeof segment?._elevation.A === "undefined" || typeof segment?._elevation.B === "undefined" ) {
+    log("_getSegmentLabelRuler elevating segments");
+    return orig_label;
+  }
 
   let elevation_label = segmentElevationLabel(segment);
   const level_name = levelNameAtElevation(elevationCoordinateToUnit(segment._elevation.B));

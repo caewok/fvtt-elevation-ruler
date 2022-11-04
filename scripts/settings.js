@@ -5,7 +5,8 @@ canvas
 */
 "use strict";
 
-import { MODULE_ID, log } from "./module.js";
+import { MODULE_ID } from "./const.js";
+import { log } from "./util.js";
 
 export const SETTINGS = {
   PREFER_TOKEN_ELEVATION: "prefer-token-elevation",

@@ -11,7 +11,8 @@ PIXI
 Used by ruler to get elevation at waypoints and at the end of the ruler.
 */
 
-import { log, MODULE_ID } from "./module.js";
+import { MODULE_ID } from "./const.js";
+import { log } from "./util.js";
 import { SETTINGS, getSetting } from "./settings.js";
 
 /**

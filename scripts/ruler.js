@@ -3,7 +3,7 @@ canvas
 */
 "use strict";
 
-import { log } from "./module.js";
+import { log } from "./util.js";
 
 
 /**

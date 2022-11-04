@@ -4,7 +4,8 @@ Ruler
 */
 "use strict";
 
-import { MODULE_ID, log } from "./module.js";
+import { MODULE_ID } from "./const.js";
+import { log } from "./util.js";
 import {
   clearRuler,
   _addWaypointRuler,
