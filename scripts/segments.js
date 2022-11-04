@@ -194,13 +194,13 @@ export async function _onDragLeftDropToken(wrapped, event) {
   if ( !selectedTokens.length ) selectedTokens.push(ruler.draggedEntity);
 
   const result = wrapped(event);
-  if ( result === false ) return false; // drag did not happen
+  if ( result === false ) return false; // Drag did not happen
 
   const updates = selectedTokens.map(t => {
     return { _id: t.id, elevation };
   });
 
-  const t0 = selectedTokens[0]
+  const t0 = selectedTokens[0];
   await t0.scene.updateEmbeddedDocuments(t0.constructor.embeddedName, updates);
   return true;
 }
