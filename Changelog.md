@@ -1,3 +1,6 @@
+# 0.6.1
+Fix ruler calculation so the combined elevation distance and 2d distance is shown. (Closes issue #11.)
+
 # 0.6.0
 Drag Ruler compatibility! Some under-the-hood changes extending Ray to a Ray3d class to make segment distance measurements easier to accomplish.
 
