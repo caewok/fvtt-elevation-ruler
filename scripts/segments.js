@@ -46,6 +46,11 @@ export function _getMeasurementSegmentsDragRulerRuler(wrapped) {
 function elevateSegments(ruler, segments) {  // Add destination as the final waypoint
   const waypoints = ruler.waypoints.concat([ruler.destination]);
 
+  // Just to help debugging.
+  if ( ruler._userElevationIncrements ) {
+    console.log(`ruler._userElevationIncrements`)
+  }
+
   const { distance, size } = canvas.dimensions;
   const gridUnits = size / distance;
 
@@ -89,8 +94,21 @@ function elevationAtWaypoint(waypoint) {
  * hypotenuse to do the measurement.
  */
 export function measureDistancesGridLayer(wrapped, segments, options = {}) {
-  if ( segments[0] instanceof Ray ) return segments.map(s => s.gameDistance(options.gridSpaces));
-  return wrapped(segments, options);
+  if ( !segments.length || !(segments[0]?.ray instanceof Ray3d) ) return wrapped(segments, options);
+
+  // Avoid modifying the segment rays.
+  const ln = segments.length;
+  const origRays = Array(ln);
+  for ( let i = 0; i < ln; i += 1 ) {
+    const s = segments[i];
+    origRays[i] = s.ray;
+    s.ray = s.ray.projectOntoCanvas();
+  }
+
+  const out = wrapped(segments, options);
+
+  for ( let i = 0; i < ln; i += 1 ) segments[i].ray = origRays[i];
+  return out;
 }
 
 /**
