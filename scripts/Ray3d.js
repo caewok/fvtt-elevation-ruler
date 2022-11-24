@@ -22,7 +22,7 @@ export function registerRayMethods() {
  * @returns {number}
  */
 function gameDistance(gridSpaces) {
-  return canvas.grid.measureDistances([this], { gridSpaces });
+  return canvas.grid.grid.measureDistances([{ ray: this }], { gridSpaces });
 }
 
 /**
