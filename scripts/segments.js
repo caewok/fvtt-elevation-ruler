@@ -45,12 +45,6 @@ export function _getMeasurementSegmentsDragRulerRuler(wrapped) {
 
 function elevateSegments(ruler, segments) {  // Add destination as the final waypoint
   const waypoints = ruler.waypoints.concat([ruler.destination]);
-
-  // Just to help debugging.
-  if ( ruler._userElevationIncrements ) {
-    console.log(`ruler._userElevationIncrements`)
-  }
-
   const { distance, size } = canvas.dimensions;
   const gridUnits = size / distance;
 
