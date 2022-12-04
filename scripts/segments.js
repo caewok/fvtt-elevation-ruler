@@ -8,7 +8,6 @@ Ray
 import { MODULE_ID } from "./const.js";
 import {
   log,
-  distance2dSquared,
   elevationCoordinateToUnit } from "./util.js";
 
 import { Ray3d } from "./geometry/3d/Ray3d.js";
@@ -55,7 +54,7 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
 
     const p0 = waypoints[i - 1];
     const p1 = waypoints[i];
-    const dist2 = distance2dSquared(p0, p1);
+    const dist2 = PIXI.Point.distanceSquaredBetween(p0, p1);
     if ( dist2 < 100 ) { // 10 ^ 2, from _getMeasurementSegments
       j -= 1; // Stay on this segment and skip this waypoint
       continue;
