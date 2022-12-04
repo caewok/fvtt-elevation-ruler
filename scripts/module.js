@@ -15,19 +15,16 @@ import { Ray3d, registerRayMethods } from "./Ray3d.js";
 // For Drag Ruler
 import { registerDragRuler } from "./patching.js";
 
+import { registerGeometry } from "./geometry/registration.js";
+
 // Setup is after init; before ready.
 // setup is called after settings and localization have been initialized,
 // but before entities, packs, UI, canvas, etc. has been initialized
 Hooks.once("setup", async function() {
   registerKeybindings(); // Should go before registering settings, so hotkey group is defined
   registerSettings();
-  registerPIXIPointMethods();
-  registerRayMethods();
 
-  game.modules.get(MODULE_ID).api = {
-    Point3d,
-    Ray3d
-  };
+  registerGeometry();
 });
 
 // For https://github.com/League-of-Foundry-Developers/foundryvtt-devMode
