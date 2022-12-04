@@ -11,7 +11,7 @@ import {
   distance2dSquared,
   elevationCoordinateToUnit } from "./util.js";
 
-import { Ray3d } from "./Ray3d.js";
+import { Ray3d } from "./geometry/3d/Ray3d.js";
 
 /**
  * Wrap Ruler.prototype._getMeasurementSegments

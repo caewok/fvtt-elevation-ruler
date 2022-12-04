@@ -8,10 +8,6 @@ import { registerSettings, registerKeybindings, SETTINGS, getSetting } from "./s
 import { registerRuler } from "./patching.js";
 import { MODULE_ID } from "./const.js";
 
-// For API
-import { Point3d, registerPIXIPointMethods } from "./Point3d.js";
-import { Ray3d, registerRayMethods } from "./Ray3d.js";
-
 // For Drag Ruler
 import { registerDragRuler } from "./patching.js";
 
