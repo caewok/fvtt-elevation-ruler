@@ -17,14 +17,3 @@ export function log(...args) {
     // Empty
   }
 }
-
-/**
- * Convert elevation grid coordinate to elevation units
- * @param {number} e    elevation coordinate
- * @returns {number}
- */
-export function elevationCoordinateToUnit(e) {
-  const { size, distance } = canvas.dimensions;
-  const gridMultiplier = distance / size;
-  return e * gridMultiplier;
-}
