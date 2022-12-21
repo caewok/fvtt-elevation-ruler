@@ -6,12 +6,9 @@ Ray
 "use strict";
 
 import { MODULE_ID } from "./const.js";
-import {
-  log,
-  distance2dSquared,
-  elevationCoordinateToUnit } from "./util.js";
+import { log } from "./util.js";
 
-import { Ray3d } from "./Ray3d.js";
+import { Ray3d } from "./geometry/3d/Ray3d.js";
 
 /**
  * Wrap Ruler.prototype._getMeasurementSegments
@@ -55,7 +52,7 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
 
     const p0 = waypoints[i - 1];
     const p1 = waypoints[i];
-    const dist2 = distance2dSquared(p0, p1);
+    const dist2 = PIXI.Point.distanceSquaredBetween(p0, p1);
     if ( dist2 < 100 ) { // 10 ^ 2, from _getMeasurementSegments
       j -= 1; // Stay on this segment and skip this waypoint
       continue;
@@ -121,7 +118,7 @@ function useLevelsLabels() {
 export function _getSegmentLabelRuler(wrapped, segment, totalDistance) {
   const orig_label = wrapped(segment, totalDistance);
   let elevation_label = segmentElevationLabel(segment);
-  const level_name = levelNameAtElevation(elevationCoordinateToUnit(segment.ray.B.z));
+  const level_name = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
   if ( level_name ) elevation_label += `\n${level_name}`;
 
   return `${orig_label}\n${elevation_label}`;
@@ -160,8 +157,8 @@ function segmentElevationLabel(s) {
 
   // Take absolute value b/c segmentArrow will represent direction
   // Allow decimals to tenths ( Math.round(x * 10) / 10).
-  let label = `${Math.abs(Math.round(elevationCoordinateToUnit(increment) * 10) / 10)} ${units}${segmentArrow}`;
-  label += ` [@${Math.round(elevationCoordinateToUnit(Bz) * 10) / 10} ${units}]`;
+  let label = `${Math.abs(Math.round(CONFIG.GeometryLib.utils.pixelsToGridUnits(increment) * 10) / 10)} ${units}${segmentArrow}`;
+  label += ` [@${Math.round(CONFIG.GeometryLib.utils.pixelsToGridUnits(Bz) * 10) / 10} ${units}]`;
 
   return label;
 }
@@ -177,7 +174,7 @@ export async function _animateSegmentRuler(wrapped, token, segment, destination)
 
   // Update elevation after the token move.
   if ( segment.ray.A.z !== segment.ray.B.z ) {
-    await token.document.update({ elevation: elevationCoordinateToUnit(segment.ray.B.z) });
+    await token.document.update({ elevation: CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z) });
   }
 
   return res;
