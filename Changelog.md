@@ -1,3 +1,6 @@
+# 0.6.2
+Use shared geometry lib git submodule.
+
 # 0.6.1
 Fix ruler calculation so the combined elevation distance and 2d distance is shown. (Closes issue #11.)
 
