@@ -13,7 +13,12 @@ export const SETTINGS = {
   USE_EV: "enable-elevated-vision-elevation",
   USE_TERRAIN: "enable-enhanced-terrain-elevation",
   USE_LEVELS: "enable-levels-elevation",
-  USE_LEVELS_LABEL: "enable-levels-floor-label",
+  USE_LEVELS_LABEL: "levels-use-floor-label",
+  LEVELS_LABELS: {
+    NEVER: "levels-labels-never",
+    UI_ONLY: "levels-labels-ui",
+    ALWAYS: "levels-labels-always"
+  },
   NO_MODS: "no-modules-message"
 };
 
@@ -77,8 +82,13 @@ export function registerSettings() {
     hint: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_LEVELS_LABEL}.hint`),
     scope: "world",
     config: levelsActive,
-    default: levelsActive,
-    type: Boolean
+    default: SETTINGS.LEVELS_LABELS.ALWAYS,
+    type: String,
+    choices: {
+      [SETTINGS.LEVELS_LABELS.NEVER]: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.LEVELS_LABELS.NEVER}`),
+      [SETTINGS.LEVELS_LABELS.UI_ONLY]: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.LEVELS_LABELS.UI_ONLY}`),
+      [SETTINGS.LEVELS_LABELS.ALWAYS]: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.LEVELS_LABELS.ALWAYS}`)
+    }
   });
 
   game.settings.register(MODULE_ID, SETTINGS.PREFER_TOKEN_ELEVATION, {

@@ -17,8 +17,11 @@
     "elevationruler.settings.enable-levels-elevation.name": "Use Levels",
     "elevationruler.settings.enable-levels-elevation.hint": "Take into account elevation information from the Levels module when measuring.",
 
-    "elevationruler.settings.enable-levels-floor-label.name": "Levels Floor Label",
-    "elevationruler.settings.enable-levels-floor-label.hint": "Label the ruler with the current floor, as provided by the Levels module.",
+    "elevationruler.settings.levels-use-floor-label.name": "Levels Floor Label",
+    "elevationruler.settings.levels-use-floor-label.hint": "Label the ruler with the current floor, if the Levels UI floors are named.",
+    "elevationruler.settings.levels-labels-never": "Never",
+    "elevationruler.settings.levels-labels-ui": "Only when Levels UI is active",
+    "elevationruler.settings.levels-labels-always": "Always",
 
     "elevationruler.settings.prefer-token-elevation.name": "Add token elevation control",
     "elevationruler.settings.prefer-token-elevation.hint": "Add a control to the token toolbar to prefer the token elevation when measuring. When toggled on, the control will keep the ruler at the elevation of the measuring token unless another token is encountered or the grid space is at a higher elevation than the token. Otherwise, the ruler will assume the elevation of the grid space or the token encountered.",

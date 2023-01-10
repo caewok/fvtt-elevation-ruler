@@ -1,11 +1,13 @@
 /* globals
 game,
 canvas,
-Ray
+PIXI,
+CONFIG
 */
 "use strict";
 
 import { MODULE_ID } from "./const.js";
+import { SETTINGS } from "./settings.js";
 import { log } from "./util.js";
 
 import { Ray3d } from "./geometry/3d/Ray3d.js";
@@ -107,8 +109,11 @@ export function measureDistancesGridLayer(wrapped, segments, options = {}) {
  * @returns {boolean}
  */
 function useLevelsLabels() {
-  return game.modules.get("levels")?.active
-    && game.settings.get(MODULE_ID, "enable-levels-floor-label");
+  if ( !game.modules.get("levels")?.active ) return false;
+
+  const labelOpt = game.settings.get(MODULE_ID, SETTINGS.USE_LEVELS_LABEL);
+  return labelOpt === SETTINGS.LEVELS_LABELS.ALWAYS
+    || (labelOpt === SETTINGS.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);
 }
 
 /**
