@@ -106,8 +106,8 @@ export function registerKeybindings() {
   });
 
   game.keybindings.register(MODULE_ID, KEYBINDINGS.INCREMENT, {
-    name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.hint`),
+    name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.INCREMENT}.name`),
+    hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.INCREMENT}.hint`),
     editable: [
       { key: "BracketRight" }
     ],
