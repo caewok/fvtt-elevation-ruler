@@ -1,3 +1,8 @@
+# 0.6.3
+Update geometry lib to v0.1.1.
+Add options to display Levels floor labels always/never/only when Levels UI is active. (Issue #12).
+Fix for description of the key control to increase ruler increments. (Issue #13).
+
 # 0.6.2
 Use shared geometry lib git submodule.
 
