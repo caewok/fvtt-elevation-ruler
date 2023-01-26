@@ -158,11 +158,11 @@ function segmentElevationLabel(s) {
   const Bz = s.ray.B.z;
 
   const segmentArrow = (increment > 0) ? "↑"
-    : (increment < 0) ? "↓" : "";
+    : (increment < 0) ? "↓" : "↕";
 
   // Take absolute value b/c segmentArrow will represent direction
   // Allow decimals to tenths ( Math.round(x * 10) / 10).
-  let label = `${Math.abs(Math.round(CONFIG.GeometryLib.utils.pixelsToGridUnits(increment) * 10) / 10)} ${units}${segmentArrow}`;
+  let label = `${segmentArrow}${Math.abs(Math.round(CONFIG.GeometryLib.utils.pixelsToGridUnits(increment) * 10) / 10)} ${units}`;
   label += ` [@${Math.round(CONFIG.GeometryLib.utils.pixelsToGridUnits(Bz) * 10) / 10} ${units}]`;
 
   return label;
