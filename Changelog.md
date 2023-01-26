@@ -1,5 +1,7 @@
 # 0.6.4
-Update geometry lib to v0.1.2.
+Update geometry lib to v0.1.3.
+Fix for calculating total distance in the vertical and horizontal directions (dx or dy equal 0). Possibly fixes issue #14.
+Add up/down arrow for label when elevation is unchanged, and move arrow to front of label.
 
 # 0.6.3
 Update geometry lib to v0.1.1.
