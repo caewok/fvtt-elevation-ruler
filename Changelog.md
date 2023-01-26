@@ -1,3 +1,6 @@
+# 0.6.4
+Update geometry lib to v0.1.2.
+
 # 0.6.3
 Update geometry lib to v0.1.1.
 Add options to display Levels floor labels always/never/only when Levels UI is active. (Issue #12).
