@@ -152,8 +152,9 @@ export function incrementElevation() {
   ruler._userElevationIncrements += 1;
 
   // Weird, but slightly change the destination to trigger a measure
+  const destination = { x: this.destination.x, y: this.destination.y };
   this.destination.x -= 1;
-  ruler.measure(this.destination);
+  ruler.measure(destination);
 
   // Broadcast the activity (see ControlsLayer.prototype._onMouseMove)
   game.user.broadcastActivity({ ruler: ruler.toJSON() });
@@ -167,8 +168,9 @@ export function decrementElevation() {
   ruler._userElevationIncrements -= 1;
 
   // Weird, but slightly change the destination to trigger a measure
+  const destination = { x: this.destination.x, y: this.destination.y };
   this.destination.x -= 1;
-  ruler.measure(this.destination);
+  ruler.measure(destination);
 
   // Broadcast the activity (see ControlsLayer.prototype._onMouseMove)
   game.user.broadcastActivity({ ruler: ruler.toJSON() });
