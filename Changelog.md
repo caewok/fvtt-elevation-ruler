@@ -1,3 +1,8 @@
+# 0.6.6
+Update geometry lib to v0.1.5. Fix for incorrect diagonal measurement in grids (issue #3). Issue with dnd5e may still result in questionable rounded values when measuring Euclidean distances and 5/10/5 measurements on hex maps. See https://github.com/foundryvtt/dnd5e/issues/2257 and https://github.com/foundryvtt/dnd5e/issues/2256.
+Fix for updating ruler elevation label on gridless maps when increasing or decreasing elevation.
+Fix for measuring elevation for terrains created by Enhanced Terrain Elevation (issues #8, #15).
+
 # 0.6.5
 Update geometry lib to v0.1.4.
 

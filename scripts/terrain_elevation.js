@@ -185,8 +185,9 @@ function TerrainLayerElevationAtPoint({x, y}) {
   // must account for possibility of
   // TO-DO: Allow user to ignore certain terrain types?
   let terrain_max_elevation = terrains.reduce((total, t) => {
-    if ( !isFinite(t.max) ) return total;
-    return Math.max(total, t.max);
+    const elevation = t.document?.elevation;
+    if ( !isFinite(elevation) ) return total;
+    return Math.max(total, elevation);
   }, Number.NEGATIVE_INFINITY);
 
   // In case all the terrain maximums are infinite.
