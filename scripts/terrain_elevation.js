@@ -1,7 +1,6 @@
 /* globals
 canvas,
 game,
-CONFIG,
 ui,
 PIXI
 */
@@ -14,6 +13,7 @@ Used by ruler to get elevation at waypoints and at the end of the ruler.
 import { MODULE_ID } from "./const.js";
 import { log } from "./util.js";
 import { SETTINGS, getSetting } from "./settings.js";
+import { elevationAtWaypoint } from "./segments.js";
 
 /**
  * Retrieve the elevation at the current ruler origin.
@@ -21,22 +21,14 @@ import { SETTINGS, getSetting } from "./settings.js";
  * Cached during a ruler movement
  */
 export function elevationAtOrigin() {
-  const measuringToken = this._getMovementToken();
   const origin = this.waypoints[0];
   if ( !origin ) return undefined;
   if ( typeof origin._terrainElevation !== "undefined" ) return origin._terrainElevation;
 
-  let value = 0;
-
-  // Use the measuring token's elevation, if any, as the starting point.
+  let value = Number.NEGATIVE_INFINITY;
+  const measuringToken = this._getMovementToken();
   if ( measuringToken ) value = tokenElevation(measuringToken);
-
-  // If the Levels UI is enabled, start at the bottom of the current layer.
-  else if ( useLevels() && CONFIG.Levels.UI.rangeEnabled ) value = parseFloat(CONFIG.Levels.UI.range[0]);
-
-  // Otherwise, get the elevation for this origin point.
-  // Pass startingElevation to avoid a loop.
-  else value = this.terrainElevationAtPoint(origin, { considerTokens: false, startingElevation: 0 });
+  else value = elevationAtLocation(origin, measuringToken);
 
   origin._terrainElevation = value;
   origin._userElevationIncrements = 0;
@@ -75,6 +67,56 @@ export function terrainElevationAtDestination({ considerTokens = true } = {}) {
 }
 
 /**
+ * Measure elevation for a given rule position
+ * Try the following, in order:
+ * 1. If measuring token, the measuring token elevation.
+ * 2. If currently selected token && EV, consider tiles
+ * 3. If currently selected token && Levels, current layer
+ * 4. If Levels UI, current layer
+ * 5. If enhanced terrain layer, terrain layer
+ * 5. If EV, point measure
+ * 6. 0
+ * @param {Point} location
+ * @param {Token} [measuringToken]
+ * @param {number} [startingElevation=Number.NEGATIVE_INFINITY]
+ * @returns {number}
+ */
+function elevationAtLocation(location, measuringToken, startingElevation = Number.NEGATIVE_INFINITY) {
+  const ignoreBelow = (measuringToken && preferTokenElevation()) ? startingElevation : Number.NEGATIVE_INFINITY;
+  log(`Checking Elevation at (${location.x}, ${location.y})\n\tstarting elevation ${startingElevation}\n\tignoring below ${ignoreBelow}`);
+
+  // If at the measuring token, use that
+  location = new PIXI.Point(location.x, location.y);
+  if ( measuringToken && location.almostEqual(measuringToken.center) ) return measuringToken.document?.elevation ?? 0;
+
+  // Prioritize the highest token at the location
+  const max_token_elevation = retrieveVisibleTokens().reduce((e, t) => {
+    // Is the point within the token control area?
+    if ( !t.bounds.contains(location.x, location.y) ) return e;
+    return Math.max(tokenElevation(t), e);
+  }, Number.NEGATIVE_INFINITY);
+  if ( isFinite(max_token_elevation) && max_token_elevation >= ignoreBelow ) return max_token_elevation;
+
+  // Try Enhanced Terrain Layer
+  // Terrain layers trumps all others
+  const terrain_elevation = TerrainLayerElevationAtPoint(location);
+  if ( terrain_elevation !== undefined && terrain_elevation > ignoreBelow ) return terrain_elevation;
+
+  // Try Elevated Vision
+  // If EV is present, it should handle Levels elevation as well
+  const ev_elevation = EVElevationAtPoint(location, measuringToken, startingElevation);
+  if ( ev_elevation !== undefined && ev_elevation > ignoreBelow ) return ev_elevation;
+
+  // Try Levels
+  const levels_elevation = LevelsElevationAtPoint(location, { startingElevation });
+  if ( levels_elevation !== undefined && levels_elevation > ignoreBelow ) return levels_elevation;
+
+  // Default to 0 elevation for the point
+  return Math.max(ignoreBelow, 0);
+}
+
+
+/**
  * Measure elevation at a given point.
  * Prioritize:
  *   1. Token found at point.
@@ -87,42 +129,13 @@ export function terrainElevationAtDestination({ considerTokens = true } = {}) {
  * @param {boolean} [options.considerTokens]    Consider token elevations at that point.
  * @returns {number} Elevation for the given point.
  */
-export function terrainElevationAtPoint(p, {
-  considerTokens = true,
-  startingElevation = this.elevationAtOrigin() } = {}) {
-
+export function terrainElevationAtPoint(p, { startingElevation } = {}) {
   const measuringToken = this._getMovementToken();
-  const ignoreBelow = ( measuringToken && preferTokenElevation() ) ? startingElevation : Number.NEGATIVE_INFINITY;
+  startingElevation ??= this.waypoints.length
+    ? elevationAtWaypoint(this.waypoints[this.waypoints.length - 1]) : measuringToken
+      ? tokenElevation(measuringToken) : Number.NEGATIVE_INFINITY;
 
-  log(`Checking Elevation at (${p.x}, ${p.y}) ${considerTokens ? "" : "not "} considering tokens\n\tstarting elevation ${startingElevation}\n\tignoring below ${ignoreBelow}`);
-
-  if ( considerTokens ) {  // Check for tokens; take the highest one at a given position
-    const tokens = retrieveVisibleTokens();
-    const max_token_elevation = tokens.reduce((e, t) => {
-      // Is the point within the token control area?
-      if ( !t.bounds.contains(p.x, p.y) ) return e;
-      return Math.max(tokenElevation(t), e);
-    }, Number.NEGATIVE_INFINITY);
-    log(`calculateEndElevation: ${tokens.length} tokens at (${p.x}, ${p.y}) with maximum elevation ${max_token_elevation}`);
-
-    // Use tokens rather than elevation if available
-    if ( isFinite(max_token_elevation) && max_token_elevation >= ignoreBelow ) return max_token_elevation;
-  }
-
-  // Try Levels
-  const levels_elevation = LevelsElevationAtPoint(p, { startingElevation });
-  if ( levels_elevation !== undefined && levels_elevation > ignoreBelow ) return levels_elevation;
-
-  // Try Elevated Vision
-  const ev_elevation = EVElevationAtPoint(p);
-  if ( ev_elevation !== undefined && ev_elevation > ignoreBelow ) return ev_elevation;
-
-  // Try Enhanced Terrain Layer
-  const terrain_elevation = TerrainLayerElevationAtPoint(p);
-  if ( terrain_elevation !== undefined && terrain_elevation > ignoreBelow ) return terrain_elevation;
-
-  // Default to 0 elevation for the point
-  return Math.max(ignoreBelow, 0);
+  return elevationAtLocation(p, measuringToken, startingElevation);
 }
 
 function retrieveVisibleTokens() {
@@ -163,9 +176,19 @@ function useLevels() {
  * @param {Point} {x,y}    Point to measure, in {x, y} format
  * @returns {Number|undefined} Point elevation or undefined if elevated vision layer is inactive
  */
-function EVElevationAtPoint({x, y}) {
+function EVElevationAtPoint(location, measuringToken, startingElevation = 0) {
   if ( !useElevatedVision() ) return undefined;
-  return canvas.elevation.elevationAt(x, y);
+
+  const EVCalc = measuringToken
+    ? new canvas.elevation.TokenElevationCalculator(measuringToken)
+    : new canvas.elevation.PointElevationCalculator(location);
+
+  // Location may or may not be correct, depending on above.
+  // Use positive infinity for elevation so that all tiles can be found
+  EVCalc.location = location;
+  EVCalc.elevation = isFinite(startingElevation) ? startingElevation : Number.POSITIVE_INFINITY;
+
+  return EVCalc.groundElevation();
 }
 
 // ----- TERRAIN LAYER ELEVATION ----- //
