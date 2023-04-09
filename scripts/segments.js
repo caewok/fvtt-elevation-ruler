@@ -75,7 +75,7 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
  * @param {object} waypoint
  * @returns {number}
  */
-function elevationAtWaypoint(waypoint) {
+export function elevationAtWaypoint(waypoint) {
   return waypoint._terrainElevation + (waypoint._userElevationIncrements * canvas.dimensions.distance);
 }
 
