@@ -32,20 +32,39 @@ Hooks.once("libWrapper.Ready", async function() {
   registerRuler();
 });
 
-Hooks.on("getSceneControlButtons", controls => {
-  if ( !getSetting(SETTINGS.PREFER_TOKEN_ELEVATION) ) return;
+const PREFER_TOKEN_CONTROL = {
+  name: SETTINGS.PREFER_TOKEN_ELEVATION,
+  title: `${MODULE_ID}.controls.${SETTINGS.PREFER_TOKEN_ELEVATION}.name`,
+  icon: "fa-solid fa-user-lock",
+  toggle: true
+};
 
+Hooks.once("init", function() {
+  // Cannot access localization until init.
+  PREFER_TOKEN_CONTROL.title = game.i18n.localize(PREFER_TOKEN_CONTROL.title);
+});
+
+// Render the prefer token control if that setting is enabled
+Hooks.on("getSceneControlButtons", controls => {
+  if ( !canvas.scene || !getSetting(SETTINGS.PREFER_TOKEN_ELEVATION) ) return;
   const tokenTools = controls.find(c => c.name === "token");
-  tokenTools.tools.push({
-    name: SETTINGS.PREFER_TOKEN_ELEVATION,
-    title: game.i18n.localize(`${MODULE_ID}.controls.${SETTINGS.PREFER_TOKEN_ELEVATION}.name`),
-    icon: "fa-solid fa-user-lock",
-    toggle: true
-  });
+  tokenTools.tools.push(PREFER_TOKEN_CONTROL);
 });
 
 Hooks.on("dragRuler.ready", function() {
   registerDragRuler();
 });
 
+Hooks.on("canvasInit", function(_canvas) {
+  updatePreferTokenControl();
+})
+
+function updatePreferTokenControl(enable) {
+  enable ??= getSetting(SETTINGS.PREFER_TOKEN_ELEVATION);
+  const tokenTools = ui.controls.controls.find(c => c.name === "token");
+  const index = tokenTools.tools.findIndex(b => b.name === SETTINGS.PREFER_TOKEN_CONTROL);
+  if ( enable && !~index ) tokenTools.tools.push(PREFER_TOKEN_CONTROL);
+  else if ( ~index ) tokenTools.tools.splice(index, 1);
+  ui.controls.render(true);
+}
 

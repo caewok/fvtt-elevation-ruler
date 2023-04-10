@@ -98,7 +98,8 @@ export function registerSettings() {
     config: true,
     default: false,
     type: Boolean,
-    requiresReload: true
+    requiresReload: false,
+    onChange: reloadTokenControls
   });
 
   log("Done registering settings.");
@@ -124,4 +125,14 @@ export function registerKeybindings() {
     onDown: () => canvas.controls.ruler.incrementElevation(),
     precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
   });
+}
+
+/**
+ * Force a reload of token controls layer.
+ * Used to force the added control to appear/disappear.
+ */
+function reloadTokenControls() {
+  if ( !canvas.tokens.active ) return;
+  canvas.tokens.deactivate();
+  canvas.tokens.activate();
 }
