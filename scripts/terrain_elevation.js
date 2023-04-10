@@ -181,7 +181,7 @@ function EVElevationAtPoint(location, measuringToken, startingElevation = 0) {
 
   const EVCalc = measuringToken
     ? new canvas.elevation.TokenElevationCalculator(measuringToken)
-    : new canvas.elevation.PointElevationCalculator(location);
+    : new canvas.elevation.CoordinateElevationCalculator(location);
 
   // Location may or may not be correct, depending on above.
   // Use positive infinity for elevation so that all tiles can be found
