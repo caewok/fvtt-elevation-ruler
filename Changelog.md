@@ -1,3 +1,8 @@
+# 0.6.7
+- Fix measuring elevation with Elevated Vision enabled (issue #18).
+- No longer require reload of the canvas when enabling/disabling prefer token control.
+- Prefer token control now remembers its current setting (enabled/disabled) when switching back-and-forth between layers
+
 # 0.6.6
 Update geometry lib to v0.1.5. Fix for incorrect diagonal measurement in grids (issue #3). Issue with dnd5e may still result in questionable rounded values when measuring Euclidean distances and 5/10/5 measurements on hex maps. See https://github.com/foundryvtt/dnd5e/issues/2257 and https://github.com/foundryvtt/dnd5e/issues/2256.
 Fix for updating ruler elevation label on gridless maps when increasing or decreasing elevation.
