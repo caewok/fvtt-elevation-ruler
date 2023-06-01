@@ -1,3 +1,7 @@
+# 0.6.8
+- Store the active/inactive status of the "prefer token elevation" toggle so it is consistent when switching scenes or reloading Foundry (issue #19).
+- Improvements to the logic for measuring overhead tile elevations and terrain elevations when Elevated Vision module is active (issue #18).
+
 # 0.6.7
 - Fix measuring elevation with Elevated Vision enabled (issue #18).
 - No longer require reload of the canvas when enabling/disabling prefer token control.
