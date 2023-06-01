@@ -4,7 +4,7 @@ Hooks
 */
 "use strict";
 
-import { registerSettings, registerKeybindings, SETTINGS, getSetting } from "./settings.js";
+import { registerSettings, registerKeybindings, SETTINGS, getSetting, setSetting } from "./settings.js";
 import { registerRuler } from "./patching.js";
 import { MODULE_ID } from "./const.js";
 
@@ -59,10 +59,18 @@ Hooks.on("canvasInit", function(_canvas) {
   updatePreferTokenControl();
 })
 
+Hooks.on("renderSceneControls", async function(controls, html, data) {
+  // Watch for enabling/disabling of the prefer token control
+  if ( controls.activeControl !== "token" ) return;
+  const toggle = controls.control.tools.find(t => t.name === SETTINGS.PREFER_TOKEN_ELEVATION);
+  await setSetting()
+
+});
+
 function updatePreferTokenControl(enable) {
   enable ??= getSetting(SETTINGS.PREFER_TOKEN_ELEVATION);
   const tokenTools = ui.controls.controls.find(c => c.name === "token");
-  const index = tokenTools.tools.findIndex(b => b.name === SETTINGS.PREFER_TOKEN_CONTROL);
+  const index = tokenTools.tools.findIndex(b => b.name === SETTINGS.PREFER_TOKEN_ELEVATION);
   if ( enable && !~index ) tokenTools.tools.push(PREFER_TOKEN_CONTROL);
   else if ( ~index ) tokenTools.tools.splice(index, 1);
   ui.controls.render(true);

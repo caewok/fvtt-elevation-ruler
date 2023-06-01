@@ -31,6 +31,10 @@ export function getSetting(settingName) {
   return game.settings.get(MODULE_ID, settingName);
 }
 
+export async function setSetting(settingName, value) {
+  await game.settings.set(MODULE_ID, settingName, value);
+}
+
 export function registerSettings() {
   log("Registering settings.");
 
