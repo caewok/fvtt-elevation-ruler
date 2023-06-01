@@ -185,8 +185,13 @@ function EVElevationAtPoint(location, measuringToken, startingElevation = 0) {
 
   // Location may or may not be correct, depending on above.
   // Use positive infinity for elevation so that all tiles can be found
+  // MAX_SAFE_INTEGER needed b/c a finite elevation is required.
   EVCalc.location = location;
-  EVCalc.elevation = isFinite(startingElevation) ? startingElevation : Number.POSITIVE_INFINITY;
+  EVCalc.elevation = isFinite(startingElevation) ? startingElevation : Number.MAX_SAFE_INTEGER;
+  if ( !measuringToken ) {
+    EVCalc.options.tileStep = Number.POSITIVE_INFINITY;
+    EVCalc.options.terrainStep =  Number.POSITIVE_INFINITY;
+  }
 
   return EVCalc.groundElevation();
 }

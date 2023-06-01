@@ -19,7 +19,8 @@ export const SETTINGS = {
     UI_ONLY: "levels-labels-ui",
     ALWAYS: "levels-labels-always"
   },
-  NO_MODS: "no-modules-message"
+  NO_MODS: "no-modules-message",
+  PREFER_TOKEN_ELEVATION_CURRENT_VALUE: "prefer-token-elevation-current-value"
 };
 
 const KEYBINDINGS = {
@@ -29,6 +30,10 @@ const KEYBINDINGS = {
 
 export function getSetting(settingName) {
   return game.settings.get(MODULE_ID, settingName);
+}
+
+export async function setSetting(settingName, value) {
+  await game.settings.set(MODULE_ID, settingName, value);
 }
 
 export function registerSettings() {
@@ -100,6 +105,14 @@ export function registerSettings() {
     type: Boolean,
     requiresReload: false,
     onChange: reloadTokenControls
+  });
+
+  game.settings.register(MODULE_ID, SETTINGS.PREFER_TOKEN_ELEVATION_CURRENT_VALUE, {
+    scope: "user",
+    config: false,
+    default: false,
+    type: Boolean,
+    requiresReload: false
   });
 
   log("Done registering settings.");
