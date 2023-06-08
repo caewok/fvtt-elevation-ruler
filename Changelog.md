@@ -1,3 +1,6 @@
+# 0.7.0
+Updated for Foundry v11. Updated lib-geometry to 0.2.0.
+
 # 0.6.8
 - Store the active/inactive status of the "prefer token elevation" toggle so it is consistent when switching scenes or reloading Foundry (issue #19).
 - Improvements to the logic for measuring overhead tile elevations and terrain elevations when Elevated Vision module is active (issue #18).
