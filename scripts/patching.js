@@ -87,5 +87,5 @@ export function registerDragRuler() {
   wrap("CONFIG.Canvas.rulerClass.prototype.dragRulerClearWaypoints", dragRulerClearWaypointsDragRuleRuler);
   wrap("CONFIG.Canvas.rulerClass.prototype.dragRulerAddWaypoint", dragRulerAddWaypointDragRulerRuler);
 
-  wrap("Token.prototype._onDragLeftDrop", _onDragLeftDropToken);
+  wrap("CONFIG.Token.objectClass.prototype._onDragLeftDrop", _onDragLeftDropToken);
 }
