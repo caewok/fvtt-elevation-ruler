@@ -1,7 +1,6 @@
 /* globals
-libWrapper,
-Ruler,
-game
+CONFIG,
+libWrapper
 */
 "use strict";
 
@@ -56,29 +55,29 @@ function addClassMethod(cl, name, fn) {
 export function registerRuler() {
 
   // Basic ruler methods
-  wrap("Ruler.prototype.clear", clearRuler);
-  wrap("Ruler.prototype._addWaypoint", _addWaypointRuler);
-  wrap("Ruler.prototype._removeWaypoint", _removeWaypointRuler);
+  wrap("CONFIG.Canvas.rulerClass.prototype.clear", clearRuler);
+  wrap("CONFIG.Canvas.rulerClass.prototype._addWaypoint", _addWaypointRuler);
+  wrap("CONFIG.Canvas.rulerClass.prototype._removeWaypoint", _removeWaypointRuler);
 
   // Pass needed variables across the sockets
-  wrap("Ruler.prototype.toJSON", toJSONRuler);
-  wrap("Ruler.prototype.update", updateRuler);
+  wrap("CONFIG.Canvas.rulerClass.prototype.toJSON", toJSONRuler);
+  wrap("CONFIG.Canvas.rulerClass.prototype.update", updateRuler);
 
   // Ruler methods related to ruler segments
-  wrap("Ruler.prototype._getMeasurementSegments", _getMeasurementSegmentsRuler);
+  wrap("CONFIG.Canvas.rulerClass.prototype._getMeasurementSegments", _getMeasurementSegmentsRuler);
   wrap("GridLayer.prototype.measureDistances", measureDistancesGridLayer);
-  wrap("Ruler.prototype._getSegmentLabel", _getSegmentLabelRuler);
+  wrap("CONFIG.Canvas.rulerClass.prototype._getSegmentLabel", _getSegmentLabelRuler);
 
   // Move token methods
-  wrap("Ruler.prototype._animateSegment", _animateSegmentRuler);
+  wrap("CONFIG.Canvas.rulerClass.prototype._animateSegment", _animateSegmentRuler);
 
-  addClassMethod(Ruler.prototype, "terrainElevationAtPoint", terrainElevationAtPoint);
-  addClassMethod(Ruler.prototype, "terrainElevationAtDestination", terrainElevationAtDestination);
-  addClassMethod(Ruler.prototype, "incrementElevation", incrementElevation);
-  addClassMethod(Ruler.prototype, "decrementElevation", decrementElevation);
-  addClassMethod(Ruler.prototype, "terrainElevationAtPoint", terrainElevationAtPoint);
-  addClassMethod(Ruler.prototype, "terrainElevationAtDestination", terrainElevationAtDestination);
-  addClassMethod(Ruler.prototype, "elevationAtOrigin", elevationAtOrigin);
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "terrainElevationAtPoint", terrainElevationAtPoint);
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "terrainElevationAtDestination", terrainElevationAtDestination);
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "incrementElevation", incrementElevation);
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "decrementElevation", decrementElevation);
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "terrainElevationAtPoint", terrainElevationAtPoint);
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "terrainElevationAtDestination", terrainElevationAtDestination);
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "elevationAtOrigin", elevationAtOrigin);
 
   log("registerRuler finished!");
 }
