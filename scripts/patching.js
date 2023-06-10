@@ -1,7 +1,6 @@
 /* globals
-libWrapper,
-Ruler,
-game
+CONFIG,
+libWrapper
 */
 "use strict";
 
@@ -31,73 +30,62 @@ import {
   terrainElevationAtDestination,
   elevationAtOrigin } from "./terrain_elevation.js";
 
+/**
+ * Helper to wrap methods.
+ * @param {string} method       Method to wrap
+ * @param {function} fn         Function to use for the wrap
+ * @param {object} [options]    Options passed to libWrapper.register. E.g., { perf_mode: libWrapper.PERF_FAST}
+ */
+function wrap(method, fn, options = {}) { libWrapper.register(MODULE_ID, method, fn, libWrapper.WRAPPER, options); }
+
+/**
+ * Helper to add a method to a class.
+ * @param {class} cl      Either Class.prototype or Class
+ * @param {string} name   Name of the method
+ * @param {function} fn   Function to use for the method
+ */
+function addClassMethod(cl, name, fn) {
+  Object.defineProperty(cl, name, {
+    value: fn,
+    writable: true,
+    configurable: true
+  });
+}
+
 export function registerRuler() {
 
   // Basic ruler methods
-  libWrapper.register(MODULE_ID, "Ruler.prototype.clear", clearRuler, libWrapper.WRAPPER);
-  libWrapper.register(MODULE_ID, "Ruler.prototype._addWaypoint", _addWaypointRuler, libWrapper.WRAPPER);
-  libWrapper.register(MODULE_ID, "Ruler.prototype._removeWaypoint", _removeWaypointRuler, libWrapper.WRAPPER);
+  wrap("CONFIG.Canvas.rulerClass.prototype.clear", clearRuler);
+  wrap("CONFIG.Canvas.rulerClass.prototype._addWaypoint", _addWaypointRuler);
+  wrap("CONFIG.Canvas.rulerClass.prototype._removeWaypoint", _removeWaypointRuler);
 
   // Pass needed variables across the sockets
-  libWrapper.register(MODULE_ID, "Ruler.prototype.toJSON", toJSONRuler, libWrapper.WRAPPER);
-  libWrapper.register(MODULE_ID, "Ruler.prototype.update", updateRuler, libWrapper.WRAPPER);
+  wrap("CONFIG.Canvas.rulerClass.prototype.toJSON", toJSONRuler);
+  wrap("CONFIG.Canvas.rulerClass.prototype.update", updateRuler);
 
   // Ruler methods related to ruler segments
-  libWrapper.register(MODULE_ID, "Ruler.prototype._getMeasurementSegments", _getMeasurementSegmentsRuler, libWrapper.WRAPPER);
-  libWrapper.register(MODULE_ID, "GridLayer.prototype.measureDistances", measureDistancesGridLayer, libWrapper.WRAPPER);
-  libWrapper.register(MODULE_ID, "Ruler.prototype._getSegmentLabel", _getSegmentLabelRuler, libWrapper.WRAPPER);
+  wrap("CONFIG.Canvas.rulerClass.prototype._getMeasurementSegments", _getMeasurementSegmentsRuler);
+  wrap("GridLayer.prototype.measureDistances", measureDistancesGridLayer);
+  wrap("CONFIG.Canvas.rulerClass.prototype._getSegmentLabel", _getSegmentLabelRuler);
 
   // Move token methods
-  libWrapper.register(MODULE_ID, "Ruler.prototype._animateSegment", _animateSegmentRuler, libWrapper.WRAPPER);
+  wrap("CONFIG.Canvas.rulerClass.prototype._animateSegment", _animateSegmentRuler);
 
-  Object.defineProperty(Ruler.prototype, "terrainElevationAtPoint", {
-    value: terrainElevationAtPoint,
-    writable: true,
-    configurable: true
-  });
-
-  Object.defineProperty(Ruler.prototype, "terrainElevationAtDestination", {
-    value: terrainElevationAtDestination,
-    writable: true,
-    configurable: true
-  });
-
-  Object.defineProperty(Ruler.prototype, "incrementElevation", {
-    value: incrementElevation,
-    writable: true,
-    configurable: true
-  });
-
-  Object.defineProperty(Ruler.prototype, "decrementElevation", {
-    value: decrementElevation,
-    writable: true,
-    configurable: true
-  });
-
-  Object.defineProperty(Ruler.prototype, "terrainElevationAtPoint", {
-    value: terrainElevationAtPoint,
-    writable: true,
-    configurable: true
-  });
-
-  Object.defineProperty(Ruler.prototype, "terrainElevationAtDestination", {
-    value: terrainElevationAtDestination,
-    writable: true,
-    configurable: true
-  });
-
-  Object.defineProperty(Ruler.prototype, "elevationAtOrigin", {
-    value: elevationAtOrigin,
-    writable: true,
-    configurable: true
-  });
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "terrainElevationAtPoint", terrainElevationAtPoint);
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "terrainElevationAtDestination", terrainElevationAtDestination);
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "incrementElevation", incrementElevation);
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "decrementElevation", decrementElevation);
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "terrainElevationAtPoint", terrainElevationAtPoint);
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "terrainElevationAtDestination", terrainElevationAtDestination);
+  addClassMethod(CONFIG.Canvas.rulerClass.prototype, "elevationAtOrigin", elevationAtOrigin);
 
   log("registerRuler finished!");
 }
 
 export function registerDragRuler() {
-  libWrapper.register(MODULE_ID, "CONFIG.Canvas.rulerClass.prototype._getMeasurementSegments", _getMeasurementSegmentsDragRulerRuler, libWrapper.WRAPPER);
-  libWrapper.register(MODULE_ID, "CONFIG.Canvas.rulerClass.prototype.dragRulerClearWaypoints", dragRulerClearWaypointsDragRuleRuler, libWrapper.WRAPPER);
-  libWrapper.register(MODULE_ID, "CONFIG.Canvas.rulerClass.prototype.dragRulerAddWaypoint", dragRulerAddWaypointDragRulerRuler, libWrapper.WRAPPER);
-  libWrapper.register(MODULE_ID, "Token.prototype._onDragLeftDrop", _onDragLeftDropToken, libWrapper.WRAPPER);
+  wrap("CONFIG.Canvas.rulerClass.prototype._getMeasurementSegments", _getMeasurementSegmentsDragRulerRuler);
+  wrap("CONFIG.Canvas.rulerClass.prototype.dragRulerClearWaypoints", dragRulerClearWaypointsDragRuleRuler);
+  wrap("CONFIG.Canvas.rulerClass.prototype.dragRulerAddWaypoint", dragRulerAddWaypointDragRulerRuler);
+
+  wrap("CONFIG.Token.objectClass.prototype._onDragLeftDrop", _onDragLeftDropToken);
 }
