@@ -1,3 +1,6 @@
+# 0.7.1
+Updated lib-geometry to 0.2.1.
+
 # 0.7.0
 Updated for Foundry v11. Updated lib-geometry to 0.2.0.
 
