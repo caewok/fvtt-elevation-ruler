@@ -1,3 +1,6 @@
+# 0.7.2
+Updated lib-geometry to 0.2.2.
+
 # 0.7.1
 Updated lib-geometry to 0.2.1.
 
