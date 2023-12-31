@@ -190,9 +190,12 @@ export class Patcher {
    * @returns {class}
    */
   static lookupByClassName(className, { returnPathString = false } = {}) {
+    if ( className === "Ruler" ) return returnPathString ? "CONFIG.Canvas.rulerClass" : CONFIG.Canvas.rulerClass;
     let isDoc = className.endsWith("Document");
     let isConfig = className.endsWith("Config");
-    let baseClass = isDoc ? className.replace("Document", "") : isConfig ? className.replace("Config", "") : className;
+    let baseClass = isDoc ? className.replace("Document", "")
+      : isConfig ? className.replace("Config", "")
+        : className;
 
     const configObj = CONFIG[baseClass];
     if ( !configObj || isConfig ) return returnPathString ? className : eval?.(`"use strict";(${className})`);
