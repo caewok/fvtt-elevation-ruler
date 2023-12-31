@@ -8,7 +8,7 @@ ui
 "use strict";
 
 import { registerSettings, registerKeybindings, SETTINGS, getSetting, setSetting } from "./settings.js";
-import { registerRuler } from "./patching.js";
+import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID } from "./const.js";
 
 // For Drag Ruler
@@ -45,6 +45,13 @@ const PREFER_TOKEN_CONTROL = {
 Hooks.once("init", function() {
   // Cannot access localization until init.
   PREFER_TOKEN_CONTROL.title = game.i18n.localize(PREFER_TOKEN_CONTROL.title);
+  game.modules.get(MODULE_ID).api = {
+    PATCHER
+  }
+});
+
+Hooks.once("setup", function() {
+  initializePatching();
 });
 
 // Render the prefer token control if that setting is enabled
