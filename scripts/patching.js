@@ -1,15 +1,13 @@
 /* globals
-CONFIG,
-libWrapper
 */
 "use strict";
 
 import { Patcher } from "./Patcher.js";
 import { MODULES_ACTIVE } from "./const.js";
 
-import { PATCHES as PATCHES.Ruler } from "./Ruler.js";
-import { PATCHES as PATCHES.Token } from "./Token.js";
-import { PATCHES as PATCHES.GridLayer } from "./GridLayer.js";
+import { PATCHES as PATCHES_Ruler } from "./Ruler.js";
+import { PATCHES as PATCHES_Token } from "./Token.js";
+import { PATCHES as PATCHES_GridLayer } from "./GridLayer.js";
 
 // Settings
 import { PATCHES as PATCHES_Settings } from "./ModuleSettingsAbstract.js";
@@ -27,5 +25,8 @@ PATCHER.addPatchesFromRegistrationObject(PATCHES);
 
 export function initializePatching() {
   PATCHER.registerGroup("BASIC");
+}
+
+export function registerDragRuler() {
   if ( MODULES_ACTIVE.DRAG_RULER ) PATCHER.registerGroup("DRAG_RULER");
 }

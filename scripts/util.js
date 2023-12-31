@@ -1,8 +1,5 @@
 /* globals
-canvas,
-CONST,
-game,
-Ray
+game
 */
 "use strict";
 

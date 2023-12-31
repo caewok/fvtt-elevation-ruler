@@ -1,5 +1,6 @@
 # 0.7.3
 Updated lib-geometry to 0.2.12.
+Refactor to use Patcher class.
 
 # 0.7.2
 Updated lib-geometry to 0.2.2.

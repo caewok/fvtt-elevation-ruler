@@ -1,5 +1,6 @@
 /* globals
-
+game,
+Hooks
 */
 "use strict";
 
@@ -20,5 +21,3 @@ Hooks.once("init", function() {
   MODULES_ACTIVE.LEVELS = game.modules.get("levels")?.active;
   MODULES_ACTIVE.ELEVATED_VISION = game.modules.get("elevatedvision")?.active;
 });
-
-
