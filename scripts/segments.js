@@ -7,7 +7,7 @@ CONFIG
 "use strict";
 
 import { MODULE_ID } from "./const.js";
-import { SETTINGS } from "./settings.js";
+import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 
 /**
@@ -102,9 +102,9 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
 function useLevelsLabels() {
   if ( !game.modules.get("levels")?.active ) return false;
 
-  const labelOpt = game.settings.get(MODULE_ID, SETTINGS.USE_LEVELS_LABEL);
-  return labelOpt === SETTINGS.LEVELS_LABELS.ALWAYS
-    || (labelOpt === SETTINGS.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);
+  const labelOpt = Settings.get(MODULE_ID, Settings.KEYS.USE_LEVELS_LABEL);
+  return labelOpt === Settings.KEYS.LEVELS_LABELS.ALWAYS
+    || (labelOpt === Settings.KEYS.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);
 }
 
 /**

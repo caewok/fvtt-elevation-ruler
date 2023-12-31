@@ -11,10 +11,15 @@ import { PATCHES as PATCHES.Ruler } from "./Ruler.js";
 import { PATCHES as PATCHES.Token } from "./Token.js";
 import { PATCHES as PATCHES.GridLayer } from "./GridLayer.js";
 
+// Settings
+import { PATCHES as PATCHES_Settings } from "./ModuleSettingsAbstract.js";
+
+
 const PATCHES = {
   GridLayer: PATCHES_GridLayer,
   Ruler: PATCHES_Ruler,
-  Token: PATCHES_Token
+  Token: PATCHES_Token,
+  Settings: PATCHES_Settings
 };
 
 export const PATCHER = new Patcher();
