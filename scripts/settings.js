@@ -8,7 +8,7 @@ canvas
 import { MODULE_ID } from "./const.js";
 import { log } from "./util.js";
 
-export const SETTINGS = {
+const SETTINGS = {
   PREFER_TOKEN_ELEVATION: "prefer-token-elevation",
   USE_EV: "enable-elevated-vision-elevation",
   USE_TERRAIN: "enable-enhanced-terrain-elevation",
@@ -28,116 +28,117 @@ const KEYBINDINGS = {
   DECREMENT: "decrementElevation"
 };
 
-export function getSetting(settingName) {
-  return game.settings.get(MODULE_ID, settingName);
-}
 
-export async function setSetting(settingName, value) {
-  await game.settings.set(MODULE_ID, settingName, value);
-}
+export class Settings extends ModuleSettingsAbstract {
+  /** @type {object} */
+  static KEYS = SETTINGS;
 
-export function registerSettings() {
-  log("Registering settings.");
+  /** @type {object} */
+  static KEYBINDINGS = KEYBINDINGS;
 
-  const evActive = game.modules.get("elevatedvision")?.active;
-  const terrainLayerActive = game.modules.get("enhanced-terrain-layer")?.active;
-  const levelsActive = game.modules.get("levels")?.active;
+  /**
+   * Register all settings
+   */
+  static registerAll() {
+    const { KEYS, register,localize } = this;
 
-  if ( !evActive && !terrainLayerActive && !levelsActive ) {
-    game.settings.register(MODULE_ID, SETTINGS.NO_MODS, {
-      name: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.NO_MODS}.name`),
-      hint: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.NO_MODS}.hint`),
+    if ( !MODULES_ACTIVE.ELEVATED_VISION
+      && !MODULES_ACTIVE.ENHANCED_TERRAINLAYER
+      && !MODULES_ACTIVE.LEVELS ) {
+      register(KEYS.NO_MODS, {
+        name: localize(`${KEYS.NO_MODS}.name`),
+        hint: localize(`${KEYS.NO_MODS}.hint`),
+        scope: "world",
+        config: true,
+        enabled: false,
+        default: true,
+        type: Boolean
+      });
+    }
+
+    register(KEYS.USE_EV, {
+      name: localize(`${KEYS.USE_EV}.name`),
+      hint: localize(`${KEYS.USE_EV}.hint`),
       scope: "world",
-      config: true,
-      enabled: false,
-      default: true,
+      config: evActive,
+      default: evActive,
       type: Boolean
+    });
+
+    register(KEYS.USE_TERRAIN, {
+      name: localize(`${KEYS.USE_TERRAIN}.name`),
+      hint: localize(`${KEYS.USE_TERRAIN}.hint`),
+      scope: "world",
+      config: terrainLayerActive,
+      default: terrainLayerActive,
+      type: Boolean
+    });
+
+    register(KEYS.USE_LEVELS, {
+      name: localize(`${KEYS.USE_LEVELS}.name`),
+      hint: localize(`${KEYS.USE_LEVELS}.hint`),
+      scope: "world",
+      config: levelsActive,
+      default: levelsActive,
+      type: Boolean
+    });
+
+    register(KEYS.USE_LEVELS_LABEL, {
+      name: localize(`${KEYS.USE_LEVELS_LABEL}.name`),
+      hint: localize(`${KEYS.USE_LEVELS_LABEL}.hint`),
+      scope: "world",
+      config: levelsActive,
+      default: KEYS.LEVELS_LABELS.ALWAYS,
+      type: String,
+      choices: {
+        [KEYS.LEVELS_LABELS.NEVER]: game.i18n.localize(`${KEYS.LEVELS_LABELS.NEVER}`),
+        [KEYS.LEVELS_LABELS.UI_ONLY]: game.i18n.localize(`${KEYS.LEVELS_LABELS.UI_ONLY}`),
+        [KEYS.LEVELS_LABELS.ALWAYS]: game.i18n.localize(`${KEYS.LEVELS_LABELS.ALWAYS}`)
+      }
+    });
+
+    register(KEYS.PREFER_TOKEN_ELEVATION, {
+      name: localize(`${KEYS.PREFER_TOKEN_ELEVATION}.name`),
+      hint: localize(`${KEYS.PREFER_TOKEN_ELEVATION}.hint`),
+      scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false,
+      onChange: reloadTokenControls
+    });
+
+    register(KEYS.PREFER_TOKEN_ELEVATION_CURRENT_VALUE, {
+      scope: "user",
+      config: false,
+      default: false,
+      type: Boolean,
+      requiresReload: false
     });
   }
 
-  game.settings.register(MODULE_ID, SETTINGS.USE_EV, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_EV}.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_EV}.hint`),
-    scope: "world",
-    config: evActive,
-    default: evActive,
-    type: Boolean
-  });
 
-  game.settings.register(MODULE_ID, SETTINGS.USE_TERRAIN, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_TERRAIN}.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_TERRAIN}.hint`),
-    scope: "world",
-    config: terrainLayerActive,
-    default: terrainLayerActive,
-    type: Boolean
-  });
+  static registerKeybindings() {
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.DECREMENT, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.hint`),
+      editable: [
+        { key: "BracketLeft" }
+      ],
+      onDown: () => canvas.controls.ruler.decrementElevation(),
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
 
-  game.settings.register(MODULE_ID, SETTINGS.USE_LEVELS, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_LEVELS}.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_LEVELS}.hint`),
-    scope: "world",
-    config: levelsActive,
-    default: levelsActive,
-    type: Boolean
-  });
-
-  game.settings.register(MODULE_ID, SETTINGS.USE_LEVELS_LABEL, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_LEVELS_LABEL}.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.USE_LEVELS_LABEL}.hint`),
-    scope: "world",
-    config: levelsActive,
-    default: SETTINGS.LEVELS_LABELS.ALWAYS,
-    type: String,
-    choices: {
-      [SETTINGS.LEVELS_LABELS.NEVER]: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.LEVELS_LABELS.NEVER}`),
-      [SETTINGS.LEVELS_LABELS.UI_ONLY]: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.LEVELS_LABELS.UI_ONLY}`),
-      [SETTINGS.LEVELS_LABELS.ALWAYS]: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.LEVELS_LABELS.ALWAYS}`)
-    }
-  });
-
-  game.settings.register(MODULE_ID, SETTINGS.PREFER_TOKEN_ELEVATION, {
-    name: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.PREFER_TOKEN_ELEVATION}.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.settings.${SETTINGS.PREFER_TOKEN_ELEVATION}.hint`),
-    scope: "user",
-    config: true,
-    default: false,
-    type: Boolean,
-    requiresReload: false,
-    onChange: reloadTokenControls
-  });
-
-  game.settings.register(MODULE_ID, SETTINGS.PREFER_TOKEN_ELEVATION_CURRENT_VALUE, {
-    scope: "user",
-    config: false,
-    default: false,
-    type: Boolean,
-    requiresReload: false
-  });
-
-  log("Done registering settings.");
-}
-
-export function registerKeybindings() {
-  game.keybindings.register(MODULE_ID, KEYBINDINGS.DECREMENT, {
-    name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.DECREMENT}.hint`),
-    editable: [
-      { key: "BracketLeft" }
-    ],
-    onDown: () => canvas.controls.ruler.decrementElevation(),
-    precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
-  });
-
-  game.keybindings.register(MODULE_ID, KEYBINDINGS.INCREMENT, {
-    name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.INCREMENT}.name`),
-    hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.INCREMENT}.hint`),
-    editable: [
-      { key: "BracketRight" }
-    ],
-    onDown: () => canvas.controls.ruler.incrementElevation(),
-    precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
-  });
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.INCREMENT, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.INCREMENT}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.INCREMENT}.hint`),
+      editable: [
+        { key: "BracketRight" }
+      ],
+      onDown: () => canvas.controls.ruler.incrementElevation(),
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
+  }
 }
 
 /**

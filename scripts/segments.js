@@ -7,16 +7,24 @@ CONFIG
 "use strict";
 
 import { MODULE_ID } from "./const.js";
-import { SETTINGS } from "./settings.js";
-import { log } from "./util.js";
-
+import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
+
+/**
+ * Calculate the elevation for a given waypoint.
+ * Terrain elevation + user increment
+ * @param {object} waypoint
+ * @returns {number}
+ */
+export function elevationAtWaypoint(waypoint) {
+  return waypoint._terrainElevation + (waypoint._userElevationIncrements * canvas.dimensions.distance);
+}
 
 /**
  * Wrap Ruler.prototype._getMeasurementSegments
  * Add elevation information to the segments
  */
-export function _getMeasurementSegmentsRuler(wrapped) {
+export function _getMeasurementSegments(wrapped) {
   const segments = wrapped();
 
   // Add destination as the final waypoint
@@ -27,21 +35,38 @@ export function _getMeasurementSegmentsRuler(wrapped) {
 }
 
 /**
- * Wrap DragRulerRuler.prototype._getMeasurementSegments
- * Add elevation information to the segments
+ * Wrap Ruler.prototype._getSegmentLabel
+ * Add elevation information to the label
  */
-export function _getMeasurementSegmentsDragRulerRuler(wrapped) {
-  const segments = wrapped();
-
-  if ( !this.isDragRuler ) return segments; // Drag Ruler calls super in this situation
-
-  // Add destination as the final waypoint
-  this.destination._terrainElevation = this.terrainElevationAtDestination();
-  this.destination._userElevationIncrements = this._userElevationIncrements;
-
-  return elevateSegments(this, segments);
+export function _getSegmentLabel(wrapped, segment, totalDistance) {
+  const orig_label = wrapped(segment, totalDistance);
+  let elevation_label = segmentElevationLabel(segment);
+  const level_name = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
+  if ( level_name ) elevation_label += `\n${level_name}`;
+  return `${orig_label}\n${elevation_label}`;
 }
 
+/**
+ * Wrap Ruler.prototype._animateSegment
+ * When moving the token along the segments, update the token elevation to the destination + increment
+ * for the given segment.
+ */
+export async function _animateSegment(wrapped, token, segment, destination) {
+  const res = await wrapped(token, segment, destination);
+
+  // Update elevation after the token move.
+  if ( segment.ray.A.z !== segment.ray.B.z ) {
+    await token.document.update({ elevation: CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z) });
+  }
+
+  return res;
+}
+
+/**
+ * Take 2d segments and make 3d.
+ * @param {Ruler} ruler
+ * @param {object[]} segments
+ */
 function elevateSegments(ruler, segments) {  // Add destination as the final waypoint
   const waypoints = ruler.waypoints.concat([ruler.destination]);
   const { distance, size } = canvas.dimensions;
@@ -69,40 +94,6 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
   return segments;
 }
 
-/**
- * Calculate the elevation for a given waypoint.
- * Terrain elevation + user increment
- * @param {object} waypoint
- * @returns {number}
- */
-export function elevationAtWaypoint(waypoint) {
-  return waypoint._terrainElevation + (waypoint._userElevationIncrements * canvas.dimensions.distance);
-}
-
-/**
- * Wrap GridLayer.prototype.measureDistances
- * Called by Ruler.prototype._computeDistance
- * If a segment ray has a z-dimension, re-do the segment by projecting the hypotenuse
- * between the ray A and B endpoints in 3d onto the 2d canvas. Use the projected
- * hypotenuse to do the measurement.
- */
-export function measureDistancesGridLayer(wrapped, segments, options = {}) {
-  if ( !segments.length || !(segments[0]?.ray instanceof Ray3d) ) return wrapped(segments, options);
-
-  // Avoid modifying the segment rays.
-  const ln = segments.length;
-  const origRays = Array(ln);
-  for ( let i = 0; i < ln; i += 1 ) {
-    const s = segments[i];
-    origRays[i] = s.ray;
-    s.ray = s.ray.projectOntoCanvas();
-  }
-
-  const out = wrapped(segments, options);
-
-  for ( let i = 0; i < ln; i += 1 ) segments[i].ray = origRays[i];
-  return out;
-}
 
 /**
  * Should Levels floor labels be used?
@@ -111,22 +102,9 @@ export function measureDistancesGridLayer(wrapped, segments, options = {}) {
 function useLevelsLabels() {
   if ( !game.modules.get("levels")?.active ) return false;
 
-  const labelOpt = game.settings.get(MODULE_ID, SETTINGS.USE_LEVELS_LABEL);
-  return labelOpt === SETTINGS.LEVELS_LABELS.ALWAYS
-    || (labelOpt === SETTINGS.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);
-}
-
-/**
- * Wrap Ruler.prototype._getSegmentLabel
- * Add elevation information to the label
- */
-export function _getSegmentLabelRuler(wrapped, segment, totalDistance) {
-  const orig_label = wrapped(segment, totalDistance);
-  let elevation_label = segmentElevationLabel(segment);
-  const level_name = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
-  if ( level_name ) elevation_label += `\n${level_name}`;
-
-  return `${orig_label}\n${elevation_label}`;
+  const labelOpt = Settings.get(MODULE_ID, Settings.KEYS.USE_LEVELS_LABEL);
+  return labelOpt === Settings.KEYS.LEVELS_LABELS.ALWAYS
+    || (labelOpt === Settings.KEYS.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);
 }
 
 /**
@@ -143,7 +121,6 @@ function levelNameAtElevation(e) {
   const lvl = sceneLevels.find(arr => arr[2] !== "" && e >= arr[0] && e <= arr[1]);
   return lvl ? lvl[2] : undefined;
 }
-
 
 /*
  * Construct a label to represent elevation changes in the ruler.
@@ -166,54 +143,4 @@ function segmentElevationLabel(s) {
   label += ` [@${Math.round(CONFIG.GeometryLib.utils.pixelsToGridUnits(Bz) * 10) / 10} ${units}]`;
 
   return label;
-}
-
-/**
- * Wrap Ruler.prototype._animateSegment
- * When moving the token along the segments, update the token elevation to the destination + increment
- * for the given segment.
- */
-export async function _animateSegmentRuler(wrapped, token, segment, destination) {
-  log(`Updating token elevation for segment with destination ${destination.x},${destination.y},${destination.z} from elevation ${segment.ray.A.z} --> ${segment.ray.B.z}`, token, segment);
-  const res = await wrapped(token, segment, destination);
-
-  // Update elevation after the token move.
-  if ( segment.ray.A.z !== segment.ray.B.z ) {
-    await token.document.update({ elevation: CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z) });
-  }
-
-  return res;
-}
-
-/**
- * Wrap Token.prototype._onDragLeftDrop
- * If Drag Ruler is active, use this to update token(s) after movement has completed.
- * Callback actions which occur on a mouse-move operation.
- * @see MouseInteractionManager#_handleDragDrop
- * @param {PIXI.InteractionEvent} event  The triggering canvas interaction event
- * @returns {Promise<*>}
- */
-export async function _onDragLeftDropToken(wrapped, event) {
-  // Assume the destination elevation is the desired elevation if dragging multiple tokens.
-  // (Likely more useful than having a bunch of tokens move down 10'?)
-  const ruler = canvas.controls.ruler;
-  if ( !ruler.isDragRuler ) return wrapped(event);
-
-  log("ending token drag");
-
-  // Do before calling wrapper b/c ruler may get cleared.
-  const elevation = elevationAtWaypoint(ruler.destination);
-  const selectedTokens = [...canvas.tokens.controlled];
-  if ( !selectedTokens.length ) selectedTokens.push(ruler.draggedEntity);
-
-  const result = wrapped(event);
-  if ( result === false ) return false; // Drag did not happen
-
-  const updates = selectedTokens.map(t => {
-    return { _id: t.id, elevation };
-  });
-
-  const t0 = selectedTokens[0];
-  await t0.scene.updateEmbeddedDocuments(t0.constructor.embeddedName, updates);
-  return true;
 }
