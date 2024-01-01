@@ -129,10 +129,49 @@ function dragRulerAddWaypoint(wrapper, point, options = {}) {
  * Wrap DragRulerRuler.prototype.dragRulerClearWaypoints
  * Remove elevation increments
  */
-export function dragRulerClearWaypoints(wrapper) {
+function dragRulerClearWaypoints(wrapper) {
   wrapper();
   this._userElevationIncrements = 0;
 }
+
+
+/**
+ * Wrap DragRulerRuler.prototype._endMeasurement
+ * If there is a dragged token, apply the elevation to all selected tokens (assumed part of the move).
+ */
+function _endMeasurement(wrapped) {
+  console.debug("_endMeasurement");
+  return wrapped();
+}
+
+
+function _postMove(wrapped, token) {
+  console.debug("_animateSegment");
+  return wrapped(token);
+}
+
+//   // Assume the destination elevation is the desired elevation if dragging multiple tokens.
+//   // (Likely more useful than having a bunch of tokens move down 10'?)
+//   const ruler = canvas.controls.ruler;
+//   if ( !ruler.isDragRuler ) return wrapped(event);
+//
+//   // Do before calling wrapper b/c ruler may get cleared.
+//   const elevation = elevationAtWaypoint(ruler.destination);
+//   const selectedTokens = [...canvas.tokens.controlled];
+//   if ( !selectedTokens.length ) selectedTokens.push(ruler.draggedEntity);
+//
+//   const result = wrapped(event);
+//   if ( result === false ) return false; // Drag did not happen
+//
+//   const updates = selectedTokens.map(t => {
+//     return { _id: t.id, elevation };
+//   });
+//
+//   const t0 = selectedTokens[0];
+//   await t0.scene.updateEmbeddedDocuments(t0.constructor.embeddedName, updates);
+//   return true;
+
+
 
 
 PATCHES.BASIC.WRAPS = {
@@ -147,12 +186,14 @@ PATCHES.BASIC.WRAPS = {
   _getSegmentLabel,
 
   // Move token methods
-  _animateSegment
+  _animateSegment,
+  // _postMove
 };
 
 PATCHES.DRAG_RULER.WRAPS = {
   dragRulerAddWaypoint,
-  dragRulerClearWaypoints
+  dragRulerClearWaypoints,
+  // _endMeasurement
 };
 
 // ----- NOTE: Methods ----- //

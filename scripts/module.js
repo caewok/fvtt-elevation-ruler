@@ -53,14 +53,8 @@ Hooks.on("getSceneControlButtons", controls => {
   tokenTools.tools.push(PREFER_TOKEN_CONTROL);
 });
 
-function _onDragLeftDropTest(wrapped, event) {
-  console.debug("_onDragLeftDropTest");
-  return wrapped();
-}
-
 Hooks.on("dragRuler.ready", function() {
   registerDragRuler();
-  libWrapper.register(MODULE_ID, "Token.prototype._onDragLeftDrop", _onDragLeftDropTest, libWrapper.WRAPPED);
 });
 
 Hooks.on("canvasInit", function(_canvas) {
