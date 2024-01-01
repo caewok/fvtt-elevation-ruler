@@ -8,30 +8,27 @@ ui
 "use strict";
 
 import { Settings } from "./settings.js";
-import { initializePatching, PATCHER } from "./patching.js";
+import { initializePatching, PATCHER, registerDragRuler } from "./patching.js";
 import { MODULE_ID } from "./const.js";
 
-// For Drag Ruler
-import { registerDragRuler } from "./patching.js"; // eslint-disable-line no-duplicate-imports
-
 import { registerGeometry } from "./geometry/registration.js";
+
+Hooks.once("init", function() {
+  registerGeometry();
+});
 
 // Setup is after init; before ready.
 // setup is called after settings and localization have been initialized,
 // but before entities, packs, UI, canvas, etc. has been initialized
-Hooks.once("setup", async function() {
-  registerKeybindings(); // Should go before registering settings, so hotkey group is defined
+Hooks.once("setup", function() {
+  Settings.registerKeybindings(); // Should go before registering settings, so hotkey group is defined
   Settings.registerAll();
-  registerGeometry();
+  initializePatching();
 });
 
 // For https://github.com/League-of-Foundry-Developers/foundryvtt-devMode
 Hooks.once("devModeReady", ({ registerPackageDebugFlag }) => {
   registerPackageDebugFlag(MODULE_ID);
-});
-
-Hooks.once("libWrapper.Ready", async function() {
-  registerRuler();
 });
 
 const PREFER_TOKEN_CONTROL = {
@@ -46,11 +43,7 @@ Hooks.once("init", function() {
   PREFER_TOKEN_CONTROL.title = game.i18n.localize(PREFER_TOKEN_CONTROL.title);
   game.modules.get(MODULE_ID).api = {
     PATCHER
-  }
-});
-
-Hooks.once("setup", function() {
-  initializePatching();
+  };
 });
 
 // Render the prefer token control if that setting is enabled
@@ -60,8 +53,14 @@ Hooks.on("getSceneControlButtons", controls => {
   tokenTools.tools.push(PREFER_TOKEN_CONTROL);
 });
 
+function _onDragLeftDropTest(wrapped, event) {
+  console.debug("_onDragLeftDropTest");
+  return wrapped();
+}
+
 Hooks.on("dragRuler.ready", function() {
   registerDragRuler();
+  libWrapper.register(MODULE_ID, "Token.prototype._onDragLeftDrop", _onDragLeftDropTest, libWrapper.WRAPPED);
 });
 
 Hooks.on("canvasInit", function(_canvas) {

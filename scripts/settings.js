@@ -5,8 +5,8 @@ canvas
 */
 "use strict";
 
-import { MODULE_ID } from "./const.js";
-import { log } from "./util.js";
+import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
+import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 
 const SETTINGS = {
   PREFER_TOKEN_ELEVATION: "prefer-token-elevation",
@@ -40,7 +40,7 @@ export class Settings extends ModuleSettingsAbstract {
    * Register all settings
    */
   static registerAll() {
-    const { KEYS, register,localize } = this;
+    const { KEYS, register, localize } = this;
 
     if ( !MODULES_ACTIVE.ELEVATED_VISION
       && !MODULES_ACTIVE.ENHANCED_TERRAINLAYER
@@ -60,8 +60,8 @@ export class Settings extends ModuleSettingsAbstract {
       name: localize(`${KEYS.USE_EV}.name`),
       hint: localize(`${KEYS.USE_EV}.hint`),
       scope: "world",
-      config: evActive,
-      default: evActive,
+      config: MODULES_ACTIVE.ELEVATED_VISION,
+      default: MODULES_ACTIVE.ELEVATED_VISION,
       type: Boolean
     });
 
@@ -69,8 +69,8 @@ export class Settings extends ModuleSettingsAbstract {
       name: localize(`${KEYS.USE_TERRAIN}.name`),
       hint: localize(`${KEYS.USE_TERRAIN}.hint`),
       scope: "world",
-      config: terrainLayerActive,
-      default: terrainLayerActive,
+      config: MODULES_ACTIVE.ENHANCED_TERRAIN_LAYER,
+      default: MODULES_ACTIVE.ENHANCED_TERRAIN_LAYER,
       type: Boolean
     });
 
@@ -78,8 +78,8 @@ export class Settings extends ModuleSettingsAbstract {
       name: localize(`${KEYS.USE_LEVELS}.name`),
       hint: localize(`${KEYS.USE_LEVELS}.hint`),
       scope: "world",
-      config: levelsActive,
-      default: levelsActive,
+      config: MODULES_ACTIVE.LEVELS,
+      default: MODULES_ACTIVE.LEVELS,
       type: Boolean
     });
 
@@ -87,7 +87,7 @@ export class Settings extends ModuleSettingsAbstract {
       name: localize(`${KEYS.USE_LEVELS_LABEL}.name`),
       hint: localize(`${KEYS.USE_LEVELS_LABEL}.hint`),
       scope: "world",
-      config: levelsActive,
+      config: MODULES_ACTIVE.LEVELS,
       default: KEYS.LEVELS_LABELS.ALWAYS,
       type: String,
       choices: {

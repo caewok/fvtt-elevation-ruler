@@ -1,5 +1,4 @@
 /* globals
-GridLayer
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -16,7 +15,7 @@ PATCHES.BASIC = {};
  * between the ray A and B endpoints in 3d onto the 2d canvas. Use the projected
  * hypotenuse to do the measurement.
  */
-export function measureDistancesGridLayer(wrapped, segments, options = {}) {
+function measureDistances(wrapped, segments, options = {}) {
   if ( !segments.length || !(segments[0]?.ray instanceof Ray3d) ) return wrapped(segments, options);
 
   // Avoid modifying the segment rays.
@@ -33,4 +32,4 @@ export function measureDistancesGridLayer(wrapped, segments, options = {}) {
   return out;
 }
 
-PATCHES.BASIC.WRAPS = { GridLayer };
+PATCHES.BASIC.WRAPS = { measureDistances };
