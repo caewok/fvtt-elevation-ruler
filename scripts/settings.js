@@ -7,6 +7,7 @@ canvas
 
 import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
+import { PATCHER } from "./patching.js";
 
 const SETTINGS = {
   PREFER_TOKEN_ELEVATION: "prefer-token-elevation",
@@ -128,10 +129,14 @@ export class Settings extends ModuleSettingsAbstract {
       config: true,
       default: false,
       type: Boolean,
-      requiresReload: false
+      requiresReload: false,
+      onChange: value => this.toggleTokenRuler(value)
     });
-  }
 
+    // Initialize the Token Ruler.
+    if ( this.get(KEYS.TOKEN_RULER.ENABLED) ) this.toggleTokenRuler(true);
+
+  }
 
   static registerKeybindings() {
     game.keybindings.register(MODULE_ID, KEYBINDINGS.DECREMENT, {
@@ -153,6 +158,11 @@ export class Settings extends ModuleSettingsAbstract {
       onDown: () => canvas.controls.ruler.incrementElevation(),
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
+  }
+
+  static toggleTokenRuler(value) {
+    if ( value ) PATCHER.registerGroup("TOKEN_RULER");
+    else PATCHER.deregisterGroup("TOKEN_RULER");
   }
 }
 
