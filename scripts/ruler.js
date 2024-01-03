@@ -2,10 +2,24 @@
 canvas,
 game
 */
-"use strict";
+/* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
-import { log } from "./util.js";
+// Patches for the Ruler class
+export const PATCHES = {};
+PATCHES.BASIC = {};
+PATCHES.DRAG_RULER = {};
 
+import {
+  elevationAtOrigin,
+  terrainElevationAtPoint,
+  terrainElevationAtDestination
+} from "./terrain_elevation.js";
+
+import {
+  _getMeasurementSegments,
+  _getSegmentLabel,
+  _animateSegment
+} from "./segments.js";
 
 /**
  * Modified Ruler
@@ -42,13 +56,13 @@ UX goals:
     would go from 5 to 55.
 */
 
+// ----- NOTE: Wrappers ----- //
+
 /**
  * Wrap Ruler.prototype.clear
  * Reset properties used to track when the user increments/decrements elevation
  */
-export function clearRuler(wrapper) {
-  log("we are clearing!", this);
-
+function clear(wrapper) {
   // User increments/decrements to the elevation for the current destination
   this.destination._userElevationIncrements = 0;
   return wrapper();
@@ -58,7 +72,7 @@ export function clearRuler(wrapper) {
  * Wrap Ruler.prototype.toJSON
  * Store the current userElevationIncrements for the destination.
  */
-export function toJSONRuler(wrapper) {
+function toJSON(wrapper) {
   // If debugging, log will not display on user's console
   // console.log("constructing ruler json!")
   const obj = wrapper();
@@ -70,10 +84,7 @@ export function toJSONRuler(wrapper) {
  * Wrap Ruler.prototype.update
  * Retrieve the current _userElevationIncrements
  */
-export function updateRuler(wrapper, data) {
-  // If debugging, log will not display on user's console
-  // console.log("updating ruler!")
-
+function update(wrapper, data) {
   // Fix for displaying user elevation increments as they happen.
   const triggerMeasure = this._userElevationIncrements !== data._userElevationIncrements;
   this._userElevationIncrements = data._userElevationIncrements;
@@ -87,66 +98,112 @@ export function updateRuler(wrapper, data) {
 }
 
 /**
- * Wrap Ruler.prototype.addWaypoint
+ * Wrap Ruler.prototype._addWaypoint
  * Add elevation increments
  */
-export function _addWaypointRuler(wrapper, point) {
-  log("adding waypoint!");
+function _addWaypoint(wrapper, point) {
   wrapper(point);
   addWaypointElevationIncrements(this, point);
+}
+
+/**
+ * Wrap Ruler.prototype._removeWaypoint
+ * Remove elevation increments.
+ * (Note: also called by DragRulerRuler.prototype.dragRulerDeleteWaypoint)
+ */
+function _removeWaypoint(wrapper, point, { snap = true } = {}) {
+  this._userElevationIncrements = 0;
+  wrapper(point, { snap });
 }
 
 /**
  * Wrap DragRulerRuler.prototype.dragRulerAddWaypoint
  * Add elevation increments
  */
-export function dragRulerAddWaypointDragRulerRuler(wrapper, point, options = {}) {
-  log("adding drag ruler waypoint!");
+function dragRulerAddWaypoint(wrapper, point, options = {}) {
   wrapper(point, options);
   addWaypointElevationIncrements(this, point);
-}
-
-/**
- * Helper to add elevation increments to waypoint
- */
-function addWaypointElevationIncrements(ruler, point) {
-  const ln = ruler.waypoints.length;
-  const newWaypoint = ruler.waypoints[ln - 1];
-
-  if ( ln === 1) {
-    // Origin waypoint -- cache using elevationAtOrigin
-    ruler.elevationAtOrigin();
-    ruler._userElevationIncrements = 0;
-  } else {
-    newWaypoint._terrainElevation = ruler.terrainElevationAtPoint(point);
-    newWaypoint._userElevationIncrements = ruler._userElevationIncrements;
-  }
-}
-
-/**
- * Wrap Ruler.prototype.removeWaypoint
- * Remove elevation increments.
- * (Note: also called by DragRulerRuler.prototype.dragRulerDeleteWaypoint)
- */
-export function _removeWaypointRuler(wrapper, point, { snap = true } = {}) {
-  log("removing waypoint!");
-  this._userElevationIncrements = 0;
-  wrapper(point, { snap });
 }
 
 /**
  * Wrap DragRulerRuler.prototype.dragRulerClearWaypoints
  * Remove elevation increments
  */
-export function dragRulerClearWaypointsDragRuleRuler(wrapper) {
-  log("clearing drag ruler waypoints");
+function dragRulerClearWaypoints(wrapper) {
   wrapper();
   this._userElevationIncrements = 0;
 }
 
-export function incrementElevation() {
+
+/**
+ * Wrap DragRulerRuler.prototype._endMeasurement
+ * If there is a dragged token, apply the elevation to all selected tokens (assumed part of the move).
+ */
+function _endMeasurement(wrapped) {
+  console.debug("_endMeasurement");
+  return wrapped();
+}
+
+
+function _postMove(wrapped, token) {
+  console.debug("_animateSegment");
+  return wrapped(token);
+}
+
+//   // Assume the destination elevation is the desired elevation if dragging multiple tokens.
+//   // (Likely more useful than having a bunch of tokens move down 10'?)
+//   const ruler = canvas.controls.ruler;
+//   if ( !ruler.isDragRuler ) return wrapped(event);
+//
+//   // Do before calling wrapper b/c ruler may get cleared.
+//   const elevation = elevationAtWaypoint(ruler.destination);
+//   const selectedTokens = [...canvas.tokens.controlled];
+//   if ( !selectedTokens.length ) selectedTokens.push(ruler.draggedEntity);
+//
+//   const result = wrapped(event);
+//   if ( result === false ) return false; // Drag did not happen
+//
+//   const updates = selectedTokens.map(t => {
+//     return { _id: t.id, elevation };
+//   });
+//
+//   const t0 = selectedTokens[0];
+//   await t0.scene.updateEmbeddedDocuments(t0.constructor.embeddedName, updates);
+//   return true;
+
+
+
+
+PATCHES.BASIC.WRAPS = {
+  clear,
+  toJSON,
+  update,
+  _addWaypoint,
+  _removeWaypoint,
+
+  // Wraps related to segments
+  _getMeasurementSegments,
+  _getSegmentLabel,
+
+  // Move token methods
+  _animateSegment,
+  // _postMove
+};
+
+PATCHES.DRAG_RULER.WRAPS = {
+  dragRulerAddWaypoint,
+  dragRulerClearWaypoints,
+  // _endMeasurement
+};
+
+// ----- NOTE: Methods ----- //
+
+/**
+ * Add Ruler.prototype.incrementElevation
+ * Increase the elevation at the current ruler destination by one grid unit.
+ */
+function incrementElevation() {
   const ruler = canvas.controls.ruler;
-  log("Trying to increment...", ruler);
   if ( !ruler || !ruler.active ) return;
 
   ruler._userElevationIncrements += 1;
@@ -160,9 +217,12 @@ export function incrementElevation() {
   game.user.broadcastActivity({ ruler: ruler.toJSON() });
 }
 
-export function decrementElevation() {
+/**
+ * Add Ruler.prototype.decrementElevation
+ * Decrease the elevation at the current ruler destination by one grid unit.
+ */
+function decrementElevation() {
   const ruler = canvas.controls.ruler;
-  log("Trying to decrement...", ruler);
   if ( !ruler || !ruler.active ) return;
 
   ruler._userElevationIncrements -= 1;
@@ -174,4 +234,33 @@ export function decrementElevation() {
 
   // Broadcast the activity (see ControlsLayer.prototype._onMouseMove)
   game.user.broadcastActivity({ ruler: ruler.toJSON() });
+}
+
+PATCHES.BASIC.METHODS = {
+  incrementElevation,
+  decrementElevation,
+
+  // From terrain_elevation.js
+  elevationAtOrigin,
+  terrainElevationAtPoint,
+  terrainElevationAtDestination
+};
+
+
+// ----- Helper functions ----- //
+
+/**
+ * Helper to add elevation increments to waypoint
+ */
+function addWaypointElevationIncrements(ruler, point) {
+  const ln = ruler.waypoints.length;
+  const newWaypoint = ruler.waypoints[ln - 1];
+  if ( ln === 1) {
+    // Origin waypoint -- cache using elevationAtOrigin
+    ruler.elevationAtOrigin();
+    ruler._userElevationIncrements = 0;
+  } else {
+    newWaypoint._terrainElevation = ruler.terrainElevationAtPoint(point);
+    newWaypoint._userElevationIncrements = ruler._userElevationIncrements;
+  }
 }
