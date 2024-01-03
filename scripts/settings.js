@@ -20,7 +20,11 @@ const SETTINGS = {
     ALWAYS: "levels-labels-always"
   },
   NO_MODS: "no-modules-message",
-  PREFER_TOKEN_ELEVATION_CURRENT_VALUE: "prefer-token-elevation-current-value"
+  PREFER_TOKEN_ELEVATION_CURRENT_VALUE: "prefer-token-elevation-current-value",
+  TOKEN_RULER: {
+    ENABLED: "enable-token-ruler",
+    RANGE_COLORS: "enable-token-ruler-colors"
+  }
 };
 
 const KEYBINDINGS = {
@@ -111,6 +115,17 @@ export class Settings extends ModuleSettingsAbstract {
     register(KEYS.PREFER_TOKEN_ELEVATION_CURRENT_VALUE, {
       scope: "user",
       config: false,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    // ----- NOTE: Token ruler ----- //
+    register(KEYS.TOKEN_RULER.ENABLED, {
+      name: localize(`${KEYS.TOKEN_RULER.ENABLED}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.ENABLED}.hint`),
+      scope: "user",
+      config: true,
       default: false,
       type: Boolean,
       requiresReload: false

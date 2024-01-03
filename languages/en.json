@@ -26,5 +26,8 @@
     "elevationruler.settings.prefer-token-elevation.name": "Add token elevation control",
     "elevationruler.settings.prefer-token-elevation.hint": "Add a control to the token toolbar to prefer the token elevation when measuring. When toggled on, the control will keep the ruler at the elevation of the measuring token unless another token is encountered or the grid space is at a higher elevation than the token. Otherwise, the ruler will assume the elevation of the grid space or the token encountered.",
 
+    "elevationruler.settings.enable-token-ruler.name": "Use Token Ruler",
+    "elevationruler.settings.enable-token-ruler.hint": "Display the ruler when dragging tokens.",
+
     "elevationruler.controls.prefer-token-elevation.name": "Prefer Token Elevation"
 }
