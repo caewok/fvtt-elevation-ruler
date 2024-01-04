@@ -79,7 +79,6 @@ function _onDragLeftMove(wrapped, event) {
 async function _onDragLeftDrop(wrapped, event) {
   console.debug("Token.prototype._onDragLeftDrop")
 
-
   // End the ruler measurement
   const ruler = canvas.controls.ruler;
   if ( !ruler.active ) return wrapped(event);

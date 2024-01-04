@@ -127,7 +127,7 @@ async function _animateMovement(wrapped, token) {
   let error;
   for ( const controlledToken of controlled ) {
     if ( controlledToken === token ) continue;
-
+    promises.push(wrapped(controlledToken));
     // TODO: token.checkCollision; throw error.
 
   }
