@@ -24,6 +24,9 @@ function _onDragLeftStart(wrapped, event) {
 
   // Start a Ruler measurement.
   canvas.controls.ruler._onDragStart(event);
+
+    // Monitor keydown
+  // document.addEventListener("keydown", onKeyDown);
 }
 
 /**
@@ -36,6 +39,15 @@ function _onDragStart(wrapped, event) {
 
   // Start a Ruler measurement.
   canvas.controls.ruler._onDragStart(event);
+
+  // Monitor keydown
+  // document.addEventListener("keydown", onKeyDown);
+}
+
+
+function onKeyDown(event) {
+  const key = event.code;
+  console.debug(`onKeyDown ${key}`);
 }
 
 /**
@@ -62,6 +74,8 @@ function _onDragLeftDrop(wrapped, event) {
   // End the ruler measurement
   const ruler = canvas.controls.ruler;
   if ( ruler.active ) ruler._onMouseUp(event);
+
+  // document.removeEventListener("keydown", onKeyDown);
 }
 
 /**
@@ -75,6 +89,7 @@ function _onDragLeftCancel(wrapped, event) {
   // Cancel the ruler measurement.
   const ruler = canvas.controls.ruler;
   if ( ruler.active ) ruler._endMeasurement();
+  // document.removeEventListener("keydown", onKeyDown);
 }
 
 /**
@@ -90,13 +105,40 @@ function _onClickRight(wrapped, event) {
   if ( ruler.active ) ruler._onClickRight(event);
 }
 
+/**
+ * Wrap Token.prototype._onClickRight2
+ */
+function _onClickRight2(wrapped, event) {
+  console.debug("Token.prototype._onClickRight2");
+  wrapped(event);
+}
+
+/**
+ * Wrap Token.prototype._onClickLeft
+ */
+function _onClickLeft(wrapped, event) {
+  console.debug("Token.prototype._onClickLeft");
+  wrapped(event);
+}
+
+/**
+ * Wrap Token.prototype._onClickLeft2
+ */
+function _onClickLeft2(wrapped, event) {
+  console.debug("Token.prototype._onClickLeft2");
+  wrapped(event);
+}
+
 PATCHES.TOKEN_RULER.WRAPS = {
   // _onDragStart,
   _onDragLeftStart,
   _onDragLeftMove,
   _onDragLeftDrop,
   _onDragLeftCancel,
-  _onClickRight
+  _onClickRight,
+  _onClickLeft,
+  _onClickLeft2,
+  _onClickRight2
 };
 
 /**

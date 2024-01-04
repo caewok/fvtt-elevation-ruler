@@ -5,6 +5,13 @@
     "elevationruler.keybindings.incrementElevation.name": "Increment Ruler Elevation",
     "elevationruler.keybindings.incrementElevation.hint": "Increase the elevation in grid increments when using the ruler.",
 
+    "elevationruler.keybindings.addWaypointTokenRuler.name": "Add Token Ruler Waypoint",
+    "elevationruler.keybindings.addWaypointTokenRuler.hint": "When token ruler is enabled, add a waypoint while dragging the token.",
+
+    "elevationruler.keybindings.removeWaypointTokenRuler.name": "Remove Token Ruler Waypoint",
+    "elevationruler.keybindings.removeWaypointTokenRuler.hint": "When token ruler is enabled, remove a waypoint while dragging the token.",
+
+
     "elevationruler.settings.no-modules-message.name": "No elevation-related modules found.",
     "elevationruler.settings.no-modules-message.hint": "Additional settings will be available here if Elevated Vision, Enhanced Terrain Layer, or Levels modules are active.",
 

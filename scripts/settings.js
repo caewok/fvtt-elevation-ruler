@@ -30,7 +30,11 @@ const SETTINGS = {
 
 const KEYBINDINGS = {
   INCREMENT: "incrementElevation",
-  DECREMENT: "decrementElevation"
+  DECREMENT: "decrementElevation",
+  TOKEN_RULER: {
+    ADD_WAYPOINT: "addWaypointTokenRuler",
+    REMOVE_WAYPOINT: "removeWaypointTokenRuler"
+  }
 };
 
 
@@ -158,12 +162,33 @@ export class Settings extends ModuleSettingsAbstract {
       onDown: () => canvas.controls.ruler.incrementElevation(),
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
+
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT}.hint`),
+      editable: [
+        { key: "=" }
+      ],
+      onDown: context => toggleTokenRulerWaypoint(context, true),
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
+
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.TOKEN_RULER.REMOVE_WAYPOINT, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.REMOVE_WAYPOINT}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.REMOVE_WAYPOINT}.hint`),
+      editable: [
+        { key: "-" }
+      ],
+      onDown: context => toggleTokenRulerWaypoint(context, false),
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
   }
 
   static toggleTokenRuler(value) {
     if ( value ) PATCHER.registerGroup("TOKEN_RULER");
     else PATCHER.deregisterGroup("TOKEN_RULER");
   }
+
 }
 
 /**
@@ -175,3 +200,27 @@ function reloadTokenControls() {
   canvas.tokens.deactivate();
   canvas.tokens.activate();
 }
+
+/**
+ * Add or remove a waypoint to the ruler, only if we are using the Token Ruler.
+ * @param {KeyboardEventContext} context          The context data of the event
+ * @param {boolean} [add=true]                    Whether to add or remove the waypoint
+ */
+let MOVE_TIME = 0;
+function toggleTokenRulerWaypoint(context, add = true) {
+  const position = canvas.mousePosition;
+  const ruler = canvas.controls.ruler;
+  if ( !canvas.tokens.active || !ruler || !ruler.active ) return;
+  console.debug(`${add ? "add" : "remove"}TokenRulerWaypoint`);
+
+  // Keep track of when we last added/deleted a waypoint.
+  const now = Date.now();
+  const delta = now - MOVE_TIME;
+  if ( delta < 100 ) return true; // Throttle keyboard movement once per 100ms
+  MOVE_TIME = now;
+
+  console.debug(`${add ? "adding" : "removing"}TokenRulerWaypoint`);
+  if ( add ) ruler._addWaypoint(position);
+  else ruler._removeWaypoint(position);
+}
+
