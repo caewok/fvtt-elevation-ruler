@@ -56,10 +56,12 @@ export async function _animateSegment(wrapped, token, segment, destination) {
 
   // If Token Ruler is active, override so we can pass ruler to options.
   let res;
-  if ( Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED) ) {
-    await token.document.update(destination, { ruler: true });
-    res = await CanvasAnimation.getAnimation(token.animationName);
-  } else res = await wrapped(token, segment, destination);
+//   if ( Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED) ) {
+//     await token.document.update(destination, { ruler: true });
+//     res = await CanvasAnimation.getAnimation(token.animationName);
+//   } else res = await wrapped(token, segment, destination);
+
+  res = await wrapped(token, segment, destination);
 
   console.debug(`_animateSegment|${token.name} --> ${destination.x},${destination.y} finished`);
 

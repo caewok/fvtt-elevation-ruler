@@ -29,7 +29,7 @@ function preUpdateToken(document, changes, options, _userId) {
   //options.animate = false;
   return true;
 }
-//PATCHES.TOKEN_RULER.HOOKS = { preUpdateToken };
+PATCHES.TOKEN_RULER.HOOKS = { preUpdateToken };
 
 
 /**
