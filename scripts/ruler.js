@@ -7,6 +7,7 @@ game
 // Patches for the Ruler class
 export const PATCHES = {};
 PATCHES.BASIC = {};
+PATCHES.TOKEN_RULER = {};
 PATCHES.DRAG_RULER = {};
 
 import {
@@ -117,6 +118,23 @@ function _removeWaypoint(wrapper, point, { snap = true } = {}) {
 }
 
 /**
+ * Wrap Ruler.prototype._animateMovement
+ * Add additional controlled tokens to the move, if permitted.
+ */
+async function _animateMovement(wrapped, token) {
+  const promises = [wrapped(token)];
+  const controlled = canvas.tokens.controlled;
+  let error;
+  for ( const controlledToken of controlled ) {
+    if ( controlledToken === token ) continue;
+
+    // TODO: token.checkCollision; throw error.
+
+  }
+  return Promise.allSettled(promises);
+}
+
+/**
  * Wrap DragRulerRuler.prototype.dragRulerAddWaypoint
  * Add elevation increments
  */
@@ -146,9 +164,10 @@ function _endMeasurement(wrapped) {
 
 
 function _postMove(wrapped, token) {
-  console.debug("_animateSegment");
+  console.debug("_postMove");
   return wrapped(token);
 }
+
 
 //   // Assume the destination elevation is the desired elevation if dragging multiple tokens.
 //   // (Likely more useful than having a bunch of tokens move down 10'?)
@@ -186,9 +205,12 @@ PATCHES.BASIC.WRAPS = {
   _getSegmentLabel,
 
   // Move token methods
-  _animateSegment,
+  // _animateSegment,
+  _animateMovement
   // _postMove
 };
+
+PATCHES.BASIC.MIXES = { _animateSegment };
 
 PATCHES.DRAG_RULER.WRAPS = {
   dragRulerAddWaypoint,

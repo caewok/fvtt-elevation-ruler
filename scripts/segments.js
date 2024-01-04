@@ -52,11 +52,23 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
  * for the given segment.
  */
 export async function _animateSegment(wrapped, token, segment, destination) {
-  const res = await wrapped(token, segment, destination);
+  console.debug(`_animateSegment|${token.name} --> ${destination.x},${destination.y}`);
+
+  // If Token Ruler is active, override so we can pass ruler to options.
+  let res;
+  if ( Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED) ) {
+    await token.document.update(destination, { ruler: true });
+    res = await CanvasAnimation.getAnimation(token.animationName);
+  } else res = await wrapped(token, segment, destination);
+
+  console.debug(`_animateSegment|${token.name} --> ${destination.x},${destination.y} finished`);
 
   // Update elevation after the token move.
   if ( segment.ray.A.z !== segment.ray.B.z ) {
-    await token.document.update({ elevation: CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z) });
+    const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z);
+    console.debug(`_animateSegment|${token.name} --> elevation ${elevation}`);
+    await token.document.update({ elevation });
+    console.debug(`_animateSegment|${token.name} --> elevation ${elevation} finished`);
   }
 
   return res;

@@ -12,6 +12,17 @@ PATCHES.TOKEN_RULER = {}; // Assume this patch is only present if the token rule
 
 
 /**
+ * Hook preUpdateToken
+ * If moving using Token Ruler, don't animate the token move here.
+ */
+function preUpdateToken(document, changes, options, userId) {
+  console.debug("preUpdateToken");
+  // options.animate = false;
+}
+PATCHES.TOKEN_RULER.HOOKS = { preUpdateToken };
+
+
+/**
  * Wrap Token.prototype._onDragLeftStart
  * Start a ruler measurement.
  */
@@ -77,9 +88,8 @@ function _onDragLeftCancel(wrapped, event) {
   wrapped(event);
 
   // Cancel the ruler measurement.
-//  const ruler = canvas.controls.ruler;
-//  if ( ruler.active ) ruler._endMeasurement();
-  // document.removeEventListener("keydown", onKeyDown);
+  // const ruler = canvas.controls.ruler;
+  // if ( ruler.active && ruler._state !== Ruler.STATES.MOVING ) ruler._endMeasurement();
 }
 
 /**
