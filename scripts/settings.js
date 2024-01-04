@@ -221,6 +221,6 @@ function toggleTokenRulerWaypoint(context, add = true) {
 
   console.debug(`${add ? "adding" : "removing"}TokenRulerWaypoint`);
   if ( add ) ruler._addWaypoint(position);
-  else ruler._removeWaypoint(position);
+  else if ( ruler.waypoints.length > 1 ) ruler._removeWaypoint(position); // Removing the last waypoint throws errors.
 }
 
