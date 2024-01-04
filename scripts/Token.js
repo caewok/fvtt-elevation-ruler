@@ -55,13 +55,15 @@ function _onDragLeftMove(wrapped, event) {
  * Wrap Token.prototype._onDragLeftDrop
  * End the ruler measurement.
  */
-function _onDragLeftDrop(wrapped, event) {
+async function _onDragLeftDrop(wrapped, event) {
   console.debug("Token.prototype._onDragLeftDrop")
   wrapped(event);
 
   // End the ruler measurement
   const ruler = canvas.controls.ruler;
-  if ( ruler.active ) ruler._onMouseUp(event);
+  if ( !ruler.active ) return;
+  await ruler.moveToken();
+  ruler._onMouseUp(event);
 
   // document.removeEventListener("keydown", onKeyDown);
 }
@@ -75,8 +77,8 @@ function _onDragLeftCancel(wrapped, event) {
   wrapped(event);
 
   // Cancel the ruler measurement.
-  const ruler = canvas.controls.ruler;
-  if ( ruler.active ) ruler._endMeasurement();
+//  const ruler = canvas.controls.ruler;
+//  if ( ruler.active ) ruler._endMeasurement();
   // document.removeEventListener("keydown", onKeyDown);
 }
 
