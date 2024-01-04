@@ -1,5 +1,6 @@
 /* globals
-canvas
+canvas,
+Ruler
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -15,11 +16,20 @@ PATCHES.TOKEN_RULER = {}; // Assume this patch is only present if the token rule
  * Hook preUpdateToken
  * If moving using Token Ruler, don't animate the token move here.
  */
-function preUpdateToken(document, changes, options, userId) {
+function preUpdateToken(document, changes, options, _userId) {
   console.debug("preUpdateToken");
-  // options.animate = false;
+  if ( options.ruler || canvas.controls.ruler._state !== Ruler.STATES.MOVING ) return true;
+
+  const changeSet = new Set(Object.getOwnPropertyNames(changes));
+  if ( !(changeSet.has("x")
+      || changeSet.has("y")
+      || changeSet.has("elevation")) ) return true;
+
+
+  //options.animate = false;
+  return true;
 }
-PATCHES.TOKEN_RULER.HOOKS = { preUpdateToken };
+//PATCHES.TOKEN_RULER.HOOKS = { preUpdateToken };
 
 
 /**
@@ -27,7 +37,7 @@ PATCHES.TOKEN_RULER.HOOKS = { preUpdateToken };
  * Start a ruler measurement.
  */
 function _onDragLeftStart(wrapped, event) {
-  console.debug("Token.prototype._onDragLeftStart")
+  console.debug("Token.prototype._onDragLeftStart");
   wrapped(event);
 
   // TODO: Do we need to have a modified CONFIG.Canvas.rulerClass.canMeasure here?
@@ -42,11 +52,11 @@ function _onDragLeftStart(wrapped, event) {
  * Start a ruler measurement
  */
 function _onDragStart(wrapped, event) {
-  console.debug("Token.prototype._onDragStart")
+  console.debug("Token.prototype._onDragStart");
   wrapped(event);
 
   // Start a Ruler measurement.
-  canvas.controls.ruler._onDragStart(event);
+  // canvas.controls.ruler._onDragStart(event);
 }
 
 /**
@@ -54,7 +64,7 @@ function _onDragStart(wrapped, event) {
  * Continue the ruler measurement
  */
 function _onDragLeftMove(wrapped, event) {
-  console.debug("Token.prototype._onDragLeftMove")
+  console.debug("Token.prototype._onDragLeftMove");
   wrapped(event);
 
   // Continue a Ruler measurement.
@@ -67,7 +77,7 @@ function _onDragLeftMove(wrapped, event) {
  * End the ruler measurement.
  */
 async function _onDragLeftDrop(wrapped, event) {
-  console.debug("Token.prototype._onDragLeftDrop")
+  console.debug("Token.prototype._onDragLeftDrop");
   wrapped(event);
 
   // End the ruler measurement
@@ -84,7 +94,7 @@ async function _onDragLeftDrop(wrapped, event) {
  * Cancel the ruler measurement.
  */
 function _onDragLeftCancel(wrapped, event) {
-  console.debug("Token.prototype._onDragLeftCancel")
+  console.debug("Token.prototype._onDragLeftCancel");
   wrapped(event);
 
   // Cancel the ruler measurement.
@@ -97,7 +107,7 @@ function _onDragLeftCancel(wrapped, event) {
  * Add a ruler waypoint.
  */
 function _onClickRight(wrapped, event) {
-  console.debug("Token.prototype._onClickRight")
+  console.debug("Token.prototype._onClickRight");
   wrapped(event);
 
   // Add waypoint.
@@ -130,7 +140,7 @@ function _onClickLeft2(wrapped, event) {
 }
 
 PATCHES.TOKEN_RULER.WRAPS = {
-  // _onDragStart,
+  _onDragStart,
   _onDragLeftStart,
   _onDragLeftMove,
   _onDragLeftDrop,
