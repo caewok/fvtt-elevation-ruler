@@ -24,9 +24,6 @@ function _onDragLeftStart(wrapped, event) {
 
   // Start a Ruler measurement.
   canvas.controls.ruler._onDragStart(event);
-
-    // Monitor keydown
-  // document.addEventListener("keydown", onKeyDown);
 }
 
 /**
@@ -39,15 +36,6 @@ function _onDragStart(wrapped, event) {
 
   // Start a Ruler measurement.
   canvas.controls.ruler._onDragStart(event);
-
-  // Monitor keydown
-  // document.addEventListener("keydown", onKeyDown);
-}
-
-
-function onKeyDown(event) {
-  const key = event.code;
-  console.debug(`onKeyDown ${key}`);
 }
 
 /**
