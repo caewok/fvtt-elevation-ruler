@@ -1,6 +1,8 @@
 /* globals
 canvas,
-game
+CONST,
+game,
+ui
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -123,13 +125,13 @@ function _removeWaypoint(wrapper, point, { snap = true } = {}) {
  */
 async function _animateMovement(wrapped, token) {
   const promises = [wrapped(token)];
-  const controlled = canvas.tokens.controlled;
-  let error;
-  for ( const controlledToken of controlled ) {
+  for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;
+    if ( hasSegmentCollision(controlledToken, this.segments) ) {
+      ui.notifications.error(`${game.i18n.localize("RULER.MovementNotAllowed")} for ${controlledToken.name}`);
+      continue;
+    }
     promises.push(wrapped(controlledToken));
-    // TODO: token.checkCollision; throw error.
-
   }
   return Promise.allSettled(promises);
 }
@@ -189,8 +191,6 @@ function _postMove(wrapped, token) {
 //   const t0 = selectedTokens[0];
 //   await t0.scene.updateEmbeddedDocuments(t0.constructor.embeddedName, updates);
 //   return true;
-
-
 
 
 PATCHES.BASIC.WRAPS = {
@@ -285,4 +285,28 @@ function addWaypointElevationIncrements(ruler, point) {
     newWaypoint._terrainElevation = ruler.terrainElevationAtPoint(point);
     newWaypoint._userElevationIncrements = ruler._userElevationIncrements;
   }
+}
+
+/**
+ * Check for token collision among the segments.
+ * Differs from Ruler.prototype._canMove because it adjusts for token position.
+ * See Ruler.prototype._animateMovement.
+ * @param {Token} token         Token to test for collisions
+ * @param {object} segments     Ruler segments to test
+ * @returns {boolean} True if a collision is found.
+ */
+function hasSegmentCollision(token, segments) {
+  const rulerOrigin = segments[0].ray.A;
+  const collisionConfig = { type: "move", mode: "any" };
+  const s2 = canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS ? 1 : (canvas.dimensions.size / 2);
+  let priorOrigin = { x: token.document.x, y: token.document.y };
+  const dx = Math.round((priorOrigin.x - rulerOrigin.x) / s2) * s2;
+  const dy = Math.round((priorOrigin.y - rulerOrigin.y) / s2) * s2;
+  for ( const segment of segments ) {
+    const adjustedDestination = canvas.grid.grid._getRulerDestination(segment.ray, {x: dx, y: dy}, token);
+    collisionConfig.origin = priorOrigin;
+    if ( token.checkCollision(adjustedDestination, collisionConfig) ) return true;
+    priorOrigin = adjustedDestination;
+  }
+  return false;
 }
