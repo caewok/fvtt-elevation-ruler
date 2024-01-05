@@ -1,12 +1,15 @@
 /* globals
 canvas,
-game
+CONST,
+game,
+ui
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 // Patches for the Ruler class
 export const PATCHES = {};
 PATCHES.BASIC = {};
+PATCHES.TOKEN_RULER = {};
 PATCHES.DRAG_RULER = {};
 
 import {
@@ -117,6 +120,23 @@ function _removeWaypoint(wrapper, point, { snap = true } = {}) {
 }
 
 /**
+ * Wrap Ruler.prototype._animateMovement
+ * Add additional controlled tokens to the move, if permitted.
+ */
+async function _animateMovement(wrapped, token) {
+  const promises = [wrapped(token)];
+  for ( const controlledToken of canvas.tokens.controlled ) {
+    if ( controlledToken === token ) continue;
+    if ( hasSegmentCollision(controlledToken, this.segments) ) {
+      ui.notifications.error(`${game.i18n.localize("RULER.MovementNotAllowed")} for ${controlledToken.name}`);
+      continue;
+    }
+    promises.push(wrapped(controlledToken));
+  }
+  return Promise.allSettled(promises);
+}
+
+/**
  * Wrap DragRulerRuler.prototype.dragRulerAddWaypoint
  * Add elevation increments
  */
@@ -146,9 +166,10 @@ function _endMeasurement(wrapped) {
 
 
 function _postMove(wrapped, token) {
-  console.debug("_animateSegment");
+  console.debug("_postMove");
   return wrapped(token);
 }
+
 
 //   // Assume the destination elevation is the desired elevation if dragging multiple tokens.
 //   // (Likely more useful than having a bunch of tokens move down 10'?)
@@ -172,8 +193,6 @@ function _postMove(wrapped, token) {
 //   return true;
 
 
-
-
 PATCHES.BASIC.WRAPS = {
   clear,
   toJSON,
@@ -186,9 +205,12 @@ PATCHES.BASIC.WRAPS = {
   _getSegmentLabel,
 
   // Move token methods
-  _animateSegment,
+  // _animateSegment,
+  _animateMovement
   // _postMove
 };
+
+PATCHES.BASIC.MIXES = { _animateSegment };
 
 PATCHES.DRAG_RULER.WRAPS = {
   dragRulerAddWaypoint,
@@ -263,4 +285,28 @@ function addWaypointElevationIncrements(ruler, point) {
     newWaypoint._terrainElevation = ruler.terrainElevationAtPoint(point);
     newWaypoint._userElevationIncrements = ruler._userElevationIncrements;
   }
+}
+
+/**
+ * Check for token collision among the segments.
+ * Differs from Ruler.prototype._canMove because it adjusts for token position.
+ * See Ruler.prototype._animateMovement.
+ * @param {Token} token         Token to test for collisions
+ * @param {object} segments     Ruler segments to test
+ * @returns {boolean} True if a collision is found.
+ */
+function hasSegmentCollision(token, segments) {
+  const rulerOrigin = segments[0].ray.A;
+  const collisionConfig = { type: "move", mode: "any" };
+  const s2 = canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS ? 1 : (canvas.dimensions.size / 2);
+  let priorOrigin = { x: token.document.x, y: token.document.y };
+  const dx = Math.round((priorOrigin.x - rulerOrigin.x) / s2) * s2;
+  const dy = Math.round((priorOrigin.y - rulerOrigin.y) / s2) * s2;
+  for ( const segment of segments ) {
+    const adjustedDestination = canvas.grid.grid._getRulerDestination(segment.ray, {x: dx, y: dy}, token);
+    collisionConfig.origin = priorOrigin;
+    if ( token.checkCollision(adjustedDestination, collisionConfig) ) return true;
+    priorOrigin = adjustedDestination;
+  }
+  return false;
 }

@@ -1,3 +1,6 @@
+# 0.7.4
+Add option to enable a Token Ruler when dragging tokens.
+
 # 0.7.3
 Updated lib-geometry to 0.2.12.
 Refactor to use Patcher class.

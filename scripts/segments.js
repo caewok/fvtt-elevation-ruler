@@ -30,7 +30,6 @@ export function _getMeasurementSegments(wrapped) {
   // Add destination as the final waypoint
   this.destination._terrainElevation = this.terrainElevationAtDestination();
   this.destination._userElevationIncrements = this._userElevationIncrements;
-
   return elevateSegments(this, segments);
 }
 
@@ -56,7 +55,8 @@ export async function _animateSegment(wrapped, token, segment, destination) {
 
   // Update elevation after the token move.
   if ( segment.ray.A.z !== segment.ray.B.z ) {
-    await token.document.update({ elevation: CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z) });
+    const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z);
+    await token.document.update({ elevation });
   }
 
   return res;
