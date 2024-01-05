@@ -1,6 +1,5 @@
 /* globals
-canvas,
-Ruler
+canvas
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -11,52 +10,15 @@ export const PATCHES = {};
 PATCHES.DRAG_RULER = {};
 PATCHES.TOKEN_RULER = {}; // Assume this patch is only present if the token ruler setting is enabled.
 
-
-/**
- * Hook preUpdateToken
- * If moving using Token Ruler, don't animate the token move here.
- */
-function preUpdateToken(document, changes, options, _userId) {
-  console.debug("preUpdateToken");
-  if ( options.ruler || canvas.controls.ruler._state !== Ruler.STATES.MOVING ) return true;
-
-  const changeSet = new Set(Object.getOwnPropertyNames(changes));
-  if ( !(changeSet.has("x")
-      || changeSet.has("y")
-      || changeSet.has("elevation")) ) return true;
-
-
-  //options.animate = false;
-  return true;
-}
-PATCHES.TOKEN_RULER.HOOKS = { preUpdateToken };
-
-
 /**
  * Wrap Token.prototype._onDragLeftStart
  * Start a ruler measurement.
  */
 function _onDragLeftStart(wrapped, event) {
-  console.debug("Token.prototype._onDragLeftStart");
   wrapped(event);
-
-  // TODO: Do we need to have a modified CONFIG.Canvas.rulerClass.canMeasure here?
-  //       Do we need to check if this.activeLayer instanceof TokenLayer?
 
   // Start a Ruler measurement.
   canvas.controls.ruler._onDragStart(event);
-}
-
-/**
- * Wrap Token.prototype._onDragStart
- * Start a ruler measurement
- */
-function _onDragStart(wrapped, event) {
-  console.debug("Token.prototype._onDragStart");
-  wrapped(event);
-
-  // Start a Ruler measurement.
-  // canvas.controls.ruler._onDragStart(event);
 }
 
 /**
@@ -64,7 +26,6 @@ function _onDragStart(wrapped, event) {
  * Continue the ruler measurement
  */
 function _onDragLeftMove(wrapped, event) {
-  console.debug("Token.prototype._onDragLeftMove");
   wrapped(event);
 
   // Continue a Ruler measurement.
@@ -77,77 +38,17 @@ function _onDragLeftMove(wrapped, event) {
  * End the ruler measurement.
  */
 async function _onDragLeftDrop(wrapped, event) {
-  console.debug("Token.prototype._onDragLeftDrop")
-
   // End the ruler measurement
   const ruler = canvas.controls.ruler;
   if ( !ruler.active ) return wrapped(event);
   await ruler.moveToken();
   ruler._onMouseUp(event);
-
-  // document.removeEventListener("keydown", onKeyDown);
 }
 
-/**
- * Wrap Token.prototype._onDragLeftCancel
- * Cancel the ruler measurement.
- */
-function _onDragLeftCancel(wrapped, event) {
-  console.debug("Token.prototype._onDragLeftCancel");
-  wrapped(event);
-
-  // Cancel the ruler measurement.
-  // const ruler = canvas.controls.ruler;
-  // if ( ruler.active && ruler._state !== Ruler.STATES.MOVING ) ruler._endMeasurement();
-}
-
-/**
- * Wrap Token.prototype._onClickRight
- * Add a ruler waypoint.
- */
-function _onClickRight(wrapped, event) {
-  console.debug("Token.prototype._onClickRight");
-  wrapped(event);
-
-  // Add waypoint.
-  const ruler = canvas.controls.ruler;
-  if ( ruler.active ) ruler._onClickRight(event);
-}
-
-/**
- * Wrap Token.prototype._onClickRight2
- */
-function _onClickRight2(wrapped, event) {
-  console.debug("Token.prototype._onClickRight2");
-  wrapped(event);
-}
-
-/**
- * Wrap Token.prototype._onClickLeft
- */
-function _onClickLeft(wrapped, event) {
-  console.debug("Token.prototype._onClickLeft");
-  wrapped(event);
-}
-
-/**
- * Wrap Token.prototype._onClickLeft2
- */
-function _onClickLeft2(wrapped, event) {
-  console.debug("Token.prototype._onClickLeft2");
-  wrapped(event);
-}
 
 PATCHES.TOKEN_RULER.WRAPS = {
-  _onDragStart,
   _onDragLeftStart,
-  _onDragLeftMove,
-  // _onDragLeftDrop,
-  _onDragLeftCancel,
-  _onClickRight,
-  _onClickLeft,
-  _onClickLeft2,
-  _onClickRight2
+  _onDragLeftMove
 };
 
 PATCHES.TOKEN_RULER.MIXES = { _onDragLeftDrop };
