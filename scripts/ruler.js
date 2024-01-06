@@ -1,7 +1,10 @@
 /* globals
 canvas,
+Color,
 CONST,
 game,
+getProperty,
+Ray,
 ui
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -23,6 +26,8 @@ import {
   _getSegmentLabel,
   _animateSegment
 } from "./segments.js";
+
+import { SPEED } from "./const.js";
 
 /**
  * Modified Ruler
@@ -170,6 +175,102 @@ function _postMove(wrapped, token) {
   return wrapped(token);
 }
 
+// ----- NOTE: Segment highlighting ----- //
+/**
+ * Wrap Ruler.prototype._highlightMeasurementSegment
+ */
+function _highlightMeasurementSegment(wrapped, segment) {
+  const token = this._getMovementToken();
+  if ( !token ) return wrapped(segment);
+  const tokenSpeed = Number(getProperty(token, SPEED.ATTRIBUTE));
+  if ( !tokenSpeed ) return wrapped(segment);
+
+  // Based on the token being measured.
+  // Track the distance to this segment.
+  // Split this segment at the break points for the colors as necessary.
+  let pastDistance = 0;
+  for ( const s of this.segments ) {
+    if ( s === segment ) break;
+    pastDistance += s.distance;
+  }
+
+  // Constants
+  const walkDist = tokenSpeed;
+  const dashDist = tokenSpeed * SPEED.MULTIPLIER;
+  const walkColor = Color.from(0x00ff00);
+  const dashColor = Color.from(0xffff00);
+  const maxColor = Color.from(0xff0000);
+
+  // Track the splits.
+  let remainingSegment = segment;
+  const splitSegments = [];
+
+  // Walk
+  remainingSegment.color = walkColor;
+  const walkSegments = splitSegment(remainingSegment, pastDistance, walkDist);
+  if ( walkSegments.length ) {
+    const segment0 = walkSegments[0];
+    splitSegments.push(segment0);
+    pastDistance += segment0.distance;
+    remainingSegment = walkSegments.length > 1 ? walkSegments[1] : undefined;
+  }
+
+  // Dash
+  if ( remainingSegment ) {
+    remainingSegment.color = dashColor;
+    const dashSegments = splitSegment(remainingSegment, pastDistance, dashDist);
+    if ( dashSegments.length ) {
+      const segment0 = dashSegments[0];
+      splitSegments.push(segment0);
+      if ( dashSegments.length > 1 ) {
+        const remainingSegment = dashSegments[1];
+        remainingSegment.color = maxColor;
+        splitSegments.push(remainingSegment);
+      }
+    }
+  }
+
+  // Highlight each split in turn, changing highlight color each time.
+  const priorColor = this.color;
+  for ( const s of splitSegments ) {
+    this.color = s.color;
+    wrapped(s);
+  }
+  this.color = priorColor;
+}
+
+/**
+ * Cut a segment, represented as a ray and a distance, at a given point.
+ * @param {object} segment
+ * @param {number} pastDistance
+ * @param {number} cutoffDistance
+ * @returns {object[]}
+ * - If cutoffDistance is before the segment start, return [].
+ * - If cutoffDistance is after the segment end, return [segment].
+ * - If cutoffDistance is within the segment, return [segment0, segment1]
+ */
+function splitSegment(segment, pastDistance, cutoffDistance) {
+  // Split the segment early so that the second segment has both squares highlighted.
+  //const spacer = canvas.scene.grid.type === CONST.GRID_TYPES.SQUARE ? 1.41 : 1;
+  // cutoffDistance -= spacer * 0.5;
+
+  // If the cutoffDistance does not fall within the segment we are done.
+  cutoffDistance -= pastDistance;
+  if ( cutoffDistance <= 0 ) return [];
+  if ( segment.distance <= cutoffDistance ) return [segment];
+
+  // Split the segment into two.
+  // TODO: Handle 3d segments.
+  const t = cutoffDistance / segment.distance;
+  const segment0 = { ray: new Ray(segment.ray.A, segment.ray.project(t)), color: segment.color };
+  const segment1 = { ray: new Ray(segment0.ray.B, segment.ray.B) };
+  const segments = [segment0, segment1];
+  const distances = canvas.grid.measureDistances(segments, { gridSpaces: false });
+  segment0.distance = distances[0];
+  segment1.distance = distances[1];
+  return segments;
+}
+
 
 //   // Assume the destination elevation is the desired elevation if dragging multiple tokens.
 //   // (Likely more useful than having a bunch of tokens move down 10'?)
@@ -206,7 +307,8 @@ PATCHES.BASIC.WRAPS = {
 
   // Move token methods
   // _animateSegment,
-  _animateMovement
+  _animateMovement,
+  _highlightMeasurementSegment
   // _postMove
 };
 
@@ -214,7 +316,7 @@ PATCHES.BASIC.MIXES = { _animateSegment };
 
 PATCHES.DRAG_RULER.WRAPS = {
   dragRulerAddWaypoint,
-  dragRulerClearWaypoints,
+  dragRulerClearWaypoints
   // _endMeasurement
 };
 
