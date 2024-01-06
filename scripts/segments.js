@@ -26,10 +26,6 @@ export function elevationAtWaypoint(waypoint) {
  */
 export function _getMeasurementSegments(wrapped) {
   const segments = wrapped();
-
-  // Add destination as the final waypoint
-  this.destination._terrainElevation = this.terrainElevationAtDestination();
-  this.destination._userElevationIncrements = this._userElevationIncrements;
   return elevateSegments(this, segments);
 }
 
@@ -68,15 +64,18 @@ export async function _animateSegment(wrapped, token, segment, destination) {
  * @param {object[]} segments
  */
 function elevateSegments(ruler, segments) {  // Add destination as the final waypoint
-  const waypoints = ruler.waypoints.concat([ruler.destination]);
-  const { distance, size } = canvas.dimensions;
-  const gridUnits = size / distance;
+  const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
 
-  const ln = waypoints.length;
+  // Add destination as the final waypoint
+  ruler.destination._terrainElevation = ruler.terrainElevationAtDestination();
+  ruler.destination._userElevationIncrements = ruler._userElevationIncrements;
+  const waypoints = ruler.waypoints.concat([ruler.destination]);
+
+  // Add the waypoint elevations to the corresponding segment endpoints.
   // Skip the first waypoint, which will (likely) end up as p0.
+  const ln = waypoints.length;
   for ( let i = 1, j = 0; i < ln; i += 1, j += 1 ) {
     const segment = segments[j];
-
     const p0 = waypoints[i - 1];
     const p1 = waypoints[i];
     const dist2 = PIXI.Point.distanceSquaredBetween(p0, p1);
@@ -86,8 +85,8 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
     }
 
     // Convert to 3d Rays
-    const Az = elevationAtWaypoint(p0) * gridUnits;
-    const Bz = elevationAtWaypoint(p1) * gridUnits;
+    const Az = gridUnitsToPixels(elevationAtWaypoint(p0));
+    const Bz = gridUnitsToPixels(elevationAtWaypoint(p1));
     segment.ray = Ray3d.from2d(segment.ray, { Az, Bz });
   }
 
