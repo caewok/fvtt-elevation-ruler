@@ -226,6 +226,10 @@ function _highlightMeasurementSegment(wrapped, segment) {
   for ( const s of splitSegments ) {
     this.color = s.color;
     wrapped(s);
+
+    // If gridless, highlight a rectangular shaped portion of the line.
+
+
   }
   this.color = priorColor;
 }
@@ -536,9 +540,8 @@ function hexGridShape(p, { width = 1, height = 1 } = {}) {
   if ( width !== height ) return null;
 
   // Get the top left corner
-  const { getTopLeft, getBorderPolygon } = canvas.grid.grid;
-  const [tlx, tly] = getTopLeft(p.x, p.y);
-  const points = getBorderPolygon(width, height, 0); // TO-DO: Should a border be included to improve calc?
+  const [tlx, tly] = canvas.grid.grid.getTopLeft(p.x, p.y);
+  const points = canvas.grid.grid.getBorderPolygon(width, height, 0); // TO-DO: Should a border be included to improve calc?
   const pointsTranslated = [];
   const ln = points.length;
   for ( let i = 0; i < ln; i += 2) pointsTranslated.push(points[i] + tlx, points[i+1] + tly);
