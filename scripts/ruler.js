@@ -28,6 +28,8 @@ import {
 } from "./segments.js";
 
 import { SPEED } from "./const.js";
+import { Ray3d } from "./geometry/3d/Ray3d.js";
+import { Point3d } from "./geometry/3d/Point3d.js";
 
 /**
  * Modified Ruler
@@ -201,6 +203,10 @@ function _highlightMeasurementSegment(wrapped, segment) {
   const dashColor = Color.from(0xffff00);
   const maxColor = Color.from(0xff0000);
 
+  if ( segment.distance > walkDist ) {
+    console.debug(`${segment.distance}`);
+  }
+
   // Track the splits.
   let remainingSegment = segment;
   const splitSegments = [];
@@ -212,7 +218,7 @@ function _highlightMeasurementSegment(wrapped, segment) {
     const segment0 = walkSegments[0];
     splitSegments.push(segment0);
     pastDistance += segment0.distance;
-    remainingSegment = walkSegments.length > 1 ? walkSegments[1] : undefined;
+    remainingSegment = walkSegments[1]; // May be undefined.
   }
 
   // Dash
@@ -250,20 +256,41 @@ function _highlightMeasurementSegment(wrapped, segment) {
  * - If cutoffDistance is within the segment, return [segment0, segment1]
  */
 function splitSegment(segment, pastDistance, cutoffDistance) {
-  // Split the segment early so that the second segment has both squares highlighted.
-  //const spacer = canvas.scene.grid.type === CONST.GRID_TYPES.SQUARE ? 1.41 : 1;
-  // cutoffDistance -= spacer * 0.5;
-
-  // If the cutoffDistance does not fall within the segment we are done.
   cutoffDistance -= pastDistance;
   if ( cutoffDistance <= 0 ) return [];
-  if ( segment.distance <= cutoffDistance ) return [segment];
+
+  // Determine where on the segment ray the cutoff occurs.
+  const deltaZ = segment.ray.B.subtract(segment.ray.A);
+  const segmentDistanceZ = deltaZ.magnitude();
+  const cutoffDistanceZ = CONFIG.GeometryLib.utils.gridUnitsToPixels(cutoffDistance)
+  let t = cutoffDistanceZ / segmentDistanceZ;
+  if ( t >= 1 ) return [segment];
+
+  // If we are using a grid, determine the point at which this segment crosses to the final
+  // grid square/hex.
+  // Split the segment early so the last grid square/hex is colored according to the highest color value (dash/max).
+  // Find where the segment intersects the last grid square/hex.
+  if ( canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS ) {
+    // Determine where before t on the ray the ray hits that grid square/hex.
+    const cutoffPoint = segment.ray.A.projectToward(segment.ray.B, t);
+
+    // Find the last grid space for the cutoff point and determine the intersection point.
+    const lastGridSpace = gridShape(cutoffPoint);
+    const ixs = lastGridSpace.segmentIntersections(segment.ray.A, cutoffPoint);
+    if ( !ixs.length ) return [segment];
+    const ix = ixs.at(-1);  // Should always have length 1, but...
+
+    // Determine the new t value based on the intersection.
+    ix.z = segment.ray.A.z;
+    const distToIx = Point3d.distanceBetween(segment.ray.A, ix);
+    t = distToIx / segmentDistanceZ;
+    if ( t > 1 ) return [segment];
+    if ( t <= 0 ) return [];
+  }
 
   // Split the segment into two.
-  // TODO: Handle 3d segments.
-  const t = cutoffDistance / segment.distance;
-  const segment0 = { ray: new Ray(segment.ray.A, segment.ray.project(t)), color: segment.color };
-  const segment1 = { ray: new Ray(segment0.ray.B, segment.ray.B) };
+  const segment0 = { ray: new Ray3d(segment.ray.A, segment.ray.A.projectToward(segment.ray.B, t)), color: segment.color };
+  const segment1 = { ray: new Ray3d(segment0.ray.B, segment.ray.B) };
   const segments = [segment0, segment1];
   const distances = canvas.grid.measureDistances(segments, { gridSpaces: false });
   segment0.distance = distances[0];
@@ -292,6 +319,12 @@ function splitSegment(segment, pastDistance, cutoffDistance) {
 //   const t0 = selectedTokens[0];
 //   await t0.scene.updateEmbeddedDocuments(t0.constructor.embeddedName, updates);
 //   return true;
+
+/**
+ * Wrap Ruler.prototype._getMeasurementDestination
+ * If the last event held down the shift key, then use the precise location (no snapping).
+ */
+
 
 
 PATCHES.BASIC.WRAPS = {
@@ -411,4 +444,52 @@ function hasSegmentCollision(token, segments) {
     priorOrigin = adjustedDestination;
   }
   return false;
+}
+
+
+/**
+ * Helper to get the grid shape for given grid type.
+ * @param {x: number, y: number} p    Location to use.
+ * @returns {null|PIXI.Rectangle|PIXI.Polygon}
+ */
+function gridShape(p) {
+  const { GRIDLESS, SQUARE } = CONST.GRID_TYPES;
+  switch ( canvas.grid.type ) {
+    case GRIDLESS: return null;
+    case SQUARE: return squareGridShape(p);
+    default: return hexGridShape(p);
+  }
+}
+
+/**
+ * From ElevatedVision ElevationLayer.js
+ * Return the rectangle corresponding to the grid square at this point.
+ * @param {x: number, y: number} p    Location within the square.
+ * @returns {PIXI.Rectangle}
+ */
+function squareGridShape(p) {
+  // Get the top left corner
+  const [tlx, tly] = canvas.grid.grid.getTopLeft(p.x, p.y);
+  const { w, h } = canvas.grid;
+  return new PIXI.Rectangle(tlx, tly, w, h);
+}
+
+/**
+ * From ElevatedVision ElevationLayer.js
+ * Return the polygon corresponding to the grid hex at this point.
+ * @param {x: number, y: number} p    Location within the square.
+ * @returns {PIXI.Rectangle}
+ */
+function hexGridShape(p, { width = 1, height = 1 } = {}) {
+  // Canvas.grid.grid.getBorderPolygon will return null if width !== height.
+  if ( width !== height ) return null;
+
+  // Get the top left corner
+  const { getTopLeft, getBorderPolygon } = canvas.grid.grid;
+  const [tlx, tly] = getTopLeft(p.x, p.y);
+  const points = getBorderPolygon(width, height, 0); // TO-DO: Should a border be included to improve calc?
+  const pointsTranslated = [];
+  const ln = points.length;
+  for ( let i = 0; i < ln; i += 2) pointsTranslated.push(points[i] + tlx, points[i+1] + tly);
+  return new PIXI.Polygon(pointsTranslated);
 }
