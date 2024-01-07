@@ -10,11 +10,18 @@ ui
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER, registerDragRuler } from "./patching.js";
 import { MODULE_ID } from "./const.js";
+import { iterateGridUnderLine } from "./ruler.js";
 
 import { registerGeometry } from "./geometry/registration.js";
 
 Hooks.once("init", function() {
+  // Cannot access localization until init.
+  PREFER_TOKEN_CONTROL.title = game.i18n.localize(PREFER_TOKEN_CONTROL.title);
   registerGeometry();
+  game.modules.get(MODULE_ID).api = {
+    iterateGridUnderLine,
+    PATCHER
+  };
 });
 
 // Setup is after init; before ready.
@@ -38,13 +45,6 @@ const PREFER_TOKEN_CONTROL = {
   toggle: true
 };
 
-Hooks.once("init", function() {
-  // Cannot access localization until init.
-  PREFER_TOKEN_CONTROL.title = game.i18n.localize(PREFER_TOKEN_CONTROL.title);
-  game.modules.get(MODULE_ID).api = {
-    PATCHER
-  };
-});
 
 // Render the prefer token control if that setting is enabled
 Hooks.on("getSceneControlButtons", controls => {

@@ -4,7 +4,7 @@ Color,
 CONST,
 game,
 getProperty,
-Ray,
+PIXI,
 ui
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -162,21 +162,6 @@ function dragRulerClearWaypoints(wrapper) {
 }
 
 
-/**
- * Wrap DragRulerRuler.prototype._endMeasurement
- * If there is a dragged token, apply the elevation to all selected tokens (assumed part of the move).
- */
-function _endMeasurement(wrapped) {
-  console.debug("_endMeasurement");
-  return wrapped();
-}
-
-
-function _postMove(wrapped, token) {
-  console.debug("_postMove");
-  return wrapped(token);
-}
-
 // ----- NOTE: Segment highlighting ----- //
 /**
  * Wrap Ruler.prototype._highlightMeasurementSegment
@@ -258,45 +243,120 @@ function _highlightMeasurementSegment(wrapped, segment) {
 function splitSegment(segment, pastDistance, cutoffDistance) {
   cutoffDistance -= pastDistance;
   if ( cutoffDistance <= 0 ) return [];
+  if ( cutoffDistance >= segment.distance ) return [segment];
 
   // Determine where on the segment ray the cutoff occurs.
-  const deltaZ = segment.ray.B.subtract(segment.ray.A);
-  const segmentDistanceZ = deltaZ.magnitude();
-  const cutoffDistanceZ = CONFIG.GeometryLib.utils.gridUnitsToPixels(cutoffDistance)
-  let t = cutoffDistanceZ / segmentDistanceZ;
-  if ( t >= 1 ) return [segment];
-
-  // If we are using a grid, determine the point at which this segment crosses to the final
-  // grid square/hex.
-  // Split the segment early so the last grid square/hex is colored according to the highest color value (dash/max).
-  // Find where the segment intersects the last grid square/hex.
+  // Use canvas grid distance measurements to handle 5-5-5, 5-10-5, other measurement configs.
+  // At this point, the segment is too long for the cutoff.
+  // If we are using a grid, split the segment a grid/square hex.
+  // Find where the segment intersects the last grid square/hex before the cutoff.
+  let breakPoint;
+  const { A, B } = segment.ray;
   if ( canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS ) {
-    // Determine where before t on the ray the ray hits that grid square/hex.
-    const cutoffPoint = segment.ray.A.projectToward(segment.ray.B, t);
+    const z = segment.ray.A.z;
+    const gridShapeFn = canvas.grid.type === CONST.GRID_TYPES.SQUARE ? squareGridShape : hexGridShape;
+    const segmentDistZ = segment.ray.distance;
 
-    // Find the last grid space for the cutoff point and determine the intersection point.
-    const lastGridSpace = gridShape(cutoffPoint);
-    const ixs = lastGridSpace.segmentIntersections(segment.ray.A, cutoffPoint);
-    if ( !ixs.length ) return [segment];
-    const ix = ixs.at(-1);  // Should always have length 1, but...
+    // Cannot just use the t value because segment distance may not be Euclidean.
+    // Also need to handle that a segment might break on a grid border.
+    // Determine all the grid positions, and drop each one in turn.
+    breakPoint = B;
+    const gridIter = iterateGridUnderLine(A, B, { reverse: true });
+    for ( const [r1, c1] of gridIter ) {
+      const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(r1, c1);
+      const shape = gridShapeFn({x, y});
+      const ixs = shape
+        .segmentIntersections(A, B)
+        .map(ix => PIXI.Point.fromObject(ix));
+      if ( !ixs.length ) continue;
 
-    // Determine the new t value based on the intersection.
-    ix.z = segment.ray.A.z;
-    const distToIx = Point3d.distanceBetween(segment.ray.A, ix);
-    t = distToIx / segmentDistanceZ;
-    if ( t > 1 ) return [segment];
-    if ( t <= 0 ) return [];
+      // If more than one, split the distance.
+      // This avoids an issue whereby a segment is too short and so the first square is dropped when highlighting.
+      if ( ixs.length === 1 ) breakPoint = ixs[0];
+      else {
+        ixs.forEach(ix => {
+          ix.distance = ix.subtract(A).magnitude();
+          ix.t0 = ix.distance / segmentDistZ;
+        });
+        const t = (ixs[0].t0 + ixs[1].t0) * 0.5;
+        breakPoint = A.projectToward(B, t);
+      }
+
+      // Construct a shorter segment.
+      breakPoint.z = z;
+      const shorterSegment = { ray: new Ray3d(A, breakPoint) };
+      shorterSegment.distance = canvas.grid.measureDistances([shorterSegment], { gridSpaces: true })[0];
+      if ( shorterSegment.distance <= cutoffDistance ) break;
+    }
+  } else {
+    // Use t values.
+    const t = cutoffDistance / segment.distance;
+    breakPoint = A.projectToward(B, t);
   }
+  if ( breakPoint === B ) return [segment];
 
-  // Split the segment into two.
-  const segment0 = { ray: new Ray3d(segment.ray.A, segment.ray.A.projectToward(segment.ray.B, t)), color: segment.color };
-  const segment1 = { ray: new Ray3d(segment0.ray.B, segment.ray.B) };
+  // Split the segment into two at the break point.
+  const segment0 = { ray: new Ray3d(A, breakPoint), color: segment.color };
+  const segment1 = { ray: new Ray3d(breakPoint, B) };
   const segments = [segment0, segment1];
   const distances = canvas.grid.measureDistances(segments, { gridSpaces: false });
   segment0.distance = distances[0];
   segment1.distance = distances[1];
   return segments;
 }
+
+/*
+ * Generator to iterate grid points under a line.
+ * See Ruler.prototype._highlightMeasurementSegment
+ * @param {x: Number, y: Number} origin       Origination point
+ * @param {x: Number, y: Number} destination  Destination point
+ * @param {object} [opts]                     Options affecting the result
+ * @param {boolean} [opts.reverse]            Return the points from destination --> origin.
+ * @return Iterator, which in turn
+ *   returns [row, col] Array for each grid point under the line.
+ */
+export function * iterateGridUnderLine(origin, destination, { reverse = false } = {}) {
+  if ( reverse ) [origin, destination] = [destination, origin];
+
+  const distance = PIXI.Point.distanceBetween(origin, destination);
+  const spacer = canvas.scene.grid.type === CONST.GRID_TYPES.SQUARE ? 1.41 : 1;
+  const nMax = Math.max(Math.floor(distance / (spacer * Math.min(canvas.grid.w, canvas.grid.h))), 1);
+  const tMax = Array.fromRange(nMax+1).map(t => t / nMax);
+
+  // Track prior position
+  let prior = null;
+  let tPrior = null;
+  for ( const t of tMax ) {
+    const {x, y} = origin.projectToward(destination, t);
+
+    // Get grid position
+    const [r0, c0] = prior ?? [null, null];
+    const [r1, c1] = canvas.grid.grid.getGridPositionFromPixels(x, y);
+    if ( r0 === r1 && c0 === c1 ) continue;
+
+    // Skip the first one
+    // If the positions are not neighbors, also highlight their halfway point
+    if ( prior && !canvas.grid.isNeighbor(r0, c0, r1, c1) ) {
+      const th = (t + tPrior) * 0.5;
+      const {x: xh, y: yh} = origin.projectToward(destination, th);
+      yield canvas.grid.grid.getGridPositionFromPixels(xh, yh); // [rh, ch]
+    }
+
+    // After so the halfway point is done first.
+    yield [r1, c1];
+
+    // Set for next round.
+    prior = [r1, c1];
+    tPrior = t;
+  }
+}
+
+// iter = iterateGridUnderLine(A, B, { reverse: false })
+// points = [...iter]
+// points = points.map(pt => canvas.grid.grid.getPixelsFromGridPosition(pt[0], pt[1]))
+// points = points.map(pt => {
+//   return {x: pt[0], y: pt[1]}
+// })
 
 
 //   // Assume the destination elevation is the desired elevation if dragging multiple tokens.
@@ -320,13 +380,6 @@ function splitSegment(segment, pastDistance, cutoffDistance) {
 //   await t0.scene.updateEmbeddedDocuments(t0.constructor.embeddedName, updates);
 //   return true;
 
-/**
- * Wrap Ruler.prototype._getMeasurementDestination
- * If the last event held down the shift key, then use the precise location (no snapping).
- */
-
-
-
 PATCHES.BASIC.WRAPS = {
   clear,
   toJSON,
@@ -339,10 +392,8 @@ PATCHES.BASIC.WRAPS = {
   _getSegmentLabel,
 
   // Move token methods
-  // _animateSegment,
   _animateMovement,
   _highlightMeasurementSegment
-  // _postMove
 };
 
 PATCHES.BASIC.MIXES = { _animateSegment };
