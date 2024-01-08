@@ -5,8 +5,9 @@ canvas
 */
 "use strict";
 
-import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
+import { MODULE_ID, MODULES_ACTIVE, SPEED } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
+import { PATCHER } from "./patching.js";
 
 const SETTINGS = {
   PREFER_TOKEN_ELEVATION: "prefer-token-elevation",
@@ -20,12 +21,21 @@ const SETTINGS = {
     ALWAYS: "levels-labels-always"
   },
   NO_MODS: "no-modules-message",
-  PREFER_TOKEN_ELEVATION_CURRENT_VALUE: "prefer-token-elevation-current-value"
+  PREFER_TOKEN_ELEVATION_CURRENT_VALUE: "prefer-token-elevation-current-value",
+  TOKEN_RULER: {
+    ENABLED: "enable-token-ruler",
+    SPEED_HIGHLIGHTING: "token-ruler-highlighting",
+    SPEED_PROPERTY: "token-speed-property"
+  }
 };
 
 const KEYBINDINGS = {
   INCREMENT: "incrementElevation",
-  DECREMENT: "decrementElevation"
+  DECREMENT: "decrementElevation",
+  TOKEN_RULER: {
+    ADD_WAYPOINT: "addWaypointTokenRuler",
+    REMOVE_WAYPOINT: "removeWaypointTokenRuler"
+  }
 };
 
 
@@ -115,8 +125,45 @@ export class Settings extends ModuleSettingsAbstract {
       type: Boolean,
       requiresReload: false
     });
-  }
 
+    // ----- NOTE: Token ruler ----- //
+    register(KEYS.TOKEN_RULER.ENABLED, {
+      name: localize(`${KEYS.TOKEN_RULER.ENABLED}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.ENABLED}.hint`),
+      scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false,
+      onChange: value => this.toggleTokenRuler(value)
+    });
+
+    register(KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING, {
+      name: localize(`${KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING}.hint`),
+      scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false,
+      onChange: value => this.toggleSpeedHighlighting(value)
+    });
+
+    register(KEYS.TOKEN_RULER.SPEED_PROPERTY, {
+      name: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTY}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTY}.hint`),
+      scope: "world",
+      config: true,
+      default: SPEED.ATTRIBUTE,
+      type: String,
+      onChange: value => this.setSpeedProperty(value)
+    });
+
+    // Initialize the Token Ruler.
+    if ( this.get(KEYS.TOKEN_RULER.ENABLED) ) this.toggleTokenRuler(true);
+    if ( this.get(KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING) ) this.toggleSpeedHighlighting(true);
+    this.setSpeedProperty(this.get(KEYS.TOKEN_RULER.SPEED_PROPERTY));
+  }
 
   static registerKeybindings() {
     game.keybindings.register(MODULE_ID, KEYBINDINGS.DECREMENT, {
@@ -138,7 +185,40 @@ export class Settings extends ModuleSettingsAbstract {
       onDown: () => canvas.controls.ruler.incrementElevation(),
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
+
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT}.hint`),
+      editable: [
+        { key: "=" }
+      ],
+      onDown: context => toggleTokenRulerWaypoint(context, true),
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
+
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.TOKEN_RULER.REMOVE_WAYPOINT, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.REMOVE_WAYPOINT}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.REMOVE_WAYPOINT}.hint`),
+      editable: [
+        { key: "-" }
+      ],
+      onDown: context => toggleTokenRulerWaypoint(context, false),
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
   }
+
+  static toggleTokenRuler(value) {
+    if ( value ) PATCHER.registerGroup("TOKEN_RULER");
+    else PATCHER.deregisterGroup("TOKEN_RULER");
+  }
+
+  static toggleSpeedHighlighting(value) {
+    if ( value ) PATCHER.registerGroup("SPEED_HIGHLIGHTING");
+    else PATCHER.deregisterGroup("SPEED_HIGHLIGHTING");
+  }
+
+  static setSpeedProperty(value) { SPEED.ATTRIBUTE = value; }
+
 }
 
 /**
@@ -150,3 +230,27 @@ function reloadTokenControls() {
   canvas.tokens.deactivate();
   canvas.tokens.activate();
 }
+
+/**
+ * Add or remove a waypoint to the ruler, only if we are using the Token Ruler.
+ * @param {KeyboardEventContext} context          The context data of the event
+ * @param {boolean} [add=true]                    Whether to add or remove the waypoint
+ */
+let MOVE_TIME = 0;
+function toggleTokenRulerWaypoint(context, add = true) {
+  const position = canvas.mousePosition;
+  const ruler = canvas.controls.ruler;
+  if ( !canvas.tokens.active || !ruler || !ruler.active ) return;
+  console.debug(`${add ? "add" : "remove"}TokenRulerWaypoint`);
+
+  // Keep track of when we last added/deleted a waypoint.
+  const now = Date.now();
+  const delta = now - MOVE_TIME;
+  if ( delta < 100 ) return true; // Throttle keyboard movement once per 100ms
+  MOVE_TIME = now;
+
+  console.debug(`${add ? "adding" : "removing"}TokenRulerWaypoint`);
+  if ( add ) ruler._addWaypoint(position);
+  else if ( ruler.waypoints.length > 1 ) ruler._removeWaypoint(position); // Removing the last waypoint throws errors.
+}
+

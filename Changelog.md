@@ -1,3 +1,7 @@
+# 0.7.4
+Add option to enable a Token Ruler when dragging tokens.
+Add option to use a token speed attribute to highlight in differing colors when using the ruler (from a token) or dragging tokens.
+
 # 0.7.3
 Updated lib-geometry to 0.2.12.
 Refactor to use Patcher class.

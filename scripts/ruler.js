@@ -1,13 +1,20 @@
 /* globals
 canvas,
-game
+Color,
+CONST,
+game,
+getProperty,
+PIXI,
+ui
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 // Patches for the Ruler class
 export const PATCHES = {};
 PATCHES.BASIC = {};
+PATCHES.TOKEN_RULER = {};
 PATCHES.DRAG_RULER = {};
+PATCHES.SPEED_HIGHLIGHTING = {};
 
 import {
   elevationAtOrigin,
@@ -20,6 +27,10 @@ import {
   _getSegmentLabel,
   _animateSegment
 } from "./segments.js";
+
+import { SPEED } from "./const.js";
+import { Ray3d } from "./geometry/3d/Ray3d.js";
+import { Point3d } from "./geometry/3d/Point3d.js";
 
 /**
  * Modified Ruler
@@ -117,6 +128,23 @@ function _removeWaypoint(wrapper, point, { snap = true } = {}) {
 }
 
 /**
+ * Wrap Ruler.prototype._animateMovement
+ * Add additional controlled tokens to the move, if permitted.
+ */
+async function _animateMovement(wrapped, token) {
+  const promises = [wrapped(token)];
+  for ( const controlledToken of canvas.tokens.controlled ) {
+    if ( controlledToken === token ) continue;
+    if ( hasSegmentCollision(controlledToken, this.segments) ) {
+      ui.notifications.error(`${game.i18n.localize("RULER.MovementNotAllowed")} for ${controlledToken.name}`);
+      continue;
+    }
+    promises.push(wrapped(controlledToken));
+  }
+  return Promise.allSettled(promises);
+}
+
+/**
  * Wrap DragRulerRuler.prototype.dragRulerAddWaypoint
  * Add elevation increments
  */
@@ -135,20 +163,217 @@ function dragRulerClearWaypoints(wrapper) {
 }
 
 
+// ----- NOTE: Segment highlighting ----- //
 /**
- * Wrap DragRulerRuler.prototype._endMeasurement
- * If there is a dragged token, apply the elevation to all selected tokens (assumed part of the move).
+ * Wrap Ruler.prototype._highlightMeasurementSegment
  */
-function _endMeasurement(wrapped) {
-  console.debug("_endMeasurement");
-  return wrapped();
+function _highlightMeasurementSegment(wrapped, segment) {
+  const token = this._getMovementToken();
+  if ( !token ) return wrapped(segment);
+  const tokenSpeed = Number(getProperty(token, SPEED.ATTRIBUTE));
+  if ( !tokenSpeed ) return wrapped(segment);
+
+  // Based on the token being measured.
+  // Track the distance to this segment.
+  // Split this segment at the break points for the colors as necessary.
+  let pastDistance = 0;
+  for ( const s of this.segments ) {
+    if ( s === segment ) break;
+    pastDistance += s.distance;
+  }
+
+  // Constants
+  const walkDist = tokenSpeed;
+  const dashDist = tokenSpeed * SPEED.MULTIPLIER;
+  const walkColor = Color.from(0x00ff00);
+  const dashColor = Color.from(0xffff00);
+  const maxColor = Color.from(0xff0000);
+
+  if ( segment.distance > walkDist ) {
+    console.debug(`${segment.distance}`);
+  }
+
+  // Track the splits.
+  let remainingSegment = segment;
+  const splitSegments = [];
+
+  // Walk
+  remainingSegment.color = walkColor;
+  const walkSegments = splitSegment(remainingSegment, pastDistance, walkDist);
+  if ( walkSegments.length ) {
+    const segment0 = walkSegments[0];
+    splitSegments.push(segment0);
+    pastDistance += segment0.distance;
+    remainingSegment = walkSegments[1]; // May be undefined.
+  }
+
+  // Dash
+  if ( remainingSegment ) {
+    remainingSegment.color = dashColor;
+    const dashSegments = splitSegment(remainingSegment, pastDistance, dashDist);
+    if ( dashSegments.length ) {
+      const segment0 = dashSegments[0];
+      splitSegments.push(segment0);
+      if ( dashSegments.length > 1 ) {
+        const remainingSegment = dashSegments[1];
+        remainingSegment.color = maxColor;
+        splitSegments.push(remainingSegment);
+      }
+    }
+  }
+
+  // Highlight each split in turn, changing highlight color each time.
+  const priorColor = this.color;
+  for ( const s of splitSegments ) {
+    this.color = s.color;
+    wrapped(s);
+
+    // If gridless, highlight a rectangular shaped portion of the line.
+    if ( canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) {
+      const { A, B } = s.ray;
+      const width = Math.floor(canvas.scene.dimensions.size * 0.2);
+      const ptsA = perpendicularPoints(A, B, width * 0.5);
+      const ptsB = perpendicularPoints(B, A, width * 0.5);
+      const shape = new PIXI.Polygon([
+        ptsA[0],
+        ptsA[1],
+        ptsB[0],
+        ptsB[1]
+      ]);
+      canvas.grid.highlightPosition(this.name, {color: this.color, shape});
+    }
+  }
+  this.color = priorColor;
 }
 
+/**
+ * Cut a segment, represented as a ray and a distance, at a given point.
+ * @param {object} segment
+ * @param {number} pastDistance
+ * @param {number} cutoffDistance
+ * @returns {object[]}
+ * - If cutoffDistance is before the segment start, return [].
+ * - If cutoffDistance is after the segment end, return [segment].
+ * - If cutoffDistance is within the segment, return [segment0, segment1]
+ */
+function splitSegment(segment, pastDistance, cutoffDistance) {
+  cutoffDistance -= pastDistance;
+  if ( cutoffDistance <= 0 ) return [];
+  if ( cutoffDistance >= segment.distance ) return [segment];
 
-function _postMove(wrapped, token) {
-  console.debug("_animateSegment");
-  return wrapped(token);
+  // Determine where on the segment ray the cutoff occurs.
+  // Use canvas grid distance measurements to handle 5-5-5, 5-10-5, other measurement configs.
+  // At this point, the segment is too long for the cutoff.
+  // If we are using a grid, split the segment a grid/square hex.
+  // Find where the segment intersects the last grid square/hex before the cutoff.
+  let breakPoint;
+  const { A, B } = segment.ray;
+  if ( canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS ) {
+    const z = segment.ray.A.z;
+    const gridShapeFn = canvas.grid.type === CONST.GRID_TYPES.SQUARE ? squareGridShape : hexGridShape;
+    const segmentDistZ = segment.ray.distance;
+
+    // Cannot just use the t value because segment distance may not be Euclidean.
+    // Also need to handle that a segment might break on a grid border.
+    // Determine all the grid positions, and drop each one in turn.
+    breakPoint = B;
+    const gridIter = iterateGridUnderLine(A, B, { reverse: true });
+    for ( const [r1, c1] of gridIter ) {
+      const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(r1, c1);
+      const shape = gridShapeFn({x, y});
+      const ixs = shape
+        .segmentIntersections(A, B)
+        .map(ix => PIXI.Point.fromObject(ix));
+      if ( !ixs.length ) continue;
+
+      // If more than one, split the distance.
+      // This avoids an issue whereby a segment is too short and so the first square is dropped when highlighting.
+      if ( ixs.length === 1 ) breakPoint = ixs[0];
+      else {
+        ixs.forEach(ix => {
+          ix.distance = ix.subtract(A).magnitude();
+          ix.t0 = ix.distance / segmentDistZ;
+        });
+        const t = (ixs[0].t0 + ixs[1].t0) * 0.5;
+        breakPoint = A.projectToward(B, t);
+      }
+
+      // Construct a shorter segment.
+      breakPoint.z = z;
+      const shorterSegment = { ray: new Ray3d(A, breakPoint) };
+      shorterSegment.distance = canvas.grid.measureDistances([shorterSegment], { gridSpaces: true })[0];
+      if ( shorterSegment.distance <= cutoffDistance ) break;
+    }
+  } else {
+    // Use t values.
+    const t = cutoffDistance / segment.distance;
+    breakPoint = A.projectToward(B, t);
+  }
+  if ( breakPoint === B ) return [segment];
+
+  // Split the segment into two at the break point.
+  const segment0 = { ray: new Ray3d(A, breakPoint), color: segment.color };
+  const segment1 = { ray: new Ray3d(breakPoint, B) };
+  const segments = [segment0, segment1];
+  const distances = canvas.grid.measureDistances(segments, { gridSpaces: false });
+  segment0.distance = distances[0];
+  segment1.distance = distances[1];
+  return segments;
 }
+
+/*
+ * Generator to iterate grid points under a line.
+ * See Ruler.prototype._highlightMeasurementSegment
+ * @param {x: Number, y: Number} origin       Origination point
+ * @param {x: Number, y: Number} destination  Destination point
+ * @param {object} [opts]                     Options affecting the result
+ * @param {boolean} [opts.reverse]            Return the points from destination --> origin.
+ * @return Iterator, which in turn
+ *   returns [row, col] Array for each grid point under the line.
+ */
+export function * iterateGridUnderLine(origin, destination, { reverse = false } = {}) {
+  if ( reverse ) [origin, destination] = [destination, origin];
+
+  const distance = PIXI.Point.distanceBetween(origin, destination);
+  const spacer = canvas.scene.grid.type === CONST.GRID_TYPES.SQUARE ? 1.41 : 1;
+  const nMax = Math.max(Math.floor(distance / (spacer * Math.min(canvas.grid.w, canvas.grid.h))), 1);
+  const tMax = Array.fromRange(nMax+1).map(t => t / nMax);
+
+  // Track prior position
+  let prior = null;
+  let tPrior = null;
+  for ( const t of tMax ) {
+    const {x, y} = origin.projectToward(destination, t);
+
+    // Get grid position
+    const [r0, c0] = prior ?? [null, null];
+    const [r1, c1] = canvas.grid.grid.getGridPositionFromPixels(x, y);
+    if ( r0 === r1 && c0 === c1 ) continue;
+
+    // Skip the first one
+    // If the positions are not neighbors, also highlight their halfway point
+    if ( prior && !canvas.grid.isNeighbor(r0, c0, r1, c1) ) {
+      const th = (t + tPrior) * 0.5;
+      const {x: xh, y: yh} = origin.projectToward(destination, th);
+      yield canvas.grid.grid.getGridPositionFromPixels(xh, yh); // [rh, ch]
+    }
+
+    // After so the halfway point is done first.
+    yield [r1, c1];
+
+    // Set for next round.
+    prior = [r1, c1];
+    tPrior = t;
+  }
+}
+
+// iter = iterateGridUnderLine(A, B, { reverse: false })
+// points = [...iter]
+// points = points.map(pt => canvas.grid.grid.getPixelsFromGridPosition(pt[0], pt[1]))
+// points = points.map(pt => {
+//   return {x: pt[0], y: pt[1]}
+// })
+
 
 //   // Assume the destination elevation is the desired elevation if dragging multiple tokens.
 //   // (Likely more useful than having a bunch of tokens move down 10'?)
@@ -171,9 +396,6 @@ function _postMove(wrapped, token) {
 //   await t0.scene.updateEmbeddedDocuments(t0.constructor.embeddedName, updates);
 //   return true;
 
-
-
-
 PATCHES.BASIC.WRAPS = {
   clear,
   toJSON,
@@ -186,13 +408,16 @@ PATCHES.BASIC.WRAPS = {
   _getSegmentLabel,
 
   // Move token methods
-  _animateSegment,
-  // _postMove
+  _animateMovement
 };
+
+PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
+
+PATCHES.BASIC.MIXES = { _animateSegment };
 
 PATCHES.DRAG_RULER.WRAPS = {
   dragRulerAddWaypoint,
-  dragRulerClearWaypoints,
+  dragRulerClearWaypoints
   // _endMeasurement
 };
 
@@ -264,3 +489,91 @@ function addWaypointElevationIncrements(ruler, point) {
     newWaypoint._userElevationIncrements = ruler._userElevationIncrements;
   }
 }
+
+/**
+ * Check for token collision among the segments.
+ * Differs from Ruler.prototype._canMove because it adjusts for token position.
+ * See Ruler.prototype._animateMovement.
+ * @param {Token} token         Token to test for collisions
+ * @param {object} segments     Ruler segments to test
+ * @returns {boolean} True if a collision is found.
+ */
+function hasSegmentCollision(token, segments) {
+  const rulerOrigin = segments[0].ray.A;
+  const collisionConfig = { type: "move", mode: "any" };
+  const s2 = canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS ? 1 : (canvas.dimensions.size / 2);
+  let priorOrigin = { x: token.document.x, y: token.document.y };
+  const dx = Math.round((priorOrigin.x - rulerOrigin.x) / s2) * s2;
+  const dy = Math.round((priorOrigin.y - rulerOrigin.y) / s2) * s2;
+  for ( const segment of segments ) {
+    const adjustedDestination = canvas.grid.grid._getRulerDestination(segment.ray, {x: dx, y: dy}, token);
+    collisionConfig.origin = priorOrigin;
+    if ( token.checkCollision(adjustedDestination, collisionConfig) ) return true;
+    priorOrigin = adjustedDestination;
+  }
+  return false;
+}
+
+
+/**
+ * Helper to get the grid shape for given grid type.
+ * @param {x: number, y: number} p    Location to use.
+ * @returns {null|PIXI.Rectangle|PIXI.Polygon}
+ */
+function gridShape(p) {
+  const { GRIDLESS, SQUARE } = CONST.GRID_TYPES;
+  switch ( canvas.grid.type ) {
+    case GRIDLESS: return null;
+    case SQUARE: return squareGridShape(p);
+    default: return hexGridShape(p);
+  }
+}
+
+/**
+ * From ElevatedVision ElevationLayer.js
+ * Return the rectangle corresponding to the grid square at this point.
+ * @param {x: number, y: number} p    Location within the square.
+ * @returns {PIXI.Rectangle}
+ */
+function squareGridShape(p) {
+  // Get the top left corner
+  const [tlx, tly] = canvas.grid.grid.getTopLeft(p.x, p.y);
+  const { w, h } = canvas.grid;
+  return new PIXI.Rectangle(tlx, tly, w, h);
+}
+
+/**
+ * From ElevatedVision ElevationLayer.js
+ * Return the polygon corresponding to the grid hex at this point.
+ * @param {x: number, y: number} p    Location within the square.
+ * @returns {PIXI.Rectangle}
+ */
+function hexGridShape(p, { width = 1, height = 1 } = {}) {
+  // Canvas.grid.grid.getBorderPolygon will return null if width !== height.
+  if ( width !== height ) return null;
+
+  // Get the top left corner
+  const [tlx, tly] = canvas.grid.grid.getTopLeft(p.x, p.y);
+  const points = canvas.grid.grid.getBorderPolygon(width, height, 0); // TO-DO: Should a border be included to improve calc?
+  const pointsTranslated = [];
+  const ln = points.length;
+  for ( let i = 0; i < ln; i += 2) pointsTranslated.push(points[i] + tlx, points[i+1] + tly);
+  return new PIXI.Polygon(pointsTranslated);
+}
+
+/**
+ * Get the two points perpendicular to line A --> B at A, a given distance from the line A --> B
+ * @param {PIXI.Point} A
+ * @param {PIXI.Point} B
+ * @param {number} distance
+ * @returns {[PIXI.Point, PIXI.Point]} Points on either side of A.
+ */
+function perpendicularPoints(A, B, distance = 1) {
+  const delta = B.subtract(A);
+  const pt0 = new PIXI.Point(A.x - delta.y, A.y + delta.x);
+  return [
+    A.towardsPoint(pt0, distance),
+    A.towardsPoint(pt0, -distance)
+  ];
+}
+
