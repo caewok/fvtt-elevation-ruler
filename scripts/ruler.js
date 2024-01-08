@@ -14,6 +14,7 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.TOKEN_RULER = {};
 PATCHES.DRAG_RULER = {};
+PATCHES.SPEED_HIGHLIGHTING = {};
 
 import {
   elevationAtOrigin,
@@ -407,9 +408,10 @@ PATCHES.BASIC.WRAPS = {
   _getSegmentLabel,
 
   // Move token methods
-  _animateMovement,
-  _highlightMeasurementSegment
+  _animateMovement
 };
+
+PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 
 PATCHES.BASIC.MIXES = { _animateSegment };
 
