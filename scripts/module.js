@@ -10,7 +10,7 @@ ui
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER, registerDragRuler } from "./patching.js";
 import { MODULE_ID } from "./const.js";
-import { iterateGridUnderLine } from "./ruler.js";
+import { iterateGridUnderLine } from "./Ruler.js";
 
 import { registerGeometry } from "./geometry/registration.js";
 
