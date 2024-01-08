@@ -41,6 +41,13 @@ async function _onDragLeftDrop(wrapped, event) {
   // End the ruler measurement
   const ruler = canvas.controls.ruler;
   if ( !ruler.active ) return wrapped(event);
+  const destination = event.interactionData.destination;
+
+  // Ensure the cursor destination is within bounds
+  if ( !canvas.dimensions.rect.contains(destination.x, destination.y) ) {
+    ruler._onMouseUp(event);
+    return false;
+  }
   await ruler.moveToken();
   ruler._onMouseUp(event);
 }

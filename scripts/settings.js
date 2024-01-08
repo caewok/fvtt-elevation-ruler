@@ -5,7 +5,7 @@ canvas
 */
 "use strict";
 
-import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
+import { MODULE_ID, MODULES_ACTIVE, SPEED } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { PATCHER } from "./patching.js";
 
@@ -24,7 +24,8 @@ const SETTINGS = {
   PREFER_TOKEN_ELEVATION_CURRENT_VALUE: "prefer-token-elevation-current-value",
   TOKEN_RULER: {
     ENABLED: "enable-token-ruler",
-    RANGE_COLORS: "enable-token-ruler-colors"
+    SPEED_HIGHLIGHTING: "token-ruler-highlighting",
+    SPEED_PROPERTY: "token-speed-property"
   }
 };
 
@@ -137,9 +138,31 @@ export class Settings extends ModuleSettingsAbstract {
       onChange: value => this.toggleTokenRuler(value)
     });
 
+    register(KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING, {
+      name: localize(`${KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING}.hint`),
+      scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false,
+      onChange: value => this.toggleSpeedHighlighting(value)
+    });
+
+    register(KEYS.TOKEN_RULER.SPEED_PROPERTY, {
+      name: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTY}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTY}.hint`),
+      scope: "world",
+      config: true,
+      default: SPEED.ATTRIBUTE,
+      type: String,
+      onChange: value => this.setSpeedProperty(value)
+    });
+
     // Initialize the Token Ruler.
     if ( this.get(KEYS.TOKEN_RULER.ENABLED) ) this.toggleTokenRuler(true);
-
+    if ( this.get(KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING) ) this.toggleSpeedHighlighting(true);
+    this.setSpeedProperty(this.get(KEYS.TOKEN_RULER.SPEED_PROPERTY));
   }
 
   static registerKeybindings() {
@@ -188,6 +211,13 @@ export class Settings extends ModuleSettingsAbstract {
     if ( value ) PATCHER.registerGroup("TOKEN_RULER");
     else PATCHER.deregisterGroup("TOKEN_RULER");
   }
+
+  static toggleSpeedHighlighting(value) {
+    if ( value ) PATCHER.registerGroup("SPEED_HIGHLIGHTING");
+    else PATCHER.deregisterGroup("SPEED_HIGHLIGHTING");
+  }
+
+  static setSpeedProperty(value) { SPEED.ATTRIBUTE = value; }
 
 }
 

@@ -36,5 +36,12 @@
     "elevationruler.settings.enable-token-ruler.name": "Use Token Ruler",
     "elevationruler.settings.enable-token-ruler.hint": "Display the ruler when dragging tokens.",
 
+    "elevationruler.settings.token-ruler-highlighting.name": "Use Token Speed Highlighting",
+    "elevationruler.settings.token-ruler-highlighting.hint": "When using the ruler, use different colors for token walk/dash/max distance.",
+
+    "elevationruler.settings.token-speed-property.name": "Token Speed Property",
+    "elevationruler.settings.token-speed-property.hint": "For token speed highlighting, this is the property representing token speed.",
+
+
     "elevationruler.controls.prefer-token-elevation.name": "Prefer Token Elevation"
 }
