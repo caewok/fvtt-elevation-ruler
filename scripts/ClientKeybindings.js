@@ -15,18 +15,20 @@ PATCHES.TOKEN_RULER = {}; // Assume this patch is only present if the token rule
  * If the Token Ruler is active, call that instead.
  * @param {KeyboardEventContext} context    The context data of the event
  */
-async function _onMeasuredRulerMovement(wrapped, context) {
-  console.log("_onMeasuredRulerMovement");
+function _onMeasuredRulerMovement(wrapped, context) {
   // We only care about when tokens are being dragged
   const ruler = canvas.controls.ruler;
+  if ( ui.controls.tool !== "select" ) return wrapped(context);
+
+  // If in token selection, don't use the ruler unless we are already starting a measurement.
   if ( !ruler.active
-    || !canvas.tokens.active
-    || ui.controls.tool !== "select" ) return wrapped(context);
+    || !canvas.controls.ruler._state
+    || !canvas.tokens.active ) return false;
 
   // For each controlled token, end the drag.
   canvas.tokens.clearPreviewContainer();
-  await ruler.moveToken();
-  ruler._endMeasurement();
+  ruler.moveToken().then((response) => ruler._endMeasurement());
+  return true;
 }
 
 PATCHES.TOKEN_RULER.STATIC_WRAPS = { _onMeasuredRulerMovement }
