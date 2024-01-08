@@ -228,8 +228,19 @@ function _highlightMeasurementSegment(wrapped, segment) {
     wrapped(s);
 
     // If gridless, highlight a rectangular shaped portion of the line.
-
-
+    if ( canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) {
+      const { A, B } = s.ray;
+      const width = Math.floor(canvas.scene.dimensions.size * 0.2);
+      const ptsA = perpendicularPoints(A, B, width * 0.5);
+      const ptsB = perpendicularPoints(B, A, width * 0.5);
+      const shape = new PIXI.Polygon([
+        ptsA[0],
+        ptsA[1],
+        ptsB[0],
+        ptsB[1]
+      ]);
+      canvas.grid.highlightPosition(this.name, {color: this.color, shape});
+    }
   }
   this.color = priorColor;
 }
@@ -547,3 +558,20 @@ function hexGridShape(p, { width = 1, height = 1 } = {}) {
   for ( let i = 0; i < ln; i += 2) pointsTranslated.push(points[i] + tlx, points[i+1] + tly);
   return new PIXI.Polygon(pointsTranslated);
 }
+
+/**
+ * Get the two points perpendicular to line A --> B at A, a given distance from the line A --> B
+ * @param {PIXI.Point} A
+ * @param {PIXI.Point} B
+ * @param {number} distance
+ * @returns {[PIXI.Point, PIXI.Point]} Points on either side of A.
+ */
+function perpendicularPoints(A, B, distance = 1) {
+  const delta = B.subtract(A);
+  const pt0 = new PIXI.Point(A.x - delta.y, A.y + delta.x);
+  return [
+    A.towardsPoint(pt0, distance),
+    A.towardsPoint(pt0, -distance)
+  ];
+}
+
