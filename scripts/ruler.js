@@ -2,6 +2,7 @@
 canvas,
 Color,
 CONST,
+duplicate,
 game,
 getProperty,
 PIXI,
@@ -30,7 +31,6 @@ import {
 
 import { SPEED } from "./const.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
-import { Point3d } from "./geometry/3d/Point3d.js";
 
 /**
  * Modified Ruler
@@ -88,17 +88,20 @@ function toJSON(wrapper) {
   // console.log("constructing ruler json!")
   const obj = wrapper();
   obj._userElevationIncrements = this._userElevationIncrements;
+  obj._unsnap = this._unsnap;
   return obj;
 }
 
 /**
  * Wrap Ruler.prototype.update
- * Retrieve the current _userElevationIncrements
+ * Retrieve the current _userElevationIncrements.
+ * Retrieve the current snap status.
  */
 function update(wrapper, data) {
   // Fix for displaying user elevation increments as they happen.
   const triggerMeasure = this._userElevationIncrements !== data._userElevationIncrements;
   this._userElevationIncrements = data._userElevationIncrements;
+  this._unsnap = data._unsnap;
   wrapper(data);
 
   if ( triggerMeasure ) {
@@ -114,6 +117,21 @@ function update(wrapper, data) {
  */
 function _addWaypoint(wrapper, point) {
   wrapper(point);
+
+  // If moving a token, start the origin at the token center.
+  if ( this.waypoints.length === 1 ) {
+    // Temporarily replace the waypoint with the point so we can detect the token properly.
+    const snappedWaypoint = duplicate(this.waypoints[0]);
+    this.waypoints[0].copyFrom(point);
+    const token = this._getMovementToken();
+    if ( token ) this.waypoints[0].copyFrom(token.center);
+    else this.waypoints[0].copyFrom(snappedWaypoint);
+  }
+
+  // Otherwise if shift was held, use the precise point.
+  else if ( this._unsnap ) this.waypoints.at(-1).copyFrom(point);
+
+  // Elevate the waypoint.
   addWaypointElevationIncrements(this, point);
 }
 
@@ -125,6 +143,18 @@ function _addWaypoint(wrapper, point) {
 function _removeWaypoint(wrapper, point, { snap = true } = {}) {
   this._userElevationIncrements = 0;
   wrapper(point, { snap });
+}
+
+/**
+ * Wrap Ruler.prototype._getMeasurementDestination
+ * If shift was held, use the precise destination instead of snapping.
+ * @param {Point} destination     The current pixel coordinates of the mouse movement
+ * @returns {Point}               The destination point, a center of a grid space
+ */
+function _getMeasurementDestination(wrapped, destination) {
+  const pt = wrapped(destination);
+  if ( this._unsnap ) pt.copyFrom(destination);
+  return pt;
 }
 
 /**
@@ -188,10 +218,6 @@ function _highlightMeasurementSegment(wrapped, segment) {
   const walkColor = Color.from(0x00ff00);
   const dashColor = Color.from(0xffff00);
   const maxColor = Color.from(0xff0000);
-
-  if ( segment.distance > walkDist ) {
-    console.debug(`${segment.distance}`);
-  }
 
   // Track the splits.
   let remainingSegment = segment;
@@ -396,19 +422,84 @@ export function * iterateGridUnderLine(origin, destination, { reverse = false } 
 //   await t0.scene.updateEmbeddedDocuments(t0.constructor.embeddedName, updates);
 //   return true;
 
+// ----- NOTE: Event handling ----- //
+
+/**
+ * Wrap Ruler.prototype._onDragStart
+ * Record whether shift is held.
+ * @param {PIXI.FederatedEvent} event   The drag start event
+ * @see {Canvas._onDragLeftStart}
+ */
+function _onDragStart(wrapped, event) {
+  this._unsnap = event.shiftKey;
+  return wrapped(event);
+}
+
+/**
+ * Wrap Ruler.prototype._onClickLeft.
+ * Record whether shift is held.
+ * @param {PIXI.FederatedEvent} event   The pointer-down event
+ * @see {Canvas._onDragLeftStart}
+ */
+function _onClickLeft(wrapped, event) {
+  this._unsnap = event.shiftKey;
+  return wrapped(event);
+}
+
+/**
+ * Wrap Ruler.prototype._onClickRight
+ * Record whether shift is held.
+ * @param {PIXI.FederatedEvent} event   The pointer-down event
+ * @see {Canvas._onClickRight}
+ */
+function _onClickRight(wrapped, event) {
+  this._unsnap = event.shiftKey;
+  return wrapped(event);
+}
+
+/**
+ * Wrap Ruler.prototype._onMouseMove
+ * Record whether shift is held.
+ * @param {PIXI.FederatedEvent} event   The mouse move event
+ * @see {Canvas._onDragLeftMove}
+ */
+function _onMouseMove(wrapped, event) {
+  this._unsnap = event.shiftKey;
+  return wrapped(event);
+}
+
+/**
+ * Wrap Ruler.prototype._onMouseUp
+ * Record whether shift is held
+ * @param {PIXI.FederatedEvent} event   The pointer-up event
+ * @see {Canvas._onDragLeftDrop}
+ */
+function _onMouseUp(wrapped, event) {
+  this._unsnap = event.shiftKey;
+  return wrapped(event);
+}
+
 PATCHES.BASIC.WRAPS = {
   clear,
   toJSON,
   update,
   _addWaypoint,
   _removeWaypoint,
+  _getMeasurementDestination,
 
   // Wraps related to segments
   _getMeasurementSegments,
   _getSegmentLabel,
 
   // Move token methods
-  _animateMovement
+  _animateMovement,
+
+  // Events
+  _onDragStart,
+  _onClickLeft,
+  _onClickRight,
+  _onMouseMove,
+  _onMouseUp
 };
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };

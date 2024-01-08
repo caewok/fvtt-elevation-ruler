@@ -1,3 +1,7 @@
+# 0.7.5
+Fix for pause/unpause game not working due to conflict with token move using spacebar.
+If shift is held, unsnap ruler waypoints and destination. If measuring from a token, set the origin point of the ruler to the (possibly unsnapped) token center.
+
 # 0.7.4
 Add option to enable a Token Ruler when dragging tokens.
 Add option to use a token speed attribute to highlight in differing colors when using the ruler (from a token) or dragging tokens.
