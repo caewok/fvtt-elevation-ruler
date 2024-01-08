@@ -1,3 +1,6 @@
+# 0.7.6
+Fix incorrect `Ruler.js` import. Closes issue #26.
+
 # 0.7.5
 Fix for pause/unpause game not working due to conflict with token move using spacebar.
 Add handling for unsnapping from the grid. If shift is held, unsnap ruler waypoints and destination. If measuring from a token, set the origin point of the ruler to the (possibly unsnapped) token center.
