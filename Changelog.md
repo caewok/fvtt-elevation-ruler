@@ -1,3 +1,6 @@
+# 0.7.5
+Fix for pause/unpause game not working due to conflict with token move using spacebar.
+
 # 0.7.4
 Add option to enable a Token Ruler when dragging tokens.
 Add option to use a token speed attribute to highlight in differing colors when using the ruler (from a token) or dragging tokens.
