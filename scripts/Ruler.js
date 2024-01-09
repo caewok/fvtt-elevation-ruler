@@ -14,7 +14,6 @@ ui
 export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.TOKEN_RULER = {};
-PATCHES.DRAG_RULER = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
 import {
@@ -138,7 +137,6 @@ function _addWaypoint(wrapper, point) {
 /**
  * Wrap Ruler.prototype._removeWaypoint
  * Remove elevation increments.
- * (Note: also called by DragRulerRuler.prototype.dragRulerDeleteWaypoint)
  */
 function _removeWaypoint(wrapper, point, { snap = true } = {}) {
   this._userElevationIncrements = 0;
@@ -172,24 +170,6 @@ async function _animateMovement(wrapped, token) {
     promises.push(wrapped(controlledToken));
   }
   return Promise.allSettled(promises);
-}
-
-/**
- * Wrap DragRulerRuler.prototype.dragRulerAddWaypoint
- * Add elevation increments
- */
-function dragRulerAddWaypoint(wrapper, point, options = {}) {
-  wrapper(point, options);
-  addWaypointElevationIncrements(this, point);
-}
-
-/**
- * Wrap DragRulerRuler.prototype.dragRulerClearWaypoints
- * Remove elevation increments
- */
-function dragRulerClearWaypoints(wrapper) {
-  wrapper();
-  this._userElevationIncrements = 0;
 }
 
 /**
@@ -441,35 +421,6 @@ export function * iterateGridUnderLine(origin, destination, { reverse = false } 
   }
 }
 
-// iter = iterateGridUnderLine(A, B, { reverse: false })
-// points = [...iter]
-// points = points.map(pt => canvas.grid.grid.getPixelsFromGridPosition(pt[0], pt[1]))
-// points = points.map(pt => {
-//   return {x: pt[0], y: pt[1]}
-// })
-
-
-//   // Assume the destination elevation is the desired elevation if dragging multiple tokens.
-//   // (Likely more useful than having a bunch of tokens move down 10'?)
-//   const ruler = canvas.controls.ruler;
-//   if ( !ruler.isDragRuler ) return wrapped(event);
-//
-//   // Do before calling wrapper b/c ruler may get cleared.
-//   const elevation = elevationAtWaypoint(ruler.destination);
-//   const selectedTokens = [...canvas.tokens.controlled];
-//   if ( !selectedTokens.length ) selectedTokens.push(ruler.draggedEntity);
-//
-//   const result = wrapped(event);
-//   if ( result === false ) return false; // Drag did not happen
-//
-//   const updates = selectedTokens.map(t => {
-//     return { _id: t.id, elevation };
-//   });
-//
-//   const t0 = selectedTokens[0];
-//   await t0.scene.updateEmbeddedDocuments(t0.constructor.embeddedName, updates);
-//   return true;
-
 // ----- NOTE: Event handling ----- //
 
 /**
@@ -554,17 +505,11 @@ PATCHES.BASIC.WRAPS = {
 
 PATCHES.TOKEN_RULER.WRAPS = {
 
-}
+};
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 
 PATCHES.BASIC.MIXES = { _animateSegment };
-
-PATCHES.DRAG_RULER.WRAPS = {
-  dragRulerAddWaypoint,
-  dragRulerClearWaypoints
-  // _endMeasurement
-};
 
 // ----- NOTE: Methods ----- //
 

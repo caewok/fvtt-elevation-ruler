@@ -34,7 +34,3 @@ export function initializePatching() {
   PATCHER.registerGroup("BASIC");
 }
 
-export function registerDragRuler() {
-  if ( MODULES_ACTIVE.DRAG_RULER ) PATCHER.registerGroup("DRAG_RULER");
-}
-

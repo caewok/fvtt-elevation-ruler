@@ -8,7 +8,7 @@ ui
 "use strict";
 
 import { Settings } from "./settings.js";
-import { initializePatching, PATCHER, registerDragRuler } from "./patching.js";
+import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID } from "./const.js";
 import { iterateGridUnderLine } from "./Ruler.js";
 
@@ -51,10 +51,6 @@ Hooks.on("getSceneControlButtons", controls => {
   if ( !canvas.scene || !Settings.get(Settings.KEYS.PREFER_TOKEN_ELEVATION) ) return;
   const tokenTools = controls.find(c => c.name === "token");
   tokenTools.tools.push(PREFER_TOKEN_CONTROL);
-});
-
-Hooks.on("dragRuler.ready", function() {
-  registerDragRuler();
 });
 
 Hooks.on("canvasInit", function(_canvas) {
