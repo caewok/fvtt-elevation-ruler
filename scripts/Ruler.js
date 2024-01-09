@@ -141,13 +141,22 @@ function _removeWaypoint(wrapper, point, { snap = true } = {}) {
 /**
  * Wrap Ruler.prototype._getMeasurementDestination
  * If shift was held, use the precise destination instead of snapping.
+ * If dragging a token, use the center of the token as the destination.
  * @param {Point} destination     The current pixel coordinates of the mouse movement
  * @returns {Point}               The destination point, a center of a grid space
  */
 function _getMeasurementDestination(wrapped, destination) {
   const pt = wrapped(destination);
-  if ( this._unsnap ) pt.copyFrom(destination);
-  return pt;
+  if ( this._unsnap ) {
+    pt.copyFrom(destination);
+    return pt;
+  }
+
+  const token = this._getMovementToken();
+  if ( !token ) return pt;
+  const clone = canvas.tokens.preview.children.find(c => c._original === token);
+  if ( !clone ) return pt;
+  return clone.center;
 }
 
 /**
