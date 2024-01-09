@@ -10,8 +10,7 @@ ui
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID } from "./const.js";
-import { iterateGridUnderLine } from "./Ruler.js";
-
+import { iterateGridUnderLine } from "./util.js";
 import { registerGeometry } from "./geometry/registration.js";
 
 Hooks.once("init", function() {
