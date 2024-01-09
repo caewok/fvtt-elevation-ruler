@@ -42,6 +42,8 @@
     "elevationruler.settings.token-speed-property.name": "Token Speed Property",
     "elevationruler.settings.token-speed-property.hint": "For token speed highlighting, this is the property representing token speed.",
 
+    "elevationruler.settings.token-speed-property.name": "Token As Terrain Multiplier",
+    "elevationruler.settings.token-speed-property.hint": "Multiplier to use to calculate movement speed when moving through other tokens. Set to 1 to ignore. Values less than 1 treat token spaces as faster than normal; values greater than 1 penalize movement through token spaces.",
 
     "elevationruler.controls.prefer-token-elevation.name": "Prefer Token Elevation"
 }
