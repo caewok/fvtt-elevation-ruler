@@ -19,7 +19,7 @@ PATCHES.BASIC = {};
 function updateSetting(document, change, options, userId) {  // eslint-disable-line no-unused-vars
   const [module, ...arr] = document.key.split(".");
   const key = arr.join("."); // If the key has periods, multiple will be returned by split.
-  if ( module === MODULE_ID && Settings.cache.has(key) ) Settings.cache.delete(key);
+  if ( module === MODULE_ID && ModuleSettingsAbstract.cache.has(key) ) ModuleSettingsAbstract.cache.delete(key);
 }
 
 PATCHES.BASIC.HOOKS = { updateSetting };
