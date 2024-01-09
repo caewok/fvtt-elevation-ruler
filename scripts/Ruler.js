@@ -193,6 +193,15 @@ function dragRulerClearWaypoints(wrapper) {
 }
 
 /**
+ * Wrap Ruler.prototype._canMove
+ * Allow GM full reign to move tokens.
+ */
+function _canMove(wrapper, token) {
+  if ( this.user.isGM ) return true;
+  return wrapper(token);
+}
+
+/**
  * Wrap Ruler.prototype._computeDistance
  * Add moveDistance property to each segment; track the total.
  * If token not present or Terrain Mapper not active, this will be the same as segment distance.
@@ -539,7 +548,8 @@ PATCHES.BASIC.WRAPS = {
   _onClickLeft,
   _onClickRight,
   _onMouseMove,
-  _onMouseUp
+  _onMouseUp,
+  _canMove
 };
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
