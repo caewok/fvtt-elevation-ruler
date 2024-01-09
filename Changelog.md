@@ -1,3 +1,6 @@
+# 0.7.7
+Allow GM to move tokens using the ruler regardless of obstacle. Closes issue #27.
+
 # 0.7.6
 Fix incorrect `Ruler.js` import. Closes issue #26.
 
