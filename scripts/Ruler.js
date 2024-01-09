@@ -13,7 +13,6 @@ ui
 // Patches for the Ruler class
 export const PATCHES = {};
 PATCHES.BASIC = {};
-PATCHES.TOKEN_RULER = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
 import {
@@ -501,10 +500,6 @@ PATCHES.BASIC.WRAPS = {
   _onMouseMove,
   _onMouseUp,
   _canMove
-};
-
-PATCHES.TOKEN_RULER.WRAPS = {
-
 };
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
