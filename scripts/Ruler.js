@@ -165,7 +165,7 @@ async function _animateMovement(wrapped, token) {
   const promises = [wrapped(token)];
   for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;
-    if ( hasSegmentCollision(controlledToken, this.segments) ) {
+    if ( !this.user.isGM && hasSegmentCollision(controlledToken, this.segments) ) {
       ui.notifications.error(`${game.i18n.localize("RULER.MovementNotAllowed")} for ${controlledToken.name}`);
       continue;
     }
@@ -551,6 +551,10 @@ PATCHES.BASIC.WRAPS = {
   _onMouseUp,
   _canMove
 };
+
+PATCHES.TOKEN_RULER.WRAPS = {
+
+}
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 
