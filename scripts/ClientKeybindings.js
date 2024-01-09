@@ -31,4 +31,4 @@ function _onMeasuredRulerMovement(wrapped, context) {
   return true;
 }
 
-PATCHES.TOKEN_RULER.STATIC_WRAPS = { _onMeasuredRulerMovement }
+PATCHES.TOKEN_RULER.STATIC_MIXES = { _onMeasuredRulerMovement }
