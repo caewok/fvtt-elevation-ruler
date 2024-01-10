@@ -294,6 +294,7 @@ function terrainTokenMoveMultiplier(ray, token) {
 
   // Determine the percentage of the ray that intersects the constrained token shapes.
   const tValues = [];
+  const deltaMag = B.to2d().subtract(A).magnitude();
   for ( const t of tokens ) {
     const border = t.constrainedTokenBorder;
     let inside = false;
@@ -304,6 +305,15 @@ function terrainTokenMoveMultiplier(ray, token) {
 
     // At each intersection, we switch between inside and outside.
     const ixs = border.segmentIntersections(A, B); // Can we assume the ixs are sorted by t0?
+
+    // See Foundry issue #10336. Don't trust the t0 values.
+    ixs.forEach(ix => {
+      // See PIXI.Point.prototype.towardsPoint
+      const distance = PIXI.Point.distanceBetween(A, ix);
+      ix.t0 = distance / deltaMag;
+    });
+    ixs.sort((a, b) => a.t0 - b.t0);
+
     ixs.forEach(ix => {
       inside ^= true;
       tValues.push({ t: ix.t0, inside })
