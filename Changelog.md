@@ -1,3 +1,10 @@
+# 0.7.7
+Allow GM to move tokens using the ruler regardless of obstacle. Closes issue #27.
+Cancel the ruler when canceling the drag. Closes issue #28.
+Add setting to treat tokens as difficult terrain. Closes issue #29.
+Force the ruler to use the center of the (dragged) token. Closes issue #30.
+Fix error message re setting when using Levels. Closes issue #31.
+
 # 0.7.6
 Fix incorrect `Ruler.js` import. Closes issue #26.
 

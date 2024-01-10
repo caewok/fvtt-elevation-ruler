@@ -12,6 +12,7 @@ import { PATCHES as PATCHES_PlaceableObject } from "./PlaceableObject.js";
 import { PATCHES as PATCHES_ClientKeybindings } from "./ClientKeybindings.js";
 import { PATCHES as PATCHES_BaseGrid } from "./BaseGrid.js";
 import { PATCHES as PATCHES_HexagonalGrid } from "./HexagonalGrid.js";
+import { PATCHES as PATCHES_ConstrainedTokenBorder } from "./ConstrainedTokenBorder.js";
 
 // Settings
 import { PATCHES as PATCHES_Settings } from "./ModuleSettingsAbstract.js";
@@ -19,6 +20,7 @@ import { PATCHES as PATCHES_Settings } from "./ModuleSettingsAbstract.js";
 const PATCHES = {
   BaseGrid: PATCHES_BaseGrid,
   ClientKeybindings: PATCHES_ClientKeybindings,
+  ConstrainedTokenBorder: PATCHES_ConstrainedTokenBorder,
   GridLayer: PATCHES_GridLayer,
   HexagonalGrid: PATCHES_HexagonalGrid,
   Ruler: PATCHES_Ruler,
@@ -32,9 +34,6 @@ PATCHER.addPatchesFromRegistrationObject(PATCHES);
 
 export function initializePatching() {
   PATCHER.registerGroup("BASIC");
-}
-
-export function registerDragRuler() {
-  if ( MODULES_ACTIVE.DRAG_RULER ) PATCHER.registerGroup("DRAG_RULER");
+  PATCHER.registerGroup("ConstrainedTokenBorder");
 }
 

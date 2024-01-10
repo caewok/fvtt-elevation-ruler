@@ -4,11 +4,12 @@ canvas
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 import { elevationAtWaypoint } from "./segments.js";
+import { ConstrainedTokenBorder } from "./ConstrainedTokenBorder.js";
 
 // Patches for the Token class
 export const PATCHES = {};
-PATCHES.DRAG_RULER = {};
 PATCHES.TOKEN_RULER = {}; // Assume this patch is only present if the token ruler setting is enabled.
+PATCHES.ConstrainedTokenBorder = {};
 
 /**
  * Wrap Token.prototype._onDragLeftStart
@@ -23,6 +24,19 @@ function _onDragLeftStart(wrapped, event) {
 
 /**
  * Wrap Token.prototype._onDragLeftMove
+ * Continue the ruler measurement
+ */
+function _onDragLeftCancel(wrapped, event) {
+  wrapped(event);
+
+  // Cancel a Ruler measurement.
+  // If moving, handled by the drag left drop.
+  const ruler = canvas.controls.ruler;
+  if ( ruler._state !== Ruler.STATES.MOVING ) canvas.controls.ruler._onMouseUp(event);
+}
+
+/**
+ * Wrap Token.prototype._onDragLeftCancel
  * Continue the ruler measurement
  */
 function _onDragLeftMove(wrapped, event) {
@@ -48,6 +62,7 @@ async function _onDragLeftDrop(wrapped, event) {
     ruler._onMouseUp(event);
     return false;
   }
+  ruler._state = Ruler.STATES.MOVING; // Do this before the await.
   await ruler.moveToken();
   ruler._onMouseUp(event);
 }
@@ -55,40 +70,65 @@ async function _onDragLeftDrop(wrapped, event) {
 
 PATCHES.TOKEN_RULER.WRAPS = {
   _onDragLeftStart,
-  _onDragLeftMove
+  _onDragLeftMove,
+  _onDragLeftCancel
 };
 
 PATCHES.TOKEN_RULER.MIXES = { _onDragLeftDrop };
 
+// ----- NOTE: Getters ----- //
+
 /**
- * Wrap Token.prototype._onDragLeftDrop
- * If Drag Ruler is active, use this to update token(s) after movement has completed.
- * Callback actions which occur on a mouse-move operation.
- * @see MouseInteractionManager#_handleDragDrop
- * @param {PIXI.InteractionEvent} event  The triggering canvas interaction event
- * @returns {Promise<*>}
+ * New getter: Token.prototype.constrainedTokenBorder
+ * Determine the constrained border shape for this token.
+ * @returns {ConstrainedTokenShape|PIXI.Rectangle}
  */
-async function _onDragLeftDropDragRuler(wrapped, event) {
-  // Assume the destination elevation is the desired elevation if dragging multiple tokens.
-  // (Likely more useful than having a bunch of tokens move down 10'?)
-  const ruler = canvas.controls.ruler;
-  if ( !ruler.isDragRuler ) return wrapped(event);
+function constrainedTokenBorder() { return ConstrainedTokenBorder.get(this).constrainedBorder(); }
 
-  // Do before calling wrapper b/c ruler may get cleared.
-  const elevation = elevationAtWaypoint(ruler.destination);
-  const selectedTokens = [...canvas.tokens.controlled];
-  if ( !selectedTokens.length ) selectedTokens.push(ruler.draggedEntity);
+/**
+ * New getter: Token.prototype.isConstrainedTokenBorder
+ * Determine whether the border is currently constrained for this token.
+ * I.e., the token overlaps a wall.
+ * @returns {boolean}
+ */
+function isConstrainedTokenBorder() { return !ConstrainedTokenBorder.get(this)._unrestricted; }
 
-  const result = wrapped(event);
-  if ( result === false ) return false; // Drag did not happen
+/**
+ * New getter: Token.prototype.tokenBorder
+ * Determine the correct border shape for this token. Utilize the cached token shape.
+ * @returns {PIXI.Polygon|PIXI.Rectangle}
+ */
+function tokenBorder() { return this.tokenShape.translate(this.x, this.y); }
 
-  const updates = selectedTokens.map(t => {
-    return { _id: t.id, elevation };
-  });
+/**
+ * New getter: Token.prototype.tokenShape
+ * Cache the token shape.
+ * @type {PIXI.Polygon|PIXI.Rectangle}
+ */
+function tokenShape() { return this._tokenShape || (this._tokenShape = calculateTokenShape(this)); }
 
-  const t0 = selectedTokens[0];
-  await t0.scene.updateEmbeddedDocuments(t0.constructor.embeddedName, updates);
-  return true;
+PATCHES.ConstrainedTokenBorder.GETTERS = {
+  constrainedTokenBorder,
+  tokenBorder,
+  tokenShape,
+  isConstrainedTokenBorder
+};
+
+// ----- NOTE: Helper functions ----- //
+/**
+ * Theoretical token shape at 0,0 origin.
+ * @returns {PIXI.Polygon|PIXI.Rectangle}
+ */
+function calculateTokenShape(token) {
+  // TODO: Use RegularPolygon shapes for use with WeilerAtherton
+  // Hexagon (for width .5 or 1)
+  // Square (for width === height)
+  let shape;
+  if ( canvas.grid.isHex ) {
+    const pts = canvas.grid.grid.getBorderPolygon(token.document.width, token.document.height, 0);
+    if ( pts ) shape = new PIXI.Polygon(pts);
+  }
+
+  return shape || new PIXI.Rectangle(0, 0, token.w, token.h);
 }
 
-PATCHES.DRAG_RULER.WRAPS = { _onDragLeftDrop: _onDragLeftDropDragRuler };
