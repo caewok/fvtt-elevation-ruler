@@ -200,10 +200,8 @@ function _computeDistance(wrapped, gridSpaces) {
   for ( const segment of this.segments ) {
     segment.moveDistance = modifiedMoveDistance(segment.distance, segment.ray, token);
     totalMoveDistance += segment.moveDistance;
-
-    const { A, B } = segment.ray;
-    console.debug(`${A.x},${A.y},${A.z} --> ${B.x},${B.y},${B.z}: distance ${segment.distance}, move ${segment.moveDistance}`);
-
+    // const { A, B } = segment.ray;
+    //console.debug(`${A.x},${A.y},${A.z} --> ${B.x},${B.y},${B.z}: distance ${segment.distance}, move ${segment.moveDistance}`);
   }
   this.totalMoveDistance = totalMoveDistance;
 }
