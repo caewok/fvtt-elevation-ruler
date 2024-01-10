@@ -1,3 +1,7 @@
+# 0.7.8
+More tweaks to how token origin and destination are set when dragging so that the token movement follows the position of the cloned dragged token. Revisits issue #30.
+Fix issue where token dragging cannot move to the adjacent space. Closes issue #32.
+
 # 0.7.7
 Allow GM to move tokens using the ruler regardless of obstacle. Closes issue #27.
 Cancel the ruler when canceling the drag. Closes issue #28.
