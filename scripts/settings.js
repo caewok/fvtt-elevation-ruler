@@ -25,7 +25,8 @@ const SETTINGS = {
   TOKEN_RULER: {
     ENABLED: "enable-token-ruler",
     SPEED_HIGHLIGHTING: "token-ruler-highlighting",
-    SPEED_PROPERTY: "token-speed-property"
+    SPEED_PROPERTY: "token-speed-property",
+    TOKEN_MULTIPLIER: "token-terrain-multiplier"
   }
 };
 
@@ -157,6 +158,20 @@ export class Settings extends ModuleSettingsAbstract {
       default: SPEED.ATTRIBUTE,
       type: String,
       onChange: value => this.setSpeedProperty(value)
+    });
+
+    register(KEYS.TOKEN_RULER.TOKEN_MULTIPLIER, {
+      name: localize(`${KEYS.TOKEN_RULER.TOKEN_MULTIPLIER}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.TOKEN_MULTIPLIER}.hint`),
+      scope: "world",
+      config: true,
+      default: 1,
+      type: Number,
+      range: {
+        max: 10,
+        min: 0,
+        step: 0.1
+      }
     });
 
     // Initialize the Token Ruler.

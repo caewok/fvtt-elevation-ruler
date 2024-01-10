@@ -1,5 +1,7 @@
 # 0.7.7
+Add setting to treat tokens as difficult terrain. Closes issue #29.
 Allow GM to move tokens using the ruler regardless of obstacle. Closes issue #27.
+Force the ruler to use the center of the (dragged) token. Closes issue #30.
 
 # 0.7.6
 Fix incorrect `Ruler.js` import. Closes issue #26.
