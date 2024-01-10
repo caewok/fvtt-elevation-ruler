@@ -26,6 +26,17 @@ function _onDragLeftStart(wrapped, event) {
  * Wrap Token.prototype._onDragLeftMove
  * Continue the ruler measurement
  */
+function _onDragLeftCancel(wrapped, event) {
+  wrapped(event);
+
+  // Cancel a Ruler measurement.
+  canvas.controls.ruler._onMouseUp(event);
+}
+
+/**
+ * Wrap Token.prototype._onDragLeftCancel
+ * Continue the ruler measurement
+ */
 function _onDragLeftMove(wrapped, event) {
   wrapped(event);
 
@@ -50,13 +61,14 @@ async function _onDragLeftDrop(wrapped, event) {
     return false;
   }
   await ruler.moveToken();
-  ruler._onMouseUp(event);
+  // ruler._onMouseUp(event);
 }
 
 
 PATCHES.TOKEN_RULER.WRAPS = {
   _onDragLeftStart,
-  _onDragLeftMove
+  _onDragLeftMove,
+  _onDragLeftCancel
 };
 
 PATCHES.TOKEN_RULER.MIXES = { _onDragLeftDrop };
