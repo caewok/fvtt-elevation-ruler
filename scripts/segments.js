@@ -399,7 +399,7 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
 function useLevelsLabels() {
   if ( !game.modules.get("levels")?.active ) return false;
 
-  const labelOpt = Settings.get(MODULE_ID, Settings.KEYS.USE_LEVELS_LABEL);
+  const labelOpt = Settings.get(Settings.KEYS.USE_LEVELS_LABEL);
   return labelOpt === Settings.KEYS.LEVELS_LABELS.ALWAYS
     || (labelOpt === Settings.KEYS.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);
 }
