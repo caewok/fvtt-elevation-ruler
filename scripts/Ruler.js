@@ -1,6 +1,6 @@
 /* globals
 canvas,
-duplicate,
+CONST,
 game,
 ui
 */
@@ -25,6 +25,8 @@ import {
   _highlightMeasurementSegment,
   modifiedMoveDistance
 } from "./segments.js";
+
+import { tokenIsSnapped } from "./util.js";
 
 /**
  * Modified Ruler
@@ -83,6 +85,7 @@ function toJSON(wrapper) {
   const obj = wrapper();
   obj._userElevationIncrements = this._userElevationIncrements;
   obj._unsnap = this._unsnap;
+  obj._unsnappedOrigin = this._unsnappedOrigin;
   return obj;
 }
 
@@ -96,6 +99,7 @@ function update(wrapper, data) {
   const triggerMeasure = this._userElevationIncrements !== data._userElevationIncrements;
   this._userElevationIncrements = data._userElevationIncrements;
   this._unsnap = data._unsnap;
+  this._unsnappedOrigin = data._unsnappedOrigin;
   wrapper(data);
 
   if ( triggerMeasure ) {
@@ -114,6 +118,14 @@ function _addWaypoint(wrapper, point) {
 
   // If shift was held, use the precise point.
   if ( this._unsnap ) this.waypoints.at(-1).copyFrom(point);
+  else if ( this.waypoints.length === 1 ) {
+    // Move the waypoint to find unsnapped token.
+    const oldWaypoint = duplicate(this.waypoints[0]);
+    this.waypoints[0].copyFrom(point);
+    const token = this._getMovementToken();
+    if ( token && !tokenIsSnapped(token) ) this._unsnappedOrigin = true;
+    else this.waypoints[0].copyFrom(oldWaypoint);
+  }
 
   // Elevate the waypoint.
   addWaypointElevationIncrements(this, point);
@@ -183,8 +195,6 @@ function _computeDistance(wrapped, gridSpaces) {
   for ( const segment of this.segments ) {
     segment.moveDistance = modifiedMoveDistance(segment.distance, segment.ray, token);
     totalMoveDistance += segment.moveDistance;
-    // const { A, B } = segment.ray;
-    //console.debug(`${A.x},${A.y},${A.z} --> ${B.x},${B.y},${B.z}: distance ${segment.distance}, move ${segment.moveDistance}`);
   }
   this.totalMoveDistance = totalMoveDistance;
 }
