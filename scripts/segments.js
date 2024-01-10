@@ -12,6 +12,7 @@ CONFIG
 import { MODULE_ID, SPEED, MODULES_ACTIVE } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
+import { Point3d } from "./geometry/3d/Point3d.js";
 import {
   squareGridShape,
   hexGridShape,
@@ -255,12 +256,95 @@ function splitSegment(segment, pastDistance, cutoffDistance, token) {
  * @returns {number} Modified distance
  */
 export function modifiedMoveDistance(distance, ray, token) {
-  if ( !MODULES_ACTIVE.TERRAIN_MAPPER || !token ) return distance;
-  const terrainAPI = game.modules.get("terrainmapper").api;
-  const moveMult = terrainAPI.Terrain.percentMovementForTokenAlongPath(token, ray.A, ray.B);
-  if ( !moveMult ) return distance;
-  return distance * (1 / moveMult); // Invert because moveMult is < 1 if speed is penalized.
+  const terrainMult = 1 / (terrainMoveMultiplier(ray, token) || 1); // Invert because moveMult is < 1 if speed is penalized.
+  const tokenMult = terrainTokenMoveMultiplier(ray, token);
+  const moveMult = terrainMult * tokenMult;
+  return distance * moveMult;
 }
+
+/**
+ * Get speed multiplier for terrain mapper along a given ray.
+ * @param {number} distance   Distance of the ray
+ * @param {Ray|Ray3d} ray     Ray to measure
+ * @param {Token} token       Token to use
+ * @returns {number} Modified distance
+ */
+function terrainMoveMultiplier(ray, token) {
+  if ( !MODULES_ACTIVE.TERRAIN_MAPPER || !token ) return 1;
+  const terrainAPI = game.modules.get("terrainmapper").api;
+  return terrainAPI.Terrain.percentMovementForTokenAlongPath(token, ray.A, ray.B);
+}
+
+/**
+ * Get speed multiplier for tokens along a given ray.
+ * @param {number} distance   Distance of the ray
+ * @param {Ray|Ray3d} ray     Ray to measure
+ * @param {Token} token       Token to use
+ */
+function terrainTokenMoveMultiplier(ray, token) {
+  const mult = Settings.get(Settings.KEYS.TOKEN_RULER.TOKEN_MULTIPLIER);
+  if ( mult === 1 ) return 1;
+
+  // Find tokens along the ray whose constrained borders intersect the ray.
+  const { A, B } = ray;
+  const collisionTest = o => o.t.constrainedTokenBorder.lineSegmentIntersects(A, B, { inside: true });
+  const tokens = canvas.tokens.quadtree.getObjects(ray.bounds, { collisionTest });
+  tokens.delete(token);
+  if ( !tokens.size ) return 1;
+
+  // Determine the percentage of the ray that intersects the constrained token shapes.
+  const tValues = [];
+  for ( const t of tokens ) {
+    const border = t.constrainedTokenBorder;
+    let inside = false;
+    if ( border.contains(A) ) {
+      inside = true;
+      tValues.push({ t: 0, inside });
+    }
+
+    // At each intersection, we switch between inside and outside.
+    const ixs = border.segmentIntersections(A, B); // Can we assume the ixs are sorted by t0?
+    ixs.forEach(ix => {
+      inside ^= true;
+      tValues.push({ t: ix.t0, inside })
+    });
+  }
+
+  // Sort tValues and calculate distance between inside start/end.
+  // May be multiple inside/outside entries.
+  tValues.sort((a, b) => a.t0 - b.t0);
+  let nInside = 0;
+  let prevT = undefined;
+  let distInside = 0;
+  for ( const tValue of tValues ) {
+    if ( tValue.inside ) {
+      nInside += 1;
+      prevT ??= tValue.t; // Store only the first t to take us inside.
+    } else if ( nInside > 2 ) nInside -= 1;
+    else if ( nInside === 1 ) { // inside is false and we are now outside.
+      const startPt = ray.project(prevT);
+      const endPt = ray.project(tValue.t);
+      distInside += Point3d.distanceBetween(startPt, endPt);
+      nInside = 0;
+      prevT = undefined;
+    }
+  }
+
+  // If still inside, we can go all the way to t = 1
+  if ( nInside > 0 ) {
+    const startPt = ray.project(prevT);
+    distInside += Point3d.distanceBetween(startPt, B);
+  }
+
+  if ( !distInside ) return 1;
+
+  const totalDistance = ray.distance;
+  return ((totalDistance - distInside) + (distInside * mult)) / totalDistance;
+}
+
+/**
+ * Modify dist
+
 
 /**
  * Take 2d segments and make 3d.
