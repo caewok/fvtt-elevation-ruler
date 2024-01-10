@@ -30,7 +30,9 @@ function _onDragLeftCancel(wrapped, event) {
   wrapped(event);
 
   // Cancel a Ruler measurement.
-  canvas.controls.ruler._onMouseUp(event);
+  // If moving, handled by the drag left drop.
+  const ruler = canvas.controls.ruler;
+  if ( ruler._state !== Ruler.STATES.MOVING ) canvas.controls.ruler._onMouseUp(event);
 }
 
 /**
@@ -60,8 +62,9 @@ async function _onDragLeftDrop(wrapped, event) {
     ruler._onMouseUp(event);
     return false;
   }
+  ruler._state = Ruler.STATES.MOVING; // Do this before the await.
   await ruler.moveToken();
-  // ruler._onMouseUp(event);
+  ruler._onMouseUp(event);
 }
 
 
