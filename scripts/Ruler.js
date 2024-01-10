@@ -118,7 +118,14 @@ function _addWaypoint(wrapper, point) {
     const snappedWaypoint = duplicate(this.waypoints[0]);
     this.waypoints[0].copyFrom(point);
     const token = this._getMovementToken();
-    if ( token ) this.waypoints[0].copyFrom(token.center);
+
+    // Use grid center, not token center, so measurements in grid space work.
+    // For snapped 1x1 or 3x3 tokens, this is token center. For snapped 2x2, it is top left.
+    if ( token ) {
+      const c = token.center;
+      const newCoords = canvas.grid.grid.getCenter(c.x, c.y);
+      this.waypoints[0].copyFrom({ x: newCoords[0], y: newCoords[1] });
+    }
     else this.waypoints[0].copyFrom(snappedWaypoint);
   }
 
@@ -147,16 +154,8 @@ function _removeWaypoint(wrapper, point, { snap = true } = {}) {
  */
 function _getMeasurementDestination(wrapped, destination) {
   const pt = wrapped(destination);
-  if ( this._unsnap ) {
-    pt.copyFrom(destination);
-    return pt;
-  }
-
-  const token = this._getMovementToken();
-  if ( !token ) return pt;
-  const clone = canvas.tokens.preview.children.find(c => c._original === token);
-  if ( !clone ) return pt;
-  return clone.center;
+  if ( this._unsnap ) pt.copyFrom(destination);
+  return pt;
 }
 
 /**
@@ -201,6 +200,10 @@ function _computeDistance(wrapped, gridSpaces) {
   for ( const segment of this.segments ) {
     segment.moveDistance = modifiedMoveDistance(segment.distance, segment.ray, token);
     totalMoveDistance += segment.moveDistance;
+
+    const { A, B } = segment.ray;
+    console.debug(`${A.x},${A.y},${A.z} --> ${B.x},${B.y},${B.z}: distance ${segment.distance}, move ${segment.moveDistance}`);
+
   }
   this.totalMoveDistance = totalMoveDistance;
 }
