@@ -18,8 +18,10 @@ function _getRulerDestination(wrapped, ray, offset, token) {
   if ( canvas.controls.ruler._unsnap ) return ray.B.add(offset);
 
   // We are moving from the token center, so add back 1/2 width/height to offset.
-  offset.x += canvas.scene.dimensions.size * 0.5;
-  offset.y += canvas.scene.dimensions.size * 0.5;
+  if ( !canvas.controls.ruler._unsnappedOrigin ) {
+    offset.x += canvas.scene.dimensions.size * 0.5;
+    offset.y += canvas.scene.dimensions.size * 0.5;
+  }
   return wrapped(ray, offset, token);
 }
 

@@ -126,4 +126,14 @@ export function * iterateGridUnderLine(origin, destination, { reverse = false } 
   }
 }
 
+/**
+ * Determine if a token is currently snapped to the grid.
+ * @param {Token} token
+ * @returns {boolean}
+ */
+export function tokenIsSnapped(token) {
+  const { x, y } = token.document;
+  const [snappedX, snappedY] = canvas.grid.grid.getTopLeft(x, y);
+  return snappedX.almostEqual(x) && snappedY.almostEqual(y);
+}
 
