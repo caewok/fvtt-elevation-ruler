@@ -199,7 +199,7 @@ function _computeDistance(wrapped, gridSpaces) {
  * @see {Canvas._onDragLeftStart}
  */
 function _onDragStart(wrapped, event) {
-  this._unsnap = event.shiftKey;
+  this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
   return wrapped(event);
 }
 
@@ -210,7 +210,7 @@ function _onDragStart(wrapped, event) {
  * @see {Canvas._onDragLeftStart}
  */
 function _onClickLeft(wrapped, event) {
-  this._unsnap = event.shiftKey;
+  this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
   return wrapped(event);
 }
 
@@ -221,7 +221,7 @@ function _onClickLeft(wrapped, event) {
  * @see {Canvas._onClickRight}
  */
 function _onClickRight(wrapped, event) {
-  this._unsnap = event.shiftKey;
+  this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
   return wrapped(event);
 }
 
@@ -232,7 +232,7 @@ function _onClickRight(wrapped, event) {
  * @see {Canvas._onDragLeftMove}
  */
 function _onMouseMove(wrapped, event) {
-  this._unsnap = event.shiftKey;
+  this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
   return wrapped(event);
 }
 
@@ -243,7 +243,7 @@ function _onMouseMove(wrapped, event) {
  * @see {Canvas._onDragLeftDrop}
  */
 function _onMouseUp(wrapped, event) {
-  this._unsnap = event.shiftKey;
+  this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
   return wrapped(event);
 }
 
