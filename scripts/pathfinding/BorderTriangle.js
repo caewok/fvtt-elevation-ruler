@@ -144,6 +144,8 @@ export class BorderEdge {
  * Note: delaunay triangles from Delaunator are oriented counterclockwise
  */
 export class BorderTriangle {
+  static EDGE_NAMES = ["AB", "BC", "CA"];
+
   vertices = {
     a: new PIXI.Point(), /** @type {PIXI.Point} */
     b: new PIXI.Point(), /** @type {PIXI.Point} */
