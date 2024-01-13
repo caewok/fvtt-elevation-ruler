@@ -2,6 +2,7 @@
 Draw = CONFIG.GeometryLib.Draw;
 
 
+
 wall0 = canvas.placeables.walls[0]
 wall1 = canvas.placeables.walls[1]
 
@@ -235,14 +236,9 @@ Ultimately traverse by choosing midpoint or points 1 grid square from each endpo
 */
 
 
-sceneRect = canvas.scene.dimensions.sceneRect;
-TL = new PIXI.Point(sceneRect.left, sceneRect.top);
-TR = new PIXI.Point(sceneRect.right, sceneRect.top);
-BR = new PIXI.Point(sceneRect.right, sceneRect.bottom);
-BL = new PIXI.Point(sceneRect.left, sceneRect.bottom);
-endpointKeys = new Set([TL.key, TR.key, BR.key, BL.key]);
 
-for ( const wall of canvas.walls.placeables ) {
+endpointKeys = new Set();
+for ( const wall of [...canvas.walls.placeables, ...canvas.walls.outerBounds] ) {
   endpointKeys.add(wall.vertices.a.key);
   endpointKeys.add(wall.vertices.b.key);
 }
@@ -280,49 +276,112 @@ for (let i = 0; i < delaunay.triangles.length; i += 3) {
 for ( const tri of triangles ) Draw.shape(tri);
 
 
-// Build set of border triangles
-borderTriangles = new Map();
+// Build array of border triangles
+borderTriangles = [];
 for (let i = 0, ii = 0; i < delaunay.triangles.length; i += 3, ii += 1) {
   const j = delaunay.triangles[i] * 2;
   const k = delaunay.triangles[i + 1] * 2;
   const l = delaunay.triangles[i + 2] * 2;
-  const tri = new BorderTriangle(
-    delaunay.coords[j], delaunay.coords[j + 1],
-    delaunay.coords[k], delaunay.coords[k + 1],
-    delaunay.coords[l], delaunay.coords[l + 1]);
-  borderTriangles.set(ii, tri);
-  tri.id = ii;
+
+  const a = { x: delaunay.coords[j], y: delaunay.coords[j + 1] };
+  const b = { x: delaunay.coords[k], y: delaunay.coords[k + 1] };
+  const c = { x: delaunay.coords[l], y: delaunay.coords[l + 1] };
+  const tri = BorderTriangle.fromPoints(a, b, c);
+  borderTriangles.push(tri);
+  tri.id = ii; // Mostly for debugging at this point.
 }
 
 // Set the half-edges
-EDGE_NAMES = ["neighborAB", "neighborBC", "neighborCA"];
-let i = 0
-for ( i = 0; i < delaunay.halfedges.length; i += 1 ) {
+EDGE_NAMES = ["AB", "BC", "CA"];
+triangleEdges = new Set();
+for ( let i = 0; i < delaunay.halfedges.length; i += 1 ) {
   const halfEdgeIndex = delaunay.halfedges[i];
   if ( !~halfEdgeIndex ) continue;
-  const triFrom = borderTriangles.get(Math.floor(i / 3));
-  const triTo = borderTriangles.get(Math.floor(halfEdgeIndex / 3));
+  const triFrom = borderTriangles[Math.floor(i / 3)];
+  const triTo = borderTriangles[Math.floor(halfEdgeIndex / 3)];
 
   // Always a, b, c in order (b/c ccw)
   const fromEdge = EDGE_NAMES[i % 3];
   const toEdge = EDGE_NAMES[halfEdgeIndex % 3];
-  triFrom[fromEdge] = triTo;
-  triTo[toEdge] = triFrom;
+
+  // Need to pick one; keep the fromEdge
+  const edgeToKeep = triFrom.edges[fromEdge];
+  triTo.setEdge(toEdge, edgeToKeep);
+
+  // Track edge set to link walls.
+  triangleEdges.add(edgeToKeep);
 }
-
-
-borderTriangles.forEach(tri => tri.draw());
-borderTriangles.forEach(tri => tri.drawLinks())
 
 // Map of wall keys corresponding to walls.
 wallKeys = new Map();
-for ( const wall of canvas.walls.placeables ) {
-  wallKeys.set(wall.vertices.a.key, wall);
-  wallKeys.set(wall.vertices.b.key, wall);
+for ( const wall of [...canvas.walls.placeables, ...canvas.walls.outerBounds] ) {
+  const aKey = wall.vertices.a.key;
+  const bKey = wall.vertices.b.key;
+  if ( wallKeys.has(aKey) ) wallKeys.get(aKey).add(wall);
+  else wallKeys.set(aKey, new Set([wall]));
+
+  if ( wallKeys.has(bKey) ) wallKeys.get(bKey).add(wall);
+  else wallKeys.set(bKey, new Set([wall]));
 }
 
 // Set the wall(s) for each triangle edge
+nullSet = new Set();
+for ( const edge of triangleEdges.values() ) {
+  const aKey = edge.a.key;
+  const bKey = edge.b.key;
+  const aWalls = wallKeys.get(aKey) || nullSet;
+  const bWalls = wallKeys.get(bKey) || nullSet;
+  edge.wall = aWalls.intersection(bWalls).first(); // May be undefined.
+}
 
+borderTriangles.forEach(tri => tri.drawEdges());
+borderTriangles.forEach(tri => tri.drawLinks())
+
+
+// Use Quadtree to locate starting triangle for a point.
+
+// quadtree.clear()
+// quadtree.update({r: bounds, t: this})
+// quadtree.remove(this)
+// quadtree.update(this)
+
+
+quadtreeBT = new CanvasQuadtree()
+borderTriangles.forEach(tri => quadtreeBT.insert({r: tri.bounds, t: tri}))
+
+
+token = _token
+startPoint = _token.center;
+endPoint = _token.center
+
+// Find the strat and end triangles
+collisionTest = (o, _rect) => o.t.contains(startPoint);
+startTri = quadtreeBT.getObjects(boundsForPoint(startPoint), { collisionTest }).first();
+
+collisionTest = (o, _rect) => o.t.contains(endPoint);
+endTri = quadtreeBT.getObjects(boundsForPoint(endPoint), { collisionTest }).first();
+
+startTri.drawEdges();
+endTri.drawEdges();
+
+// Locate valid destinations
+destinations = startTri.getValidDestinations(startPoint, null, token.w * 0.5);
+destinations.forEach(d => Draw.point(d.entryPoint, { color: Draw.COLORS.yellow }))
+destinations.sort((a, b) => a.distance - b.distance);
+
+
+// Pick direction, repeat.
+chosenDestination = destinations[0];
+Draw.segment({ A: startPoint, B: chosenDestination.entryPoint }, { color: Draw.COLORS.yellow })
+nextTri = chosenDestination.triangle;
+destinations = nextTri.getValidDestinations(startPoint, null, token.w * 0.5);
+destinations.forEach(d => Draw.point(d.entryPoint, { color: Draw.COLORS.yellow }))
+destinations.sort((a, b) => a.distance - b.distance);
+
+
+function boundsForPoint(pt) {
+  return new PIXI.Rectangle(pt.x - 1, pt.y - 1, 3, 3);
+}
 
 
 /* For the triangles, need:
@@ -344,28 +403,127 @@ class BorderEdge {
   /** @type {PIXI.Point} */
   b = new PIXI.Point();
 
+  /** @type {Set<number>} */
+  endpointKeys = new Set();
+
   /** @type {BorderTriangle} */
   cwTriangle;
 
   /** @type {BorderTriangle} */
   ccwTriangle;
 
-  constructor(a, b) {
+  /** @type {Wall} */
+  wall;
 
+  constructor(a, b) {
+    this.a.copyFrom(a);
+    this.b.copyFrom(b);
+    this.endpointKeys.add(this.a.key);
+    this.endpointKeys.add(this.b.key);
+  }
+
+  /** @type {PIXI.Point} */
+  #median;
+
+  get median() { return this.#median || (this.#median = this.a.add(this.b).multiplyScalar(0.5)); }
+
+  /** @type {number} */
+  #length;
+
+  get length() { return this.#length || (this.#length = this.b.subtract(this.a).magnitude()); }
+
+  /**
+   * Get the other triangle for this edge.
+   * @param {BorderTriangle}
+   * @returns {BorderTriangle}
+   */
+  otherTriangle(triangle) { return this.cwTriangle === triangle ? this.ccwTriangle : this.cwTriangle; }
+
+  /**
+   * Remove the triangle link.
+   * @param {BorderTriangle}
+   */
+  removeTriangle(triangle) {
+    if ( this.cwTriangle === triangle ) this.cwTriangle = undefined;
+    if ( this.ccwTriangle === triangle ) this.ccwTriangle = undefined;
+  }
+
+  /**
+   * Provide valid destinations for this edge.
+   * Blocked walls are invalid.
+   * Typically returns 2 corner destinations plus the median destination.
+   * If the edge is less than 2 * spacer, no destinations are valid.
+   * @param {Point} center              Test if wall blocks from perspective of this origin point.
+   * @param {number} [spacer]           How much away from the corner to set the corner destinations.
+   *   If the edge is less than 2 * spacer, it will be deemed invalid.
+   *   Corner destinations are skipped if not more than spacer away from median.
+   * @returns {PIXI.Point[]}
+   */
+  getValidDestinations(origin, spacer) {
+    spacer ??= canvas.grid.size * 0.5;
+    const length = this.length;
+    const destinations = [];
+
+    // No destination if edge is smaller than 2x spacer.
+    if ( length < (spacer * 2) || this.wallBlocks(origin) ) return destinations;
+    destinations.push(this.median);
+
+    // Skip corners if not at least spacer away from median.
+    if ( length < (spacer * 4) ) return destinations;
+
+    const { a, b } = this;
+    const t = spacer / length;
+    destinations.push(
+      a.projectToward(b, t),
+      b.projectToward(a, t));
+    return destinations;
+  }
+
+
+  /**
+   * Does this edge wall block from an origin somewhere else in the triangle?
+   * Tested "live" and not cached so door or wall orientation changes need not be tracked.
+   * @param {Point} origin    Measure wall blocking from perspective of this origin point.
+   * @returns {boolean}
+   */
+  wallBlocks(origin) {
+    const wall = this.wall;
+    if ( !wall ) return false;
+    if ( !wall.document.move || wall.isOpen ) return false;
+
+    // Ignore one-directional walls which are facing away from the center
+    const side = wall.orientPoint(origin);
+    const wdm = PointSourcePolygon.WALL_DIRECTION_MODES;
+    if ( wall.document.dir
+      && (wallDirectionMode === wdm.NORMAL) === (side === wall.document.dir) ) return false;
+    return true;
   }
 
   /**
    * Link a triangle to this edge, replacing any previous triangle in that position.
    */
   linkTriangle(triangle) {
-    const triEndpoints = new Set([triangle.a, triangle.b, triangle.c]);
+    const { a, b } = this;
+    if ( !triangle.endpointKeys.has(a.key)
+      || !triangle.endpointKeys.has(b.key) ) throw new Error("Triangle does not share this edge!");
 
-    otherEndpoint =
-
+    const { a: aTri, b: bTri, c: cTri } = triangle.vertices;
+    const otherEndpoint = !this.endpointKeys.has(aTri.key) ? aTri
+      : !this.endpointKeys.has(bTri.key) ? bTri
+        : cTri;
+    const orient2d = foundry.utils.orient2dFast;
+    if ( orient2d(a, b, otherEndpoint) > 0 ) this.ccwTriangle = triangle;
+    else this.cwTriangle = triangle;
   }
 
-
-
+  /**
+   * For debugging.
+   * Draw this edge.
+   */
+  draw(opts = {}) {
+    opts.color ??= this.wall ? Draw.COLORS.red : Draw.COLORS.blue;
+    Draw.segment({ A: this.a, B: this.b }, opts);
+  }
 }
 
 /**
@@ -373,51 +531,79 @@ class BorderEdge {
  * Assumed static---points cannot change.
  * Note: delaunay triangles from Delaunator are oriented counterclockwise
  */
-class BorderTriangle extends PIXI.Polygon {
-  /** @type {PIXI.Point} */
-  a = new PIXI.Point();
+class BorderTriangle {
+  vertices = {
+    a: new PIXI.Point(), /** @type {PIXI.Point} */
+    b: new PIXI.Point(), /** @type {PIXI.Point} */
+    c: new PIXI.Point()  /** @type {PIXI.Point} */
+  };
 
-  /** @type {PIXI.Point} */
-  b = new PIXI.Point();
+  edges = {
+    AB: undefined, /** @type {BorderEdge} */
+    BC: undefined, /** @type {BorderEdge} */
+    CA: undefined  /** @type {BorderEdge} */
+  };
 
-  /** @type {PIXI.Point} */
-  c = new PIXI.Point();
+  /** @type {BorderEdge} */
+
+  /** @type {Set<number>} */
+  endpointKeys = new Set();
 
   /** @type {number} */
   id = -1;
 
-  constructor(...args) {
-    super(...args);
-    if ( this.points.length !== 6 ) throw new Error("Border Triangle must have 6 coordinates");
-
-
-  }
-
   /**
-   * Initialize properties based on the unchanging coordinates.
+   * @param {Point} a
+   * @param {Point} b
+   * @param {Point} c
    */
-  _initialize() {
-    // Orient a --> b --> c counterclockwise
-    if ( this.isClockwise ) this.reverseOrientation();
-    this.a.x = this.points[0];
-    this.a.y = this.points[1];
-    this.b.x = this.points[2];
-    this.b.y = this.points[3];
-    this.c.x = this.points[4];
-    this.c.y = this.points[5];
+  constructor(edgeAB, edgeBC, edgeCA) {
+    // Determine the shared endpoint for each.
+    let a = edgeCA.endpointKeys.has(edgeAB.a.key) ? edgeAB.a : edgeAB.b;
+    let b = edgeAB.endpointKeys.has(edgeBC.a.key) ? edgeBC.a : edgeBC.b;
+    let c = edgeBC.endpointKeys.has(edgeCA.a.key) ? edgeCA.a : edgeCA.b;
 
-    // Get the
-
-  }
-
-  /**
-   * Calculate coordinate index in the Delaunay set.
-   */
-  delaunayCoordinate(vertex = "a") {
-    switch ( vertex ) {
-      case "a": return BorderTriangle.delauney
+    const oABC = foundry.utils.orient2dFast(a, b, c);
+    if ( !oABC ) throw Error("BorderTriangle requires three non-collinear points.");
+    if ( oABC < 0 ) {
+      // Flip to ccw.
+      [a, b, c] = [c, b, a];
+      [edgeAB, edgeCA] = [edgeCA, edgeAB];
     }
+
+    this.vertices.a.copyFrom(a);
+    this.vertices.b.copyFrom(b);
+    this.vertices.c.copyFrom(c);
+
+    this.edges.AB = edgeAB;
+    this.edges.BC = edgeBC;
+    this.edges.CA = edgeCA;
+
+    Object.values(this.vertices).forEach(v => this.endpointKeys.add(v.key));
+    Object.values(this.edges).forEach(e => e.linkTriangle(this));
   }
+
+  /**
+   * Construct a BorderTriangle from three points.
+   * Creates three new edges.
+   * @param {Point} a     First point of the triangle
+   * @param {Point} b     Second point of the triangle
+   * @param {Point} c     Third point of the triangle
+   * @returns {BorderTriangle}
+   */
+  static fromPoints(a, b, c) {
+    return new this(
+      new BorderEdge(a, b),
+      new BorderEdge(b, c),
+      new BorderEdge(c, a)
+    );
+  }
+
+  /** @type {Point} */
+  #center;
+
+  get center() { return this.#center
+    || (this.#center = this.vertices.a.add(this.vertices.b).add(this.vertices.c).multiplyScalar(1/3)); }
 
   /**
    * Contains method based on orientation.
@@ -425,70 +611,109 @@ class BorderTriangle extends PIXI.Polygon {
    * @param {number} x                  X coordinate of point to test
    * @param {number} y                  Y coordinate of point to test
    * @returns {boolean}
-   *   - False if not contained at all
-   *   -
    */
-  containsPoint(pt) {
+  contains(pt) {
     const orient2d = foundry.utils.orient2dFast;
+    const { a, b, c } = this.vertices;
     return orient2d(a, b, pt) >= 0
         && orient2d(b, c, pt) >= 0
         && orient2d(c, a, pt) >= 0;
   }
-
-  /**
-   * Replace getBounds with static version.
-   * @returns {PIXI.Rectangle}
-   */
 
   /** @type {PIXI.Rectangle} */
   #bounds;
 
   get bounds() { return this.#bounds || (this.#bounds = this._getBounds()); }
 
-  getBounds() { return this.#bounds || (this.#bounds = this._getBounds()); }
+  getBounds() { return this.bounds; }
 
   _getBounds() {
-    const xMinMax = Math.minMax(this.a.x, this.b.x, this.c.x);
-    const yMinMax = Math.minMax(this.a.y, this.b.y, this.c.y);
+    const { a, b, c } = this.vertices;
+    const xMinMax = Math.minMax(a.x, b.x, c.x);
+    const yMinMax = Math.minMax(a.y, b.y, c.y);
     return new PIXI.Rectangle(xMinMax.min, yMinMax.min, xMinMax.max - xMinMax.min, yMinMax.max - yMinMax.min);
   }
 
   /**
-   * Links to neighboring triangles.
-   * @type {BorderTriangle}
+   * Provide valid destinations given that you came from a specific neighbor.
+   * Blocked walls are invalid.
+   * Typically returns 2 corner destinations plus the median destination.
+   * @param {Point} entryPoint
+   * @param {BorderTriangle|null} priorTriangle
+   * @param {number} spacer           How much away from the corner to set the corner destinations.
+   *   If the edge is less than 2 * spacer, it will be deemed invalid.
+   *   Corner destinations are skipped if not more than spacer away from median.
+   * @returns {object[]} Each element has properties describing the destination:
+   *   - {BorderTriangle} triangle
+   *   - {Point} entryPoint
+   *   - {number} distance
    */
-  neighborAB;
+  getValidDestinations(entryPoint, priorTriangle, spacer) {
+    spacer ??= canvas.grid.size * 0.5;
+    const destinations = [];
+    const center = this.center;
+    for ( const edge of Object.values(this.edges) ) {
+      const neighbor = edge.otherTriangle(this);
+      if ( priorTriangle && priorTriangle === neighbor ) continue;
+      const pts = edge.getValidDestinations(center, spacer);
+      pts.forEach(pt => {
+        destinations.push({
+          entryPoint: pt,
+          triangle: neighbor,
 
-  neighborBC;
-
-  neighborCA;
-
-  /**
-   * Links to the wall(s) representing each edge
-   * @type {Set<Wall>}
-   */
-  wallsAB;
-
-  wallsBC;
-
-  wallsCA;
-
-  /**
-   * Debug helper to draw the triangle.
-   */
-  draw(opts = {}) {
-    Draw.shape(this, opts);
-    if ( ~this.id ) Draw.labelPoint(this.center, this.id.toString());
+          // TODO: Handle 3d distances.
+          // Probably use canvas.grid.measureDistances, passing a Ray3d.
+          // TODO: Handle terrain distance
+          distance: canvas.grid.measureDistance(center, pt),
+        });
+      })
+    }
+    return destinations;
   }
+
+  /**
+   * Replace an edge in this triangle.
+   * Used to link triangles by an edge.
+   * @param {string} edgeName     "AB"|"BC"|"CA"
+   */
+  setEdge(edgeName, newEdge) {
+    const oldEdge = this.edges[edgeName];
+    if ( !oldEdge ) {
+      console.error(`No edge with name ${edgeName} found.`);
+      return;
+    }
+
+    if ( !(newEdge instanceof BorderEdge) ) {
+      console.error("BorderTriangle requires BorderEdge to replace an edge.");
+      return;
+    }
+
+    if ( !(oldEdge.endpointKeys.has(newEdge.a.key) && oldEdge.endpointKeys.has(newEdge.b.key)) ) {
+      console.error("BorderTriangle edge replacement must have the same endpoints. Try building a new triangle instead.");
+      return;
+    }
+
+    oldEdge.removeTriangle(this);
+    this.edges[edgeName] = newEdge;
+    newEdge.linkTriangle(this);
+  }
+
+  /**
+   * For debugging. Draw edges on the canvas.
+   */
+  drawEdges() { Object.values(this.edges).forEach(e => e.draw()); }
 
   /*
    * Draw links to other triangles.
    */
   drawLinks() {
     const center = this.center;
-    if ( this.neighborAB ) Draw.segment({ A: center, B: this.neighborAB.center });
-    if ( this.neighborBC ) Draw.segment({ A: center, B: this.neighborBC.center });
-    if ( this.neighborCA ) Draw.segment({ A: center, B: this.neighborCA.center });
+    for ( const edge of Object.values(this.edges) ) {
+      if ( edge.otherTriangle(this) ) {
+        const color = edge.wallBlocks(center) ? Draw.COLORS.orange : Draw.COLORS.green;
+        Draw.segment({ A: center, B: edge.median }, { color });
+
+      }
+    }
   }
 }
-
