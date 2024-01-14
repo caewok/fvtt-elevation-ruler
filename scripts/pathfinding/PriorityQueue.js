@@ -2,6 +2,12 @@
 // from https://www.digitalocean.com/community/tutorials/js-binary-heaps
 
 class Node {
+  /** @param {object} */
+  val = {};
+
+  /** @param {number} */
+  priority = -1;
+
   constructor(val, priority) {
     this.val = val;
     this.priority = priority;
@@ -14,11 +20,13 @@ class Node {
  * Highest priority item will be dequeued first.
  */
 export class PriorityQueue {
-  constructor() {
-    this.values = [];
-  }
+  /** @param {Node[]} */
+  values = [];
 
   get length() { return this.values.length; }
+
+  /** @type {number} */
+  clear() { this.data.length = 0; }
 
 
  /**

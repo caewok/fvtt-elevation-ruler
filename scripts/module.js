@@ -13,13 +13,31 @@ import { MODULE_ID } from "./const.js";
 import { iterateGridUnderLine } from "./util.js";
 import { registerGeometry } from "./geometry/registration.js";
 
+// Pathfinding
+import { BorderTriangle, BorderEdge } from "./pathfinding/BorderTriangle.js";
+import { Pathfinder, BreadthFirstPathSearch, UniformCostPathSearch, AStarPathSearch } from "./pathfinding/pathfinding.js";
+import { PriorityQueueArray } from "./pathfinding/PriorityQueueArray.js";
+import { PriorityQueue } from "./pathfinding/PriorityQueue.js";
+
 Hooks.once("init", function() {
   // Cannot access localization until init.
   PREFER_TOKEN_CONTROL.title = game.i18n.localize(PREFER_TOKEN_CONTROL.title);
   registerGeometry();
   game.modules.get(MODULE_ID).api = {
     iterateGridUnderLine,
-    PATCHER
+    PATCHER,
+
+    // Pathfinding
+    pathfinding: {
+      BorderTriangle,
+      BorderEdge,
+      Pathfinder,
+      BreadthFirstPathSearch,
+      UniformCostPathSearch,
+      AStarPathSearch,
+      PriorityQueueArray,
+      PriorityQueue
+    }
   };
 });
 

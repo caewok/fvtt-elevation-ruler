@@ -1,9 +1,13 @@
 /* globals
-canvas
+canvas,
+foundry,
+PIXI,
+PointSourcePolygon
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
-import { Draw } from "./geometry/Draw.js";
+import { Draw } from "../geometry/Draw.js";
+
 
 /**
  * An edge that makes up the triangle-shaped polygon
@@ -105,9 +109,13 @@ export class BorderEdge {
 
     // Ignore one-directional walls which are facing away from the center
     const side = wall.orientPoint(origin);
-    const wdm = PointSourcePolygon.WALL_DIRECTION_MODES;
+//    const wdm = PointSourcePolygon.WALL_DIRECTION_MODES;
+//     if ( wall.document.dir
+//       && (wallDirectionMode === wdm.NORMAL) === (side === wall.document.dir) ) return false;
+
     if ( wall.document.dir
-      && (wallDirectionMode === wdm.NORMAL) === (side === wall.document.dir) ) return false;
+      && side === wall.document.dir ) return false;
+
     return true;
   }
 
@@ -181,7 +189,7 @@ export class BorderTriangle {
     if ( !oABC ) throw Error("BorderTriangle requires three non-collinear points.");
     if ( oABC < 0 ) {
       // Flip to ccw.
-      [a, b, c] = [c, b, a];
+      [a, c] = [c, a];
       [edgeAB, edgeCA] = [edgeCA, edgeAB];
     }
 
@@ -250,37 +258,47 @@ export class BorderTriangle {
 
   /**
    * Provide valid destinations given that you came from a specific neighbor.
-   * Blocked walls are invalid.
-   * Typically returns 2 corner destinations plus the median destination.
-   * @param {Point} entryPoint
+   * Typically returns 2 corner destinations plus the median destination per edge.
+   * Invalid destinations for an edge:
+   * - blocked walls
+   * - no neighbor (edge on border of map)
+   * - edge length < 2 * spacer
+   * - edge shared with the prior triangle, if any
+   *
+   * Corner destination skipped if median --> corner < spacer
+   *
+   * @param {Point} priorEntryPoint
    * @param {BorderTriangle|null} priorTriangle
    * @param {number} spacer           How much away from the corner to set the corner destinations.
-   *   If the edge is less than 2 * spacer, it will be deemed invalid.
-   *   Corner destinations are skipped if not more than spacer away from median.
-   * @returns {object[]} Each element has properties describing the destination:
-   *   - {BorderTriangle} triangle
+   * @returns {object[]} Each element has properties describing the destination, conforming to pathfinding
+   *   - {BorderTriangle} key
    *   - {Point} entryPoint
-   *   - {number} distance
+   *   - {number} cost
    */
-  getValidDestinations(entryPoint, priorTriangle, spacer) {
+  getValidDestinations(priorEntryPoint, priorTriangle, spacer) {
     spacer ??= canvas.grid.size * 0.5;
     const destinations = [];
     const center = this.center;
     for ( const edge of Object.values(this.edges) ) {
-      const neighbor = edge.otherTriangle(this);
-      if ( priorTriangle && priorTriangle === neighbor ) continue;
+      const key = edge.otherTriangle(this); // Neighbor
+      if ( !key ) continue;
+      if ( priorTriangle && priorTriangle === key ) continue;
       const pts = edge.getValidDestinations(center, spacer);
-      pts.forEach(pt => {
+      pts.forEach(entryPoint => {
         destinations.push({
-          entryPoint: pt,
-          triangle: neighbor,
+          entryPoint,
+          key,
+
+          // Debugging:
+          // priorEntryPoint,
+          // priorTriangle,
 
           // TODO: Handle 3d distances.
           // Probably use canvas.grid.measureDistances, passing a Ray3d.
           // TODO: Handle terrain distance
-          distance: canvas.grid.measureDistance(center, pt),
+          cost: canvas.grid.measureDistance(priorEntryPoint, entryPoint)
         });
-      })
+      });
     }
     return destinations;
   }
