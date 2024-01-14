@@ -10,8 +10,25 @@ import { radixSortObj } from "../geometry/RadixSort.js";
  * instead of using a Node class.
  */
 export class PriorityQueueArray {
-  /** @param {} */
+  /** @param {object[]} */
   data = [];
+
+  /** @param {function} */
+  comparator = (elem, obj) => (obj._priority - elem._priority) < 0;
+
+  /**
+   * @param {"high"|"low"|function} comparator    What is the first element to leave the queue:
+   *                                              - highest priority,
+   *                                              - lowest priority, or
+   *                                              - custom comparator method
+   */
+  constructor(comparator = "high") {
+    switch ( comparator ) {
+      case "high": break;
+      case "low": this.comparator = (elem, obj) => (elem._priority - obj._priority) < 0; break;
+      default: this.comparator = comparator;
+     }
+  }
 
   /** @type {number} */
   get length() { return this.data.length; }
@@ -69,5 +86,5 @@ export class PriorityQueueArray {
    * @param {object} object   Object, with "_priority" property.
    * @returns {number}
    */
-  findPriorityIndex(obj) { return binaryFindIndex(this.data, elem => (obj._priority - elem._priority) < 0); }
+  findPriorityIndex(obj) { return binaryFindIndex(this.data, elem => this.comparator(elem, obj)); }
 }

@@ -18,7 +18,32 @@ import { Draw } from "../geometry/Draw.js";
 Draw = CONFIG.GeometryLib.Draw;
 api = game.modules.get("elevationruler").api
 Pathfinder = api.pathfinding.Pathfinder
+PriorityQueueArray = api.pathfinding.PriorityQueueArray;
+PriorityQueue = api.pathfinding.PriorityQueue;
+
+// Test queue (PQ takes only objects, not strings or numbers)
+pq = new PriorityQueueArray("high")
+pq.enqueue({"D": 4}, 4)
+pq.enqueue({"A": 1}, 1);
+pq.enqueue({"C": 3}, 3);
+pq.enqueue({"B": 2}, 2);
+pq.data
+
+pq = new PriorityQueueArray("low")
+pq.enqueue({"D": 4}, 4)
+pq.enqueue({"A": 1}, 1);
+pq.enqueue({"C": 3}, 3);
+pq.enqueue({"B": 2}, 2);
+pq.data
+
+
+
+
+
+// Test pathfinding
 Pathfinder.initialize()
+Pathfinder.borderTriangles.forEach(tri => tri.drawEdges());
+
 
 endPoint = _token.center
 
@@ -26,6 +51,7 @@ token = _token
 startPoint = _token.center;
 
 pf = new Pathfinder(token);
+
 path = pf.breadthFirstPath(startPoint, endPoint)
 pathPoints = pf.getPathPoints(path);
 pf.drawPath(pathPoints, { color: Draw.COLORS.red })
@@ -483,7 +509,7 @@ export class BreadthFirstPathSearch {
  * Dijkstra's Algorithm, or uniform cost path search.
  */
 export class UniformCostPathSearch extends BreadthFirstPathSearch {
-  frontier = new PriorityQueueArray([], { comparator: (a, b) => a.cost - b.cost });
+  frontier = new PriorityQueueArray("low");
 
   /** @type {Map<PathNode.key, number>} */
   costSoFar = new Map();
@@ -508,6 +534,7 @@ export class UniformCostPathSearch extends BreadthFirstPathSearch {
 
     frontier.enqueue(start, 0);
     costSoFar.set(start.key, 0);
+    const MAX_COST = canvas.dimensions.maxR;
 
     while ( frontier.length ) {
       const current = frontier.dequeue();
@@ -515,8 +542,9 @@ export class UniformCostPathSearch extends BreadthFirstPathSearch {
 
       // Get each neighbor destination in turn.
       for ( const next of this.getNeighbors(current) ) {
-        const newCost = costSoFar.get(current.key) + next.cost;
+        const newCost = (costSoFar.get(current.key) ?? MAX_COST)  + next.cost;
         if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
+          costSoFar.set(next.key, newCost);
           frontier.enqueue(next, newCost); // Priority is newCost
           cameFrom.set(next.key, current);
         }
