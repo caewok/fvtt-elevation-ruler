@@ -137,3 +137,10 @@ export function tokenIsSnapped(token) {
   return snappedX.almostEqual(x) && snappedY.almostEqual(y);
 }
 
+/**
+ * Create a very small rectangle for a point to be used with Quadtree.
+ * @param {Point} pt
+ * @returns {PIXI.Rectangle}
+ */
+export function boundsForPoint(pt) { return new PIXI.Rectangle(pt.x - 1, pt.y - 1, 3, 3); }
+

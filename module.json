@@ -26,6 +26,10 @@
       }
     ]
   },
+  "scripts": [
+    "/scripts/delaunator/delaunator.min.js"
+  ],
+
   "esmodules": [
     "/scripts/module.js"
   ],
