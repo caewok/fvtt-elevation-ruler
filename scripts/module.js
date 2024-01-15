@@ -15,7 +15,8 @@ import { registerGeometry } from "./geometry/registration.js";
 
 // Pathfinding
 import { BorderTriangle, BorderEdge } from "./pathfinding/BorderTriangle.js";
-import { Pathfinder, BreadthFirstPathSearch, UniformCostPathSearch, AStarPathSearch } from "./pathfinding/pathfinding.js";
+import { Pathfinder } from "./pathfinding/pathfinding.js";
+import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./pathfinding/algorithms.js";
 import { PriorityQueueArray } from "./pathfinding/PriorityQueueArray.js";
 import { PriorityQueue } from "./pathfinding/PriorityQueue.js";
 
@@ -34,6 +35,7 @@ Hooks.once("init", function() {
       Pathfinder,
       BreadthFirstPathSearch,
       UniformCostPathSearch,
+      GreedyPathSearch,
       AStarPathSearch,
       PriorityQueueArray,
       PriorityQueue

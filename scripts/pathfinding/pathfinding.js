@@ -1,16 +1,16 @@
 /* globals
 canvas,
 CanvasQuadtree,
+CONFIG,
 Delaunator,
 PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 import { BorderTriangle } from "./BorderTriangle.js";
-import { PriorityQueueArray } from "./PriorityQueueArray.js";
-// import { PriorityQueue } from "./PriorityQueue.js";
 import { boundsForPoint } from "../util.js";
 import { Draw } from "../geometry/Draw.js";
+import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./algorithms.js";
 
 
 /* Testing
@@ -36,10 +36,6 @@ pq.enqueue({"C": 3}, 3);
 pq.enqueue({"B": 2}, 2);
 pq.data
 
-
-
-
-
 // Test pathfinding
 Pathfinder.initialize()
 Pathfinder.borderTriangles.forEach(tri => tri.drawEdges());
@@ -52,13 +48,25 @@ startPoint = _token.center;
 
 pf = new Pathfinder(token);
 
-path = pf.breadthFirstPath(startPoint, endPoint)
-pathPoints = pf.getPathPoints(path);
-pf.drawPath(pathPoints, { color: Draw.COLORS.red })
 
-path = pf.uniformCostPath(startPoint, endPoint)
+path = pf.runPath(startPoint, endPoint, "breadth")
 pathPoints = pf.getPathPoints(path);
-pf.drawPath(pathPoints, { color: Draw.COLORS.blue })
+pf.drawPath(pathPoints, { color: Draw.COLORS.orange })
+
+path = pf.runPath(startPoint, endPoint, "uniform")
+pathPoints = pf.getPathPoints(path);
+pf.drawPath(pathPoints, { color: Draw.COLORS.yellow })
+
+path = pf.runPath(startPoint, endPoint, "greedy")
+pathPoints = pf.getPathPoints(path);
+pf.drawPath(pathPoints, { color: Draw.COLORS.green })
+
+pf.algorithm.greedy.debug = true
+
+
+path = pf.runPath(startPoint, endPoint, "astar")
+pathPoints = pf.getPathPoints(path);
+pf.drawPath(pathPoints, { color: Draw.COLORS.white })
 
 */
 
@@ -343,38 +351,55 @@ export class Pathfinder {
     return this._spacer || (this.token.w * 0.5) || (canvas.dimensions.size * 0.5);
   }
 
+  /** @enum {BreadthFirstPathSearch} */
+  static ALGORITHMS = {
+    breadth: BreadthFirstPathSearch,
+    uniform: UniformCostPathSearch,
+    greedy: GreedyPathSearch,
+    astar: AStarPathSearch
+  };
+
+  /** @enum {string} */
+  static COST_METHOD = {
+    breadth: "_identifyDestinations",
+    uniform: "_identifyDestinationsWithCost",
+    greedy: "_identifyDestinations",
+    astar: "_identifyDestinationsWithCost"
+  };
+
+  /** @type {object{BreadthFirstPathSearch}} */
+  algorithm = {};
+
   /**
-   * Run a breadth first, early exit search of the border triangles.
+   * Find the path between startPoint and endPoint using the chosen algorithm.
    * @param {Point} startPoint      Start point for the graph
    * @param {Point} endPoint        End point for the graph
    * @returns {Map<PathNode.key, PathNode>}
    */
-  _breadthFirstPF;
-
-  breadthFirstPath(startPoint, endPoint) {
-    const { start, end } = this._initializeStartEndNodes(startPoint, endPoint);
-    if ( !this._breadthFirstPF ) {
-       this._breadthFirstPF = new BreadthFirstPathSearch();
-       this._breadthFirstPF.getNeighbors = this.identifyDestinations.bind(this);
+  runPath(startPoint, endPoint, type = "astar") {
+    // Initialize the algorithm if not already.
+    if ( !this.algorithm[type] ) {
+      const alg = this.algorithm[type] = new this.constructor.ALGORITHMS[type]();
+      const costMethod = this.constructor.COST_METHOD[type];
+      alg.getNeighbors = this[costMethod];
+      alg.heuristic = this._heuristic;
     }
-    return this._breadthFirstPF.run(start, end);
+
+    // Run the algorithm.
+    const { start, end } = this._initializeStartEndNodes(startPoint, endPoint);
+    return this.algorithm[type].run(start, end);
   }
 
-  /**
-   * Run a uniform cost search (Dijkstra's).
-   * @param {Point} startPoint      Start point for the graph
-   * @param {Point} endPoint        End point for the graph
-   * @returns {Map<PathNode.key, PathNode>}
-   */
-  _uniformCostPF;
 
-  uniformCostPath(startPoint, endPoint) {
-    const { start, end } = this._initializeStartEndNodes(startPoint, endPoint);
-    if ( !this._uniformCostPF ) {
-       this._uniformCostPF = new UniformCostPathSearch();
-       this._uniformCostPF.getNeighbors = this.identifyDestinations.bind(this);
-    }
-    return this._uniformCostPF.run(start, end);
+  /**
+   * Heuristic that takes a goal node and a current node and returns a priority based on
+   * the canvas distance between two points.
+   * @param {PathNode} goal
+   * @param {PathNode} current
+   */
+  // TODO: Handle 3d points?
+  _heuristic(goal, current) {
+    return CONFIG.GeometryLib.utils.gridUnitsToPixels(canvas.grid.measureDistance(goal.entryPoint, current.entryPoint));
   }
 
   /**
@@ -399,20 +424,38 @@ export class Pathfinder {
     collisionTest = (o, _rect) => o.t.contains(endPoint);
     const endTri = quadtree.getObjects(boundsForPoint(endPoint), { collisionTest }).first();
 
-    const start = { key: startTri, entryPoint: PIXI.Point.fromObject(startPoint) };
-    const end = { key: endTri, entryPoint: endPoint };
+    const start = { key: startPoint.key, entryTriangle: startTri, entryPoint: PIXI.Point.fromObject(startPoint) };
+    const end = { key: endPoint.key, entryTriangle: endTri, entryPoint: endPoint };
 
     return { start, end };
   }
 
-
   /**
-   * Get destinations for a given pathfinding object, which is a triangle plus an entryPoint.
+   * Get destinations for a given path node
    * @param {PathNode} pathObject
    * @returns {PathNode[]} Array of destination nodes
    */
-  identifyDestinations(pathNode) {
-    return pathNode.key.getValidDestinations(pathNode.entryPoint, pathNode.key, this.spacer);
+  _identifyDestinations(pathNode, goal) {
+    // If the goal node is reached, return the goal with the cost.
+    if ( pathNode.entryTriangle === goal.entryTriangle ) return [goal];
+    return pathNode.entryTriangle.getValidDestinations(pathNode.priorTriangle, this.spacer);
+  }
+
+  /**
+   * Get destinations with cost calculated for a given path node.
+    * @param {PathNode} pathObject
+   * @returns {PathNode[]} Array of destination nodes
+   */
+  _identifyDestinationsWithCost(pathNode, goal) {
+    // If the goal node is reached, return the goal with the cost.
+    if ( pathNode.entryTriangle === goal.entryTriangle ) {
+      // Need a copy so we can modify cost for this goal node only.
+      const newNode = {...goal};
+      newNode.cost = goal.entryTriangle._calculateMovementCost(pathNode.entryPoint, goal.entryPoint);
+      newNode.priorTriangle = pathNode.priorTriangle;
+      return [newNode];
+    }
+    return pathNode.entryTriangle.getValidDestinationsWithCost(pathNode.priorTriangle, this.spacer, pathNode.entryPoint);
   }
 
   /**
@@ -440,128 +483,4 @@ export class Pathfinder {
       prior = curr;
     }
   }
-
-}
-
-// See https://www.redblobgames.com/pathfinding/a-star/introduction.html
-
-
-/**
- * Pathfinding objects used here must have the following properties:
- * - {object} key   Unique object, string, or number that can be used in a Set or as a Map key.
- * - {number} cost  For algorithms that measure value, the cost of this move.
- * Objects can have any other properties needed.
- */
-export class BreadthFirstPathSearch {
-  /** @type {PathNode[]} */
-  frontier = [];
-
-  /** @type {Map<PathNode.key, PathNode>} */
-  cameFrom = new Map(); // Path a -> b stored as cameFrom[b] = a
-
-  /**
-   * Run the breadth first search on the graph.
-   * Each object must have a unique key property used for comparison.
-   * @param {PathNode} start    Path node representing start
-   * @param {PathNode} goal     Path node representing end
-   * @returns {Map<PathNode>} Path as the cameFrom map. Note that rerunning will change this return.
-   */
-  run(start, goal) {
-    this.clear();
-    const { cameFrom, frontier } = this;
-    frontier.unshift(start);
-
-    while ( frontier.length ) {
-      const current = frontier.pop();
-      if ( current.key === goal.key ) break;
-
-      // Get each neighbor destination in turn.
-      for ( const next of this.getNeighbors(current) ) {
-        if ( !cameFrom.has(next.key) ) {
-          frontier.unshift(next);
-          cameFrom.set(next.key, current);
-        }
-      }
-    }
-
-    cameFrom.goal = goal;
-    cameFrom.start = start;
-    return cameFrom;
-  }
-
-  /**
-   * Neighbor method that can be overriden to handle different objects.
-   * @param {PathNode} pathNode   Object representing a graph node
-   * @returns {Array[PathNode]} Array of neighboring objects to the node.
-   */
-  getNeighbors(pathNode) { return pathNode.neighbors; }
-
-  /**
-   * Clear the path properties.
-   */
-  clear() {
-    this.frontier.length = 0;
-    this.cameFrom.clear();
-  }
-}
-
-/**
- * Dijkstra's Algorithm, or uniform cost path search.
- */
-export class UniformCostPathSearch extends BreadthFirstPathSearch {
-  frontier = new PriorityQueueArray("low");
-
-  /** @type {Map<PathNode.key, number>} */
-  costSoFar = new Map();
-
-  clear() {
-    this.frontier.clear();
-    this.costSoFar.clear();
-    this.cameFrom.clear();
-  }
-
-  /**
-   * Run the cost search on the graph.
-   * Each PathNode must have a unique key property used for comparison
-   * and cost property used to value cost so far.
-   * @param {PathNode} start    Path node representing start
-   * @param {PathNode} goal     Path node representing end
-   * @returns {Map<PathNode>} Path as the cameFrom map. Note that rerunning will change this return.
-   */
-  run(start, goal) {
-    this.clear();
-    const { cameFrom, costSoFar, frontier } = this;
-
-    frontier.enqueue(start, 0);
-    costSoFar.set(start.key, 0);
-    const MAX_COST = canvas.dimensions.maxR;
-
-    while ( frontier.length ) {
-      const current = frontier.dequeue();
-      if ( current.key === goal.key ) break;
-
-      // Get each neighbor destination in turn.
-      for ( const next of this.getNeighbors(current) ) {
-        const newCost = (costSoFar.get(current.key) ?? MAX_COST)  + next.cost;
-        if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
-          costSoFar.set(next.key, newCost);
-          frontier.enqueue(next, newCost); // Priority is newCost
-          cameFrom.set(next.key, current);
-        }
-      }
-    }
-
-    cameFrom.goal = goal;
-    cameFrom.start = start;
-    return cameFrom;
-  }
-}
-
-export class AStarPathSearch {
-  /** @type {PriorityQueueArray} */
-  frontier = new PriorityQueueArray([], { comparator: (a, b) => a.distance - b.distance });
-
-  /** @type {Map<BorderTriangle>} */
-  cameFrom = new Map(); // path a -> b stored as cameFrom[b] = a
-
 }

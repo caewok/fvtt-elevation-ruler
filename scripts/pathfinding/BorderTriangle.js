@@ -1,8 +1,8 @@
 /* globals
 canvas,
+CONFIG,
 foundry,
-PIXI,
-PointSourcePolygon
+PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -267,40 +267,56 @@ export class BorderTriangle {
    *
    * Corner destination skipped if median --> corner < spacer
    *
-   * @param {Point} priorEntryPoint
-   * @param {BorderTriangle|null} priorTriangle
-   * @param {number} spacer           How much away from the corner to set the corner destinations.
-   * @returns {object[]} Each element has properties describing the destination, conforming to pathfinding
-   *   - {BorderTriangle} key
-   *   - {Point} entryPoint
-   *   - {number} cost
+   * @param {BorderTriangle|null} priorTriangle       Triangle that preceded this one along the path
+   * @param {number} spacer                           How far from the corner to set the corner destinations
+   * @returns {PathNode} Each element has properties describing the destination, conforming to pathfinding
+   *   - {number} key
+   *   - {PIXI.Point} entryPoint
+   *   - {BorderTriangle} entryTriangle
+   *   - {BorderTriangle} priorTriangle
    */
-  getValidDestinations(priorEntryPoint, priorTriangle, spacer) {
+  getValidDestinations(priorTriangle, spacer) {
     spacer ??= canvas.grid.size * 0.5;
     const destinations = [];
     const center = this.center;
     for ( const edge of Object.values(this.edges) ) {
-      const key = edge.otherTriangle(this); // Neighbor
-      if ( !key ) continue;
-      if ( priorTriangle && priorTriangle === key ) continue;
+      const entryTriangle = edge.otherTriangle(this); // Neighbor
+      if ( !entryTriangle || priorTriangle && priorTriangle === entryTriangle ) continue;
       const pts = edge.getValidDestinations(center, spacer);
       pts.forEach(entryPoint => {
         destinations.push({
           entryPoint,
-          key,
-
-          // Debugging:
-          // priorEntryPoint,
-          // priorTriangle,
-
-          // TODO: Handle 3d distances.
-          // Probably use canvas.grid.measureDistances, passing a Ray3d.
-          // TODO: Handle terrain distance
-          cost: canvas.grid.measureDistance(priorEntryPoint, entryPoint)
+          key: entryPoint.key, // Key needs to be unique for each point,
+          entryTriangle, // Needed to locate neighbors in the next iteration.
+          priorTriangle, // Needed to eliminate irrelevant neighbors in the next iteration.
         });
       });
     }
     return destinations;
+  }
+
+  /**
+   * Retrieve destinations with cost calculation added.
+   * @param {BorderTriangle|null} priorTriangle     Triangle that preceded this one along the path
+   * @param {number} spacer                         How far from the corner to set the corner destinations
+   * @param {Point} fromPoint                       Point to measure from, for cost
+   */
+  getValidDestinationsWithCost(priorTriangle, spacer, fromPoint) {
+    const destinations = this.getValidDestinations(priorTriangle, spacer);
+    destinations.forEach(d => d.cost = this._calculateMovementCost(fromPoint, d.entryPoint));
+    return destinations;
+  }
+
+  /**
+   * Calculate the cost for a single path node from a given point.
+   * @param {PathNode} node
+   * @param {Point} fromPoint
+   * @returns {number} Cost value
+   */
+  _calculateMovementCost(fromPoint, toPoint) {
+    // TODO: Handle 3d distance. Probably Ray3d with measureDistance or measureDistances.
+    // TODO: Handle terrain distance.
+    return CONFIG.GeometryLib.utils.gridUnitsToPixels(canvas.grid.measureDistance(fromPoint, toPoint));
   }
 
   /**
