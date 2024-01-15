@@ -19,6 +19,7 @@ import { Pathfinder } from "./pathfinding/pathfinding.js";
 import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./pathfinding/algorithms.js";
 import { PriorityQueueArray } from "./pathfinding/PriorityQueueArray.js";
 import { PriorityQueue } from "./pathfinding/PriorityQueue.js";
+import { benchPathfinding } from "./pathfinding/benchmark.js";
 
 Hooks.once("init", function() {
   // Cannot access localization until init.
@@ -38,7 +39,8 @@ Hooks.once("init", function() {
       GreedyPathSearch,
       AStarPathSearch,
       PriorityQueueArray,
-      PriorityQueue
+      PriorityQueue,
+      benchPathfinding
     }
   };
 });
