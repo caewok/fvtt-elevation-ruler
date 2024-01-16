@@ -324,7 +324,7 @@ export class BorderTriangle {
    * Used to link triangles by an edge.
    * @param {string} edgeName     "AB"|"BC"|"CA"
    */
-  setEdge(edgeName, newEdge) {
+  _setEdge(edgeName, newEdge) {
     const oldEdge = this.edges[edgeName];
     if ( !oldEdge ) {
       console.error(`No edge with name ${edgeName} found.`);
@@ -347,6 +347,27 @@ export class BorderTriangle {
   }
 
   /**
+   * Locate an edge name given edge keys.
+   * @param {number} key0
+   * @param {number} key1
+   * @returns {string|null} Edge name or null if none.
+   */
+  _edgeNameForKeys(key0, key1) {
+    if ( !(this.endpointKeys.has(key0) && this.endpointKeys.has(key1)) ) return undefined;
+
+    const keysAB = this.edges.AB.endpointKeys;
+    if ( keysAB.has(key0) && keysAB.has(key1) ) return "AB";
+
+    const keysBC = this.edges.BC.endpointKeys;
+    if ( keysBC.has(key0) && keysBC.has(key1) ) return "BC";
+
+    const keysCA = this.edges.CA.endpointKeys;
+    if ( keysCA.has(key0) && keysCA.has(key1) ) return "CA";
+
+    return undefined; // Should not be reached.
+  }
+
+  /**
    * For debugging. Draw edges on the canvas.
    */
   drawEdges() { Object.values(this.edges).forEach(e => e.draw()); }
@@ -363,5 +384,49 @@ export class BorderTriangle {
 
       }
     }
+  }
+
+  /**
+   * Link edges of an array of BorderTriangles.
+   * Each linked edge is shared with a second triangle.
+   * Assumed that no edge endpoint is in the middle of another edge.
+   * @param {BorderTriangle[]} borderTriangles    Triangle to link. Modified in place.
+   * @returns {BorderTriangle[]} The same array, for convenience.
+   */
+  static linkTriangleEdges(borderTriangles) {
+    // Map: edge key --> triangles set.
+    const pointMap = new Map();
+    for ( const borderTriangle of borderTriangles ) {
+      const { a, b, c } = borderTriangle.vertices;
+      const aSet = pointMap.get(a.key) || new Set();
+      const bSet = pointMap.get(b.key) || new Set();
+      const cSet = pointMap.get(c.key) || new Set();
+
+      aSet.add(borderTriangle);
+      bSet.add(borderTriangle);
+      cSet.add(borderTriangle);
+      if ( !pointMap.has(a.key) ) pointMap.set(a.key, aSet);
+      if ( !pointMap.has(b.key) ) pointMap.set(b.key, aSet);
+      if ( !pointMap.has(c.key) ) pointMap.set(c.key, aSet);
+    }
+
+    // For each triangle, if the edge is not yet linked, link if it has a shared edge.
+    // Use the point map to determine if a triangle has a shared edge.
+    for ( const borderTriangle of borderTriangles ) {
+      for ( const edge of Object.values(borderTriangle.edges) ) {
+        if ( edge.cwTriangle && edge.ccwTriangle ) continue; // Already linked.
+        const aSet = pointMap.get(edge.a.key);
+        const bSet = pointMap.get(edge.b.key);
+        const otherTriangle = aSet.intersection(bSet).first(); // Should always have 0 or 1 elements.
+        if ( !otherTriangle ) continue; // No bordering triangle.
+
+        // Determine where this edge is on the other triangle and replace.
+        const otherEdgeName = otherTriangle._edgeNameForKeys(edge.a.key, edge.b.key);
+        if ( !otherEdgeName ) continue;
+        otherTriangle._setEdge(otherEdgeName, edge);
+      }
+    }
+
+    return borderTriangles;
   }
 }
