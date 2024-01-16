@@ -52,9 +52,9 @@ function tokenElevation(token) {
  * @returns {boolean}
  */
 function preferTokenElevation() {
-  if ( !Settings.get(Settings.KEYS.PREFER_TOKEN_ELEVATION) ) return false;
+  if ( !Settings.get(Settings.KEYS.CONTROLS.PREFER_TOKEN_ELEVATION) ) return false;
   const token_controls = ui.controls.controls.find(elem => elem.name === "token");
-  const prefer_token_control = token_controls.tools.find(elem => elem.name === Settings.KEYS.PREFER_TOKEN_ELEVATION);
+  const prefer_token_control = token_controls.tools.find(elem => elem.name === Settings.KEYS.CONTROLS.PREFER_TOKEN_ELEVATION);
   return prefer_token_control.active;
 }
 
