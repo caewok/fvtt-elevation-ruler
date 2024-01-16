@@ -2,7 +2,6 @@
 canvas,
 CanvasQuadtree,
 CONFIG,
-Delaunator,
 PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -12,6 +11,7 @@ import { boundsForPoint } from "../util.js";
 import { Draw } from "../geometry/Draw.js";
 import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./algorithms.js";
 import { SCENE_GRAPH } from "./WallTracer.js";
+import { cdt2dConstrainedGraph, cdt2dToBorderTriangles } from "../delaunator/cdt2d_access_functions.js";
 
 /* Testing
 
@@ -71,109 +71,6 @@ pf.drawPath(pathPoints, { color: Draw.COLORS.white })
 
 */
 
-// Pathfinder.initialize();
-//
-// Draw = CONFIG.GeometryLib.Draw;
-//
-// measureInitWalls = performance.measure("measureInitWalls", "Pathfinder|Initialize Walls", "Pathfinder|Initialize Delauney")
-// measureInitDelaunay = performance.measure("measureInitDelaunay", "Pathfinder|Initialize Delauney", "Pathfinder|Initialize Triangles")
-// measureInitTriangles = performance.measure("measureInitTriangles", "Pathfinder|Initialize Triangles", "Pathfinder|Finished Initialization")
-// console.table([measureInitWalls, measureInitDelaunay,measureInitTriangles ])
-//
-//
-//
-// // Triangulate
-// /*
-// Take the 4 corners plus coordinates of each wall endpoint.
-// (TODO: Use wall edges to capture overlapping walls)
-//
-// Triangulate.
-//
-// Can traverse using the half-edge structure.
-//
-// Start in a triangle. For now, traverse between triangles at midpoints.
-// Triangle coords correspond to a wall. Each triangle edge may or may not block.
-// Can either look up the wall or just run collision between the two triangle midpoints (probably the latter).
-// This handles doors, one-way walls, etc., and limits when the triangulation must be re-done.
-//
-// Each triangle can represent terrain. Triangle terrain is then used to affect the distance value.
-// Goal heuristic based on distance (modified by terrain?).
-// Alternatively, apply terrain only when moving. But should still triangulate terrain so can move around it.
-//
-// Ultimately traverse by choosing midpoint or points 1 grid square from each endpoint on the edge.
-//
-// */
-//
-//
-// // Draw each endpoint
-// for ( const key of endpointKeys ) {
-//   const pt = PIXI.Point.invertKey(key);
-//   Draw.point(pt, { color: Draw.COLORS.blue })
-// }
-//
-// // Draw each triangle
-// triangles = [];
-// for (let i = 0; i < delaunay.triangles.length; i += 3) {
-//   const j = delaunay.triangles[i] * 2;
-//   const k = delaunay.triangles[i + 1] * 2;
-//   const l = delaunay.triangles[i + 2] * 2;
-//   triangles.push(new PIXI.Polygon(
-//     delaunay.coords[j], delaunay.coords[j + 1],
-//     delaunay.coords[k], delaunay.coords[k + 1],
-//     delaunay.coords[l], delaunay.coords[l + 1]
-//   ));
-// }
-//
-// for ( const tri of triangles ) Draw.shape(tri);
-//
-//
-//
-//
-// borderTriangles.forEach(tri => tri.drawEdges());
-// borderTriangles.forEach(tri => tri.drawLinks())
-//
-//
-// // Use Quadtree to locate starting triangle for a point.
-//
-// // quadtree.clear()
-// // quadtree.update({r: bounds, t: this})
-// // quadtree.remove(this)
-// // quadtree.update(this)
-//
-//
-// quadtreeBT = new CanvasQuadtree()
-// borderTriangles.forEach(tri => quadtreeBT.insert({r: tri.bounds, t: tri}))
-//
-//
-// token = _token
-// startPoint = _token.center;
-// endPoint = _token.center
-//
-// // Find the strat and end triangles
-// collisionTest = (o, _rect) => o.t.contains(startPoint);
-// startTri = quadtreeBT.getObjects(boundsForPoint(startPoint), { collisionTest }).first();
-//
-// collisionTest = (o, _rect) => o.t.contains(endPoint);
-// endTri = quadtreeBT.getObjects(boundsForPoint(endPoint), { collisionTest }).first();
-//
-// startTri.drawEdges();
-// endTri.drawEdges();
-//
-// // Locate valid destinations
-// destinations = startTri.getValidDestinations(startPoint, null, token.w * 0.5);
-// destinations.forEach(d => Draw.point(d.entryPoint, { color: Draw.COLORS.yellow }))
-// destinations.sort((a, b) => a.distance - b.distance);
-//
-//
-// // Pick direction, repeat.
-// chosenDestination = destinations[0];
-// Draw.segment({ A: startPoint, B: chosenDestination.entryPoint }, { color: Draw.COLORS.yellow })
-// nextTri = chosenDestination.triangle;
-// destinations = nextTri.getValidDestinations(startPoint, null, token.w * 0.5);
-// destinations.forEach(d => Draw.point(d.entryPoint, { color: Draw.COLORS.yellow }))
-// destinations.sort((a, b) => a.distance - b.distance);
-//
-
 /* For the triangles, need:
 √ Contains test. Could use PIXI.Polygon, but a custom contains will be faster.
   --> Used to find where a start/end point is located.
@@ -196,9 +93,6 @@ export class Pathfinder {
   /** @type {CanvasQuadTree} */
   static quadtree = new CanvasQuadtree();
 
-  /** @type {Delaunator} */
-  static delaunay;
-
   /** @type {BorderTriangle[]} */
   static borderTriangles = [];
 
@@ -206,137 +100,41 @@ export class Pathfinder {
   static triangleEdges = new Set();
 
   /** @type {object<boolean>} */
-  static #dirty = {
-    delauney: true,
-    triangles: true
-  }
+  static #dirty = true;
 
-  static get dirty() { return this.#dirty.delauney || this.#dirty.triangles; }
+  static get dirty() { return this.#dirty; }
 
-  static set dirty(value) {
-    this.#dirty.delauney ||= value;
-    this.#dirty.triangles ||= value;
-  }
+  static set dirty(value) { this.#dirty ||= value; }
 
   /**
    * Initialize properties used for pathfinding related to the scene walls.
    */
   static initialize() {
     this.clear();
-    this.initializeDelauney();
-    this.initializeTriangles();
+    const { borderTriangles, quadtree } = this;
+    const triCoords = cdt2dConstrainedGraph(SCENE_GRAPH);
+    cdt2dToBorderTriangles(triCoords, borderTriangles);
+    BorderTriangle.linkTriangleEdges(borderTriangles);
+    borderTriangles.forEach(tri => quadtree.insert({ r: tri.bounds, t: tri }));
+    this._linkWallsToEdges();
+    this.#dirty &&= false;
   }
 
   static clear() {
     this.borderTriangles.length = 0;
     this.triangleEdges.clear();
     this.quadtree.clear();
-    this.#dirty.delauney ||= true;
-    this.#dirty.triangles ||= true;
+    this.#dirty ||= true;
   }
 
-  /**
-   * Build a set of Delaunay triangles from the walls in the scene.
-   */
-  static initializeDelauney() {
-    this.clear();
-    const coords = new Uint32Array(SCENE_GRAPH.vertices.size * 2);
-    let i = 0;
-    const coordKeys = new Map();
-    for ( const vertex of SCENE_GRAPH.vertices.values() ) {
-      coords[i] = vertex.x;
-      coords[i + 1] = vertex.y;
-      coordKeys.set(vertex.key, i);
-      i += 2;
-    }
-    this.delaunay = new Delaunator(coords);
-    this.delaunay.coordKeys = coordKeys
-    this.#dirty.delauney &&= false;
-  }
-
-
-
-//   static _constrainDelauney() {
-//     // https://github.com/kninnug/Constrainautor
-//
-//     // Build the points to be constrained.
-//     // Array of array of indices into the Delaunator points array.
-//     // Treat each edge in the SCENE_GRAPH as constraining.
-//     delaunay = Pathfinder.delaunay;
-//     coordKeys = delaunay.coordKeys;
-//     edges = new Array(SCENE_GRAPH.edges.size);
-//     let i = 0;
-//     for ( const edge of SCENE_GRAPH.edges.values() ) {
-//       const iA = delaunay.coordKeys.get(edge.A.key);
-//       const iB = delaunay.coordKeys.get(edge.B.key);
-//       edges[i] = [iA, iB];
-//       i += 1;
-//     }
-//     con = new Constrainautor(delaunay);
-//
-//     sceneEdges = [...SCENE_GRAPH.edges.values()]
-//
-//
-//     for ( let i = 0; i < SCENE_GRAPH.edges.size; i += 1) {
-//       edge = edges[i]
-//       try {
-//         con.constrainOne(edge[0], edge[1])
-//       } catch(err) {
-//         console.debug(`Error constraining edge ${i}.`)
-//       }
-//     }
-//
-//     i = 0
-//
-//     edge = edges[i]
-//     Draw.segment(sceneEdges[i], { color: Draw.COLORS.red })
-//     con.constrainOne(edge[0], edge[1])
-//
-//
-//   }
-
-  /**
-   * Build the triangle objects used to represent the Delauney objects for pathfinding.
-   * Must first run initializeDelauney and initializeWalls.
-   */
-  static initializeTriangles() {
-    const { borderTriangles, triangleEdges, delaunay, quadtree } = this;
-    if ( this.#dirty.delauney ) this.initializeDelauney();
-
+  static _linkWallsToEdges() {
+    const triangleEdges = this.triangleEdges;
     triangleEdges.clear();
-    quadtree.clear();
-
-    // Build array of border triangles
-    borderTriangles.length = delaunay.triangles.length / 3;
-    forEachTriangle(delaunay, (i, pts) => {
-       const tri = BorderTriangle.fromPoints(pts[0], pts[1], pts[2]);
-       tri.id = i;
-       borderTriangles[i] = tri;
-
-       // Add to the quadtree
-       quadtree.insert({ r: tri.bounds, t: tri });
+    this.borderTriangles.forEach(tri => {
+      triangleEdges.add(tri.edges.AB);
+      triangleEdges.add(tri.edges.BC);
+      triangleEdges.add(tri.edges.CA);
     });
-
-
-    // Set the half-edges
-    const EDGE_NAMES = BorderTriangle.EDGE_NAMES;
-    for ( let i = 0; i < delaunay.halfedges.length; i += 1 ) {
-      const halfEdgeIndex = delaunay.halfedges[i];
-      if ( !~halfEdgeIndex ) continue;
-      const triFrom = borderTriangles[Math.floor(i / 3)];
-      const triTo = borderTriangles[Math.floor(halfEdgeIndex / 3)];
-
-      // Always a, b, c in order (b/c ccw)
-      const fromEdge = EDGE_NAMES[i % 3];
-      const toEdge = EDGE_NAMES[halfEdgeIndex % 3];
-
-      // Need to pick one; keep the fromEdge
-      const edgeToKeep = triFrom.edges[fromEdge];
-      triTo.setEdge(toEdge, edgeToKeep);
-
-      // Track edge set to link walls.
-      triangleEdges.add(edgeToKeep);
-    }
 
     // Set the wall, if any, for each triangle edge
     const aWalls = new Set();
@@ -352,8 +150,6 @@ export class Pathfinder {
       aWalls.clear();
       bWalls.clear();
     }
-
-    this.#dirty.triangles &&= false;
   }
 
   /** @type {Token} token */
@@ -410,7 +206,7 @@ export class Pathfinder {
     }
 
     // Make sure pathfinder triangles are up-to-date.
-    if ( this.constructor.dirty ) this.constructor.initializeTriangles();
+    if ( this.constructor.dirty ) this.constructor.initialize();
 
     // Run the algorithm.
     const { start, end } = this._initializeStartEndNodes(startPoint, endPoint);
@@ -482,7 +278,8 @@ export class Pathfinder {
       newNode.priorTriangle = pathNode.priorTriangle;
       return [newNode];
     }
-    return pathNode.entryTriangle.getValidDestinationsWithCost(pathNode.priorTriangle, this.spacer, pathNode.entryPoint);
+    return pathNode.entryTriangle.getValidDestinationsWithCost(
+      pathNode.priorTriangle, this.spacer, pathNode.entryPoint);
   }
 
   /**
@@ -515,100 +312,14 @@ export class Pathfinder {
    * Debugging. Draw the triangle graph.
    */
   static drawTriangles() {
-    if ( this.dirty ) this.initializeTriangles();
+    if ( this.dirty ) this.initialize();
     this.borderTriangles.forEach(tri => tri.drawEdges());
   }
-}
 
-
-// NOTE: Helper functions to handle Delaunay coordinates.
-// See https://mapbox.github.io/delaunator/
-
-/**
- * Get the three vertex coordinates (edges) for a delaunay triangle.
- * @param {number} t    Triangle index
- * @returns {number[3]}
- */
-function edgesOfTriangle(t) { return [3 * t, 3 * t + 1, 3 * t + 2]; }
-
-/**
- * Get the points of a delaunay triangle.
- * @param {Delaunator} delaunay     The triangulation to use
- * @param {number} t                Triangle index
- * @returns {PIXI.Point[3]}
- */
-function pointsOfTriangle(delaunay, t) {
-  const points = delaunay.coords;
-  return edgesOfTriangle(t)
-        .map(e => delaunay.triangles[e])
-        .map(p => new PIXI.Point(points[2 * p], points[(2 * p) + 1]));
-}
-
-/**
- * Apply a function to each triangle in the triangulation.
- * @param {Delaunator} delaunay     The triangulation to use
- * @param {function} callback       Function to apply, which is given the triangle id and array of 3 points
- */
-function forEachTriangle(delaunay, callback) {
-  const nTriangles = delaunay.triangles.length / 3;
-  for ( let t = 0; t < nTriangles; t += 1 ) callback(t, pointsOfTriangle(delaunay, t));
-}
-
-/**
- * Get index of triangle for a given edge.
- * @param {number} e      Edge index
- * @returns {number} Triangle index
- */
-function triangleOfEdge(e)  { return Math.floor(e / 3); }
-
-/**
- * For a given half-edge index, go to the next half-edge for the triangle.
- * @param {number} e    Edge index
- * @returns {number} Edge index.
- */
-function nextHalfedge(e) { return (e % 3 === 2) ? e - 2 : e + 1; }
-
-/**
- * For a given half-edge index, go to the previous half-edge for the triangle.
- * @param {number} e    Edge index
- * @returns {number} Edge index.
- */
-function prevHalfedge(e) { return (e % 3 === 0) ? e + 2 : e - 1; }
-
-/**
- * Apply a function for each triangle edge in the triangulation.
- * @param {Delaunator} delaunay     The triangulation to use
- * @param {function} callback       Function to call, passing the edge index and points of the edge.
- */
-function forEachTriangleEdge(delaunay, callback) {
-  const points = delaunay.coords;
-    for (let e = 0; e < delaunay.triangles.length; e++) {
-      if (e > delaunay.halfedges[e]) {
-        const ip = delaunay.triangles[e];
-        const p = new PIXI.Point(points[2 * ip], points[(2 * ip) + 1])
-
-        const iq = delaunay.triangles[nextHalfedge(e)];
-        const q = new PIXI.Point(points[2 * iq], points[(2 * iq) + 1])
-        callback(e, p, q);
-      }
-    }
-}
-
-/**
- * Identify triangle indices corresponding to triangles adjacent to the one provided.
- * @param {Delaunator} delaunay     The triangulation to use
- * @param {number} t    Triangle index
- * @returns {number[]}
- */
-function trianglesAdjacentToTriangle(delaunay, t) {
-  const adjacentTriangles = [];
-  for ( const e of edgesOfTriangle(t) ) {
-    const opposite = delaunay.halfedges[e];
-    if (opposite >= 0) adjacentTriangles.push(triangleOfEdge(opposite));
+  /**
+   * Debugging. Draw the edges.
+   */
+  static drawEdges() {
+    this.triangleEdges.forEach(edge => edge.draw());
   }
-  return adjacentTriangles;
 }
-
-
-
-
