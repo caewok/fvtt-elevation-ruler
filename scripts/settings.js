@@ -10,7 +10,12 @@ import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { PATCHER } from "./patching.js";
 
 const SETTINGS = {
-  PREFER_TOKEN_ELEVATION: "prefer-token-elevation",
+  CONTROLS: {
+    PATHFINDING: "pathfinding-control",
+    PREFER_TOKEN_ELEVATION: "prefer-token-elevation",
+    PREFER_TOKEN_ELEVATION_CURRENT_VALUE: "prefer-token-elevation-current-value"
+  },
+
   USE_EV: "enable-elevated-vision-elevation",
   USE_TERRAIN: "enable-enhanced-terrain-elevation",
   USE_LEVELS: "enable-levels-elevation",
@@ -21,7 +26,6 @@ const SETTINGS = {
     ALWAYS: "levels-labels-always"
   },
   NO_MODS: "no-modules-message",
-  PREFER_TOKEN_ELEVATION_CURRENT_VALUE: "prefer-token-elevation-current-value",
   TOKEN_RULER: {
     ENABLED: "enable-token-ruler",
     SPEED_HIGHLIGHTING: "token-ruler-highlighting",
@@ -108,9 +112,9 @@ export class Settings extends ModuleSettingsAbstract {
       }
     });
 
-    register(KEYS.PREFER_TOKEN_ELEVATION, {
-      name: localize(`${KEYS.PREFER_TOKEN_ELEVATION}.name`),
-      hint: localize(`${KEYS.PREFER_TOKEN_ELEVATION}.hint`),
+    register(KEYS.CONTROLS.PREFER_TOKEN_ELEVATION, {
+      name: localize(`${KEYS.CONTROLS.PREFER_TOKEN_ELEVATION}.name`),
+      hint: localize(`${KEYS.CONTROLS.PREFER_TOKEN_ELEVATION}.hint`),
       scope: "user",
       config: true,
       default: false,
@@ -119,7 +123,15 @@ export class Settings extends ModuleSettingsAbstract {
       onChange: reloadTokenControls
     });
 
-    register(KEYS.PREFER_TOKEN_ELEVATION_CURRENT_VALUE, {
+    register(KEYS.CONTROLS.PREFER_TOKEN_ELEVATION_CURRENT_VALUE, {
+      scope: "user",
+      config: false,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.CONTROLS.PATHFINDING, {
       scope: "user",
       config: false,
       default: false,
