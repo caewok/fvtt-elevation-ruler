@@ -11,13 +11,14 @@ import { BorderTriangle } from "./BorderTriangle.js";
 import { boundsForPoint } from "../util.js";
 import { Draw } from "../geometry/Draw.js";
 import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./algorithms.js";
-
+import { SCENE_GRAPH } from "./WallTracer.js";
 
 /* Testing
 
 Draw = CONFIG.GeometryLib.Draw;
 api = game.modules.get("elevationruler").api
 Pathfinder = api.pathfinding.Pathfinder
+SCENE_GRAPH = api.pathfinding.SCENE_GRAPH
 PriorityQueueArray = api.pathfinding.PriorityQueueArray;
 PriorityQueue = api.pathfinding.PriorityQueue;
 
@@ -38,7 +39,7 @@ pq.data
 
 // Test pathfinding
 Pathfinder.initialize()
-Pathfinder.borderTriangles.forEach(tri => tri.drawEdges());
+Pathfinder.drawTriangles();
 
 
 endPoint = _token.center
@@ -195,14 +196,8 @@ export class Pathfinder {
   /** @type {CanvasQuadTree} */
   static quadtree = new CanvasQuadtree();
 
-  /** @type {Set<number>} */
-  static endpointKeys = new Set();
-
   /** @type {Delaunator} */
   static delaunay;
-
-  /** @type {Map<key, Set<Wall>>} */
-  static wallKeys = new Map();
 
   /** @type {BorderTriangle[]} */
   static borderTriangles = [];
@@ -210,96 +205,118 @@ export class Pathfinder {
   /** @type {Set<BorderEdge>} */
   static triangleEdges = new Set();
 
+  /** @type {object<boolean>} */
+  static #dirty = {
+    delauney: true,
+    triangles: true
+  }
+
+  static get dirty() { return this.#dirty.delauney || this.#dirty.triangles; }
+
+  static set dirty(value) {
+    this.#dirty.delauney ||= value;
+    this.#dirty.triangles ||= value;
+  }
+
   /**
    * Initialize properties used for pathfinding related to the scene walls.
    */
   static initialize() {
     this.clear();
-
-    performance.mark("Pathfinder|Initialize Walls");
-    this.initializeWalls();
-
-    performance.mark("Pathfinder|Initialize Delauney");
     this.initializeDelauney();
-
-    performance.mark("Pathfinder|Initialize Triangles");
     this.initializeTriangles();
-
-    performance.mark("Pathfinder|Finished Initialization");
   }
 
   static clear() {
     this.borderTriangles.length = 0;
     this.triangleEdges.clear();
-    this.wallKeys.clear();
     this.quadtree.clear();
-  }
-
-  /**
-   * Build a map of wall keys to walls.
-   * Each key points to a set of walls whose endpoint matches the key.
-   */
-  static initializeWalls() {
-    const wallKeys = this.wallKeys;
-    for ( const wall of [...canvas.walls.placeables, ...canvas.walls.outerBounds] ) {
-      const aKey = wall.vertices.a.key;
-      const bKey = wall.vertices.b.key;
-      if ( wallKeys.has(aKey) ) wallKeys.get(aKey).add(wall);
-      else wallKeys.set(aKey, new Set([wall]));
-
-      if ( wallKeys.has(bKey) ) wallKeys.get(bKey).add(wall);
-      else wallKeys.set(bKey, new Set([wall]));
-    }
+    this.#dirty.delauney ||= true;
+    this.#dirty.triangles ||= true;
   }
 
   /**
    * Build a set of Delaunay triangles from the walls in the scene.
-   * TODO: Use wall segments instead of walls to handle overlapping walls.
    */
   static initializeDelauney() {
-    const endpointKeys = this.endpointKeys;
-    for ( const wall of [...canvas.walls.placeables, ...canvas.walls.outerBounds] ) {
-      endpointKeys.add(wall.vertices.a.key);
-      endpointKeys.add(wall.vertices.b.key);
-    }
-
-    const coords = new Uint32Array(endpointKeys.size * 2);
+    this.clear();
+    const coords = new Uint32Array(SCENE_GRAPH.vertices.size * 2);
     let i = 0;
-    for ( const key of endpointKeys ) {
-      const pt = PIXI.Point.invertKey(key);
-      coords[i] = pt.x;
-      coords[i + 1] = pt.y;
+    const coordKeys = new Map();
+    for ( const vertex of SCENE_GRAPH.vertices.values() ) {
+      coords[i] = vertex.x;
+      coords[i + 1] = vertex.y;
+      coordKeys.set(vertex.key, i);
       i += 2;
     }
-
     this.delaunay = new Delaunator(coords);
+    this.delaunay.coordKeys = coordKeys
+    this.#dirty.delauney &&= false;
   }
+
+
+
+//   static _constrainDelauney() {
+//     // https://github.com/kninnug/Constrainautor
+//
+//     // Build the points to be constrained.
+//     // Array of array of indices into the Delaunator points array.
+//     // Treat each edge in the SCENE_GRAPH as constraining.
+//     delaunay = Pathfinder.delaunay;
+//     coordKeys = delaunay.coordKeys;
+//     edges = new Array(SCENE_GRAPH.edges.size);
+//     let i = 0;
+//     for ( const edge of SCENE_GRAPH.edges.values() ) {
+//       const iA = delaunay.coordKeys.get(edge.A.key);
+//       const iB = delaunay.coordKeys.get(edge.B.key);
+//       edges[i] = [iA, iB];
+//       i += 1;
+//     }
+//     con = new Constrainautor(delaunay);
+//
+//     sceneEdges = [...SCENE_GRAPH.edges.values()]
+//
+//
+//     for ( let i = 0; i < SCENE_GRAPH.edges.size; i += 1) {
+//       edge = edges[i]
+//       try {
+//         con.constrainOne(edge[0], edge[1])
+//       } catch(err) {
+//         console.debug(`Error constraining edge ${i}.`)
+//       }
+//     }
+//
+//     i = 0
+//
+//     edge = edges[i]
+//     Draw.segment(sceneEdges[i], { color: Draw.COLORS.red })
+//     con.constrainOne(edge[0], edge[1])
+//
+//
+//   }
 
   /**
    * Build the triangle objects used to represent the Delauney objects for pathfinding.
    * Must first run initializeDelauney and initializeWalls.
    */
   static initializeTriangles() {
-    const { borderTriangles, triangleEdges, delaunay, wallKeys, quadtree } = this;
+    const { borderTriangles, triangleEdges, delaunay, quadtree } = this;
+    if ( this.#dirty.delauney ) this.initializeDelauney();
+
+    triangleEdges.clear();
+    quadtree.clear();
 
     // Build array of border triangles
-    const nTriangles = delaunay.triangles.length / 3;
-    borderTriangles.length = nTriangles;
-    for (let i = 0, ii = 0; i < delaunay.triangles.length; i += 3, ii += 1) {
-      const j = delaunay.triangles[i] * 2;
-      const k = delaunay.triangles[i + 1] * 2;
-      const l = delaunay.triangles[i + 2] * 2;
+    borderTriangles.length = delaunay.triangles.length / 3;
+    forEachTriangle(delaunay, (i, pts) => {
+       const tri = BorderTriangle.fromPoints(pts[0], pts[1], pts[2]);
+       tri.id = i;
+       borderTriangles[i] = tri;
 
-      const a = { x: delaunay.coords[j], y: delaunay.coords[j + 1] };
-      const b = { x: delaunay.coords[k], y: delaunay.coords[k + 1] };
-      const c = { x: delaunay.coords[l], y: delaunay.coords[l + 1] };
-      const tri = BorderTriangle.fromPoints(a, b, c);
-      borderTriangles[ii] = tri;
-      tri.id = ii; // Mostly for debugging at this point.
+       // Add to the quadtree
+       quadtree.insert({ r: tri.bounds, t: tri });
+    });
 
-      // Add to the quadtree
-      quadtree.insert({ r: tri.bounds, t: tri });
-    }
 
     // Set the half-edges
     const EDGE_NAMES = BorderTriangle.EDGE_NAMES;
@@ -322,14 +339,21 @@ export class Pathfinder {
     }
 
     // Set the wall, if any, for each triangle edge
-    const nullSet = new Set();
+    const aWalls = new Set();
+    const bWalls = new Set();
     for ( const edge of triangleEdges.values() ) {
       const aKey = edge.a.key;
       const bKey = edge.b.key;
-      const aWalls = wallKeys.get(aKey) || nullSet;
-      const bWalls = wallKeys.get(bKey) || nullSet;
+      const aVertex = SCENE_GRAPH.vertices.get(aKey);
+      const bVertex = SCENE_GRAPH.vertices.get(bKey);
+      if ( aVertex ) aVertex._edgeSet.forEach(e => aWalls.add(e.wall));
+      if ( bVertex ) bVertex._edgeSet.forEach(e => bWalls.add(e.wall));
       edge.wall = aWalls.intersection(bWalls).first(); // May be undefined.
+      aWalls.clear();
+      bWalls.clear();
     }
+
+    this.#dirty.triangles &&= false;
   }
 
   /** @type {Token} token */
@@ -384,6 +408,9 @@ export class Pathfinder {
       alg.getNeighbors = this[costMethod];
       alg.heuristic = this._heuristic;
     }
+
+    // Make sure pathfinder triangles are up-to-date.
+    if ( this.constructor.dirty ) this.constructor.initializeTriangles();
 
     // Run the algorithm.
     const { start, end } = this._initializeStartEndNodes(startPoint, endPoint);
@@ -483,4 +510,105 @@ export class Pathfinder {
       prior = curr;
     }
   }
+
+  /**
+   * Debugging. Draw the triangle graph.
+   */
+  static drawTriangles() {
+    if ( this.dirty ) this.initializeTriangles();
+    this.borderTriangles.forEach(tri => tri.drawEdges());
+  }
 }
+
+
+// NOTE: Helper functions to handle Delaunay coordinates.
+// See https://mapbox.github.io/delaunator/
+
+/**
+ * Get the three vertex coordinates (edges) for a delaunay triangle.
+ * @param {number} t    Triangle index
+ * @returns {number[3]}
+ */
+function edgesOfTriangle(t) { return [3 * t, 3 * t + 1, 3 * t + 2]; }
+
+/**
+ * Get the points of a delaunay triangle.
+ * @param {Delaunator} delaunay     The triangulation to use
+ * @param {number} t                Triangle index
+ * @returns {PIXI.Point[3]}
+ */
+function pointsOfTriangle(delaunay, t) {
+  const points = delaunay.coords;
+  return edgesOfTriangle(t)
+        .map(e => delaunay.triangles[e])
+        .map(p => new PIXI.Point(points[2 * p], points[(2 * p) + 1]));
+}
+
+/**
+ * Apply a function to each triangle in the triangulation.
+ * @param {Delaunator} delaunay     The triangulation to use
+ * @param {function} callback       Function to apply, which is given the triangle id and array of 3 points
+ */
+function forEachTriangle(delaunay, callback) {
+  const nTriangles = delaunay.triangles.length / 3;
+  for ( let t = 0; t < nTriangles; t += 1 ) callback(t, pointsOfTriangle(delaunay, t));
+}
+
+/**
+ * Get index of triangle for a given edge.
+ * @param {number} e      Edge index
+ * @returns {number} Triangle index
+ */
+function triangleOfEdge(e)  { return Math.floor(e / 3); }
+
+/**
+ * For a given half-edge index, go to the next half-edge for the triangle.
+ * @param {number} e    Edge index
+ * @returns {number} Edge index.
+ */
+function nextHalfedge(e) { return (e % 3 === 2) ? e - 2 : e + 1; }
+
+/**
+ * For a given half-edge index, go to the previous half-edge for the triangle.
+ * @param {number} e    Edge index
+ * @returns {number} Edge index.
+ */
+function prevHalfedge(e) { return (e % 3 === 0) ? e + 2 : e - 1; }
+
+/**
+ * Apply a function for each triangle edge in the triangulation.
+ * @param {Delaunator} delaunay     The triangulation to use
+ * @param {function} callback       Function to call, passing the edge index and points of the edge.
+ */
+function forEachTriangleEdge(delaunay, callback) {
+  const points = delaunay.coords;
+    for (let e = 0; e < delaunay.triangles.length; e++) {
+      if (e > delaunay.halfedges[e]) {
+        const ip = delaunay.triangles[e];
+        const p = new PIXI.Point(points[2 * ip], points[(2 * ip) + 1])
+
+        const iq = delaunay.triangles[nextHalfedge(e)];
+        const q = new PIXI.Point(points[2 * iq], points[(2 * iq) + 1])
+        callback(e, p, q);
+      }
+    }
+}
+
+/**
+ * Identify triangle indices corresponding to triangles adjacent to the one provided.
+ * @param {Delaunator} delaunay     The triangulation to use
+ * @param {number} t    Triangle index
+ * @returns {number[]}
+ */
+function trianglesAdjacentToTriangle(delaunay, t) {
+  const adjacentTriangles = [];
+  for ( const e of edgesOfTriangle(t) ) {
+    const opposite = delaunay.halfedges[e];
+    if (opposite >= 0) adjacentTriangles.push(triangleOfEdge(opposite));
+  }
+  return adjacentTriangles;
+}
+
+
+
+

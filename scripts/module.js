@@ -21,6 +21,9 @@ import { PriorityQueueArray } from "./pathfinding/PriorityQueueArray.js";
 import { PriorityQueue } from "./pathfinding/PriorityQueue.js";
 import { benchPathfinding } from "./pathfinding/benchmark.js";
 
+// Wall updates for pathfinding
+import { SCENE_GRAPH, WallTracer, WallTracerEdge, WallTracerVertex } from "./pathfinding/WallTracer.js";
+
 Hooks.once("init", function() {
   // Cannot access localization until init.
   PREFER_TOKEN_CONTROL.title = game.i18n.localize(PREFER_TOKEN_CONTROL.title);
@@ -40,8 +43,11 @@ Hooks.once("init", function() {
       AStarPathSearch,
       PriorityQueueArray,
       PriorityQueue,
-      benchPathfinding
-    }
+      benchPathfinding,
+      SCENE_GRAPH
+    },
+
+    WallTracer, WallTracerEdge, WallTracerVertex
   };
 });
 

@@ -13,6 +13,9 @@ import { PATCHES as PATCHES_BaseGrid } from "./BaseGrid.js";
 import { PATCHES as PATCHES_HexagonalGrid } from "./HexagonalGrid.js";
 import { PATCHES as PATCHES_ConstrainedTokenBorder } from "./ConstrainedTokenBorder.js";
 
+// Pathfinding
+import { PATCHES as PATCHES_Wall } from "./pathfinding/Wall.js";
+
 // Settings
 import { PATCHES as PATCHES_Settings } from "./ModuleSettingsAbstract.js";
 
@@ -24,7 +27,8 @@ const PATCHES = {
   HexagonalGrid: PATCHES_HexagonalGrid,
   Ruler: PATCHES_Ruler,
   Token: PATCHES_Token,
-  Settings: PATCHES_Settings
+  Settings: PATCHES_Settings,
+  Wall: PATCHES_Wall
 };
 
 export const PATCHER = new Patcher();
@@ -33,5 +37,6 @@ PATCHER.addPatchesFromRegistrationObject(PATCHES);
 export function initializePatching() {
   PATCHER.registerGroup("BASIC");
   PATCHER.registerGroup("ConstrainedTokenBorder");
+  PATCHER.registerGroup("PATHFINDING");
 }
 
