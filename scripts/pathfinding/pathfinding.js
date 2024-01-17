@@ -39,6 +39,8 @@ pq.data
 
 // Test pathfinding
 Pathfinder.initialize()
+
+Draw.clearDrawings()
 Pathfinder.drawTriangles();
 
 
@@ -51,23 +53,41 @@ pf = new Pathfinder(token);
 
 
 path = pf.runPath(startPoint, endPoint, "breadth")
-pathPoints = pf.getPathPoints(path);
+pathPoints = Pathfinder.getPathPoints(path);
+paths = pf.algorithm.breadth.getAllPathPoints()
+paths.forEach(path => pf.algorithm.breadth.drawPath(path, { color: Draw.COLORS.lightorange }))
 pf.drawPath(pathPoints, { color: Draw.COLORS.orange })
 
 path = pf.runPath(startPoint, endPoint, "uniform")
-pathPoints = pf.getPathPoints(path);
+pathPoints = Pathfinder.getPathPoints(path);
+paths = pf.algorithm.breadth.getAllPathPoints()
+paths.forEach(path => pf.algorithm.uniform.drawPath(path, { color: Draw.COLORS.lightyellow }))
 pf.drawPath(pathPoints, { color: Draw.COLORS.yellow })
 
+
 path = pf.runPath(startPoint, endPoint, "greedy")
-pathPoints = pf.getPathPoints(path);
+pathPoints = Pathfinder.getPathPoints(path);
+paths = pf.algorithm.breadth.getAllPathPoints()
+paths.forEach(path => pf.algorithm.greedy.drawPath(path, { color: Draw.COLORS.lightgreen }))
 pf.drawPath(pathPoints, { color: Draw.COLORS.green })
 
 pf.algorithm.greedy.debug = true
 
 
 path = pf.runPath(startPoint, endPoint, "astar")
-pathPoints = pf.getPathPoints(path);
+pathPoints = Pathfinder.getPathPoints(path);
+paths = pf.algorithm.breadth.getAllPathPoints()
+paths.forEach(path => pf.algorithm.astar.drawPath(path, { color: Draw.COLORS.gray }))
 pf.drawPath(pathPoints, { color: Draw.COLORS.white })
+
+// Walk through an algorithm
+
+let { start, end } = pf._initializeStartEndNodes(startPoint, endPoint)
+Draw.point(startPoint, { color: Draw.COLORS.white })
+Draw.point(endPoint, { color: Draw.COLORS.green })
+
+alg = pf.algorithm.breadth
+
 
 */
 
@@ -259,8 +279,14 @@ export class Pathfinder {
    * @returns {PathNode[]} Array of destination nodes
    */
   _identifyDestinations(pathNode, goal) {
-    // If the goal node is reached, return the goal with the cost.
-    if ( pathNode.entryTriangle === goal.entryTriangle ) return [goal];
+    // If the goal node is reached, return the goal
+    if ( pathNode.entryTriangle === goal.entryTriangle ) {
+      // Need a copy so we can modify priorTriangle for this node only.
+      const newNode = {...goal};
+      newNode.priorTriangle = pathNode.priorTriangle;
+      return [newNode];
+
+    }
     return pathNode.entryTriangle.getValidDestinations(pathNode.priorTriangle, this.spacer);
   }
 
@@ -276,6 +302,7 @@ export class Pathfinder {
       const newNode = {...goal};
       newNode.cost = goal.entryTriangle._calculateMovementCost(pathNode.entryPoint, goal.entryPoint);
       newNode.priorTriangle = pathNode.priorTriangle;
+      newNode.fromPoint = pathNode.entryPoint;
       return [newNode];
     }
     return pathNode.entryTriangle.getValidDestinationsWithCost(
@@ -286,14 +313,14 @@ export class Pathfinder {
    * Identify path points, in order from start to finish, for a cameFrom path map.
    * @returns {PIXI.Point[]}
    */
-  getPathPoints(pathMap) {
-    let current = pathMap.goal;
-    const pts = [current.entryPoint];
-    while ( current.key !== pathMap.start.key ) {
-      current = pathMap.get(current.key);
-      pts.push(current.entryPoint);
+  static getPathPoints(pathMap) {
+    let curr = pathMap.goal;
+    const pts = [];
+    while ( curr && pts.length < 1000 ) {
+      pts.push(PIXI.Point.invertKey(curr.key));
+      curr = pathMap.get(curr.key);
     }
-    return pts;
+    return pts.reverse();
   }
 
   drawPath(pathPoints, opts) {
@@ -322,4 +349,12 @@ export class Pathfinder {
   static drawEdges() {
     this.triangleEdges.forEach(edge => edge.draw());
   }
+
+  /**
+   * Debugging. Draw links between triangles.
+   */
+  static drawLinks(toMedian = false) {
+    this.borderTriangles.forEach(tri => tri.drawLinks(toMedian));
+  }
+
 }

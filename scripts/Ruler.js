@@ -1,6 +1,7 @@
 /* globals
 canvas,
 CONST,
+duplicate,
 game,
 ui
 */
@@ -134,8 +135,10 @@ function _addWaypoint(wrapper, point) {
 /**
  * Wrap Ruler.prototype._removeWaypoint
  * Remove elevation increments.
+ * Remove calculated path.
  */
 function _removeWaypoint(wrapper, point, { snap = true } = {}) {
+  if ( this._pathfindingSegmentMap ) this._pathfindingSegmentMap.delete(this.waypoints.at(-1));
   this._userElevationIncrements = 0;
   wrapper(point, { snap });
 }
@@ -256,6 +259,7 @@ function _onMouseUp(wrapped, event) {
   this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
   return wrapped(event);
 }
+
 
 PATCHES.BASIC.WRAPS = {
   clear,
