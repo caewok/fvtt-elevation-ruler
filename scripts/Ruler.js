@@ -201,8 +201,9 @@ function _computeDistance(gridSpaces) {
     segment.moveDistance = this.modifiedMoveDistance(segment, token);
     totalDistance += segment.distance;
     totalMoveDistance += segment.moveDistance;
+    segment.last = false;
   }
-  this.segments.at(-1).last = true;
+  if ( this.segments.length ) this.segments.at(-1).last = true;
   this.totalDistance = totalDistance;
   this.totalMoveDistance = totalMoveDistance;
 }
