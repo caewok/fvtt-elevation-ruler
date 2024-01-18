@@ -128,15 +128,16 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
  * for the given segment.
  */
 export async function _animateSegment(wrapped, token, segment, destination) {
-  const res = await wrapped(token, segment, destination);
+  // If the token is already at the destination, _animateSegment will throw an error when the animation is undefined.
+  // This can happen when setting artificial segments for highlighting or pathfinding.
+  if ( token.document.x !== destination.x
+    || token.document.y !== destination.y ) await wrapped(token, segment, destination);
 
   // Update elevation after the token move.
   if ( segment.ray.A.z !== segment.ray.B.z ) {
     const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z);
     await token.document.update({ elevation });
   }
-
-  return res;
 }
 
 /**
