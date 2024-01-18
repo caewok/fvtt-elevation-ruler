@@ -9,7 +9,7 @@ PIXI
 */
 "use strict";
 
-import { SPEED, MODULES_ACTIVE } from "./const.js";
+import { SPEED, MODULES_ACTIVE, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
@@ -43,42 +43,55 @@ export function _getMeasurementSegments(wrapped) {
   // Test for a collision; if none, no pathfinding.
   const lastSegment = segments.at(-1);
   if ( !lastSegment ) {
-    console.debug(`No last segment found`, [...segments]);
+    console.debug("No last segment found", [...segments]);
     return segments;
   }
 
-  if ( !token.checkCollision(lastSegment.ray.B,
-    {origin: lastSegment.ray.A, type: "move", mode: "any"}) ) return segments;
-
-  const t0 = performance.now();
-
-  // Add pathfinding segments.
-  this._pathfindingSegmentMap ??= new Map();
-  this._pathfinder ??= new Pathfinder(token);
+  const { A, B } = lastSegment.ray;
+  if ( !token.checkCollision(B, { origin: A, type: "move", mode: "any" }) ) return segments;
 
   // Find path between last waypoint and destination.
-
-  const path = this._pathfinder.runPath(lastSegment.ray.A, lastSegment.ray.B);
+  const t0 = performance.now();
+  token[MODULE_ID] ??= {};
+  const pf = token[MODULE_ID].pathfinder ??= new Pathfinder(token);
+  const path = pf.runPath(A, B);
   const pathPoints = Pathfinder.getPathPoints(path);
+  const t1 = performance.now();
+  console.debug(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`);
   if ( pathPoints.length < 2 ) {
     console.debug(`Only ${pathPoints.length} path points found.`, [...pathPoints]);
     return segments;
   }
 
-  const t1 = performance.now();
-
   // Store points in case a waypoint is added.
   // Overwrite the last calculated path from this waypoint.
-  // Note that lastSegment.ray.A equals the last waypoint in memory.
-  this._pathfindingSegmentMap.set(lastSegment.ray.A.to2d().key, pathPoints);
+  const t2 = performance.now();
+  const segmentMap = this._pathfindingSegmentMap ??= new Map();
+  segmentMap.set(A.to2d().key, pathPoints);
 
+  // For each segment, replace with path sub-segment if pathfinding was used.
+  const newSegments = constructPathfindingSegments(segments, segmentMap);
+  const t3 = performance.now();
+  console.debug(`${newSegments.length} segments processed in ${t3-t2} ms.`);
+  return newSegments;
+}
+
+/**
+ * Check provided array of segments against stored path points.
+ * For each segment with pathfinding points, replace the segment with sub-segments
+ * between each pathfinding point.
+ * @param {RulerMeasurementSegment[]} segments
+ * @returns {RulerMeasurementSegment[]} Updated segment array
+ */
+function constructPathfindingSegments(segments, segmentMap) {
   // For each segment, check the map for pathfinding points.
   // If any, replace segment with the points.
   // Make sure to keep the label for the last segment piece only
+  if ( !segmentMap.size ) return segments;
   const newSegments = [];
   for ( const segment of segments ) {
     const { A, B } = segment.ray;
-    const pathPoints = this._pathfindingSegmentMap.get(A.to2d().key);
+    const pathPoints = segmentMap.get(A.to2d().key);
     if ( !pathPoints ) {
       newSegments.push(segment);
       continue;
@@ -100,12 +113,6 @@ export function _getMeasurementSegments(wrapped) {
       lastPathSegment.label = segment.label;
     }
   }
-
-  const t2 = performance.now();
-
-  console.debug(`Found ${pathPoints.length} path points between ${lastSegment.ray.A.x},${lastSegment.ray.A.y} -> ${lastSegment.ray.B.x},${lastSegment.ray.B.y} in ${t1 - t0} ms.`);
-  console.debug(`${newSegments.length} segments processed in ${t2-t1} ms.`);
-
   return newSegments;
 }
 
