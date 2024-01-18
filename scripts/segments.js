@@ -39,7 +39,7 @@ export function _getMeasurementSegments(wrapped) {
   const segments = elevateSegments(this, wrapped());
   const token = this._getMovementToken();
 
-  if ( !(token || Settings.get(Settings.KEYS.CONTROLS.PATHFINDING)) ) return segments;
+  if ( !(token && Settings.get(Settings.KEYS.CONTROLS.PATHFINDING)) ) return segments;
 
   // Test for a collision; if none, no pathfinding.
   const lastSegment = segments.at(-1);
@@ -48,7 +48,8 @@ export function _getMeasurementSegments(wrapped) {
     return segments;
   }
 
-  if ( !token.checkCollision(lastSegment.ray.B, {origin: lastSegment.ray.A, type: "move", mode: "any"}) ) return segments;
+  if ( !token.checkCollision(lastSegment.ray.B,
+    {origin: lastSegment.ray.A, type: "move", mode: "any"}) ) return segments;
 
   const t0 = performance.now();
 
