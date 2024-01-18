@@ -1,8 +1,10 @@
 /* globals
 canvas,
+CONFIG
 CONST,
 duplicate,
 game,
+PIXI,
 ui
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -27,7 +29,7 @@ import {
   modifiedMoveDistance
 } from "./segments.js";
 
-import { tokenIsSnapped } from "./util.js";
+import { tokenIsSnapped, iterateGridUnderLine } from "./util.js";
 
 /**
  * Modified Ruler
@@ -183,22 +185,25 @@ function _canMove(wrapper, token) {
 }
 
 /**
- * Wrap Ruler.prototype._computeDistance
+ * Override Ruler.prototype._computeDistance
+ * Use measurement that counts segments within a grid square properly.
  * Add moveDistance property to each segment; track the total.
  * If token not present or Terrain Mapper not active, this will be the same as segment distance.
  * @param {boolean} gridSpaces    Base distance on the number of grid spaces moved?
  */
-function _computeDistance(wrapped, gridSpaces) {
-  wrapped(gridSpaces);
-
-  // Add a movement distance based on token and terrain for the segment.
-  // Default to segment distance.
+function _computeDistance(gridSpaces) {
+  const gridless = !gridSpaces;
   const token = this._getMovementToken();
+  let totalDistance = 0;
   let totalMoveDistance = 0;
   for ( const segment of this.segments ) {
-    segment.moveDistance = modifiedMoveDistance(segment.distance, segment.ray, token);
+    segment.distance = this.measureDistance(segment.ray.A, segment.ray.B, gridless);
+    segment.moveDistance = this.modifiedMoveDistance(segment, token);
+    totalDistance += segment.distance;
     totalMoveDistance += segment.moveDistance;
   }
+  this.segments.at(-1).last = true;
+  this.totalDistance = totalDistance;
   this.totalMoveDistance = totalMoveDistance;
 }
 
@@ -272,7 +277,6 @@ PATCHES.BASIC.WRAPS = {
   // Wraps related to segments
   _getMeasurementSegments,
   _getSegmentLabel,
-  _computeDistance,
 
   // Move token methods
   _animateMovement,
@@ -286,9 +290,11 @@ PATCHES.BASIC.WRAPS = {
   _canMove
 };
 
-PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
-
 PATCHES.BASIC.MIXES = { _animateSegment };
+
+PATCHES.BASIC.OVERRIDES = { _computeDistance };
+
+PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 
 // ----- NOTE: Methods ----- //
 
@@ -330,6 +336,68 @@ function decrementElevation() {
   game.user.broadcastActivity({ ruler: ruler.toJSON() });
 }
 
+/**
+ * Add separate method to measure distance of a segment based on grid type.
+ * Square or hex: count only distance for when the segment crosses to another square/hex.
+ * A segment wholly within a square is 0 distance.
+ * Instead of mathematical shortcuts from center, actual grid squares are counted.
+ * Euclidean also uses grid squares, but measures using actual diagonal from center to center.
+ * @param {Point} start                 Starting point for the measurement
+ * @param {Point} end                   Ending point for the measurement
+ * @param {boolean} [gridless=false]    For gridded canvas, force gridless measurement
+ * @returns {number} Measure in grid (game) units (not pixels).
+ */
+const DIAGONAL_RULES = {
+  EUCL: 0,
+  555: 1,
+  5105: 2
+};
+const CHANGE = {
+  NONE: 0,
+  V: 1,
+  H: 2,
+  D: 3
+};
+
+function measureDistance(start, end, gridless = false) {
+  gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
+  if ( gridless ) return CONFIG.GeometryLib.utils.pixelsToGridUnits(PIXI.Point.distanceBetween(start, end));
+
+  start = PIXI.Point.fromObject(start);
+  end = PIXI.Point.fromObject(end);
+
+  const iter = iterateGridUnderLine(start, end);
+  let prev = iter.next().value;
+  if ( !prev ) return 0;
+
+  // No change, vertical change, horizontal change, diagonal change.
+  const changeCount = new Uint32Array([0, 0, 0, 0]);
+  for ( const next of iter ) {
+    const xChange = prev[1] !== next[1]; // Column is x
+    const yChange = prev[0] !== next[0]; // Row is y
+    changeCount[((xChange * 2) + yChange)] += 1;
+    prev = next;
+  }
+
+  const distance = canvas.dimensions.distance;
+  const diagonalRule = DIAGONAL_RULES[canvas.grid.diagonalRule] ?? DIAGONAL_RULES["555"];
+  let diagonalDist = distance;
+  if ( diagonalRule === DIAGONAL_RULES.EUCL ) diagonalDist = Math.hypot(distance, distance);
+
+  // Sum the horizontal, vertical, and diagonal grid moves.
+  let d = (changeCount[CHANGE.V] * distance)
+    + (changeCount[CHANGE.H] * distance)
+    + (changeCount[CHANGE.D] * diagonalDist);
+
+  // If diagonal is 5-10-5, every even move gets an extra 5.
+  if ( diagonalRule === DIAGONAL_RULES["5105"] ) {
+    const nEven = ~~(changeCount[CHANGE.D] * 0.5);
+    d += (nEven * distance);
+  }
+
+  return d;
+}
+
 PATCHES.BASIC.METHODS = {
   incrementElevation,
   decrementElevation,
@@ -337,7 +405,10 @@ PATCHES.BASIC.METHODS = {
   // From terrain_elevation.js
   elevationAtOrigin,
   terrainElevationAtPoint,
-  terrainElevationAtDestination
+  terrainElevationAtDestination,
+
+  measureDistance,
+  modifiedMoveDistance
 };
 
 

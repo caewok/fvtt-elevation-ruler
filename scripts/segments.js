@@ -5,8 +5,7 @@ CONFIG,
 CONST,
 game,
 getProperty,
-PIXI,
-Ray
+PIXI
 */
 "use strict";
 
@@ -96,7 +95,7 @@ export function _getMeasurementSegments(wrapped) {
     }
 
     const lastPathSegment = newSegments.at(-1);
-    if ( lastPathSegment )  {
+    if ( lastPathSegment ) {
       lastPathSegment.ray.B.z = B.z;
       lastPathSegment.label = segment.label;
     }
@@ -299,7 +298,7 @@ function splitSegment(segment, pastDistance, cutoffDistance, token) {
       breakPoint.z = z;
       const shorterSegment = { ray: new Ray3d(A, breakPoint) };
       shorterSegment.distance = canvas.grid.measureDistances([shorterSegment], { gridSpaces: true })[0];
-      shorterSegment.moveDistance = modifiedMoveDistance(shorterSegment.distance, shorterSegment.ray, token);
+      shorterSegment.moveDistance = modifiedMoveDistance(shorterSegment, token);
       if ( shorterSegment.moveDistance <= cutoffDistance ) break;
     }
   } else {
@@ -316,23 +315,25 @@ function splitSegment(segment, pastDistance, cutoffDistance, token) {
   const distances = canvas.grid.measureDistances(segments, { gridSpaces: false });
   segment0.distance = distances[0];
   segment1.distance = distances[1];
-  segment0.moveDistance = modifiedMoveDistance(segment0.distance, segment0.ray, token);
-  segment1.moveDistance = modifiedMoveDistance(segment1.distance, segment1.ray, token);
+  segment0.moveDistance = modifiedMoveDistance(segment0, token);
+  segment1.moveDistance = modifiedMoveDistance(segment1, token);
   return segments;
 }
 
 /**
  * Modify distance by terrain mapper adjustment for token speed.
- * @param {number} distance   Distance of the ray
- * @param {Ray|Ray3d} ray     Ray to measure
+ * @param {RulerMeasurementSegment} segment
  * @param {Token} token       Token to use
  * @returns {number} Modified distance
  */
-export function modifiedMoveDistance(distance, ray, token) {
+export function modifiedMoveDistance(segment, token) {
+  const ray = segment.ray;
+  segment.distance ??= this.measureDistance(ray.A, ray.B);
+  token ??= this._getMovementToken();
   const terrainMult = 1 / (terrainMoveMultiplier(ray, token) || 1); // Invert because moveMult is < 1 if speed is penalized.
   const tokenMult = terrainTokenMoveMultiplier(ray, token);
   const moveMult = terrainMult * tokenMult;
-  return distance * moveMult;
+  return segment.distance * moveMult;
 }
 
 /**
