@@ -242,6 +242,7 @@ function _computeTokenSpeed(token, tokenSpeed, gridless = false) {
   const newSegments = [];
   for ( let segment of this.segments ) {
     if ( atMaximum ) {
+      segment.speed = SPEED.TYPES.MAXIMUM;
       newSegments.push(segment);
       continue;
     }
