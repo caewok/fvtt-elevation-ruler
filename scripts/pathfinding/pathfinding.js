@@ -357,4 +357,120 @@ export class Pathfinder {
     this.borderTriangles.forEach(tri => tri.drawLinks(toMedian));
   }
 
+  /**
+   * Clean an array of path points.
+   * Straighten path and remove points that are very close to one another.
+   * If gridded, attempt to center the points on the grid.
+   * If not gridded, keep within the canvas grid size.
+   * Do not move a point if the path collides with a wall.
+   * Do not move a point if it would take it outside its grid square (to limit
+   * possibility that it would move the path into a terrain).
+   * @param {PIXI.Point[]} pathPoints
+   * @returns {PIXI.Point[]}
+   */
+   static cleanPath(pathPoints) {
+     if ( canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) return cleanNonGridPath(pathPoints);
+     else return cleanGridPath(pathPoints);
+   }
 }
+
+/**
+ * For given point on a grid:
+ * - if next point shares this grid square, delete if prev --> next has no collision.
+ * - temporarily move to the grid center.
+ * - if collision, move back and go to next point. Otherwise keep at center.
+ * Don't move the start or end points.
+ * @param {PIXI.Point[]} pathPoints
+ * @returns {PIXI.Point[]}
+ */
+function cleanGridPath(pathPoints) {
+  const nPoints = pathPoints.length;
+  if ( nPoints < 3 ) return pathPoints;
+
+  const config = { mode: "any", type: "move" };
+  let prev = pathPoints[0];
+  let curr = pathPoints[1];
+  const newPath = [prev];
+  for ( let i = 2; i < nPoints; i += 1 ) {
+    const next = pathPoints[i];
+    if ( next ) {
+      // If next shares this grid space, test if we can remove current.
+      const currGridPos = canvas.grid.grid.getGridPositionFromPixels(curr.x, curr.y);
+      const nextGridPos = canvas.grid.grid.getGridPositionFromPixels(next.x, next.y);
+      if ( currGridPos[0] === nextGridPos[0]
+        && currGridPos[1] === nextGridPos[1]
+        && !ClockwiseSweepPolygon.testCollision(curr, next, config) ) {
+        curr = next;
+        continue;
+      }
+    }
+
+    // Test if we can move the current point to the center of the grid without a collision.
+    const currCenter = getGridCenterPoint(curr);
+    if ( !ClockwiseSweepPolygon.testCollision(prev, currCenter, config) ) curr = currCenter;
+    newPath.push(curr);
+    prev = curr;
+    curr = next;
+  }
+  newPath.push(pathPoints.at(-1));
+  return newPath;
+}
+
+function getGridCenterPoint(pt) {
+  const [x, y] = canvas.grid.grid.getCenter(pt.x, pt.y);
+  return new PIXI.Point(x, y);
+}
+
+/**
+ * For given point not on a grid:
+ * - Radial test: if next point is within canvas.dimensions.size * 0.5, delete if prev --> next has no collision.
+ * - Also (not yet implemented): Try Ramer–Douglas–Peucker to straighten line by removing points if no collision.
+ * Don't move the start or end points.
+ * @param {PIXI.Point[]} pathPoints
+ * @returns {PIXI.Point[]}
+ */
+function cleanNonGridPath(pathPoints) {
+   const nPoints = pathPoints.length;
+  if ( nPoints < 3 ) return pathPoints;
+
+  const MAX_DIST2 = Math.pow(canvas.scene.dimensions.size * 0.5, 2);
+  const config = { mode: "any", type: "move" };
+  let prev = pathPoints[0];
+  let curr = pathPoints[1];
+  const newPath = [prev];
+  for ( let i = 2; i < nPoints; i += 1 ) {
+    const next = pathPoints[i];
+
+    // If next is sufficiently close to current, see if we can remove current.
+    if ( next
+      && PIXI.Point.distanceSquaredBetween(curr, next) < MAX_DIST2
+      && !ClockwiseSweepPolygon.testCollision(curr, next, config) ) {
+      curr = next;
+      continue;
+    }
+
+    newPath.push(curr);
+    prev = curr;
+    curr = next;
+  }
+  newPath.push(pathPoints.at(-1));
+  return newPath;
+}
+
+/**
+ * Perpendicular distance to a line from a point.
+ * https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
+ * @param {PIXI.Point} a    First endpoint of the line
+ * @param {PIXI.Point} b    Second endpoint of the line
+ * @param {PIXI.Point} c    Point to measure
+ * @returns {number|undefined}
+ */
+function perpendicularDistance(a, b, c) {
+  const deltaBA = b.subtract(a);
+  const deltaCA = c.subtract(a);
+  const denom = Math.pow(deltaBA.x, 2) + Math.pow(deltaBA.y, 2);
+  if ( !denom ) return undefined; // The line AB has length 0.
+  const num = (deltaBA.x * deltaCA.y) - (deltaBA.y * deltaCA.x);
+  return Math.abs(num) / Math.sqrt(denom);
+}
+
