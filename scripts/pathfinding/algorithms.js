@@ -41,13 +41,14 @@ export class BreadthFirstPathSearch {
 
     while ( frontier.length ) {
       const current = frontier.pop();
-      if ( this.debug ) Draw.point(current.entryPoint, { color: Draw.COLORS.green });
+      if ( this.debug ) current.entryTriangle.drawEdges();
+      if ( this.debug ) Draw.point(current.entryPoint, { color: Draw.COLORS.lightgreen });
       if ( this.goalReached(goal, current) ) break;
 
       // Get each neighbor destination in turn.
       for ( const next of this.getNeighbors(current, goal) ) {
         if ( !cameFrom.has(next.key) ) {
-          if ( this.debug ) Draw.point(next.entryPoint, { color: Draw.COLORS.lightgreen });
+          if ( this.debug ) Draw.point(next.entryPoint, { color: Draw.COLORS.lightyellow });
           frontier.unshift(next);
           cameFrom.set(next.key, current);
         }
@@ -81,6 +82,42 @@ export class BreadthFirstPathSearch {
   clear() {
     this.frontier.length = 0;
     this.cameFrom.clear();
+  }
+
+  /**
+   * Debugging. Get a nested array of all paths for this algorithm's cameFrom map.
+   * @returns {PIXI.Point[][]}
+   */
+  getAllPathPoints() {
+    const pathMap = this.cameFrom;
+    const paths = [];
+    for ( let [key, curr] of pathMap.entries() ) {
+      const path = [PIXI.Point.invertKey(key)];
+      paths.push(path);
+      while ( pathMap.has(curr.key) ) {
+        path.push(PIXI.Point.invertKey(curr.key))
+        curr = pathMap.get(curr.key);
+      }
+      path.push(PIXI.Point.invertKey(curr.key));
+      path.reverse()
+    }
+    return paths;
+  }
+
+  /**
+   * Draw a single path.
+   * @param {PIXI.Point[]} path   Array of points to draw
+   * @param {object} [opts]       Options to pass to Draw.point and Draw.segment
+   */
+  drawPath(path, opts = {}) {
+    let A = path[0];
+    Draw.point(A, opts);
+    for ( let i = 1; i < path.length; i += 1 ) {
+      const B = path[i];
+      Draw.point(B, opts);
+      Draw.segment({ A, B }, opts);
+      A = B;
+    }
   }
 }
 
@@ -176,6 +213,7 @@ export class GreedyPathSearch extends BreadthFirstPathSearch {
 
     while ( frontier.length ) {
       const current = frontier.dequeue();
+      if ( this.debug ) current.entryTriangle.drawEdges();
       if ( this.debug ) Draw.point(current.entryPoint, { color: Draw.COLORS.green });
       if ( this.goalReached(goal, current) ) break;
 

@@ -288,7 +288,7 @@ export class BorderTriangle {
           entryPoint,
           key: entryPoint.key, // Key needs to be unique for each point,
           entryTriangle, // Needed to locate neighbors in the next iteration.
-          priorTriangle, // Needed to eliminate irrelevant neighbors in the next iteration.
+          priorTriangle: this // Needed to eliminate irrelevant neighbors in the next iteration.
         });
       });
     }
@@ -303,7 +303,10 @@ export class BorderTriangle {
    */
   getValidDestinationsWithCost(priorTriangle, spacer, fromPoint) {
     const destinations = this.getValidDestinations(priorTriangle, spacer);
-    destinations.forEach(d => d.cost = this._calculateMovementCost(fromPoint, d.entryPoint));
+    destinations.forEach(d => {
+      d.cost = this._calculateMovementCost(fromPoint, d.entryPoint);
+      d.fromPoint = fromPoint;
+    });
     return destinations;
   }
 
@@ -370,18 +373,19 @@ export class BorderTriangle {
   /**
    * For debugging. Draw edges on the canvas.
    */
-  drawEdges() { Object.values(this.edges).forEach(e => e.draw()); }
+  drawEdges(opts = {}) { Object.values(this.edges).forEach(e => e.draw(opts)); }
 
   /*
    * Draw links to other triangles.
    */
-  drawLinks() {
+  drawLinks(toMedian = false) {
     const center = this.center;
     for ( const edge of Object.values(this.edges) ) {
-      if ( edge.otherTriangle(this) ) {
+      const other = edge.otherTriangle(this);
+      if ( other ) {
+        const B = toMedian ? edge.median : other.center;
         const color = edge.wallBlocks(center) ? Draw.COLORS.orange : Draw.COLORS.green;
-        Draw.segment({ A: center, B: edge.median }, { color });
-
+        Draw.segment({ A: center, B }, { color });
       }
     }
   }
@@ -398,16 +402,17 @@ export class BorderTriangle {
     const pointMap = new Map();
     for ( const borderTriangle of borderTriangles ) {
       const { a, b, c } = borderTriangle.vertices;
-      const aSet = pointMap.get(a.key) || new Set();
-      const bSet = pointMap.get(b.key) || new Set();
-      const cSet = pointMap.get(c.key) || new Set();
+      if ( !pointMap.has(a.key) ) pointMap.set(a.key, new Set());
+      if ( !pointMap.has(b.key) ) pointMap.set(b.key, new Set());
+      if ( !pointMap.has(c.key) ) pointMap.set(c.key, new Set());
+
+      const aSet = pointMap.get(a.key);
+      const bSet = pointMap.get(b.key);
+      const cSet = pointMap.get(c.key);
 
       aSet.add(borderTriangle);
       bSet.add(borderTriangle);
       cSet.add(borderTriangle);
-      if ( !pointMap.has(a.key) ) pointMap.set(a.key, aSet);
-      if ( !pointMap.has(b.key) ) pointMap.set(b.key, aSet);
-      if ( !pointMap.has(c.key) ) pointMap.set(c.key, aSet);
     }
 
     // For each triangle, if the edge is not yet linked, link if it has a shared edge.
@@ -417,12 +422,23 @@ export class BorderTriangle {
         if ( edge.cwTriangle && edge.ccwTriangle ) continue; // Already linked.
         const aSet = pointMap.get(edge.a.key);
         const bSet = pointMap.get(edge.b.key);
-        const otherTriangle = aSet.intersection(bSet).first(); // Should always have 0 or 1 elements.
-        if ( !otherTriangle ) continue; // No bordering triangle.
+        const ixSet = aSet.intersection(bSet)
+
+        // Debug: should always have 2 elements: this borderTriangle and the other.
+        if ( ixSet.size > 2 ) {
+          console.warn("aSet and bSet intersection is larger than expected.", pointMap, edge);
+        }
+        if ( ixSet.size && !ixSet.has(borderTriangle) ) {
+          console.warn("ixSet does not have this borderTriangle", pointMap, edge, borderTriangle);
+        }
+
+        if ( ixSet.size !== 2 ) continue; // No bordering triangle.
+        const [tri1, tri2] = ixSet;
+        const otherTriangle = borderTriangle === tri1 ? tri2 : tri1;
 
         // Determine where this edge is on the other triangle and replace.
         const otherEdgeName = otherTriangle._edgeNameForKeys(edge.a.key, edge.b.key);
-        if ( !otherEdgeName ) continue;
+        if ( !otherEdgeName ) continue; // Should not happen.
         otherTriangle._setEdge(otherEdgeName, edge);
       }
     }
