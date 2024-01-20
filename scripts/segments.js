@@ -1,10 +1,8 @@
 /* globals
 canvas,
-Color,
 CONFIG,
 CONST,
 game,
-getProperty,
 PIXI
 */
 "use strict";
@@ -13,11 +11,7 @@ import { SPEED, MODULES_ACTIVE, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
-import {
-  squareGridShape,
-  hexGridShape,
-  perpendicularPoints,
-  iterateGridUnderLine } from "./util.js";
+import { perpendicularPoints } from "./util.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
 
 /**
@@ -177,166 +171,42 @@ export function hasSegmentCollision(token, segments) {
 export function _highlightMeasurementSegment(wrapped, segment) {
   const token = this._getMovementToken();
   if ( !token ) return wrapped(segment);
-  const tokenSpeed = Number(getProperty(token, SPEED.ATTRIBUTE));
-  if ( !tokenSpeed ) return wrapped(segment);
-
-  // Based on the token being measured.
-  // Track the distance to this segment.
-  // Split this segment at the break points for the colors as necessary.
-  let pastDistance = 0;
-  for ( const s of this.segments ) {
-    if ( s === segment ) break;
-    pastDistance += s.moveDistance;
-  }
-
-  // Constants
-  const walkDist = tokenSpeed;
-  const dashDist = tokenSpeed * SPEED.MULTIPLIER;
-  const walkColor = Color.from(0x00ff00);
-  const dashColor = Color.from(0xffff00);
-  const maxColor = Color.from(0xff0000);
-
-  // Track the splits.
-  let remainingSegment = segment;
-  const splitSegments = [];
-
-  // Walk
-  remainingSegment.color = walkColor;
-  const walkSegments = splitSegment(remainingSegment, pastDistance, walkDist, token);
-  if ( walkSegments.length ) {
-    const segment0 = walkSegments[0];
-    splitSegments.push(segment0);
-    pastDistance += segment0.moveDistance;
-    remainingSegment = walkSegments[1]; // May be undefined.
-  }
-
-  // Dash
-  if ( remainingSegment ) {
-    remainingSegment.color = dashColor;
-    const dashSegments = splitSegment(remainingSegment, pastDistance, dashDist, token);
-    if ( dashSegments.length ) {
-      const segment0 = dashSegments[0];
-      splitSegments.push(segment0);
-      if ( dashSegments.length > 1 ) {
-        const remainingSegment = dashSegments[1];
-        remainingSegment.color = maxColor;
-        splitSegments.push(remainingSegment);
-      }
-    }
-  }
 
   // Highlight each split in turn, changing highlight color each time.
   const priorColor = this.color;
-  for ( const s of splitSegments ) {
-    this.color = s.color;
-    wrapped(s);
+  this.color = SPEED.COLORS[segment.speed];
+  wrapped(segment);
 
-    // If gridless, highlight a rectangular shaped portion of the line.
-    if ( canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) {
-      const { A, B } = s.ray;
-      const width = Math.floor(canvas.scene.dimensions.size * 0.2);
-      const ptsA = perpendicularPoints(A, B, width * 0.5);
-      const ptsB = perpendicularPoints(B, A, width * 0.5);
-      const shape = new PIXI.Polygon([
-        ptsA[0],
-        ptsA[1],
-        ptsB[0],
-        ptsB[1]
-      ]);
-      canvas.grid.highlightPosition(this.name, {color: this.color, shape});
-    }
+  // If gridless, highlight a rectangular shaped portion of the line.
+  if ( canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) {
+    const { A, B } = segment.ray;
+    const width = Math.floor(canvas.scene.dimensions.size * 0.2);
+    const ptsA = perpendicularPoints(A, B, width * 0.5);
+    const ptsB = perpendicularPoints(B, A, width * 0.5);
+    const shape = new PIXI.Polygon([
+      ptsA[0],
+      ptsA[1],
+      ptsB[0],
+      ptsB[1]
+    ]);
+    canvas.grid.highlightPosition(this.name, {color: this.color, shape});
   }
+
+  // Reset to the default color.
   this.color = priorColor;
 }
 
 /**
- * Cut a segment, represented as a ray and a distance, at a given point.
- * @param {object} segment
- * @param {number} pastDistance
- * @param {number} cutoffDistance
- * @returns {object[]}
- * - If cutoffDistance is before the segment start, return [].
- * - If cutoffDistance is after the segment end, return [segment].
- * - If cutoffDistance is within the segment, return [segment0, segment1]
- */
-function splitSegment(segment, pastDistance, cutoffDistance, token) {
-  cutoffDistance -= pastDistance;
-  if ( cutoffDistance <= 0 ) return [];
-  if ( cutoffDistance >= segment.moveDistance ) return [segment];
-
-  // Determine where on the segment ray the cutoff occurs.
-  // Use canvas grid distance measurements to handle 5-5-5, 5-10-5, other measurement configs.
-  // At this point, the segment is too long for the cutoff.
-  // If we are using a grid, split the segment a grid/square hex.
-  // Find where the segment intersects the last grid square/hex before the cutoff.
-  let breakPoint;
-  const { A, B } = segment.ray;
-  if ( canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS ) {
-    const z = segment.ray.A.z;
-    const gridShapeFn = canvas.grid.type === CONST.GRID_TYPES.SQUARE ? squareGridShape : hexGridShape;
-    const segmentDistZ = segment.ray.distance;
-
-    // Cannot just use the t value because segment distance may not be Euclidean.
-    // Also need to handle that a segment might break on a grid border.
-    // Determine all the grid positions, and drop each one in turn.
-    breakPoint = B;
-    const gridIter = iterateGridUnderLine(A, B, { reverse: true });
-    for ( const [r1, c1] of gridIter ) {
-      const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(r1, c1);
-      const shape = gridShapeFn({x, y});
-      const ixs = shape
-        .segmentIntersections(A, B)
-        .map(ix => PIXI.Point.fromObject(ix));
-      if ( !ixs.length ) continue;
-
-      // If more than one, split the distance.
-      // This avoids an issue whereby a segment is too short and so the first square is dropped when highlighting.
-      if ( ixs.length === 1 ) breakPoint = ixs[0];
-      else {
-        ixs.forEach(ix => {
-          ix.distance = ix.subtract(A).magnitude();
-          ix.t0 = ix.distance / segmentDistZ;
-        });
-        const t = (ixs[0].t0 + ixs[1].t0) * 0.5;
-        breakPoint = A.projectToward(B, t);
-      }
-
-      // Construct a shorter segment.
-      breakPoint.z = z;
-      const shorterSegment = { ray: new Ray3d(A, breakPoint) };
-      shorterSegment.distance = canvas.grid.measureDistances([shorterSegment], { gridSpaces: true })[0];
-      shorterSegment.moveDistance = modifiedMoveDistance(shorterSegment, token);
-      if ( shorterSegment.moveDistance <= cutoffDistance ) break;
-    }
-  } else {
-    // Use t values.
-    const t = cutoffDistance / segment.moveDistance;
-    breakPoint = A.projectToward(B, t);
-  }
-  if ( breakPoint === B ) return [segment];
-
-  // Split the segment into two at the break point.
-  const segment0 = { ray: new Ray3d(A, breakPoint), color: segment.color };
-  const segment1 = { ray: new Ray3d(breakPoint, B) };
-  const segments = [segment0, segment1];
-  const distances = canvas.grid.measureDistances(segments, { gridSpaces: false });
-  segment0.distance = distances[0];
-  segment1.distance = distances[1];
-  segment0.moveDistance = modifiedMoveDistance(segment0, token);
-  segment1.moveDistance = modifiedMoveDistance(segment1, token);
-  return segments;
-}
-
-/**
  * Modify distance by terrain mapper adjustment for token speed.
- * @param {RulerMeasurementSegment} segment
- * @param {Token} token       Token to use
+ * @param {RulerMeasurementSegment}   segment
+ * @param {Token} token               Token to use
+ * @param {boolean} gridless          Passed to Ruler.measureDistance if segment distance not defined.
  * @returns {number} Modified distance
  */
-export function modifiedMoveDistance(segment, token) {
+export function modifiedMoveDistance(segment, token, gridless = false) {
+  if ( !token ) return segment.distance;
   const ray = segment.ray;
-  segment.distance ??= this.measureDistance(ray.A, ray.B);
-  token ??= this._getMovementToken();
+  segment.distance ??= this.measureDistance(ray.A, ray.B, gridless);
   const terrainMult = 1 / (terrainMoveMultiplier(ray, token) || 1); // Invert because moveMult is < 1 if speed is penalized.
   const tokenMult = terrainTokenMoveMultiplier(ray, token);
   const moveMult = terrainMult * tokenMult;
