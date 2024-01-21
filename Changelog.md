@@ -1,3 +1,14 @@
+# 0.8.0
+Added pathfinding toggle. Pathfinding works on gridded (both hex and square) and gridless maps. Works when dragging tokens, if Token Ruler is enabled, or when using the Ruler control and you start at a token.
+
+To benchmark pathfinding in a scene:
+```js
+api = game.modules.get("elevationruler").api;
+api.pathfinding.benchPathfinding()
+```
+
+Refactored movement highlighting to work better with pathfinding.
+
 # 0.7.8
 More tweaks to how token origin and destination are set when dragging so that the token movement follows the position of the cloned dragged token. Revisits issue #30.
 Fix issue where token dragging cannot move to the adjacent space. Closes issue #32.

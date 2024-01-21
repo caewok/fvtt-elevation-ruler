@@ -26,6 +26,12 @@
       }
     ]
   },
+  "scripts": [
+    "/scripts/delaunator/delaunator.min.js",
+    "/scripts/delaunator/Constrainautor.min.js",
+    "/scripts/delaunator/cdt2d_bundle.js"
+  ],
+
   "esmodules": [
     "/scripts/module.js"
   ],

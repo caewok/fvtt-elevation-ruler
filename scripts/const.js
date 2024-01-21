@@ -1,4 +1,5 @@
 /* globals
+Color,
 game,
 Hooks
 */
@@ -50,8 +51,23 @@ SOFTWARE.
 
 export const SPEED = {
   ATTRIBUTE: "",
-  MULTIPLIER: 0
+  MULTIPLIER: 0,
+  TYPES: {
+    WALK: 0,
+    DASH: 1,
+    MAXIMUM: -1
+  },
+  COLORS: {
+    WALK: Color.from(0x00ff00),
+    DASH: Color.from(0xffff00),
+    MAXIMUM: Color.from(0xff0000)
+  }
 };
+
+// Add the inversions for lookup
+SPEED.COLORS[SPEED.TYPES.WALK] = SPEED.COLORS.WALK;
+SPEED.COLORS[SPEED.TYPES.DASH] = SPEED.COLORS.DASH;
+SPEED.COLORS[SPEED.TYPES.MAXIMUM] = SPEED.COLORS.MAXIMUM;
 
 // Avoid testing for the system id each time.
 Hooks.once("init", function() {
