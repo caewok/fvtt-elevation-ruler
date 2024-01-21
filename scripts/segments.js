@@ -49,13 +49,25 @@ export function _getMeasurementSegments(wrapped) {
   token[MODULE_ID] ??= {};
   const pf = token[MODULE_ID].pathfinder ??= new Pathfinder(token);
   const path = pf.runPath(A, B);
-  const pathPoints = Pathfinder.getPathPoints(path);
+  let pathPoints = Pathfinder.getPathPoints(path);
   const t1 = performance.now();
   console.debug(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`);
+
+  const t4 = performance.now();
+  pathPoints = Pathfinder.cleanPath(pathPoints);
+  const t5 = performance.now();
+  if ( !pathPoints ) {
+    console.debug("No path points after cleaning");
+    return segments;
+  }
+
+  console.debug(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t5 - t4} ms.`);
   if ( pathPoints.length < 2 ) {
     console.debug(`Only ${pathPoints.length} path points found.`, [...pathPoints]);
     return segments;
   }
+
+
 
   // Store points in case a waypoint is added.
   // Overwrite the last calculated path from this waypoint.
