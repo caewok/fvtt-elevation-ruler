@@ -37,7 +37,7 @@ export function _getMeasurementSegments(wrapped) {
   // Test for a collision; if none, no pathfinding.
   const lastSegment = segments.at(-1);
   if ( !lastSegment ) {
-    console.debug("No last segment found", [...segments]);
+    // console.debug("No last segment found", [...segments]);
     return segments;
   }
 
@@ -51,19 +51,19 @@ export function _getMeasurementSegments(wrapped) {
   const path = pf.runPath(A, B);
   let pathPoints = Pathfinder.getPathPoints(path);
   const t1 = performance.now();
-  console.debug(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`);
+  // console.debug(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`);
 
   const t4 = performance.now();
   pathPoints = Pathfinder.cleanPath(pathPoints);
   const t5 = performance.now();
   if ( !pathPoints ) {
-    console.debug("No path points after cleaning");
+    // console.debug("No path points after cleaning");
     return segments;
   }
 
-  console.debug(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t5 - t4} ms.`);
+  // console.debug(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t5 - t4} ms.`);
   if ( pathPoints.length < 2 ) {
-    console.debug(`Only ${pathPoints.length} path points found.`, [...pathPoints]);
+    // console.debug(`Only ${pathPoints.length} path points found.`, [...pathPoints]);
     return segments;
   }
 
@@ -78,7 +78,7 @@ export function _getMeasurementSegments(wrapped) {
   // For each segment, replace with path sub-segment if pathfinding was used.
   const newSegments = constructPathfindingSegments(segments, segmentMap);
   const t3 = performance.now();
-  console.debug(`${newSegments.length} segments processed in ${t3-t2} ms.`);
+  // console.debug(`${newSegments.length} segments processed in ${t3-t2} ms.`);
   return newSegments;
 }
 
