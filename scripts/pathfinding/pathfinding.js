@@ -257,20 +257,27 @@ export class Pathfinder {
   _initializeStartEndNodes(startPoint, endPoint) {
     // Locate start and end triangles.
     // TODO: Handle 3d
-    const quadtree = this.constructor.quadtree;
     startPoint = PIXI.Point.fromObject(startPoint);
     endPoint = PIXI.Point.fromObject(endPoint);
+    const startTri = this.constructor.trianglesAtPoint(startPoint).first();
+    const endTri = this.constructor.trianglesAtPoint(endPoint).first();
 
-    let collisionTest = (o, _rect) => o.t.contains(startPoint);
-    const startTri = quadtree.getObjects(boundsForPoint(startPoint), { collisionTest }).first();
-
-    collisionTest = (o, _rect) => o.t.contains(endPoint);
-    const endTri = quadtree.getObjects(boundsForPoint(endPoint), { collisionTest }).first();
-
+    // Build PathNode for start and end.
     const start = { key: startPoint.key, entryTriangle: startTri, entryPoint: PIXI.Point.fromObject(startPoint) };
     const end = { key: endPoint.key, entryTriangle: endTri, entryPoint: endPoint };
-
     return { start, end };
+  }
+
+  /**
+   * Locate a triangle at a specific point.
+   * Used to locate start and end nodes but also for debugging.
+   * @param {PIXI.Point} pt
+   * @returns {Set<BorderTriangle>} Typically, only one triangle in the set.
+   *  Possibly more than one at a border point.
+   */
+  static trianglesAtPoint(pt) {
+    const collisionTest = (o, _rect) => o.t.contains(pt);
+    return this.quadtree.getObjects(boundsForPoint(pt), { collisionTest });
   }
 
   /**

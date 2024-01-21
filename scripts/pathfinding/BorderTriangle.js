@@ -80,12 +80,15 @@ export class BorderEdge {
     const length = this.length;
     const destinations = [];
 
-    // No destination if edge is smaller than 2x spacer.
-    if ( length < (spacer * 2) || this.wallBlocks(origin) ) return destinations;
+    // No destination if edge is smaller than 2x spacer unless it is a door.
+    // Cheat a little on the spacing so tokens exactly the right size will fit.
+    if ( !this.wall?.isOpen
+      && (length < (spacer * 1.9) || this.wallBlocks(origin)) ) return destinations;
     destinations.push(this.median);
 
     // Skip corners if not at least spacer away from median.
-    if ( length < (spacer * 4) ) return destinations;
+    // Again, cheat a little on the spacing.
+    if ( length < (spacer * 3.9) ) return destinations;
 
     const { a, b } = this;
     const t = spacer / length;
