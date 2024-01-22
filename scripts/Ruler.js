@@ -114,8 +114,8 @@ function toJSON(wrapper) {
   myObj._userElevationIncrements = this._userElevationIncrements;
   myObj._unsnap = this._unsnap;
   myObj._unsnappedOrigin = this._unsnappedOrigin;
-  myObj._totalDistance = this.totalDistance;
-  myObj._totalMoveDistance = this.totalMoveDistance;
+  myObj.totalDistance = this.totalDistance;
+  myObj.totalMoveDistance = this.totalMoveDistance;
   return obj;
 }
 
@@ -141,8 +141,8 @@ function update(wrapper, data) {
   });
 
   // Add the calculated distance totals.
-  this.totalDistance = myData._totalDistance;
-  this.totalMoveDistance = myData._totalMoveDistance;
+  this.totalDistance = myData.totalDistance;
+  this.totalMoveDistance = myData.totalMoveDistance;
 
   wrapper(data);
 
@@ -265,7 +265,20 @@ function _computeDistance(gridSpaces) {
     console.error("Segment is undefined.");
   }
 
-
+  // Compute the waypoint distances for labeling. (Distance to immediately previous waypoint.)
+  const waypointKeys = new Set(this.waypoints.map(w => w.key));
+  let waypointDistance = 0;
+  let waypointMoveDistance = 0;
+  for ( const segment of this.segments ) {
+    if ( waypointKeys.has(segment.ray.A.to2d().key) ) {
+      waypointDistance = 0;
+      waypointMoveDistance = 0;
+    }
+    waypointDistance += segment.distance;
+    waypointMoveDistance += segment.moveDistance;
+    segment.waypointDistance = waypointDistance;
+    segment.waypointMoveDistance = waypointMoveDistance;
+  }
 }
 
 function _computeTokenSpeed(token, tokenSpeed, gridless = false) {
@@ -410,8 +423,12 @@ function splitSegment(segment, splitMoveDistance, token, gridless) {
   if ( breakPoint.almostEqual(A) ) return [];
 
   // Split the segment into two at the break point.
-  const segment0 = { ray: new Ray3d(A, breakPoint) };
-  const segment1 = { ray: new Ray3d(breakPoint, B) };
+  const segment0 = {...segment};
+  const segment1 = {...segment};
+  segment0.ray = new Ray3d(A, breakPoint);
+  segment1.ray = new Ray3d(breakPoint, B);
+  segment0.distance = rulerClass.measureDistance(segment0.ray.A, segment0.ray.B, gridless);
+  segment1.distance = rulerClass.measureDistance(segment1.ray.A, segment1.ray.B, gridless);
   segment0.moveDistance = rulerClass.modifiedMoveDistance(segment0, token);
   segment1.moveDistance = rulerClass.modifiedMoveDistance(segment1, token);
   return [segment0, segment1];

@@ -60,7 +60,7 @@ export function _getMeasurementSegments(wrapped) {
   const lastSegment = segments.at(-1);
   const pathPoints = Settings.get(Settings.KEYS.CONTROLS.PATHFINDING)
     ? calculatePathPointsForSegment(lastSegment, token)
-      : [];
+    : [];
   if ( pathPoints.length > 2 ) segmentMap.set(lastSegment.ray.A.to2d().key, pathPoints);
   else segmentMap.delete(lastSegment.ray.A.to2d().key);
 
@@ -150,7 +150,11 @@ function constructPathfindingSegments(segments, segmentMap) {
  * Add elevation information to the label
  */
 export function _getSegmentLabel(wrapped, segment, totalDistance) {
+  // Force distance to be between waypoints instead of (possibly pathfinding) segments.
+  const origSegmentDistance = segment.distance;
+  segment.distance = segment.waypointDistance;
   const orig_label = wrapped(segment, totalDistance);
+  segment.distance = origSegmentDistance;
   let elevation_label = segmentElevationLabel(segment);
   const level_name = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
   if ( level_name ) elevation_label += `\n${level_name}`;
