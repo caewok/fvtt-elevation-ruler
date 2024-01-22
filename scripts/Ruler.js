@@ -98,7 +98,7 @@ function toJSON(wrapper) {
 
   // Segment information
   // Simplify the ray.
-  obj._segments = this.segments.map(s => {
+  if ( this.segments ) obj._segments = this.segments.map(s => {
     const newObj = { ...s };
     newObj.ray = {
       A: s.ray.A,
@@ -128,11 +128,10 @@ function update(wrapper, data) {
   this._unsnappedOrigin = data._unsnappedOrigin;
 
   // Reconstruct segments.
-  this.segments = data._segments.map(s => {
+  if ( data._segments ) this.segments = data._segments.map(s => {
     s.ray = new Ray3d(s.ray.A, s.ray.B);
     return s;
   });
-
 
   wrapper(data);
 
