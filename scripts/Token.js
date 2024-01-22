@@ -5,6 +5,7 @@ canvas
 
 import { elevationAtWaypoint } from "./segments.js";
 import { ConstrainedTokenBorder } from "./ConstrainedTokenBorder.js";
+import { Settings } from "./settings.js";
 
 // Patches for the Token class
 export const PATCHES = {};
@@ -18,7 +19,8 @@ PATCHES.ConstrainedTokenBorder = {};
 function _onDragLeftStart(wrapped, event) {
   wrapped(event);
 
-  // Start a Ruler measurement.
+  // If Token Ruler, start a ruler measurement.
+  if ( !Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED) ) return;
   canvas.controls.ruler._onDragStart(event);
 }
 
@@ -31,6 +33,7 @@ function _onDragLeftCancel(wrapped, event) {
 
   // Cancel a Ruler measurement.
   // If moving, handled by the drag left drop.
+  if ( !Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED) ) return;
   const ruler = canvas.controls.ruler;
   if ( ruler._state !== Ruler.STATES.MOVING ) canvas.controls.ruler._onMouseUp(event);
 }
@@ -43,6 +46,7 @@ function _onDragLeftMove(wrapped, event) {
   wrapped(event);
 
   // Continue a Ruler measurement.
+  if ( !Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED) ) return;
   const ruler = canvas.controls.ruler;
   if ( ruler._state > 0 ) ruler._onMouseMove(event);
 }
@@ -54,7 +58,7 @@ function _onDragLeftMove(wrapped, event) {
 async function _onDragLeftDrop(wrapped, event) {
   // End the ruler measurement
   const ruler = canvas.controls.ruler;
-  if ( !ruler.active ) return wrapped(event);
+  if ( !ruler.active || !Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED) ) return wrapped(event);
   const destination = event.interactionData.destination;
 
   // Ensure the cursor destination is within bounds

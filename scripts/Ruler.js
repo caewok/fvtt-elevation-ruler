@@ -6,7 +6,6 @@ duplicate,
 game,
 getProperty,
 PIXI,
-Ruler,
 ui
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -16,7 +15,7 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
-import { SPEED } from "./const.js";
+import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import {
@@ -38,7 +37,8 @@ import {
   tokenIsSnapped,
   iterateGridUnderLine,
   squareGridShape,
-  hexGridShape } from "./util.js";
+  hexGridShape,
+  log } from "./util.js";
 
 /**
  * Modified Ruler
@@ -84,20 +84,39 @@ UX goals:
 function clear(wrapper) {
   // User increments/decrements to the elevation for the current destination
   this.destination._userElevationIncrements = 0;
+  this._movementToken = undefined;
   return wrapper();
 }
 
 /**
  * Wrap Ruler.prototype.toJSON
  * Store the current userElevationIncrements for the destination.
+ * Store segment information, possibly including pathfinding.
  */
 function toJSON(wrapper) {
   // If debugging, log will not display on user's console
   // console.log("constructing ruler json!")
   const obj = wrapper();
-  obj._userElevationIncrements = this._userElevationIncrements;
-  obj._unsnap = this._unsnap;
-  obj._unsnappedOrigin = this._unsnappedOrigin;
+
+  const myObj = obj[MODULE_ID] = {};
+
+  // Segment information
+  // Simplify the ray.
+  if ( this.segments ) myObj._segments = this.segments.map(s => {
+    const newObj = { ...s };
+    newObj.ray = {
+      A: s.ray.A,
+      B: s.ray.B
+    };
+    newObj.label = Boolean(s.label);
+    return newObj;
+  });
+
+  myObj._userElevationIncrements = this._userElevationIncrements;
+  myObj._unsnap = this._unsnap;
+  myObj._unsnappedOrigin = this._unsnappedOrigin;
+  myObj.totalDistance = this.totalDistance;
+  myObj.totalMoveDistance = this.totalMoveDistance;
   return obj;
 }
 
@@ -107,11 +126,25 @@ function toJSON(wrapper) {
  * Retrieve the current snap status.
  */
 function update(wrapper, data) {
+  const myData = data[MODULE_ID];
+  if ( !myData ) return wrapper(data); // Just in case.
+
   // Fix for displaying user elevation increments as they happen.
-  const triggerMeasure = this._userElevationIncrements !== data._userElevationIncrements;
-  this._userElevationIncrements = data._userElevationIncrements;
-  this._unsnap = data._unsnap;
-  this._unsnappedOrigin = data._unsnappedOrigin;
+  const triggerMeasure = this._userElevationIncrements !== myData._userElevationIncrements;
+  this._userElevationIncrements = myData._userElevationIncrements;
+  this._unsnap = myData._unsnap;
+  this._unsnappedOrigin = myData._unsnappedOrigin;
+
+  // Reconstruct segments.
+  if ( myData._segments ) this.segments = myData._segments.map(s => {
+    s.ray = new Ray3d(s.ray.A, s.ray.B);
+    return s;
+  });
+
+  // Add the calculated distance totals.
+  this.totalDistance = myData.totalDistance;
+  this.totalMoveDistance = myData.totalMoveDistance;
+
   wrapper(data);
 
   if ( triggerMeasure ) {
@@ -201,6 +234,9 @@ function _canMove(wrapper, token) {
  * @param {boolean} gridSpaces    Base distance on the number of grid spaces moved?
  */
 function _computeDistance(gridSpaces) {
+  // If not this ruler's user, use the segments already calculated and passed via socket.
+  if ( this.user !== game.user ) return;
+
   const gridless = !gridSpaces;
   const token = this._getMovementToken();
   const { measureDistance, modifiedMoveDistance } = this.constructor;
@@ -230,7 +266,20 @@ function _computeDistance(gridSpaces) {
     console.error("Segment is undefined.");
   }
 
-
+  // Compute the waypoint distances for labeling. (Distance to immediately previous waypoint.)
+  const waypointKeys = new Set(this.waypoints.map(w => w.key));
+  let waypointDistance = 0;
+  let waypointMoveDistance = 0;
+  for ( const segment of this.segments ) {
+    if ( waypointKeys.has(segment.ray.A.to2d().key) ) {
+      waypointDistance = 0;
+      waypointMoveDistance = 0;
+    }
+    waypointDistance += segment.distance;
+    waypointMoveDistance += segment.moveDistance;
+    segment.waypointDistance = waypointDistance;
+    segment.waypointMoveDistance = waypointMoveDistance;
+  }
 }
 
 function _computeTokenSpeed(token, tokenSpeed, gridless = false) {
@@ -375,8 +424,12 @@ function splitSegment(segment, splitMoveDistance, token, gridless) {
   if ( breakPoint.almostEqual(A) ) return [];
 
   // Split the segment into two at the break point.
-  const segment0 = { ray: new Ray3d(A, breakPoint) };
-  const segment1 = { ray: new Ray3d(breakPoint, B) };
+  const segment0 = {...segment};
+  const segment1 = {...segment};
+  segment0.ray = new Ray3d(A, breakPoint);
+  segment1.ray = new Ray3d(breakPoint, B);
+  segment0.distance = rulerClass.measureDistance(segment0.ray.A, segment0.ray.B, gridless);
+  segment1.distance = rulerClass.measureDistance(segment1.ray.A, segment1.ray.B, gridless);
   segment0.moveDistance = rulerClass.modifiedMoveDistance(segment0, token);
   segment1.moveDistance = rulerClass.modifiedMoveDistance(segment1, token);
   return [segment0, segment1];
@@ -439,6 +492,21 @@ function _onMouseUp(wrapped, event) {
   return wrapped(event);
 }
 
+/**
+ * Add cached movement token.
+ * Mixed to avoid error if waypoints have no length.
+ */
+function _getMovementToken(wrapped) {
+  if ( !this.waypoints.length ) {
+    log("Waypoints length 0");
+    return undefined;
+  }
+
+  if ( typeof this._movementToken !== "undefined" ) return this._movementToken;
+  this._movementToken = wrapped();
+  if ( !this._movementToken ) this._movementToken = null; // So we can skip next time.
+  return this._movementToken;
+}
 
 PATCHES.BASIC.WRAPS = {
   clear,
@@ -449,7 +517,6 @@ PATCHES.BASIC.WRAPS = {
   _getMeasurementDestination,
 
   // Wraps related to segments
-  _getMeasurementSegments,
   _getSegmentLabel,
 
   // Move token methods
@@ -464,7 +531,7 @@ PATCHES.BASIC.WRAPS = {
   _canMove
 };
 
-PATCHES.BASIC.MIXES = { _animateSegment };
+PATCHES.BASIC.MIXES = { _animateSegment, _getMovementToken, _getMeasurementSegments };
 
 PATCHES.BASIC.OVERRIDES = { _computeDistance };
 

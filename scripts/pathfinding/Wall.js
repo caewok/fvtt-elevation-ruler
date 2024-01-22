@@ -19,9 +19,6 @@ PATCHES.PATHFINDING = {};
 
 // When canvas is ready, the existing walls are not created, so must re-do here.
 Hooks.on("canvasReady", async function() {
-  // console.debug(`outerBounds: ${canvas.walls.outerBounds.length}`);
-  // console.debug(`innerBounds: ${canvas.walls.innerBounds.length}`);
-
   const t0 = performance.now();
   SCENE_GRAPH.clear();
   const walls = [

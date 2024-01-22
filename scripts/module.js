@@ -28,6 +28,11 @@ Hooks.once("init", function() {
   // Cannot access localization until init.
   PREFER_TOKEN_CONTROL.title = game.i18n.localize(PREFER_TOKEN_CONTROL.title);
   registerGeometry();
+
+  // Configuration
+  CONFIG[MODULE_ID] = { debug: false };
+
+
   game.modules.get(MODULE_ID).api = {
     iterateGridUnderLine,
     PATCHER,
@@ -47,7 +52,9 @@ Hooks.once("init", function() {
       SCENE_GRAPH
     },
 
-    WallTracer, WallTracerEdge, WallTracerVertex
+    WallTracer, WallTracerEdge, WallTracerVertex,
+
+    Settings
   };
 });
 

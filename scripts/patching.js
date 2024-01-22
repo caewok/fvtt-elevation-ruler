@@ -38,5 +38,7 @@ export function initializePatching() {
   PATCHER.registerGroup("BASIC");
   PATCHER.registerGroup("ConstrainedTokenBorder");
   PATCHER.registerGroup("PATHFINDING");
+  PATCHER.registerGroup("TOKEN_RULER");
+  PATCHER.registerGroup("SPEED_HIGHLIGHTING");
 }
 
