@@ -11,7 +11,7 @@ import { SPEED, MODULES_ACTIVE, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
-import { perpendicularPoints } from "./util.js";
+import { perpendicularPoints, log } from "./util.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
 
 /**
@@ -68,7 +68,7 @@ export function _getMeasurementSegments(wrapped) {
   const t2 = performance.now();
   const newSegments = constructPathfindingSegments(segments, segmentMap);
   const t3 = performance.now();
-  //console.debug(`${newSegments.length} segments processed in ${t3-t2} ms.`);
+  log(`${newSegments.length} segments processed in ${t3-t2} ms.`);
   return newSegments;
 }
 
@@ -88,17 +88,17 @@ function calculatePathPointsForSegment(segment, token) {
   const path = pf.runPath(A, B);
   let pathPoints = Pathfinder.getPathPoints(path);
   const t1 = performance.now();
-  //console.debug(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`);
+  log(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`);
 
   // Clean the path
   const t2 = performance.now();
   pathPoints = Pathfinder.cleanPath(pathPoints);
   const t3 = performance.now();
-  //console.debug(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t3 - t2} ms.`);
+  log(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t3 - t2} ms.`);
 
   // If less than 3 points after cleaning, just use the original segment.
   if ( pathPoints.length < 2 ) {
-    //console.debug(`Only ${pathPoints.length} path points found.`, [...pathPoints]);
+    log(`Only ${pathPoints.length} path points found.`, [...pathPoints]);
     return [];
   }
 

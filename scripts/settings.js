@@ -7,6 +7,7 @@ canvas
 
 import { MODULE_ID, MODULES_ACTIVE, SPEED } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
+import { log } from "./util.js";
 
 const SETTINGS = {
   CONTROLS: {
@@ -252,7 +253,7 @@ function toggleTokenRulerWaypoint(context, add = true) {
   const position = canvas.mousePosition;
   const ruler = canvas.controls.ruler;
   if ( !canvas.tokens.active || !ruler || !ruler.active ) return;
-  // console.debug(`${add ? "add" : "remove"}TokenRulerWaypoint`);
+  log(`${add ? "add" : "remove"}TokenRulerWaypoint`);
 
   // Keep track of when we last added/deleted a waypoint.
   const now = Date.now();
@@ -260,7 +261,7 @@ function toggleTokenRulerWaypoint(context, add = true) {
   if ( delta < 100 ) return true; // Throttle keyboard movement once per 100ms
   MOVE_TIME = now;
 
-  // console.debug(`${add ? "adding" : "removing"}TokenRulerWaypoint`);
+  log(`${add ? "adding" : "removing"}TokenRulerWaypoint`);
   if ( add ) ruler._addWaypoint(position);
   else if ( ruler.waypoints.length > 1 ) ruler._removeWaypoint(position); // Removing the last waypoint throws errors.
 }

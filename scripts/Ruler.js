@@ -37,7 +37,8 @@ import {
   tokenIsSnapped,
   iterateGridUnderLine,
   squareGridShape,
-  hexGridShape } from "./util.js";
+  hexGridShape,
+  log } from "./util.js";
 
 /**
  * Modified Ruler
@@ -497,7 +498,7 @@ function _onMouseUp(wrapped, event) {
  */
 function _getMovementToken(wrapped) {
   if ( !this.waypoints.length ) {
-    // console.debug("Waypoints length 0");
+    log("Waypoints length 0");
     return undefined;
   }
 
