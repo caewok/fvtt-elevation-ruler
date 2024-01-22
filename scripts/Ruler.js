@@ -497,7 +497,7 @@ function _onMouseUp(wrapped, event) {
  */
 function _getMovementToken(wrapped) {
   if ( !this.waypoints.length ) {
-    console.debug("Waypoints length 0");
+    // console.debug("Waypoints length 0");
     return undefined;
   }
 

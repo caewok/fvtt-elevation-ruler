@@ -68,7 +68,7 @@ export function _getMeasurementSegments(wrapped) {
   const t2 = performance.now();
   const newSegments = constructPathfindingSegments(segments, segmentMap);
   const t3 = performance.now();
-  console.debug(`${newSegments.length} segments processed in ${t3-t2} ms.`);
+  //console.debug(`${newSegments.length} segments processed in ${t3-t2} ms.`);
   return newSegments;
 }
 
@@ -88,17 +88,17 @@ function calculatePathPointsForSegment(segment, token) {
   const path = pf.runPath(A, B);
   let pathPoints = Pathfinder.getPathPoints(path);
   const t1 = performance.now();
-  console.debug(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`);
+  //console.debug(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`);
 
   // Clean the path
   const t2 = performance.now();
   pathPoints = Pathfinder.cleanPath(pathPoints);
   const t3 = performance.now();
-  console.debug(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t3 - t2} ms.`);
+  //console.debug(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t3 - t2} ms.`);
 
   // If less than 3 points after cleaning, just use the original segment.
   if ( pathPoints.length < 2 ) {
-    console.debug(`Only ${pathPoints.length} path points found.`, [...pathPoints]);
+    //console.debug(`Only ${pathPoints.length} path points found.`, [...pathPoints]);
     return [];
   }
 
