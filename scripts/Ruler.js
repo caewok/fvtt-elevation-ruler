@@ -15,7 +15,7 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
-import { SPEED } from "./const.js";
+import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import {
@@ -90,28 +90,32 @@ function clear(wrapper) {
 /**
  * Wrap Ruler.prototype.toJSON
  * Store the current userElevationIncrements for the destination.
+ * Store segment information, possibly including pathfinding.
  */
 function toJSON(wrapper) {
   // If debugging, log will not display on user's console
   // console.log("constructing ruler json!")
   const obj = wrapper();
 
+  const myObj = obj[MODULE_ID] = {};
+
   // Segment information
   // Simplify the ray.
-  if ( this.segments ) obj._segments = this.segments.map(s => {
+  if ( this.segments ) myObj._segments = this.segments.map(s => {
     const newObj = { ...s };
     newObj.ray = {
       A: s.ray.A,
       B: s.ray.B
     };
-
     newObj.label = Boolean(s.label);
     return newObj;
   });
 
-  obj._userElevationIncrements = this._userElevationIncrements;
-  obj._unsnap = this._unsnap;
-  obj._unsnappedOrigin = this._unsnappedOrigin;
+  myObj._userElevationIncrements = this._userElevationIncrements;
+  myObj._unsnap = this._unsnap;
+  myObj._unsnappedOrigin = this._unsnappedOrigin;
+  myObj._totalDistance = this.totalDistance;
+  myObj._totalMoveDistance = this.totalMoveDistance;
   return obj;
 }
 
@@ -121,17 +125,24 @@ function toJSON(wrapper) {
  * Retrieve the current snap status.
  */
 function update(wrapper, data) {
+  const myData = data[MODULE_ID];
+  if ( !myData ) return wrapper(data); // Just in case.
+
   // Fix for displaying user elevation increments as they happen.
-  const triggerMeasure = this._userElevationIncrements !== data._userElevationIncrements;
-  this._userElevationIncrements = data._userElevationIncrements;
-  this._unsnap = data._unsnap;
-  this._unsnappedOrigin = data._unsnappedOrigin;
+  const triggerMeasure = this._userElevationIncrements !== myData._userElevationIncrements;
+  this._userElevationIncrements = myData._userElevationIncrements;
+  this._unsnap = myData._unsnap;
+  this._unsnappedOrigin = myData._unsnappedOrigin;
 
   // Reconstruct segments.
-  if ( data._segments ) this.segments = data._segments.map(s => {
+  if ( myData._segments ) this.segments = myData._segments.map(s => {
     s.ray = new Ray3d(s.ray.A, s.ray.B);
     return s;
   });
+
+  // Add the calculated distance totals.
+  this.totalDistance = myData._totalDistance;
+  this.totalMoveDistance = myData._totalMoveDistance;
 
   wrapper(data);
 
