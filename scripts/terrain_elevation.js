@@ -93,7 +93,7 @@ function elevationAtLocation(location, measuringToken, startingElevation = Numbe
   // Prioritize the highest token at the location
   const max_token_elevation = retrieveVisibleTokens().reduce((e, t) => {
     // Is the point within the token control area?
-    // Issue #34: bounds can apparently be undefined in some systems?
+    // Issue #33: bounds can apparently be undefined in some systems?
     if ( !t.bounds || !t.bounds.contains(location.x, location.y) ) return e;
     return Math.max(tokenElevation(t), e);
   }, Number.NEGATIVE_INFINITY);
