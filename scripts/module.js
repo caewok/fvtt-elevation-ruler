@@ -47,7 +47,9 @@ Hooks.once("init", function() {
       SCENE_GRAPH
     },
 
-    WallTracer, WallTracerEdge, WallTracerVertex
+    WallTracer, WallTracerEdge, WallTracerVertex,
+
+    Settings
   };
 });
 

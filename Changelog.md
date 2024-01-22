@@ -1,3 +1,9 @@
+# 0.8.1
+
+Fix toggling on/off the pathfinding between waypoints.
+Various fixes to display of ruler for other users.
+
+
 # 0.8.0
 Added pathfinding toggle. Pathfinding works on gridded (both hex and square) and gridless maps. Works when dragging tokens, if Token Ruler is enabled, or when using the Ruler control and you start at a token.
 
