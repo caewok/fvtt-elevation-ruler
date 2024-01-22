@@ -25,22 +25,32 @@ export function elevationAtWaypoint(waypoint) {
 }
 
 /**
- * Wrap Ruler.prototype._getMeasurementSegments
- * Add elevation information to the segments
+ * Mixed wrap of  Ruler.prototype._getMeasurementSegments
+ * Add elevation information to the segments.
+ * Add pathfinding segments.
  */
 export function _getMeasurementSegments(wrapped) {
-  const segments = elevateSegments(this, wrapped());
-  const token = this._getMovementToken();
-
-  if ( !(token && Settings.get(Settings.KEYS.CONTROLS.PATHFINDING)) ) return segments;
-
-  // Test for a collision; if none, no pathfinding.
-  const lastSegment = segments.at(-1);
-  if ( !lastSegment ) {
-    // console.debug("No last segment found", [...segments]);
-    return segments;
+  // If not the user's ruler, segments calculated by original user and copied via socket.
+  if ( this.user !== game.user ) {
+    // Reconstruct labels if necessary.
+    let labelIndex = 0;
+    for ( const s of this.segments ) {
+      if ( !s.label ) continue; // Not every segment has a label.
+      s.label = this.labels.children[labelIndex++];
+    }
+    return this.segments;
   }
 
+  // Elevate the segments
+  const segments = elevateSegments(this, wrapped());
+  const token = this._getMovementToken();
+  if ( !(token && Settings.get(Settings.KEYS.CONTROLS.PATHFINDING)) ) return segments;
+
+  // No segments are possible if dragging back to the origin point.
+  const lastSegment = segments.at(-1);
+  if ( !lastSegment ) return segments;
+
+  // Test for a collision; if none, no pathfinding.
   const { A, B } = lastSegment.ray;
   if ( !token.checkCollision(B, { origin: A, type: "move", mode: "any" }) ) return segments;
 
@@ -51,19 +61,19 @@ export function _getMeasurementSegments(wrapped) {
   const path = pf.runPath(A, B);
   let pathPoints = Pathfinder.getPathPoints(path);
   const t1 = performance.now();
-  // console.debug(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`);
+  console.debug(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`);
 
   const t4 = performance.now();
   pathPoints = Pathfinder.cleanPath(pathPoints);
   const t5 = performance.now();
   if ( !pathPoints ) {
-    // console.debug("No path points after cleaning");
+    console.debug("No path points after cleaning");
     return segments;
   }
 
-  // console.debug(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t5 - t4} ms.`);
+  console.debug(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t5 - t4} ms.`);
   if ( pathPoints.length < 2 ) {
-    // console.debug(`Only ${pathPoints.length} path points found.`, [...pathPoints]);
+    console.debug(`Only ${pathPoints.length} path points found.`, [...pathPoints]);
     return segments;
   }
 
@@ -78,7 +88,7 @@ export function _getMeasurementSegments(wrapped) {
   // For each segment, replace with path sub-segment if pathfinding was used.
   const newSegments = constructPathfindingSegments(segments, segmentMap);
   const t3 = performance.now();
-  // console.debug(`${newSegments.length} segments processed in ${t3-t2} ms.`);
+  console.debug(`${newSegments.length} segments processed in ${t3-t2} ms.`);
   return newSegments;
 }
 
