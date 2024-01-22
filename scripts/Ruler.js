@@ -6,7 +6,6 @@ duplicate,
 game,
 getProperty,
 PIXI,
-Ruler,
 ui
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -84,6 +83,7 @@ UX goals:
 function clear(wrapper) {
   // User increments/decrements to the elevation for the current destination
   this.destination._userElevationIncrements = 0;
+  this._movementToken = undefined;
   return wrapper();
 }
 
@@ -95,6 +95,20 @@ function toJSON(wrapper) {
   // If debugging, log will not display on user's console
   // console.log("constructing ruler json!")
   const obj = wrapper();
+
+  // Segment information
+  // Simplify the ray.
+  obj._segments = this.segments.map(s => {
+    const newObj = { ...s };
+    newObj.ray = {
+      A: s.ray.A,
+      B: s.ray.B
+    };
+
+    newObj.label = Boolean(s.label);
+    return newObj;
+  });
+
   obj._userElevationIncrements = this._userElevationIncrements;
   obj._unsnap = this._unsnap;
   obj._unsnappedOrigin = this._unsnappedOrigin;
@@ -112,6 +126,14 @@ function update(wrapper, data) {
   this._userElevationIncrements = data._userElevationIncrements;
   this._unsnap = data._unsnap;
   this._unsnappedOrigin = data._unsnappedOrigin;
+
+  // Reconstruct segments.
+  this.segments = data._segments.map(s => {
+    s.ray = new Ray3d(s.ray.A, s.ray.B);
+    return s;
+  });
+
+
   wrapper(data);
 
   if ( triggerMeasure ) {
@@ -439,6 +461,31 @@ function _onMouseUp(wrapped, event) {
   return wrapped(event);
 }
 
+/**
+ * Add cached movement token.
+ * Mixed to avoid error if waypoints have no length.
+ */
+function _getMovementToken(wrapped) {
+  if ( !this.waypoints.length ) {
+    console.debug("Waypoints length 0");
+    return undefined;
+  }
+
+  if ( typeof this._movementToken !== "undefined" ) return this._movementToken;
+  this._movementToken = wrapped();
+  if ( !this._movementToken ) this._movementToken = null; // So we can skip next time.
+  return this._movementToken;
+}
+
+/**
+ * Override measure to break it into two parts.
+ * If this ruler is not the current user's ruler, only draw.
+ */
+function measure(destination, opts) {
+  if ( this.user === game.user ) this.measureSegments(destination, opts);
+  this.drawSegments();
+}
+
 
 PATCHES.BASIC.WRAPS = {
   clear,
@@ -464,9 +511,9 @@ PATCHES.BASIC.WRAPS = {
   _canMove
 };
 
-PATCHES.BASIC.MIXES = { _animateSegment };
+PATCHES.BASIC.MIXES = { _animateSegment, _getMovementToken };
 
-PATCHES.BASIC.OVERRIDES = { _computeDistance };
+PATCHES.BASIC.OVERRIDES = { _computeDistance, measure };
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 
@@ -572,6 +619,38 @@ function measureDistance(start, end, gridless = false) {
   return d;
 }
 
+/**
+ * Break apart measure so we can avoid recalculating segments.
+ * See https://github.com/foundryvtt/foundryvtt/issues/10361
+ */
+function drawSegments() {
+  // Reconstruct labels if necessary.
+  let labelIndex = 0;
+  for ( const s of this.segments ) {
+    if ( !s.label ) continue; // Not every segment has a label.
+    s.label = this.labels.children[labelIndex++];
+  }
+
+  // Following is from Ruler.prototype.measure
+
+  // Draw the ruler graphic
+  this.ruler.clear();
+  this._drawMeasuredPath();
+
+  // Draw grid highlight
+  this.highlightLayer.clear();
+  for ( const segment of this.segments ) this._highlightMeasurementSegment(segment);
+}
+
+function measureSegments(destination, {gridSpaces=true, force=false}={}) {
+  // Compute the measurement destination, segments, and distance
+  const d = this._getMeasurementDestination(destination);
+  if ( ( d.x === this.destination.x ) && ( d.y === this.destination.y ) && !force ) return;
+  this.destination = d;
+  this.segments = this._getMeasurementSegments();
+  this._computeDistance(gridSpaces);
+}
+
 PATCHES.BASIC.METHODS = {
   incrementElevation,
   decrementElevation,
@@ -581,7 +660,9 @@ PATCHES.BASIC.METHODS = {
   terrainElevationAtPoint,
   terrainElevationAtDestination,
 
-  _computeTokenSpeed
+  _computeTokenSpeed,
+  drawSegments,
+  measureSegments
 };
 
 PATCHES.BASIC.STATIC_METHODS = {

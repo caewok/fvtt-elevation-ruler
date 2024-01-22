@@ -7,7 +7,6 @@ canvas
 
 import { MODULE_ID, MODULES_ACTIVE, SPEED } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
-import { PATCHER } from "./patching.js";
 
 const SETTINGS = {
   CONTROLS: {
@@ -147,8 +146,7 @@ export class Settings extends ModuleSettingsAbstract {
       config: true,
       default: false,
       type: Boolean,
-      requiresReload: false,
-      onChange: value => this.toggleTokenRuler(value)
+      requiresReload: false
     });
 
     register(KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING, {
@@ -158,8 +156,7 @@ export class Settings extends ModuleSettingsAbstract {
       config: true,
       default: false,
       type: Boolean,
-      requiresReload: false,
-      onChange: value => this.toggleSpeedHighlighting(value)
+      requiresReload: false
     });
 
     register(KEYS.TOKEN_RULER.SPEED_PROPERTY, {
@@ -187,8 +184,6 @@ export class Settings extends ModuleSettingsAbstract {
     });
 
     // Initialize the Token Ruler.
-    if ( this.get(KEYS.TOKEN_RULER.ENABLED) ) this.toggleTokenRuler(true);
-    if ( this.get(KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING) ) this.toggleSpeedHighlighting(true);
     this.setSpeedProperty(this.get(KEYS.TOKEN_RULER.SPEED_PROPERTY));
   }
 
@@ -234,18 +229,7 @@ export class Settings extends ModuleSettingsAbstract {
     });
   }
 
-  static toggleTokenRuler(value) {
-    if ( value ) PATCHER.registerGroup("TOKEN_RULER");
-    else PATCHER.deregisterGroup("TOKEN_RULER");
-  }
-
-  static toggleSpeedHighlighting(value) {
-    if ( value ) PATCHER.registerGroup("SPEED_HIGHLIGHTING");
-    else PATCHER.deregisterGroup("SPEED_HIGHLIGHTING");
-  }
-
   static setSpeedProperty(value) { SPEED.ATTRIBUTE = value; }
-
 }
 
 /**

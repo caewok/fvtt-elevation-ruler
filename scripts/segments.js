@@ -181,6 +181,9 @@ export function hasSegmentCollision(token, segments) {
  * Wrap Ruler.prototype._highlightMeasurementSegment
  */
 export function _highlightMeasurementSegment(wrapped, segment) {
+  if ( !(this.user === game.user
+      && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING)) ) return wrapped(segment);
+
   const token = this._getMovementToken();
   if ( !token ) return wrapped(segment);
 
