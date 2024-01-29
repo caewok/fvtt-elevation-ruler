@@ -29,8 +29,7 @@ import {
   _getSegmentLabel,
   _animateSegment,
   hasSegmentCollision,
-  _highlightMeasurementSegment,
-  modifiedMoveDistance
+  _highlightMeasurementSegment
 } from "./segments.js";
 
 import {
@@ -39,6 +38,11 @@ import {
   squareGridShape,
   hexGridShape,
   log } from "./util.js";
+
+import {
+  measureDistance,
+  measureMoveDistance
+} from "./measure_distance.js";
 
 /**
  * Modified Ruler
@@ -237,34 +241,16 @@ function _computeDistance(gridSpaces) {
   // If not this ruler's user, use the segments already calculated and passed via socket.
   if ( this.user !== game.user ) return;
 
-  const gridless = !gridSpaces;
-  const token = this._getMovementToken();
-  const { measureDistance, modifiedMoveDistance } = this.constructor;
-  let totalDistance = 0;
-  let totalMoveDistance = 0;
+  // Debugging
+  if ( this.segments.some(s => !s) ) console.error("Segment is undefined.");
 
-  if ( this.segments.some(s => !s) ) {
-    console.error("Segment is undefined.");
-  }
-
-  for ( const segment of this.segments ) {
-    segment.distance = measureDistance(segment.ray.A, segment.ray.B, gridless);
-    segment.moveDistance = modifiedMoveDistance(segment, token);
-    totalDistance += segment.distance;
-    totalMoveDistance += segment.moveDistance;
-    segment.last = false;
-  }
-  this.totalDistance = totalDistance;
-  this.totalMoveDistance = totalMoveDistance;
-
-  const tokenSpeed = Number(getProperty(token, SPEED.ATTRIBUTE));
-  if ( Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING)
-    && tokenSpeed ) this._computeTokenSpeed(token, tokenSpeed, gridless);
+  // Determine the distance of each segment.
+  _computeSegmentDistances.call(this, gridSpaces);
+  if ( Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING) ) _computeTokenSpeed.call(this, gridSpaces);
   if ( this.segments.length ) this.segments.at(-1).last = true;
 
-  if ( this.segments.some(s => !s) ) {
-    console.error("Segment is undefined.");
-  }
+  // Debugging
+  if ( this.segments.some(s => !s) ) console.error("Segment is undefined.");
 
   // Compute the waypoint distances for labeling. (Distance to immediately previous waypoint.)
   const waypointKeys = new Set(this.waypoints.map(w => w.key));
@@ -282,73 +268,118 @@ function _computeDistance(gridSpaces) {
   }
 }
 
-function _computeTokenSpeed(token, tokenSpeed, gridless = false) {
+/**
+ * Calculate the distance of each segment.
+ */
+function _computeSegmentDistances(gridSpaces) {
+  const token = this._getMovementToken();
+  const gridless = !gridSpaces;
+  const measureMoveDistance = this.constructor.measureMoveDistance;
+
+  // Loop over each segment in turn, adding the physical distance and the move distance.
+  let totalDistance = 0;
+  let totalMoveDistance = 0;
+  for ( const segment of this.segments ) {
+    const { distance, moveDistance } = measureMoveDistance(segment.ray.A, segment.ray.B, token, gridless);
+    segment.distance = distance;
+    segment.moveDistance = moveDistance;
+    totalDistance += segment.distance;
+    totalMoveDistance += segment.moveDistance;
+    segment.last = false;
+  }
+  this.totalDistance = totalDistance;
+  this.totalMoveDistance = totalMoveDistance;
+}
+
+function _computeTokenSpeed(gridSpaces) {
+  // Requires a movement token and a defined token speed.
+  const token = this._getMovementToken();
+  if ( !token ) return;
+  const tokenSpeed = Number(getProperty(token, SPEED.ATTRIBUTE));
+  if ( !tokenSpeed ) return;
+
+  // Other constants
+  const gridless = !gridSpaces;
+  const walkDistance = tokenSpeed;
+  const dashDistance = tokenSpeed * SPEED.MULTIPLIER;
+
+  // For each segment, determine the type of movement: walk, dash, max.
+  // If a segment has 2+ types, split the segment; recalculating distances.
+  let totalDistance = 0;
   let totalMoveDistance = 0;
   let dashing = false;
   let atMaximum = false;
-  const walkDist = tokenSpeed;
-  const dashDist = tokenSpeed * SPEED.MULTIPLIER;
-  const newSegments = [];
-  for ( let segment of this.segments ) {
+  let nSegments = this.segments.length;
+  const maxIter = nSegments * 3;  // Debugging
+  let iter = 0;
+  for ( let i = 0; i < nSegments; i += 1 ) {
+    let segment = this.segments[i];
+
+    iter += 1; // Debugging
+    if ( iter > maxIter ) break; // Debugging
+
+    // A previous segment was at the maximum speed, so all subsequent segments are at maximum.
     if ( atMaximum ) {
       segment.speed = SPEED.TYPES.MAXIMUM;
-      newSegments.push(segment);
       continue;
     }
 
-    let newMoveDistance = totalMoveDistance + segment.moveDistance;
-    if ( !dashing && Number.between(walkDist, totalMoveDistance, newMoveDistance, false) ) {
-      // Split required
-      const splitMoveDistance = walkDist - totalMoveDistance;
-      const segments = splitSegment(segment, splitMoveDistance, token, gridless);
-      if ( segments.length === 1 ) {
-        segment.speed = SPEED.TYPES.WALK;
-        newSegments.push(segment);
-        totalMoveDistance += segment.moveDistance;
-        continue;
-      } else if ( segments.length === 2 ) {
-        segments[0].speed = SPEED.TYPES.WALK;
-        newSegments.push(segments[0]);
-        totalMoveDistance += segments[0].moveDistance;
-        segment = segments[1];
-        newMoveDistance = totalMoveDistance + segment.moveDistance;
+    // Check if segment must be split.
+    // Do dash first so the split can later be checked for maximum.
+    const newMoveDistance = totalMoveDistance + segment.moveDistance;
+    const targetDistance = (!dashing && newMoveDistance > walkDistance) ? walkDistance
+      : (!atMaximum && newMoveDistance > dashDistance) ? dashDistance
+        : undefined;
+    if ( targetDistance ) {
+      // Force dash and maximum, to avoid loops on error in measurement.
+      atMaximum ||= dashing;
+      dashing = true;
+
+      // Split the segment, storing the latter portion in the queue for next iteration.
+      const splitDistance = targetDistance - totalMoveDistance;
+      const segments = splitSegment(segment, splitDistance, token, gridless);
+      if ( segments.length === 2 ) {
+        this.segments.splice(i, 1, segments[0]); // Delete the old segment, replace.
+        this.segments.splice(i + 1, 0, segments[1]); // Add the split.
+        nSegments += 1;
+        segment = segments[0];
       }
     }
 
-    if ( !atMaximum && Number.between(dashDist, totalMoveDistance, newMoveDistance, false) ) {
-      // Split required
-      const splitMoveDistance = dashDist - totalMoveDistance;
-      const segments = splitSegment(segment, splitMoveDistance, token, gridless);
-      if ( segments.length === 1 ) {
-        segment.speed = SPEED.TYPES.DASH;
-        newSegments.push(segment);
-        totalMoveDistance += segment.moveDistance;
-        continue;
-      } else if ( segments.length === 2 ) {
-        segments[0].speed = SPEED.TYPES.DASH;
-        newSegments.push(segments[0]);
-        totalMoveDistance += segments[0].moveDistance;
-        segment = segments[1];
-        newMoveDistance = totalMoveDistance + segment.moveDistance;
-      }
-    }
+    totalDistance += segment.distance;
+    totalMoveDistance += segment.moveDistance;
 
-    if ( totalMoveDistance > dashDist ) {
+    // Mark segment speed and flag when past the dash and maximum points.
+    if ( totalMoveDistance > dashDistance ) {
       segment.speed = SPEED.TYPES.MAXIMUM;
       dashing ||= true;
       atMaximum ||= true;
-    } else if ( totalMoveDistance > walkDist ) {
+    } else if ( totalMoveDistance > walkDistance ) {
       segment.speed = SPEED.TYPES.DASH;
       dashing ||= true;
     } else segment.speed = SPEED.TYPES.WALK;
-
-    totalMoveDistance += segment.moveDistance;
-    newSegments.push(segment);
   }
 
-  this.segments = newSegments;
-  return newSegments;
+  // Recalculated distances, just in case the splitting is off.
+  this.totalDistance = totalDistance;
+  this.totalMoveDistance = totalMoveDistance;
 }
+
+/* Debugging
+  arr = [1,2,3,4,5,6];
+  nArr = arr.length;
+  iter = 0;
+  for ( let i = 0; i < nArr; i += 1 ) {
+    iter += 1
+    if ( iter > 10 ) break;
+    const a = arr[i];
+    if ( a === 3 ) {
+      arr.splice(i + 1, 0, 3.5);
+      nArr += 1;
+    }
+    console.debug(`${i}, ${a}`);
+  }
+*/
 
 /**
  * Cut a ruler segment at a specific point such that the first subsegment
@@ -364,7 +395,7 @@ function _computeTokenSpeed(token, tokenSpeed, gridless = false) {
 function splitSegment(segment, splitMoveDistance, token, gridless) {
   if ( splitMoveDistance <= 0 ) return [];
   if ( splitMoveDistance > segment.moveDistance ) return [segment];
-
+  if ( !segment.moveDistance ) return [segment]; // Segment is length 0 for the move.
 
   // Determine where on the segment ray the cutoff occurs.
   // Use canvas grid distance measurements to handle 5-5-5, 5-10-5, other measurement configs.
@@ -372,67 +403,100 @@ function splitSegment(segment, splitMoveDistance, token, gridless) {
   // If we are using a grid, split the segment at grid/square hex.
   // Find where the segment intersects the last grid square/hex before the cutoff.
   const rulerClass = CONFIG.Canvas.rulerClass;
-  let breakPoint;
   const { A, B } = segment.ray;
   gridless ||= (canvas.grid.type === CONST.GRID_TYPES.GRIDLESS);
-  if ( gridless ) {
-    // Use ratio (t) value
-    const t = splitMoveDistance / segment.moveDistance;
-    breakPoint = A.projectToward(B, t);
-  } else {
-    // Cannot just use the t value because segment distance may not be Euclidean.
-    // Also need to handle that a segment might break on a grid border.
-    // Determine all the grid positions, and drop each one in turn.
-    const z = segment.ray.A.z;
-    const gridShapeFn = canvas.grid.type === CONST.GRID_TYPES.SQUARE ? squareGridShape : hexGridShape;
-    const segmentDistZ = segment.ray.distance;
-
-    // Cannot just use the t value because segment distance may not be Euclidean.
-    // Also need to handle that a segment might break on a grid border.
-    // Determine all the grid positions, and drop each one in turn.
-    breakPoint = B;
-    const gridIter = iterateGridUnderLine(A, B, { reverse: true });
-    for ( const [r1, c1] of gridIter ) {
-      const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(r1, c1);
-      const shape = gridShapeFn({x, y});
-      const ixs = shape
-        .segmentIntersections(A, B)
-        .map(ix => PIXI.Point.fromObject(ix));
-      if ( !ixs.length ) continue;
-
-      // If more than one, split the distance.
-      // This avoids an issue whereby a segment is too short and so the first square is dropped when highlighting.
-      if ( ixs.length === 1 ) breakPoint = ixs[0];
-      else {
-        ixs.forEach(ix => {
-          ix.distance = ix.subtract(A).magnitude();
-          ix.t0 = ix.distance / segmentDistZ;
-        });
-        const t = (ixs[0].t0 + ixs[1].t0) * 0.5;
-        breakPoint = A.projectToward(B, t);
-      }
-
-      // Construct a shorter segment.
-      breakPoint.z = z;
-      const shorterSegment = { ray: new Ray3d(A, breakPoint) };
-      shorterSegment.moveDistance = rulerClass.modifiedMoveDistance(shorterSegment, token);
-      if ( shorterSegment.moveDistance <= splitMoveDistance ) break;
-    }
-  }
+  const breakPoint = gridless
+    ? findGridlessBreakpoint(segment, splitMoveDistance, token)
+    : findGriddedBreakpoint(segment, splitMoveDistance, token);
 
   if ( breakPoint.almostEqual(B) ) return [segment];
   if ( breakPoint.almostEqual(A) ) return [];
 
   // Split the segment into two at the break point.
-  const segment0 = {...segment};
-  const segment1 = {...segment};
-  segment0.ray = new Ray3d(A, breakPoint);
-  segment1.ray = new Ray3d(breakPoint, B);
-  segment0.distance = rulerClass.measureDistance(segment0.ray.A, segment0.ray.B, gridless);
-  segment1.distance = rulerClass.measureDistance(segment1.ray.A, segment1.ray.B, gridless);
-  segment0.moveDistance = rulerClass.modifiedMoveDistance(segment0, token);
-  segment1.moveDistance = rulerClass.modifiedMoveDistance(segment1, token);
-  return [segment0, segment1];
+  const newSegments = [];
+  for ( const [start, end] of [[A, breakPoint], [breakPoint, B]]) {
+    const s = {...segment};
+    newSegments.push(s);
+    s.ray = new Ray3d(start, end);
+    const { distance, moveDistance } = rulerClass.measureMoveDistance(start, end, token, gridless);
+    s.distance = distance;
+    s.moveDistance = moveDistance;
+  }
+  return newSegments;
+}
+
+/**
+ * Search for the best point at which to split a segment on a gridless Canvas so that
+ * the first half of the segment is splitMoveDistance.
+ * @param {RulerMeasurementSegment} segment       Segment, with ray property, to split
+ * @param {number} splitMoveDistance              Distance, in grid units, of the desired first subsegment move distance
+ * @param {Token} token                           Token to use when measuring move distance
+ * @returns {PIXI.Point}
+ */
+function findGridlessBreakpoint(segment, splitMoveDistance, token) {
+  // Binary search to find a reasonably close t value for the split move distance.
+  // Because the move distance can vary depending on terrain.
+  const { A, B } = segment.ray;
+  const MAX_ITER = 20;
+  let t = splitMoveDistance / segment.moveDistance;
+  let maxHigh = 1;
+  let maxLow = 0;
+  let testSplitPoint;
+  for ( let i = 0; i < MAX_ITER; i += 1 ) {
+    testSplitPoint = A.projectToward(B, t);
+    const { moveDistance } = measureMoveDistance(A, testSplitPoint, token, true);
+
+    // Adjust t by half the distance to the max/min t value.
+    if ( moveDistance === splitMoveDistance ) break;
+    if ( moveDistance > splitMoveDistance ) {
+      maxLow = t;
+      t += ((maxHigh - t) * 0.5);
+    } else {
+      maxHigh = t;
+      t -= ((t - maxLow) * 0.5);
+    }
+  }
+  return testSplitPoint;
+}
+
+/**
+ * Search for the best point at which to split a segment on a gridded Canvas so that
+ * the first half of the segment is splitMoveDistance.
+ * @param {RulerMeasurementSegment} segment       Segment, with ray property, to split
+ * @param {number} splitMoveDistance              Distance, in grid units, of the desired first subsegment move distance
+ * @param {Token} token                           Token to use when measuring move distance
+ * @returns {PIXI.Point}
+ */
+function findGriddedBreakpoint(segment, splitMoveDistance, token) {
+  const { A, B } = segment.ray;
+  const gridShapeFn = canvas.grid.type === CONST.GRID_TYPES.SQUARE ? squareGridShape : hexGridShape;
+  const rulerClass = CONFIG.Canvas.rulerClass;
+
+  // Determine all the grid positions, and add each in turn.
+  const gridIter = iterateGridUnderLine(A, B);
+  let breakPoint = A;
+  for ( const [r1, c1] of gridIter ) {
+    const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(r1, c1);
+    const shape = gridShapeFn({x, y});
+    const ixs = shape
+      .segmentIntersections(A, B)
+      .map(ix => PIXI.Point.fromObject(ix));
+    if ( !ixs.length ) continue;
+
+    // Find the midpoint so we avoid the grid edges.
+    const testBreakPoint = ixs.length === 1
+      ? PIXI.Point.midPoint(breakPoint, ixs[0])
+      : PIXI.Point.midPoint(ixs[0], ixs[1]);
+
+    // Calculate the distance from A to the current test breakpoint.
+    // If we have exceeded move distance, we are done.
+    const { moveDistance } = rulerClass.measureMoveDistance(A, testBreakPoint, token, false);
+    if ( moveDistance > splitMoveDistance ) break;
+
+    // Cycle to next iteration.
+    breakPoint = testBreakPoint;
+  }
+  return breakPoint;
 }
 
 // ----- NOTE: Event handling ----- //
@@ -577,68 +641,6 @@ function decrementElevation() {
   game.user.broadcastActivity({ ruler: ruler.toJSON() });
 }
 
-/**
- * Add separate method to measure distance of a segment based on grid type.
- * Square or hex: count only distance for when the segment crosses to another square/hex.
- * A segment wholly within a square is 0 distance.
- * Instead of mathematical shortcuts from center, actual grid squares are counted.
- * Euclidean also uses grid squares, but measures using actual diagonal from center to center.
- * @param {Point} start                 Starting point for the measurement
- * @param {Point} end                   Ending point for the measurement
- * @param {boolean} [gridless=false]    For gridded canvas, force gridless measurement
- * @returns {number} Measure in grid (game) units (not pixels).
- */
-const DIAGONAL_RULES = {
-  EUCL: 0,
-  555: 1,
-  5105: 2
-};
-const CHANGE = {
-  NONE: 0,
-  V: 1,
-  H: 2,
-  D: 3
-};
-
-function measureDistance(start, end, gridless = false) {
-  gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
-  if ( gridless ) return CONFIG.GeometryLib.utils.pixelsToGridUnits(PIXI.Point.distanceBetween(start, end));
-
-  start = PIXI.Point.fromObject(start);
-  end = PIXI.Point.fromObject(end);
-
-  const iter = iterateGridUnderLine(start, end);
-  let prev = iter.next().value;
-  if ( !prev ) return 0;
-
-  // No change, vertical change, horizontal change, diagonal change.
-  const changeCount = new Uint32Array([0, 0, 0, 0]);
-  for ( const next of iter ) {
-    const xChange = prev[1] !== next[1]; // Column is x
-    const yChange = prev[0] !== next[0]; // Row is y
-    changeCount[((xChange * 2) + yChange)] += 1;
-    prev = next;
-  }
-
-  const distance = canvas.dimensions.distance;
-  const diagonalRule = DIAGONAL_RULES[canvas.grid.diagonalRule] ?? DIAGONAL_RULES["555"];
-  let diagonalDist = distance;
-  if ( diagonalRule === DIAGONAL_RULES.EUCL ) diagonalDist = Math.hypot(distance, distance);
-
-  // Sum the horizontal, vertical, and diagonal grid moves.
-  let d = (changeCount[CHANGE.V] * distance)
-    + (changeCount[CHANGE.H] * distance)
-    + (changeCount[CHANGE.D] * diagonalDist);
-
-  // If diagonal is 5-10-5, every even move gets an extra 5.
-  if ( diagonalRule === DIAGONAL_RULES["5105"] ) {
-    const nEven = ~~(changeCount[CHANGE.D] * 0.5);
-    d += (nEven * distance);
-  }
-
-  return d;
-}
-
 PATCHES.BASIC.METHODS = {
   incrementElevation,
   decrementElevation,
@@ -653,7 +655,7 @@ PATCHES.BASIC.METHODS = {
 
 PATCHES.BASIC.STATIC_METHODS = {
   measureDistance,
-  modifiedMoveDistance
+  measureMoveDistance
 };
 
 
