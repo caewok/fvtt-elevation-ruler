@@ -8,11 +8,7 @@ Hooks
 export const MODULE_ID = "elevationruler";
 export const EPSILON = 1e-08;
 
-export const MODULES_ACTIVE = {
-  ELEVATED_VISION: false,
-  ENHANCED_TERRAIN_LAYER: false,
-  LEVELS: false
-};
+export const MODULES_ACTIVE = { API: {} };
 
 // Hook init b/c game.modules is not initialized at start.
 Hooks.once("init", function() {
@@ -20,6 +16,11 @@ Hooks.once("init", function() {
   MODULES_ACTIVE.LEVELS = game.modules.get("levels")?.active;
   MODULES_ACTIVE.ELEVATED_VISION = game.modules.get("elevatedvision")?.active;
   MODULES_ACTIVE.TERRAIN_MAPPER = game.modules.get("terrainmapper")?.active;
+});
+
+// API not necessarily available until ready hook. (Likely added at init.)
+Hooks.once("ready", function() {
+  if ( MODULES_ACTIVE.TERRAIN_MAPPER ) MODULES_ACTIVE.API.TERRAIN_MAPPER = game.modules.get("terrainmapper").api;
 });
 
 /**
