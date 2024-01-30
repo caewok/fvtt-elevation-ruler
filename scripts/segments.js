@@ -159,7 +159,7 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
   if ( levelName ) elevLabel += `\n${level_name}`;
 
   let moveLabel = "";
-  if ( segment.waypointDistance !== segment.waypointMoveDistance ) moveLabel = `\n🥾${Math.round(segment.waypointMoveDistance * 100) * .01}`;
+  if ( segment.waypointDistance !== segment.waypointMoveDistance ) moveLabel = `\n🥾${Number(segment.waypointMoveDistance.toFixed(2))}`;
 
   return `${origLabel}\n${elevLabel}${moveLabel}`;
 }
@@ -321,8 +321,8 @@ function segmentElevationLabel(s) {
 
   // Take absolute value b/c segmentArrow will represent direction
   // Allow decimals to tenths ( Math.round(x * 10) / 10).
-  let label = `${segmentArrow}${Math.abs(Math.round(CONFIG.GeometryLib.utils.pixelsToGridUnits(increment) * 10) / 10)} ${units}`;
-  label += ` [@${Math.round(CONFIG.GeometryLib.utils.pixelsToGridUnits(Bz) * 10) / 10} ${units}]`;
+  let label = `${segmentArrow}${Math.abs(Number(CONFIG.GeometryLib.utils.pixelsToGridUnits(increment).toFixed(1)))} ${units}`;
+  label += ` [@${Number(CONFIG.GeometryLib.utils.pixelsToGridUnits(Bz).toFixed(1))} ${units}]`;
 
   return label;
 }
