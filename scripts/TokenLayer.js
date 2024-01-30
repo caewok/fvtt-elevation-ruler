@@ -26,9 +26,7 @@ async function _onClickLeft(wrapped, event) {
   // Drop the token.
   const token = ruler._getMovementToken();
   if ( !token ) return wrapped(event);
-  await token._onDragLeftDrop(event);
-  token._onDragEnd();
-  // if ( ruler._state !== Ruler.STATES.MOVING ) canvas.controls.ruler._onMouseUp(event);
+  token._onDragLeftDrop(event);
 }
 
 PATCHES.TOKEN_RULER.MIXES = { _onClickLeft };
