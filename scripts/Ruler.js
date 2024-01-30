@@ -350,11 +350,11 @@ function _computeTokenSpeed(gridSpaces) {
     totalMoveDistance += segment.moveDistance;
 
     // Mark segment speed and flag when past the dash and maximum points.
-    if ( totalMoveDistance > dashDistance ) {
+    if ( totalMoveDistance > dashDistance && !totalMoveDistance.almostEqual(dashDistance, .01) ) {
       segment.speed = SPEED.TYPES.MAXIMUM;
       dashing ||= true;
       atMaximum ||= true;
-    } else if ( totalMoveDistance > walkDistance ) {
+    } else if ( totalMoveDistance > walkDistance && !totalMoveDistance.almostEqual(walkDistance, .01) ) {
       segment.speed = SPEED.TYPES.DASH;
       dashing ||= true;
     } else segment.speed = SPEED.TYPES.WALK;
@@ -447,13 +447,15 @@ function findGridlessBreakpoint(segment, splitMoveDistance, token) {
     const { moveDistance } = measureMoveDistance(A, testSplitPoint, token, true);
 
     // Adjust t by half the distance to the max/min t value.
-    if ( moveDistance === splitMoveDistance ) break;
+    // Need not be all that exact but must be over the target distance.
+    if ( moveDistance.almostEqual(splitMoveDistance, .01) ) break;
     if ( moveDistance > splitMoveDistance ) {
-      maxLow = t;
-      t += ((maxHigh - t) * 0.5);
-    } else {
       maxHigh = t;
       t -= ((t - maxLow) * 0.5);
+    } else {
+      maxLow = t;
+      t += ((maxHigh - t) * 0.5);
+
     }
   }
   return testSplitPoint;
