@@ -36,6 +36,9 @@
     "elevationruler.settings.enable-token-ruler.name": "Use Token Ruler",
     "elevationruler.settings.enable-token-ruler.hint": "Display the ruler when dragging tokens.",
 
+    "elevationruler.settings.right-click-waypoint.name": "Right-click for waypoints",
+    "elevationruler.settings.right-click-waypoint.hint": "When dragging with the Token Ruler, right-click to add waypoints. Control-right-click to delete waypoints.",
+
     "elevationruler.settings.token-ruler-highlighting.name": "Use Token Speed Highlighting",
     "elevationruler.settings.token-ruler-highlighting.hint": "When using the ruler, use different colors for token walk/dash/max distance.",
 

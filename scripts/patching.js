@@ -12,6 +12,7 @@ import { PATCHES as PATCHES_ClientKeybindings } from "./ClientKeybindings.js";
 import { PATCHES as PATCHES_BaseGrid } from "./BaseGrid.js";
 import { PATCHES as PATCHES_HexagonalGrid } from "./HexagonalGrid.js";
 import { PATCHES as PATCHES_ConstrainedTokenBorder } from "./ConstrainedTokenBorder.js";
+import { PATCHES as PATCHES_TokenLayer } from "./TokenLayer.js";
 
 // Pathfinding
 import { PATCHES as PATCHES_Wall } from "./pathfinding/Wall.js";
@@ -27,6 +28,7 @@ const PATCHES = {
   HexagonalGrid: PATCHES_HexagonalGrid,
   Ruler: PATCHES_Ruler,
   Token: PATCHES_Token,
+  TokenLayer: PATCHES_TokenLayer,
   Settings: PATCHES_Settings,
   Wall: PATCHES_Wall
 };

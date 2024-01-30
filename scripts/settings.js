@@ -30,7 +30,8 @@ const SETTINGS = {
     ENABLED: "enable-token-ruler",
     SPEED_HIGHLIGHTING: "token-ruler-highlighting",
     SPEED_PROPERTY: "token-speed-property",
-    TOKEN_MULTIPLIER: "token-terrain-multiplier"
+    TOKEN_MULTIPLIER: "token-terrain-multiplier",
+    RIGHT_CLICK_ADDS_WAYPOINT: "right-click-waypoint"
   }
 };
 
@@ -43,7 +44,7 @@ const KEYBINDINGS = {
   }
 };
 
-
+let MOVE_TIME = 0;
 export class Settings extends ModuleSettingsAbstract {
   /** @type {object} */
   static KEYS = SETTINGS;
@@ -150,6 +151,16 @@ export class Settings extends ModuleSettingsAbstract {
       requiresReload: false
     });
 
+    register(KEYS.TOKEN_RULER.RIGHT_CLICK_ADDS_WAYPOINT, {
+      name: localize(`${KEYS.TOKEN_RULER.RIGHT_CLICK_ADDS_WAYPOINT}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.RIGHT_CLICK_ADDS_WAYPOINT}.hint`),
+      scope: "user",
+      config: true,
+      default: true,
+      type: Boolean,
+      requiresReload: false
+    });
+
     register(KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING, {
       name: localize(`${KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING}.name`),
       hint: localize(`${KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING}.hint`),
@@ -215,7 +226,7 @@ export class Settings extends ModuleSettingsAbstract {
       editable: [
         { key: "=" }
       ],
-      onDown: context => toggleTokenRulerWaypoint(context, true),
+      onDown: _context => this.toggleTokenRulerWaypoint(true),
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
 
@@ -225,12 +236,35 @@ export class Settings extends ModuleSettingsAbstract {
       editable: [
         { key: "-" }
       ],
-      onDown: context => toggleTokenRulerWaypoint(context, false),
+      onDown: _context => this.toggleTokenRulerWaypoint(false),
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
   }
 
   static setSpeedProperty(value) { SPEED.ATTRIBUTE = value; }
+
+
+  /**
+   * Add or remove a waypoint to the ruler, only if we are using the Token Ruler.
+   * @param {KeyboardEventContext} context          The context data of the event
+   * @param {boolean} [add=true]                    Whether to add or remove the waypoint
+   */
+  static toggleTokenRulerWaypoint(add = true) {
+    const position = canvas.mousePosition;
+    const ruler = canvas.controls.ruler;
+    if ( !canvas.tokens.active || !ruler || !ruler.active ) return;
+    log(`${add ? "add" : "remove"}TokenRulerWaypoint`);
+
+    // Keep track of when we last added/deleted a waypoint.
+    const now = Date.now();
+    const delta = now - MOVE_TIME;
+    if ( delta < 100 ) return true; // Throttle keyboard movement once per 100ms
+    MOVE_TIME = now;
+
+    log(`${add ? "adding" : "removing"}TokenRulerWaypoint`);
+    if ( add ) ruler._addWaypoint(position);
+    else if ( ruler.waypoints.length > 1 ) ruler._removeWaypoint(position); // Removing the last waypoint throws errors.
+  }
 }
 
 /**
@@ -242,27 +276,3 @@ function reloadTokenControls() {
   canvas.tokens.deactivate();
   canvas.tokens.activate();
 }
-
-/**
- * Add or remove a waypoint to the ruler, only if we are using the Token Ruler.
- * @param {KeyboardEventContext} context          The context data of the event
- * @param {boolean} [add=true]                    Whether to add or remove the waypoint
- */
-let MOVE_TIME = 0;
-function toggleTokenRulerWaypoint(context, add = true) {
-  const position = canvas.mousePosition;
-  const ruler = canvas.controls.ruler;
-  if ( !canvas.tokens.active || !ruler || !ruler.active ) return;
-  log(`${add ? "add" : "remove"}TokenRulerWaypoint`);
-
-  // Keep track of when we last added/deleted a waypoint.
-  const now = Date.now();
-  const delta = now - MOVE_TIME;
-  if ( delta < 100 ) return true; // Throttle keyboard movement once per 100ms
-  MOVE_TIME = now;
-
-  log(`${add ? "adding" : "removing"}TokenRulerWaypoint`);
-  if ( add ) ruler._addWaypoint(position);
-  else if ( ruler.waypoints.length > 1 ) ruler._removeWaypoint(position); // Removing the last waypoint throws errors.
-}
-

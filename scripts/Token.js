@@ -9,7 +9,7 @@ import { Settings } from "./settings.js";
 
 // Patches for the Token class
 export const PATCHES = {};
-PATCHES.TOKEN_RULER = {}; // Assume this patch is only present if the token ruler setting is enabled.
+PATCHES.TOKEN_RULER = {};
 PATCHES.ConstrainedTokenBorder = {};
 
 /**
@@ -29,12 +29,24 @@ function _onDragLeftStart(wrapped, event) {
  * Continue the ruler measurement
  */
 function _onDragLeftCancel(wrapped, event) {
+  const useTokenRuler = Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED);
+  const ruler = canvas.controls.ruler;
+
+  if ( useTokenRuler
+    && (event.button === 2 || event.ctrlKey)
+    && ruler._state !== Ruler.STATES.MOVING ) {
+    event.preventDefault();
+
+    // Create waypoint
+    Settings.toggleTokenRulerWaypoint(true);
+    return;
+  }
+
   wrapped(event);
 
   // Cancel a Ruler measurement.
   // If moving, handled by the drag left drop.
-  if ( !Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED) ) return;
-  const ruler = canvas.controls.ruler;
+  if ( !useTokenRuler ) return;
   if ( ruler._state !== Ruler.STATES.MOVING ) canvas.controls.ruler._onMouseUp(event);
 }
 
@@ -75,10 +87,9 @@ async function _onDragLeftDrop(wrapped, event) {
 PATCHES.TOKEN_RULER.WRAPS = {
   _onDragLeftStart,
   _onDragLeftMove,
-  _onDragLeftCancel
 };
 
-PATCHES.TOKEN_RULER.MIXES = { _onDragLeftDrop };
+PATCHES.TOKEN_RULER.MIXES = { _onDragLeftDrop, _onDragLeftCancel };
 
 // ----- NOTE: Getters ----- //
 
