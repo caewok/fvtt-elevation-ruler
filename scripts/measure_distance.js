@@ -145,6 +145,7 @@ function griddedMoveDistance(a, b, token) {
     const shape = gridShapeFn({x, y});
     tokenOverlapsPrev = tokens.some(t => {
       const border = t.constrainedTokenBorder ?? t.bounds;
+      border.pad(-2);
       return border.overlaps(shape)
     });
   }
@@ -173,9 +174,11 @@ function griddedMoveDistance(a, b, token) {
     currCenter.y = cy;
 
     // Do one or more token constrained borders overlap this grid space?
+    // Shrink the token border to avoid overlap with an adjacent shape.
     const shape = gridShapeFn({x, y});
     const tokenOverlaps = mult === 1 ? false : tokens.some(t => {
       const border = t.constrainedTokenBorder ?? t.bounds;
+      border.pad(-2);
       return border.overlaps(shape)
     });
 
