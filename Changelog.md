@@ -1,3 +1,8 @@
+# 0.8.2
+Improvements to calculating distance on a grid. Improvements to splitting ruler segments when highlighting based on token speed. Closes issue #35. Improvements to treating tokens as difficult terrain for purposes of token speed highlighting.
+
+Added a "hiking boot" displaying token movement distance in the ruler when difficult terrain is encountered (tokens or from Terrain Mapper module).
+
 # 0.8.1
 Fix toggling pathfinding between waypoints.
 Various fixes to display of ruler for other users.
