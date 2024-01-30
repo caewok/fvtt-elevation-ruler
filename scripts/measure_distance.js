@@ -330,9 +330,9 @@ function terrainTokenGridlessMoveMultiplier(a, b, token) {
       prevT ??= tValue.t; // Store only the first t to take us inside.
     } else if ( nInside > 2 ) nInside -= 1;
     else if ( nInside === 1 ) { // Inside is false and we are now outside.
-      const startPt = a.project(b, prevT);
-      const endPt = a.project(b, tValue.t);
-      distInside += Point3d.distanceBetween(startPt, endPt);
+      const startPt = a.projectToward(b, prevT);
+      const endPt = a.projectToward(b, tValue.t);
+      distInside += PIXI.Point.distanceBetween(startPt, endPt);
       nInside = 0;
       prevT = undefined;
     }
@@ -341,12 +341,12 @@ function terrainTokenGridlessMoveMultiplier(a, b, token) {
   // If still inside, we can go all the way to t = 1
   if ( nInside > 0 ) {
     const startPt = a.projectToward(b, prevT);
-    distInside += Point3d.distanceBetween(startPt, b);
+    distInside += PIXI.Point.distanceBetween(startPt, b);
   }
 
   if ( !distInside ) return 1;
 
-  const totalDistance = Point3d.distanceBetween(a, b);
+  const totalDistance = PIXI.Point.distanceBetween(a, b);
   return ((totalDistance - distInside) + (distInside * mult)) / totalDistance;
 }
 
