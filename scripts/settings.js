@@ -16,6 +16,15 @@ const SETTINGS = {
     PREFER_TOKEN_ELEVATION_CURRENT_VALUE: "prefer-token-elevation-current-value"
   },
 
+  PATHFINDING: {
+    TOKENS_BLOCK: "pathfinding_tokens_block",
+    TOKENS_BLOCK_CHOICES: {
+      NO: "pathfinding_tokens_block_no",
+      HOSTILE: "pathfinding_tokens_block_hostile",
+      ALL: "pathfinding_tokens_block_all"
+    }
+  },
+
   USE_EV: "enable-elevated-vision-elevation",
   USE_TERRAIN: "enable-enhanced-terrain-elevation",
   USE_LEVELS: "enable-levels-elevation",
@@ -139,6 +148,19 @@ export class Settings extends ModuleSettingsAbstract {
       requiresReload: false
     });
 
+    register(KEYS.PATHFINDING.TOKENS_BLOCK, {
+      scope: "user",
+      config: true,
+      default: KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO
+      type: String,
+      requiresReload: false,
+      choices: {
+        [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO]: game.i18n.localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO}`),
+        [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.HOSTILE]: game.i18n.localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.HOSTILE}`),
+        [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL]: game.i18n.localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL}`)
+      }
+    });
+
     // ----- NOTE: Token ruler ----- //
     register(KEYS.TOKEN_RULER.ENABLED, {
       name: localize(`${KEYS.TOKEN_RULER.ENABLED}.name`),
@@ -186,6 +208,12 @@ export class Settings extends ModuleSettingsAbstract {
 
     // Initialize the Token Ruler.
     this.setSpeedProperty(this.get(KEYS.TOKEN_RULER.SPEED_PROPERTY));
+
+    // Initialize hooks for token blocks pathfinding.
+    const PATHFINDING = KEYS.PATHFINDING;
+    if ( Settings.get(PATHFINDING.TOKENS_BLOCK) !== PATHFINDING.TOKENS_BLOCK_CHOICES.NO ) {
+      this.enableTokenBlocksPathfinding();
+    }
   }
 
   static registerKeybindings() {
@@ -231,6 +259,16 @@ export class Settings extends ModuleSettingsAbstract {
   }
 
   static setSpeedProperty(value) { SPEED.ATTRIBUTE = value; }
+
+  static enableTokenBlocksPathfinding() {
+    PATCHER.registerGroup("PATHFINDING_TOKENS");
+    for ( const token of canvas.tokens.placeables ) SCENE_GRAPH.addToken(token);
+    Pathfinder.dirty = true;
+  }
+
+  static disableTokenBlocksPathfinding() {
+    PATCHER.deregisterGroup("PATHFINDING_TOKENS");
+  }
 }
 
 /**
