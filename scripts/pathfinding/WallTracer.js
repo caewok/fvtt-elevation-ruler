@@ -12,7 +12,7 @@ Wall
 
 // WallTracer3
 
-import { groupBy } from "../util.js";
+import { groupBy, segmentBounds } from "../util.js";
 import { ClipperPaths } from "../geometry/ClipperPaths.js";
 import { Draw } from "../geometry/Draw.js";
 import { Graph, GraphVertex, GraphEdge } from "../geometry/Graph.js";
@@ -178,25 +178,33 @@ export class WallTracerVertex extends GraphVertex {
 }
 
 /**
- * Represents a portion of a wall.
- * The wall is divided into distinct edges based on intersections with other walls.
+ * Represent a segment. For example, a token border edge.
  */
-export class WallTracerEdge extends GraphEdge {
-  /**
-   * Number of places to round the ratio for wall collisions, in order to treat
+export class SegmentTracerEdge extends GraphEdge {
+   /**
+   * Number of places to round the ratio for segment collisions, in order to treat
    * close collisions as equal.
    * @type {number}
    */
   static PLACES = 8;
 
   /**
-   * Wall represented by this edge.
-   * The edge may represent the entire wall or just a portion (see tA and tB).
-   * @type {Wall}
+   * Placeable object represented by this edge.
+   * The edge may represent the entire object edge or just a portion (see tA and tB).
+   * @type {PlaceableObject}
    */
-  wall;
+  object;
 
-  // Location on the wall, as a ratio, where the endpoint of the edge is located.
+  /**
+   * The full edge endpoint, before accounting for any ratios/splits.
+   * @type {PIXI.Point}
+   */
+  edgeA;
+
+  /** @type {PIXI.Point} */
+  edgeB;
+
+  // Location on the edge, as a ratio, where the endpoint of the edge is located.
   /** @type {number} */
   tA = 0;
 
@@ -207,18 +215,22 @@ export class WallTracerEdge extends GraphEdge {
   delta = new PIXI.Point();
 
   /**
-   * Construct an edge from a wall.
+   * Construct an edge.
    * To be used instead of constructor in most cases.
-   * @param {Wall} wall       Wall represented by this edge
-   * @param {number} [tA=0]   Where the A endpoint of this edge falls on the wall
-   * @param {number} [tB=1]   Where the B endpoint of this edge falls on the wall
-   * @returns {WallTracerEdge}
+   * @param {Point} A                       First edge endpoint
+   * @param {Point} b                       Other edge endpoint
+   * @param {PlaceableObject} object       Object that contains this edge
+   * @param {number} [tA=0]   Where the A endpoint of this edge falls on the object
+   * @param {number} [tB=1]   Where the B endpoint of this edge falls on the object
+   * @returns {SegmentTracerEdge}
    */
-  static fromWall(wall, tA = 0, tB = 1) {
+  static fromObject(edgeA, edgeB, object, tA = 0, tB = 1) {
     tA = Math.clamped(tA, 0, 1);
     tB = Math.clamped(tB, 0, 1);
-    const eA = WallTracerEdge.pointAtWallRatio(wall, tA);
-    const eB = WallTracerEdge.pointAtWallRatio(wall, tB);
+    edgeA = PIXI.Point.fromObject(edgeA);
+    edgeB = PIXI.Point.fromObject(edgeB);
+    const eA = this.pointAtEdgeRatio(edgeA, edgeB, tA);
+    const eB = this.pointAtEdgeRatio(edgeA, edgeB, tB);
     const A = new WallTracerVertex(eA.x, eA.y);
     const B = new WallTracerVertex(eB.x, eB.y);
     const dist = PIXI.Point.distanceSquaredBetween(A.point, B.point);
@@ -226,27 +238,26 @@ export class WallTracerEdge extends GraphEdge {
 
     edge.tA = tA;
     edge.tB = tB;
-    edge.wall = wall;
+    edge.object = object;
     edge.delta = edge.B.point.subtract(edge.A.point);
+    edge.edgeA = edgeA;
+    edge.edgeB = edgeB;
     return edge;
   }
 
   /**
-   * Determine the point along the line of a wall given a ratio.
-   * @param {number} wallT
+   * Determine the point along the line of an edge given a ratio.
+   * @param {PIXI.Point} edgeA      First edge endpoint
+   * @param {PIXI.Point} edgeB      Other edge endpoint
+   * @param {number} edgeT          The percentage from the edge endpoint A to use.
    * @returns {PIXI.Point} The point along the wall line. Ratio 0: endpoint A; 1: endpoint B.
    */
-  static pointAtWallRatio(wall, wallT) {
-    const A = new PIXI.Point(wall.A.x, wall.A.y);
-    if ( wallT.almostEqual(0) ) return A;
+  static pointAtEdgeRatio(edgeA, edgeB, edgeT) {
+    if ( edgeT.almostEqual(0) ) return edgeA;
+    if ( edgeT.almostEqual(1) ) return edgeB;
 
-    const B = new PIXI.Point(wall.B.x, wall.B.y);
-    if ( wallT.almostEqual(1) ) return B;
-
-    wallT = Math.roundDecimals(wallT, WallTracerEdge.PLACES);
-    const outPoint = new PIXI.Point();
-    A.projectToward(B, wallT, outPoint);
-    return outPoint;
+    edgeT = Math.roundDecimals(edgeT, WallTracerEdge.PLACES);
+    return edgeA.projectToward(edgeB, edgeT);
   }
 
   /**
@@ -258,19 +269,11 @@ export class WallTracerEdge extends GraphEdge {
     return new PIXI.Rectangle(A.x, A.y, delta.x, delta.y).normalize();
   }
 
-  // Methods to trick Foundry into thinking this edge is basically a wall.
-
   /** @type {string} */
-  get id() { return this.wall.id; }
+  get id() { return this.object.id; }
 
   /** @type {object} */
-  get document() { return this.wall.document; }
-
-  /** @type {boolean} */
-  get hasActiveRoof() { return this.wall.hasActiveRoof; }
-
-  /** @type {boolean} */
-  get isOpen() { return this.wall.isOpen; }
+  get document() { return this.object.document; }
 
   /**
    * Reverse this edge
@@ -278,82 +281,77 @@ export class WallTracerEdge extends GraphEdge {
    */
   reverse() {
     const edge = super.reverse();
-    edge.tA = this.tB;
-    edge.tB = this.tA;
-    edge.wall = this.wall;
+    [edge.tA, edge.tB] = [this.tB, this.tA];
+    [edge.edgeA, edge.edgeB] = [this.edgeB, this.edgeA];
+    edge.object = this.object;
     edge.delta = edge.B.point.subtract(edge.A.point);
     return edge;
   }
 
   /**
-   * @typedef {object} WallTracerCollision
-   * @property {number} wallT   Location of collision on the wall, where A = 0 and B = 1
-   * @property {number} edgeT   Location of collision on the edge, where A = 0 and B = 1
-   * @property {Point} pt       Intersection point.
-   * @property {WallTracerEdge} edge    Edge associated with this collision
-   * @property {Wall} wall              Wall associated with this collision
+   * @typedef {object} EdgeTracerCollision
+   * @property {number} objectT             Location of collision on the object's edge, where A = 0 and B = 1
+   * @property {number} edgeT               Location of collision on this edge, where A = 0 and B = 1
+   * @property {Point} pt                   Intersection point.
+   * @property {SegmentEdge} edge           Edge associated with this collision
+   * @property {PlaceableObject} object     Object associated with this collision
    */
 
   /**
-   * Find the collision, if any, between this edge and a wall
-   * @param {Wall} wall               Foundry wall object to test
-   * @returns {WallTracerCollision}
+   * Find the collision, if any, between this edge and another object's edge.
+   * @param {PIXI.Point} A              First edge endpoint
+   * @param {PIXI.Point} B              Second edge endpoint
+   * @param {PlaceableObject} object    The object for the edge to be tested, for convenience
+   * @returns {EdgeTracerCollision}
    */
-  findWallCollision(wall) {
-    const { A, B } = wall;
+  findEdgeCollision(A, B, object) {
     const { A: eA, B: eB } = this;
-
     let out;
-    if ( A.key === eA.key || eA.almostEqual(A) ) out = { wallT: 0, edgeT: 0, pt: A };
-    else if ( A.key === eB.key || eB.almostEqual(A) ) out = { wallT: 0, edgeT: 1, pt: A };
-    else if ( B.key === eA.key || eA.almostEqual(B) ) out = { wallT: 1, edgeT: 0, pt: B };
-    else if ( B.key === eB.key || eB.almostEqual(B) ) out = { wallT: 1, edgeT: 1, pt: B };
+    if ( A.key === eA.key || eA.almostEqual(A) ) out = { objectT: 0, edgeT: 0, pt: A };
+    else if ( A.key === eB.key || eB.almostEqual(A) ) out = { objectT: 0, edgeT: 1, pt: A };
+    else if ( B.key === eA.key || eA.almostEqual(B) ) out = { objectT: 1, edgeT: 0, pt: B };
+    else if ( B.key === eB.key || eB.almostEqual(B) ) out = { objectT: 1, edgeT: 1, pt: B };
     else if ( foundry.utils.lineSegmentIntersects(A, B, eA, eB) ) {
       const ix = CONFIG.GeometryLib.utils.lineLineIntersection(A, B, eA, eB, { t1: true });
       out = {
-        wallT: Math.roundDecimals(ix.t0, WallTracerEdge.PLACES),
+        objectT: Math.roundDecimals(ix.t0, WallTracerEdge.PLACES),
         edgeT: Math.roundDecimals(ix.t1, WallTracerEdge.PLACES),
         pt: ix };
-
-    } else {
-      // Edge is either completely collinear or does not intersect.
-      return null;
-    }
+    } else return null; // Edge is either completely collinear or does not intersect.
 
     out.pt = new PIXI.Point(out.pt.x, out.pt.y);
     out.edge = this;
-    out.wall = wall;
+    out.object = object;
     return out;
   }
 
   /**
    * Split this edge at some t value.
    * @param {number} edgeT  The portion on this *edge* that designates a point.
-   * @returns {WallTracerEdge[]|null} Array of two wall tracer edges that share t endpoint.
+   * @returns {WallTracerEdge[]|null} Array of two edge tracer edges that share t endpoint.
    */
   splitAtT(edgeT) {
     edgeT = Math.clamped(edgeT, 0, 1);
     if ( edgeT.almostEqual(0) || edgeT.almostEqual(1) ) return null;
 
     // Construct two new edges, divided at the edgeT location.
-    const wall = this.wall;
-    const wallT = this._tRatioToWallRatio(edgeT);
-    const edge1 = WallTracerEdge.fromWall(wall, this.tA, wallT);
-    const edge2 = WallTracerEdge.fromWall(wall, wallT, this.tB);
-
+    const { edgeA, edgeB, object } = this;
+    const objectT = this._tRatioToObjectRatio(edgeT);
+    const edge1 = this.constructor.fromObject(edgeA, edgeB, object, this.tA, objectT);
+    const edge2 = this.constructor.fromObject(edgeA, edgeB, object, objectT, this.tB);
     return [edge1, edge2];
   }
 
   /**
-   * For a given t ratio for this edge, what is the equivalent wall ratio?
+   * For a given t ratio for this edge, what is the equivalent object ratio?
    * @param {number} t
    * @returns {number}
    */
-  _tRatioToWallRatio(t) {
+  _tRatioToObjectRatio(t) {
     if ( t.almostEqual(0) ) return this.tA;
     if ( t.almostEqual(1) ) return this.tB;
 
-    // Linear mapping where wallT === 0 --> tA, wallT === 1 --> tB
+    // Linear mapping where edgeT === 0 --> tA, edgeT === 1 --> tB
     const dT = this.tB - this.tA;
     return this.tA + (dT * t);
   }
@@ -365,15 +363,80 @@ export class WallTracerEdge extends GraphEdge {
   draw(drawingOptions = {}) {
     Draw.segment(this, drawingOptions);
 
+    // Draw first endpoint in red.
     drawingOptions.color = Draw.COLORS.red;
     this.A.draw(drawingOptions);
 
+    // Draw second endpoint in blue.
     drawingOptions.color = Draw.COLORS.blue;
     this.B.draw(drawingOptions);
   }
 }
 
+/**
+ * Represents a portion of token border.
+ * The border is divided into distinct edges based on intersections with other edges.
+ */
+export class TokenTracerEdge extends SegmentTracerEdge {
+  /** @type {Token} */
+  get token() { return this.object; }
+
+  /**
+   * Construct a set of edges for the token.
+   * To be used instead of constructor in most cases.
+   * @param {Point} A                       First edge endpoint
+   * @param {Point} b                       Other edge endpoint
+   * @param {PlaceableObject} object       Object that contains this edge
+   * @param {number} [tA=0]   Where the A endpoint of this edge falls on the object
+   * @param {number} [tB=1]   Where the B endpoint of this edge falls on the object
+   * @returns {SegmentTracerEdge[]}
+   */
+  static fromToken(token) {
+    const edgeIter = token.constrainedTokenBorder.iterateEdges();
+    const edges = [];
+    for ( const edge of edgeIter ) edges.push(this.fromObject(edge.A, edge.B, token))
+    return edges;
+  }
+}
+
+/**
+ * Represents a portion of a wall.
+ * The wall is divided into distinct edges based on intersections with other edges.
+ */
+export class WallTracerEdge extends SegmentTracerEdge {
+  /**
+   * Wall represented by this edge.
+   * The edge may represent the entire wall or just a portion (see tA and tB).
+   * @type {Wall}
+   */
+  get wall() { return this.object; }
+
+  /**
+   * Construct an edge from a wall.
+   * To be used instead of constructor in most cases.
+   * @param {Wall} wall       Wall represented by this edge
+   * @param {number} [tA=0]   Where the A endpoint of this edge falls on the wall
+   * @param {number} [tB=1]   Where the B endpoint of this edge falls on the wall
+   * @returns {WallTracerEdge}
+   */
+  static fromWall(wall, tA = 0, tB = 1) { return this.fromObject(wall.A, wall.B, wall, tA, tB); }
+
+  /** @type {boolean} */
+  get hasActiveRoof() { return this.wall.hasActiveRoof; }
+
+  /** @type {boolean} */
+  get isOpen() { return this.wall.isOpen; }
+
+  /**
+   * Find the collision, if any, between this edge and a wall
+   * @param {Wall} wall               Foundry wall object to test
+   * @returns {EdgeTracerCollision}
+   */
+  findWallCollision(wall) { return this.findEdgeCollision(wall.A, wall.B, wall); }
+}
+
 export class WallTracer extends Graph {
+
 
   /**
    * Number of places to round the ratio for wall collisions, in order to treat
@@ -387,13 +450,21 @@ export class WallTracer extends Graph {
    * @param {WallTracerCollision} c   Collision to group
    * @returns {number} The t0 property, rounded.
    */
-  static _keyGetter(c) { return Math.roundDecimals(c.wallT, WallTracer.PLACES); }
+  static _keyGetter(c) { return Math.roundDecimals(c.objectT, WallTracer.PLACES); }
 
   /**
    * Map of a set of edges for a given wall, keyed to the wall id.
    * Must be wall id because deleted walls may still need to be accessed here.
-   * @type {Map<string, Set<WallTracerEdge>>} */
+   * @type {Map<string, Set<WallTracerEdge>>}
+   */
   wallEdges = new Map();
+
+  /**
+   * Map of a set of edges for a given token, keyed to the token id.
+   * Must be token id because deleted tokens may still need to be accessed here.
+   * @type {Map<string, Set<TokenTracerEdge>>}
+   */
+  tokenEdges = new Map();
 
   /** @type {CanvasQuadtree} */
   edgesQuadtree = new CanvasQuadtree();
@@ -413,6 +484,7 @@ export class WallTracer extends Graph {
     this.edgesQuadtree.clear();
     this.cyclePolygonsQuadtree.clear();
     this.wallEdges.clear();
+    this.tokenEdges.clear();
     super.clear();
   }
 
@@ -439,23 +511,26 @@ export class WallTracer extends Graph {
   }
 
   /**
-   * Split the wall by edges already in this graph.
-   * @param {Wall} wall   Wall to convert to edge(s)
-   * @returns {Set<WallTracerEdge>}
+   * Add an edge for an object, splitting based on edges already present in the graph.
+   * @param {PIXI.Point} edgeA                  First edge endpoint
+   * @param {PIXI.Point} edgeB                  Other edge endpoint
+   * @param {PlaceableObject} object            Object to convert to edge(s)
+   * @param {Set<SegmentTracerEdge>} [edgeSet]  Existing edge set to use
+   * @param {class} [cl]                        Class to use for the object.
+   * @returns {Set<SegmentTracerEdge>}
    */
-  addWall(wall) {
-    const wallId = wall.id;
-    if ( this.wallEdges.has(wallId) ) return this.wallEdges.get(wallId);
+  addObjectEdge(edgeA, edgeB, object, edgeSet, cl) {
+    cl ??= object instanceof Wall ? WallTracerEdge
+      : object instanceof Token ? TokenTracerEdge
+        : SegmentTracerEdge;
 
-    // Construct a new wall edge set.
-    const edgeSet = new Set();
-    this.wallEdges.set(wallId, edgeSet);
+    edgeSet ??= new Set();
 
     // Locate collision points for any edges that collide with this wall.
     // If no collisions, then a single edge can represent this wall.
-    const collisions = this.findWallCollisions(wall);
+    const collisions = this.findEdgeCollisions(edgeA, edgeB, object);
     if ( !collisions.size ) {
-      const edge = WallTracerEdge.fromWall(wall);
+      const edge = cl.fromObject(edgeA, edgeB, object);
       this.addEdge(edge);
       return edgeSet.add(edge);
     }
@@ -472,7 +547,7 @@ export class WallTracer extends Graph {
     for ( const t of tArr ) {
       // Build edge for portion of wall between priorT and t, skipping when t === 0
       if ( t ) {
-        const edge = WallTracerEdge.fromWall(wall, priorT, t);
+        const edge = cl.fromObject(edgeA, edgeB, object, priorT, t);
         this.addEdge(edge);
         edgeSet.add(edge);
       }
@@ -500,35 +575,86 @@ export class WallTracer extends Graph {
   }
 
   /**
-   * Remove all associated edges with this wall.
-   * @param {string|Wall} wallId    Id of the wall to remove, or the wall itself.
+   * Split the token edges by edges already in this graph.
+   * @param {Token} token   Token to convert to edge(s)
+   * @returns {Set<TokenTracerEdge>}
    */
-  removeWall(wallId) {
-    if ( wallId instanceof Wall ) wallId = wallId.id;
-    const edges = this.wallEdges.get(wallId);
+  addToken(token) {
+    const tokenId = token.id;
+    if ( this.tokenEdges.has(tokenId) ) return this.tokenEdges.get(tokenId);
+
+    // Construct a new token edge set.
+    const edgeSet = new Set();
+    this.tokenEdges.set(tokenId, edgeSet);
+    const edgeIter = token.constrainedTokenBorder.iterateEdges();
+    for ( const edge of edgeIter ) this.addObjectEdge(edge.A, edge.B, token, edgeSet, TokenTracerEdge);
+    return edgeSet;
+  }
+
+  /**
+   * Split the wall by edges already in this graph.
+   * @param {Wall} wall   Wall to convert to edge(s)
+   * @returns {Set<WallTracerEdge>}
+   */
+  addWall(wall) {
+    const wallId = wall.id;
+    if ( this.wallEdges.has(wallId) ) return this.wallEdges.get(wallId);
+
+    // Construct a new wall edge set.
+    const edgeSet = new Set();
+    this.wallEdges.set(wallId, edgeSet);
+    return this.addObjectEdge(wall.A, wall.B, wall, edgeSet, WallTracerEdge);
+  }
+
+  /**
+   * Remove all associated edges with this edge set and object id.
+   * @param {string} id             Id of the edge object to remove
+   * @param {Map<string, Set<TokenTracerEdge>>} Map of edges to remove from
+   */
+  removeObject(id, objectMap) {
+    const edges = objectMap.get(id);
     if ( !edges || !edges.size ) return;
 
     // Shallow copy the edges b/c they will be removed from the set with destroy.
     const edgesArr = [...edges];
     for ( const edge of edgesArr ) this.deleteEdge(edge);
-    this.wallEdges.delete(wallId);
+    objectMap.delete(id);
   }
 
   /**
-   * Locate collision points for any edges that collide with this wall.
-   * @param {Wall} wall                             Wall to check for collisions
-   * @returns {Map<number, WallTracerCollision[]>}  Map of locations of the collisions
+   * Remove all associated edges with this wall.
+   * @param {string|Wall} wallId    Id of the wall to remove, or the wall itself.
    */
-  findWallCollisions(wall) {
-    const { A, B } = wall;
+  removeWall(wallId) {
+    if ( wallId instanceof Wall ) wallId = wallId.id;
+    return this.removeObject(wallId, this.wallEdges);
+  }
+
+  /**
+   * Remove all associated edges with this token.
+   * @param {string|Token} tokenId    Id of the token to remove, or the token itself.
+   */
+  removeToken(tokenId) {
+    if ( tokenId instanceof Token ) tokenId = tokenId.id;
+    return this.removeObject(tokenId, this.tokenEdges);
+  }
+
+  /**
+   * Locate collision points for any edges that collide with this edge.
+   * @param {PIXI.Point} edgeA                      Edge endpoint
+   * @param {PIXI.Point} edgeB                      Other edge endpoint
+   * @returns {Map<number, EdgeTracerCollision[]>}  Map of locations of the collisions
+   */
+  findEdgeCollisions(edgeA, edgeB, object) {
     const collisions = [];
-    const collisionTest = (o, _rect) => segmentsOverlap(A, B, o.t.A, o.t.B);
-    const collidingEdges = this.edgesQuadtree.getObjects(wall.bounds, { collisionTest });
+    const bounds = segmentBounds(edgeA, edgeB);
+    const collisionTest = (o, _rect) => segmentsOverlap(edgeA, edgeB, o.t.A, o.t.B);
+    const collidingEdges = this.edgesQuadtree.getObjects(bounds, { collisionTest });
     for ( const edge of collidingEdges ) {
-      const collision = edge.findWallCollision(wall);
+      const collision = edge.findEdgeCollision(edgeA, edgeB, object);
       if ( collision ) collisions.push(collision);
     }
-    return groupBy(collisions, WallTracer._keyGetter);
+    return groupBy(collisions, this.constructor._keyGetter);
   }
 
   // ----- Polygon handling ---- //

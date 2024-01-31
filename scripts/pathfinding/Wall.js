@@ -9,6 +9,7 @@ Hooks
 import { MODULE_ID } from "../const.js";
 import { SCENE_GRAPH } from "./WallTracer.js";
 import { Pathfinder } from "./pathfinding.js";
+import { Settings } from "../settings.js";
 
 // Track wall creation, update, and deletion, constructing WallTracerEdges as we go.
 // Use to update the pathfinding triangulation.
@@ -27,6 +28,8 @@ Hooks.on("canvasReady", async function() {
     ...canvas.walls.innerBounds
   ];
   for ( const wall of walls ) SCENE_GRAPH.addWall(wall);
+
+  const PATHFINDING = Settings.KEYS.PATHFINDING;
   const t1 = performance.now();
 
   // Use the scene graph to initialize Pathfinder triangulation.
