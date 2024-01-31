@@ -6,7 +6,7 @@ PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
-import { BorderTriangle } from "./BorderTriangle.js";
+import { BorderTriangle, BorderEdge } from "./BorderTriangle.js";
 import { boundsForPoint } from "../util.js";
 import { Draw } from "../geometry/Draw.js";
 import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./algorithms.js";
@@ -217,6 +217,9 @@ export class Pathfinder {
    * @returns {Map<PathNode.key, PathNode>}
    */
   runPath(startPoint, endPoint, type = "astar") {
+    // Set disposition for token edge blocking.
+    BorderEdge.tokenDisposition = this.token.document.disposition;
+
     // Initialize the algorithm if not already.
     if ( !this.algorithm[type] ) {
       const alg = this.algorithm[type] = new this.constructor.ALGORITHMS[type]();

@@ -11,6 +11,7 @@ import { log } from "./util.js";
 import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
 import { PATCHER } from "./patching.js";
+import { BorderEdge } from "./pathfinding/BorderTriangle.js";
 
 const SETTINGS = {
   CONTROLS: {
@@ -260,13 +261,18 @@ export class Settings extends ModuleSettingsAbstract {
 
   static setSpeedProperty(value) { SPEED.ATTRIBUTE = value; }
 
-  static toggleTokenBlocksPathfinding(enable = true) {
-    if ( enable ) {
-      PATCHER.registerGroup("PATHFINDING_TOKENS");
-      for ( const token of canvas.tokens.placeables ) SCENE_GRAPH.addToken(token);
-    } else {
+  static toggleTokenBlocksPathfinding(blockType) {
+    const C = this.KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES;
+    const D = CONST.TOKEN_DISPOSITIONS;
+    blockType ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
+    if ( blockType === C.NO ) { // Disable
+      BorderEdge.tokenBlockType = D.NEUTRAL;
       PATCHER.deregisterGroup("PATHFINDING_TOKENS");
       for ( const id of SCENE_GRAPH.tokenEdges.keys() ) SCENE_GRAPH.removeToken(id);
+    } else { // Enable
+      BorderEdge.tokenBlockType = (blockType === C.HOSTILE) ? D.HOSTILE : D.SECRET;
+      PATCHER.registerGroup("PATHFINDING_TOKENS");
+      for ( const token of canvas.tokens.placeables ) SCENE_GRAPH.addToken(token);
     }
     Pathfinder.dirty = true;
   }

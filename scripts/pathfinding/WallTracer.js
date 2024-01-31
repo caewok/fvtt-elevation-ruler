@@ -436,8 +436,6 @@ export class WallTracerEdge extends SegmentTracerEdge {
 }
 
 export class WallTracer extends Graph {
-
-
   /**
    * Number of places to round the ratio for wall collisions, in order to treat
    * close collisions as equal.
@@ -526,8 +524,8 @@ export class WallTracer extends Graph {
 
     edgeSet ??= new Set();
 
-    // Locate collision points for any edges that collide with this wall.
-    // If no collisions, then a single edge can represent this wall.
+    // Locate collision points for any edges that collide with this edge object.
+    // If no collisions, then a single edge can represent this edge object.
     const collisions = this.findEdgeCollisions(edgeA, edgeB, object);
     if ( !collisions.size ) {
       const edge = cl.fromObject(edgeA, edgeB, object);
@@ -910,3 +908,22 @@ function findOverlappingPoints(a, b, c, d) {
 
 // Must declare this variable after defining WallTracer.
 export const SCENE_GRAPH = new WallTracer();
+
+/* Debugging
+api = game.modules.get("elevationruler").api
+Draw = CONFIG.GeometryLib.Draw
+
+SCENE_GRAPH = api.pathfinding.SCENE_GRAPH
+
+// Do we have all the tokens?
+tokenKeys = new Set([...SCENE_GRAPH.tokenEdges.keys()])
+canvas.tokens.placeables.filter(t => !tokenKeys.has(t.id))
+
+// Draw token edges
+
+SCENE_GRAPH.tokenEdges.forEach(s => s.forEach(e => e.draw({color: Draw.COLORS.orange})))
+
+// Draw wall edges
+SCENE_GRAPH.wallEdges.forEach(s => s.forEach(e => e.draw({color: Draw.COLORS.blue})))
+
+*/

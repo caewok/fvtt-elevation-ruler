@@ -30,19 +30,14 @@ Hooks.on("canvasReady", async function() {
   for ( const wall of walls ) SCENE_GRAPH.addWall(wall);
 
   // Must happen when the canvas is set so tokens (and walls) are available.
-  let tokenMessage = "";
-  const { TOKENS_BLOCK, TOKENS_BLOCK_CHOICES } = Settings.KEYS.PATHFINDING;
-  const tokensBlock = Settings.get(TOKENS_BLOCK) !== TOKENS_BLOCK_CHOICES.NO;
-  Settings.toggleTokenBlocksPathfinding(tokensBlock);
-  if ( tokensBlock ) tokenMessage = `and ${canvas.tokens.placeables.length} tokens `;
-
+  Settings.toggleTokenBlocksPathfinding();
   const t1 = performance.now();
 
   // Use the scene graph to initialize Pathfinder triangulation.
   Pathfinder.initialize();
   const t2 = performance.now();
 
-  console.debug(`${MODULE_ID}|Tracked ${walls.length} walls ${tokenMessage}in ${t1 - t0} ms.`);
+  console.debug(`${MODULE_ID}|Tracked ${walls.length} walls in ${t1 - t0} ms.`);
   console.debug(`${MODULE_ID}|Initialized pathfinding in ${t2 - t1} ms.`);
 });
 
