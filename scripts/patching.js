@@ -12,6 +12,7 @@ import { PATCHES as PATCHES_ClientKeybindings } from "./ClientKeybindings.js";
 import { PATCHES as PATCHES_BaseGrid } from "./BaseGrid.js";
 import { PATCHES as PATCHES_HexagonalGrid } from "./HexagonalGrid.js";
 import { PATCHES as PATCHES_ConstrainedTokenBorder } from "./ConstrainedTokenBorder.js";
+import { PATCHES as PATCHES_TokenPF } from "./pathfinding/Token.js";
 
 // Pathfinding
 import { PATCHES as PATCHES_Wall } from "./pathfinding/Wall.js";
@@ -26,7 +27,7 @@ const PATCHES = {
   GridLayer: PATCHES_GridLayer,
   HexagonalGrid: PATCHES_HexagonalGrid,
   Ruler: PATCHES_Ruler,
-  Token: PATCHES_Token,
+  Token: foundry.utils.mergeObject(PATCHES_Token, PATCHES_TokenPF),
   Settings: PATCHES_Settings,
   Wall: PATCHES_Wall
 };

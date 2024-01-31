@@ -603,7 +603,10 @@ export class WallTracer extends Graph {
     // Construct a new wall edge set.
     const edgeSet = new Set();
     this.wallEdges.set(wallId, edgeSet);
-    return this.addObjectEdge(wall.A, wall.B, wall, edgeSet, WallTracerEdge);
+    return this.addObjectEdge(
+      PIXI.Point.fromObject(wall.A),
+      PIXI.Point.fromObject(wall.B),
+      wall, edgeSet, WallTracerEdge);
   }
 
   /**
