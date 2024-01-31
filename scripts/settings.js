@@ -28,6 +28,7 @@ const SETTINGS = {
   NO_MODS: "no-modules-message",
   TOKEN_RULER: {
     ENABLED: "enable-token-ruler",
+    ROUND_TO_MULTIPLE: "round-to-multiple",
     SPEED_HIGHLIGHTING: "token-ruler-highlighting",
     SPEED_PROPERTY: "token-speed-property",
     TOKEN_MULTIPLIER: "token-terrain-multiplier"
@@ -168,6 +169,14 @@ export class Settings extends ModuleSettingsAbstract {
       default: SPEED.ATTRIBUTE,
       type: String,
       onChange: value => this.setSpeedProperty(value)
+    });
+
+    register(KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE, {
+      name: localize(`${KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE}.hint`),
+      scope: "world",
+      config: true,
+      type: Number
     });
 
     register(KEYS.TOKEN_RULER.TOKEN_MULTIPLIER, {

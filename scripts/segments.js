@@ -10,7 +10,7 @@ PIXI
 import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
-import { perpendicularPoints, log } from "./util.js";
+import { perpendicularPoints, log, roundToMultiple } from "./util.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
 
 /**
@@ -151,8 +151,9 @@ function constructPathfindingSegments(segments, segmentMap) {
 export function _getSegmentLabel(wrapped, segment, totalDistance) {
   // Force distance to be between waypoints instead of (possibly pathfinding) segments.
   const origSegmentDistance = segment.distance;
-  segment.distance = segment.waypointDistance;
-  const origLabel = wrapped(segment, totalDistance);
+  const { newSegmentDistance, newTotalDistance } = _getDistanceLabels(segment.waypointDistance, totalDistance);
+  segment.distance = newSegmentDistance;
+  const origLabel = wrapped(segment, newTotalDistance);
   segment.distance = origSegmentDistance;
   let elevLabel = segmentElevationLabel(segment);
   const levelName = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
@@ -162,6 +163,22 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
   if ( segment.waypointDistance !== segment.waypointMoveDistance ) moveLabel = `\n🥾${Number(segment.waypointMoveDistance.toFixed(2))}`;
 
   return `${origLabel}\n${elevLabel}${moveLabel}`;
+}
+
+/**
+ * Return modified segment and total distance labels
+ * @param {number} segmentDistance
+ * @param {number} totalDistance 
+ * @returns {object} 
+ */
+export function _getDistanceLabels(segmentDistance, totalDistance) {
+  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || null;
+  if (canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS || !multiple) return { newSegmentDistance: segmentDistance, newTotalDistance: totalDistance };
+
+  const newSegmentDistance = roundToMultiple(segmentDistance, multiple);
+  const newTotalDistance = roundToMultiple(totalDistance, multiple);
+
+  return { newSegmentDistance, newTotalDistance };
 }
 
 /**

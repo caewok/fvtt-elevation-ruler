@@ -166,3 +166,11 @@ export function groupBy(list, keyGetter) {
   return map;
 }
 
+/**
+ * Round a number to the nearest multiple of a given number
+ * @param {number} num  The number to round
+ * @param {number} rNum The multiple
+ * @returns 
+ */
+export function roundToMultiple(num, rNum) { return Math.round(num / rNum) * rNum; }
+
