@@ -10,7 +10,7 @@ PIXI
 import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
-import { perpendicularPoints, log, roundToMultiple } from "./util.js";
+import { perpendicularPoints, log } from "./util.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
 
 /**
@@ -151,7 +151,7 @@ function constructPathfindingSegments(segments, segmentMap) {
 export function _getSegmentLabel(wrapped, segment, totalDistance) {
   // Force distance to be between waypoints instead of (possibly pathfinding) segments.
   const origSegmentDistance = segment.distance;
-  const { newSegmentDistance, newTotalDistance } = _getDistanceLabels(segment.waypointDistance, totalDistance);
+  const { newSegmentDistance, newMoveDistance, newTotalDistance } = _getDistanceLabels(segment.waypointDistance, segment.waypointMoveDistance, totalDistance);
   segment.distance = newSegmentDistance;
   const origLabel = wrapped(segment, newTotalDistance);
   segment.distance = origSegmentDistance;
@@ -160,7 +160,8 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
   if ( levelName ) elevLabel += `\n${level_name}`;
 
   let moveLabel = "";
-  if ( segment.waypointDistance !== segment.waypointMoveDistance ) moveLabel = `\n🥾${Number(segment.waypointMoveDistance.toFixed(2))}`;
+  const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
+  if ( segment.waypointDistance !== segment.waypointMoveDistance ) moveLabel = `\n🥾${newMoveDistance}${units}`;
 
   return `${origLabel}\n${elevLabel}${moveLabel}`;
 }
@@ -168,17 +169,23 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
 /**
  * Return modified segment and total distance labels
  * @param {number} segmentDistance
+ * @param {number} segmentMoveDistance
  * @param {number} totalDistance 
  * @returns {object} 
  */
-export function _getDistanceLabels(segmentDistance, totalDistance) {
+export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance) {
   const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || null;
-  if (canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS || !multiple) return { newSegmentDistance: segmentDistance, newTotalDistance: totalDistance };
+  if (canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS || !multiple) return { 
+    newSegmentDistance: segmentDistance,
+    newMoveDistance: Number(moveDistance.toFixed(2)),
+    newTotalDistance: totalDistance
+  };
 
-  const newSegmentDistance = roundToMultiple(segmentDistance, multiple);
-  const newTotalDistance = roundToMultiple(totalDistance, multiple);
+  const newSegmentDistance = segmentDistance.toNearest(multiple);
+  const newMoveDistance = moveDistance.toNearest(multiple);
+  const newTotalDistance = totalDistance.toNearest(multiple);
 
-  return { newSegmentDistance, newTotalDistance };
+  return { newSegmentDistance, newMoveDistance, newTotalDistance };
 }
 
 /**
