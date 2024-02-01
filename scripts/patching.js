@@ -11,7 +11,6 @@ import { PATCHES as PATCHES_GridLayer } from "./GridLayer.js";
 import { PATCHES as PATCHES_ClientKeybindings } from "./ClientKeybindings.js";
 import { PATCHES as PATCHES_BaseGrid } from "./BaseGrid.js";
 import { PATCHES as PATCHES_HexagonalGrid } from "./HexagonalGrid.js";
-import { PATCHES as PATCHES_ConstrainedTokenBorder } from "./ConstrainedTokenBorder.js";
 import { PATCHES as PATCHES_TokenPF } from "./pathfinding/Token.js";
 
 // Pathfinding
@@ -23,7 +22,6 @@ import { PATCHES as PATCHES_Settings } from "./ModuleSettingsAbstract.js";
 const PATCHES = {
   BaseGrid: PATCHES_BaseGrid,
   ClientKeybindings: PATCHES_ClientKeybindings,
-  ConstrainedTokenBorder: PATCHES_ConstrainedTokenBorder,
   GridLayer: PATCHES_GridLayer,
   HexagonalGrid: PATCHES_HexagonalGrid,
   Ruler: PATCHES_Ruler,
@@ -37,7 +35,6 @@ PATCHER.addPatchesFromRegistrationObject(PATCHES);
 
 export function initializePatching() {
   PATCHER.registerGroup("BASIC");
-  PATCHER.registerGroup("ConstrainedTokenBorder");
   PATCHER.registerGroup("PATHFINDING");
   PATCHER.registerGroup("TOKEN_RULER");
   PATCHER.registerGroup("SPEED_HIGHLIGHTING");
