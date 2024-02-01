@@ -21,6 +21,7 @@ Draw = CONFIG.GeometryLib.Draw;
 api = game.modules.get("elevationruler").api
 Pathfinder = api.pathfinding.Pathfinder
 SCENE_GRAPH = api.pathfinding.SCENE_GRAPH
+BorderEdge = api.pathfinding.BorderEdge
 PriorityQueueArray = api.pathfinding.PriorityQueueArray;
 PriorityQueue = api.pathfinding.PriorityQueue;
 
@@ -43,6 +44,8 @@ pq.data
 Pathfinder.initialize()
 
 Draw.clearDrawings()
+
+BorderEdge.moveToken = _token;
 Pathfinder.drawTriangles();
 
 
@@ -214,8 +217,8 @@ export class Pathfinder {
    * @returns {Map<PathNode.key, PathNode>}
    */
   runPath(startPoint, endPoint, type = "astar") {
-    // Set disposition for token edge blocking.
-    BorderEdge.tokenDisposition = this.token.document.disposition;
+    // Set token for token edge blocking.
+    BorderEdge.moveToken = this.token;
 
     // Initialize the algorithm if not already.
     if ( !this.algorithm[type] ) {
@@ -347,7 +350,7 @@ export class Pathfinder {
    */
   static drawTriangles() {
     if ( this.dirty ) this.initialize();
-    this.borderTriangles.forEach(tri => tri.drawEdges());
+    this.borderTriangles.forEach(tri => tri.drawTriangle());
   }
 
   /**

@@ -26,8 +26,8 @@ export class BorderEdge {
    */
   static tokenBlockType = CONST.TOKEN_DISPOSITIONS.SECRET;
 
-  /** @type {CONST.TOKEN_DISPOSITIONS} */
-  static tokenDisposition = CONST.TOKEN_DISPOSITIONS.SECRET;
+  /** @type {Token} */
+  static moveToken;
 
   /** @type {PIXI.Point} */
   a = new PIXI.Point();
@@ -170,22 +170,25 @@ export class BorderEdge {
    * @returns {boolean}
    */
   _tokenEdgeBlocks(token) {
+    const moveToken = this.constructor.moveToken;
+    if ( !moveToken || moveToken === token ) return false;
+
     const D = CONST.TOKEN_DISPOSITIONS;
+    const moveTokenD = moveToken.document.disposition;
     const edgeTokenD = token.document.disposition;
-    const { tokenDisposition, tokenBlockType } = this.constructor;
-    switch ( tokenBlockType ) {
+    switch ( this.constructor.tokenBlockType ) {
       case D.NEUTRAL: return false;
       case D.SECRET: return true;
 
       // Hostile: Block if dispositions are different
       case D.HOSTILE: return ( edgeTokenD === D.SECRET
-        || tokenDisposition === D.SECRET
-        || edgeTokenD !== tokenDisposition );
+        || moveTokenD === D.SECRET
+        || edgeTokenD !== moveTokenD );
 
       // Friendly: Block if dispositions are the same
       case D.FRIENDLY: return ( edgeTokenD === D.SECRET
-        || tokenDisposition === D.SECRET
-        || edgeTokenD === tokenDisposition );
+        || moveTokenD === D.SECRET
+        || edgeTokenD === moveTokenD );
 
       default: return true;
     }
@@ -215,7 +218,7 @@ export class BorderEdge {
   draw(opts = {}) {
     if ( !Object.hasOwn(opts, "color") ) {
       const hasWall = this.objects.some(obj => obj instanceof Wall);
-      const hasToken = this.object.some(obj => obj instanceof Token);
+      const hasToken = this.objects.some(obj => obj instanceof Token);
       opts.color = (hasWall && hasToken) ? Draw.COLORS.white
         : hasWall ? Draw.COLORS.red
           : hasToken ? Draw.COLORS.orange
@@ -456,8 +459,11 @@ export class BorderTriangle {
    */
   drawTriangle(opts = {}) {
     Object.values(this.edges).forEach(edge => {
-      opts.alpha ??= edge.edgeBlocks(this.center) ? 1 : 0.5;
-      edge.draw(opts);
+      const edgeOpts = {...opts}; // Avoid modification of the original each loop.
+      const blocks = edge.edgeBlocks(this.center)
+      edgeOpts.alpha ??= blocks ? 1 : 0.25;
+      edgeOpts.width ??= blocks ? 2 : 1;
+      edge.draw(edgeOpts);
     });
   }
 

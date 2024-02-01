@@ -652,15 +652,14 @@ let { Graph, GraphVertex, GraphEdge } = CONFIG.GeometryLib.Graph
 SCENE_GRAPH = api.pathfinding.SCENE_GRAPH
 
 // Do we have all the tokens?
-tokenKeys = new Set([...SCENE_GRAPH.tokenEdges.keys()])
-canvas.tokens.placeables.filter(t => !tokenKeys.has(t.id))
+canvas.tokens.placeables.filter(t => !SCENE_GRAPH.tokenIds.has(t.id))
 
-// Draw token edges
+// do we have all the walls?
+canvas.walls.placeables.filter(w => !SCENE_GRAPH.wallIds.has(w.id))
 
-SCENE_GRAPH.tokenEdges.forEach(s => s.forEach(e => e.draw({color: Draw.COLORS.orange})))
+// Draw all edges
+SCENE_GRAPH.drawEdges()
 
-// Draw wall edges
-SCENE_GRAPH.wallEdges.forEach(s => s.forEach(e => e.draw({color: Draw.COLORS.blue})))
 
 // Construct a test graph and add all tokens
 wt = new api.WallTracer()
