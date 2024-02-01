@@ -2,6 +2,7 @@
 canvas,
 CONFIG,
 CONST,
+foundry,
 game,
 PIXI
 */
@@ -10,8 +11,10 @@ PIXI
 import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
-import { perpendicularPoints, log } from "./util.js";
+import { perpendicularPoints, log, segmentBounds } from "./util.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
+import { BorderEdge } from "./pathfinding/BorderTriangle.js";
+import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
 
 /**
  * Calculate the elevation for a given waypoint.
@@ -78,7 +81,16 @@ export function _getMeasurementSegments(wrapped) {
  */
 function calculatePathPointsForSegment(segment, token) {
   const { A, B } = segment.ray;
-  if ( !token.checkCollision(B, { origin: A, type: "move", mode: "any" }) ) return [];
+
+  // If no collision present, no pathfinding required.
+  const tC = performance.now();
+  if ( !hasCollision(A, B, token) ) {
+    const tEnd = performance.now();
+    log(`Determined no collision for ${Pathfinder.triangleEdges.size} edges in ${tEnd - tC} ms.`);
+    return [];
+  }
+  const tEnd = performance.now();
+  log(`Found collision for ${Pathfinder.triangleEdges.size} edges in ${tEnd - tC} ms.`);
 
   // Find path between last waypoint and destination.
   const t0 = performance.now();
@@ -102,6 +114,25 @@ function calculatePathPointsForSegment(segment, token) {
   }
 
   return pathPoints;
+}
+
+/**
+ * Instead of a typical `token.checkCollision` test, test for collisions against the edge graph.
+ * With this approach, collisions with enemy tokens trigger pathfinding.
+ * @param {PIXI.Point} A          Origin point for the move
+ * @param {PIXI.Point} B          Destination point for the move
+ * @param {Token} token           Token that is moving
+ * @returns {boolean}
+ */
+function hasCollision(A, B, token) {
+  BorderEdge.moveToken = token; // Set the token so we can test token edge blocking.
+  const lineSegmentIntersects = foundry.utils.lineSegmentIntersects;
+
+  // SCENE_GRAPH has way less edges than Pathfinder and has quadtree for the edges.
+  const edges = SCENE_GRAPH.edgesQuadtree.getObjects(segmentBounds(A, B));
+  const tokenBlockType = Settings._tokenBlockType();
+  return edges.some(edge => lineSegmentIntersects(A, B, edge.A, edge.B)
+    && edge.edgeBlocks(origin, token, tokenBlockType));
 }
 
 /**
@@ -156,7 +187,7 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
   segment.distance = origSegmentDistance;
   let elevLabel = segmentElevationLabel(segment);
   const levelName = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
-  if ( levelName ) elevLabel += `\n${level_name}`;
+  if ( levelName ) elevLabel += `\n${levelName}`;
 
   let moveLabel = "";
   if ( segment.waypointDistance !== segment.waypointMoveDistance ) moveLabel = `\n🥾${Number(segment.waypointMoveDistance.toFixed(2))}`;

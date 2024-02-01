@@ -8,12 +8,25 @@ canvas
 import { MODULE_ID, MODULES_ACTIVE, SPEED } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { log } from "./util.js";
+import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
+import { Pathfinder } from "./pathfinding/pathfinding.js";
+import { PATCHER } from "./patching.js";
+import { BorderEdge } from "./pathfinding/BorderTriangle.js";
 
 const SETTINGS = {
   CONTROLS: {
     PATHFINDING: "pathfinding-control",
     PREFER_TOKEN_ELEVATION: "prefer-token-elevation",
     PREFER_TOKEN_ELEVATION_CURRENT_VALUE: "prefer-token-elevation-current-value"
+  },
+
+  PATHFINDING: {
+    TOKENS_BLOCK: "pathfinding_tokens_block",
+    TOKENS_BLOCK_CHOICES: {
+      NO: "pathfinding_tokens_block_no",
+      HOSTILE: "pathfinding_tokens_block_hostile",
+      ALL: "pathfinding_tokens_block_all"
+    }
   },
 
   USE_EV: "enable-elevated-vision-elevation",
@@ -106,9 +119,9 @@ export class Settings extends ModuleSettingsAbstract {
       default: KEYS.LEVELS_LABELS.ALWAYS,
       type: String,
       choices: {
-        [KEYS.LEVELS_LABELS.NEVER]: game.i18n.localize(`${KEYS.LEVELS_LABELS.NEVER}`),
-        [KEYS.LEVELS_LABELS.UI_ONLY]: game.i18n.localize(`${KEYS.LEVELS_LABELS.UI_ONLY}`),
-        [KEYS.LEVELS_LABELS.ALWAYS]: game.i18n.localize(`${KEYS.LEVELS_LABELS.ALWAYS}`)
+        [KEYS.LEVELS_LABELS.NEVER]: localize(`${KEYS.LEVELS_LABELS.NEVER}`),
+        [KEYS.LEVELS_LABELS.UI_ONLY]: localize(`${KEYS.LEVELS_LABELS.UI_ONLY}`),
+        [KEYS.LEVELS_LABELS.ALWAYS]: localize(`${KEYS.LEVELS_LABELS.ALWAYS}`)
       }
     });
 
@@ -137,6 +150,22 @@ export class Settings extends ModuleSettingsAbstract {
       default: false,
       type: Boolean,
       requiresReload: false
+    });
+
+    register(KEYS.PATHFINDING.TOKENS_BLOCK, {
+      name: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK}.name`),
+      hint: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK}.hint`),
+      scope: "user",
+      config: true,
+      default: KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
+      type: String,
+      requiresReload: false,
+      choices: {
+        [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO}`),
+        [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.HOSTILE]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.HOSTILE}`),
+        [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL}`)
+      },
+      onChange: value => this.toggleTokenBlocksPathfinding(value)
     });
 
     // ----- NOTE: Token ruler ----- //
@@ -231,6 +260,30 @@ export class Settings extends ModuleSettingsAbstract {
   }
 
   static setSpeedProperty(value) { SPEED.ATTRIBUTE = value; }
+
+  static toggleTokenBlocksPathfinding(blockSetting) {
+    const C = this.KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES;
+    const D = CONST.TOKEN_DISPOSITIONS;
+    blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
+    if ( blockSetting === C.NO ) { // Disable
+      PATCHER.deregisterGroup("PATHFINDING_TOKENS");
+      for ( const id of SCENE_GRAPH.tokenEdges.keys() ) SCENE_GRAPH.removeToken(id);
+    } else { // Enable
+      PATCHER.registerGroup("PATHFINDING_TOKENS");
+      for ( const token of canvas.tokens.placeables ) SCENE_GRAPH.addToken(token);
+    }
+    BorderEdge.tokenBlockType = this._tokenBlockType(blockSetting);
+    Pathfinder.dirty = true;
+  }
+
+  static _tokenBlockType(blockSetting) {
+    const C = this.KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES;
+    const D = CONST.TOKEN_DISPOSITIONS;
+    blockSetting ??= this.get(this.KEYS.PATHFINDING.TOKENS_BLOCK);
+    return blockSetting === C.NO ? D.NEUTRAL
+      : blockSetting === C.HOSTILE ? D.HOSTILE
+        : D.SECRET;
+  }
 }
 
 /**
