@@ -1,7 +1,9 @@
 /* globals
 canvas,
 CanvasQuadtree,
+ClockwiseSweepPolygon,
 CONFIG,
+CONST,
 PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -131,12 +133,8 @@ export class Pathfinder {
    */
   static initialize() {
     this.clear();
-    const { borderTriangles, quadtree } = this;
-    const triCoords = cdt2dConstrainedGraph(SCENE_GRAPH);
-    cdt2dToBorderTriangles(triCoords, borderTriangles);
-    BorderTriangle.linkTriangleEdges(borderTriangles);
-    borderTriangles.forEach(tri => quadtree.insert({ r: tri.bounds, t: tri }));
-    this._linkWallsToEdges();
+    this._buildTriangles();
+    this._linkObjectsToEdges();
     this.#dirty &&= false;
   }
 
@@ -147,28 +145,27 @@ export class Pathfinder {
     this.#dirty ||= true;
   }
 
-  static _linkWallsToEdges() {
-    const triangleEdges = this.triangleEdges;
+  static _buildTriangles() {
+    const { borderTriangles, quadtree, triangleEdges } = this;
+    const triCoords = cdt2dConstrainedGraph(SCENE_GRAPH);
+    cdt2dToBorderTriangles(triCoords, borderTriangles);
+    BorderTriangle.linkTriangleEdges(borderTriangles);
+    borderTriangles.forEach(tri => quadtree.insert({ r: tri.bounds, t: tri }));
+
+    // Add the edges.
     triangleEdges.clear();
-    this.borderTriangles.forEach(tri => {
+    borderTriangles.forEach(tri => {
       triangleEdges.add(tri.edges.AB);
       triangleEdges.add(tri.edges.BC);
       triangleEdges.add(tri.edges.CA);
     });
+  }
 
-    // Set the wall, if any, for each triangle edge
-    const aWalls = new Set();
-    const bWalls = new Set();
-    for ( const edge of triangleEdges.values() ) {
-      const aKey = edge.a.key;
-      const bKey = edge.b.key;
-      const aVertex = SCENE_GRAPH.vertices.get(aKey);
-      const bVertex = SCENE_GRAPH.vertices.get(bKey);
-      if ( aVertex ) aVertex._edgeSet.forEach(e => aWalls.add(e.wall));
-      if ( bVertex ) bVertex._edgeSet.forEach(e => bWalls.add(e.wall));
-      edge.wall = aWalls.intersection(bWalls).first(); // May be undefined.
-      aWalls.clear();
-      bWalls.clear();
+  static _linkObjectsToEdges() {
+    // Set the placeable objects, if any, for each triangle edge
+    for ( const triEdge of this.triangleEdges.values() ) {
+      const graphEdge = SCENE_GRAPH.getEdgeByKeys(triEdge.a.key, triEdge.b.key);
+      graphEdge.forEach(edge => edge.objects.forEach(obj => triEdge.objects.add(obj)));
     }
   }
 
@@ -378,10 +375,10 @@ export class Pathfinder {
    * @param {PIXI.Point[]} pathPoints
    * @returns {PIXI.Point[]}
    */
-   static cleanPath(pathPoints) {
-     if ( canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) return cleanNonGridPath(pathPoints);
-     else return cleanGridPath(pathPoints);
-   }
+  static cleanPath(pathPoints) {
+    if ( canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) return cleanNonGridPath(pathPoints);
+    else return cleanGridPath(pathPoints);
+  }
 }
 
 /**
@@ -440,7 +437,7 @@ function getGridCenterPoint(pt) {
  * @returns {PIXI.Point[]}
  */
 function cleanNonGridPath(pathPoints) {
-   const nPoints = pathPoints.length;
+  const nPoints = pathPoints.length;
   if ( nPoints < 3 ) return pathPoints;
 
   const MAX_DIST2 = Math.pow(canvas.scene.dimensions.size * 0.5, 2);
@@ -466,21 +463,3 @@ function cleanNonGridPath(pathPoints) {
   newPath.push(pathPoints.at(-1));
   return newPath;
 }
-
-/**
- * Perpendicular distance to a line from a point.
- * https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
- * @param {PIXI.Point} a    First endpoint of the line
- * @param {PIXI.Point} b    Second endpoint of the line
- * @param {PIXI.Point} c    Point to measure
- * @returns {number|undefined}
- */
-function perpendicularDistance(a, b, c) {
-  const deltaBA = b.subtract(a);
-  const deltaCA = c.subtract(a);
-  const denom = Math.pow(deltaBA.x, 2) + Math.pow(deltaBA.y, 2);
-  if ( !denom ) return undefined; // The line AB has length 0.
-  const num = (deltaBA.x * deltaCA.y) - (deltaBA.y * deltaCA.x);
-  return Math.abs(num) / Math.sqrt(denom);
-}
-

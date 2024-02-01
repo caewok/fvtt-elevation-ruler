@@ -3,7 +3,9 @@ canvas,
 CONFIG,
 CONST,
 foundry,
-PIXI
+PIXI,
+Token,
+Wall
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -42,8 +44,11 @@ export class BorderEdge {
   /** @type {BorderTriangle} */
   ccwTriangle;
 
-  /** @type {Wall} */
-  wall;
+  /**
+   * Placeable objects represented by this edge.
+   * @type {Set<PlaceableObject>}
+   */
+  objects = new Set();
 
   constructor(a, b) {
     this.a.copyFrom(a);
@@ -96,8 +101,8 @@ export class BorderEdge {
 
     // No destination if edge is smaller than 2x spacer unless it is a door.
     // Cheat a little on the spacing so tokens exactly the right size will fit.
-    if ( !this.wall?.isOpen
-      && (length < (spacer * 1.9) || this.edgeBlocks(origin)) ) return destinations;
+    if ( this.edgeBlocks(origin)
+      || (!this.isOpenDoor && (length < (spacer * 1.9))) ) return destinations;
     destinations.push(this.median);
 
     // Skip corners if not at least spacer away from median.
@@ -113,11 +118,27 @@ export class BorderEdge {
   }
 
   /**
+   * Determine if this is an open door with nothing else blocking.
+   * @returns {boolean}
+   */
+  isOpenDoor() {
+    return this.objects.every(obj =>
+      (obj instanceof Wall) ? obj.isOpen
+        : (obj instanceof Token ) ? !this._tokenEdgeBlocks(obj)
+          : true);
+  }
+
+  /**
    * Compilation of tests based on edge type for whether this wall blocks.
    * @param {Point} origin    Measure wall blocking from perspective of this origin point.
    * @returns {boolean}
    */
-  edgeBlocks(origin) { return this._wallBlocks(origin) || this._tokenEdgeBlocks(origin); }
+  edgeBlocks(origin) {
+    return this.objects.some(obj =>
+      (obj instanceof Wall) ? this._wallBlocks(obj, origin)
+        : (obj instanceof Token) ? this._tokenEdgeBlocks(obj)
+          : false);
+  }
 
   /**
    * Does this edge wall block from an origin somewhere else in the triangle?
@@ -125,9 +146,7 @@ export class BorderEdge {
    * @param {Point} origin    Measure wall blocking from perspective of this origin point.
    * @returns {boolean}
    */
-  _wallBlocks(origin) {
-    const wall = this.wall;
-    if ( !wall ) return false;
+  _wallBlocks(wall, origin) {
     if ( !wall.document.move || wall.isOpen ) return false;
 
     // Ignore one-directional walls which are facing away from the center
@@ -150,10 +169,7 @@ export class BorderEdge {
    * @param {Point} origin    Measure edge blocking from perspective of this origin point.
    * @returns {boolean}
    */
-  _tokenEdgeBlocks(_origin) {
-    const token = this.token;
-    if ( !token ) return false;
-
+  _tokenEdgeBlocks(token) {
     const D = CONST.TOKEN_DISPOSITIONS;
     const edgeTokenD = token.document.disposition;
     const { tokenDisposition, tokenBlockType } = this.constructor;
@@ -172,16 +188,6 @@ export class BorderEdge {
         || edgeTokenD === tokenDisposition );
 
       default: return true;
-    }
-  }
-
-  function(value) {
-    switch ( value ) {
-      case 0: return 0;
-      case 1: return 1;
-      case 2: return 2;
-      default: return -1;
-
     }
   }
 
@@ -207,7 +213,15 @@ export class BorderEdge {
    * Draw this edge.
    */
   draw(opts = {}) {
-    opts.color ??= this.wall ? Draw.COLORS.red : Draw.COLORS.blue;
+    if ( !Object.hasOwn(opts, "color") ) {
+      const hasWall = this.objects.some(obj => obj instanceof Wall);
+      const hasToken = this.object.some(obj => obj instanceof Token);
+      opts.color = (hasWall && hasToken) ? Draw.COLORS.white
+        : hasWall ? Draw.COLORS.red
+          : hasToken ? Draw.COLORS.orange
+            : Draw.COLORS.blue;
+    }
+
     Draw.segment({ A: this.a, B: this.b }, opts);
   }
 }
@@ -434,6 +448,17 @@ export class BorderTriangle {
     if ( keysCA.has(key0) && keysCA.has(key1) ) return "CA";
 
     return undefined; // Should not be reached.
+  }
+
+  /**
+   * For debugging.
+   * Draw edges, identifying the different types and whether they block.
+   */
+  drawTriangle(opts = {}) {
+    Object.values(this.edges).forEach(edge => {
+      opts.alpha ??= edge.edgeBlocks(this.center) ? 1 : 0.5;
+      edge.draw(opts);
+    });
   }
 
   /**

@@ -1,9 +1,9 @@
 /* globals
-CONST,
 CanvasQuadtree,
 CONFIG,
 foundry,
 PIXI,
+Token,
 Wall
 */
 "use strict";
@@ -12,8 +12,7 @@ Wall
 
 // WallTracer3
 
-import { groupBy, segmentBounds } from "../util.js";
-import { ClipperPaths } from "../geometry/ClipperPaths.js";
+import { groupBy, segmentBounds, perpendicularPoints } from "../util.js";
 import { Draw } from "../geometry/Draw.js";
 import { Graph, GraphVertex, GraphEdge } from "../geometry/Graph.js";
 
@@ -178,10 +177,14 @@ export class WallTracerVertex extends GraphVertex {
 }
 
 /**
- * Represent a segment. For example, a token border edge.
+ * Represent a segment or edge of a placeable object in the graph.
+ * For example, a token border edge or a wall edge.
+ * Each edge may be a portion or an entire edge of the object.
+ * Edges may represent a portion of multiple objects. For example, where a token border
+ * overlaps a wall. Or where two walls overlap, or two token borders overlap.
  */
-export class SegmentTracerEdge extends GraphEdge {
-   /**
+export class WallTracerEdge extends GraphEdge {
+  /**
    * Number of places to round the ratio for segment collisions, in order to treat
    * close collisions as equal.
    * @type {number}
@@ -189,42 +192,32 @@ export class SegmentTracerEdge extends GraphEdge {
   static PLACES = 8;
 
   /**
-   * Placeable object represented by this edge.
-   * The edge may represent the entire object edge or just a portion (see tA and tB).
-   * @type {PlaceableObject}
+   * Placeable objects represented by this edge.
+   * @type {Set<PlaceableObject>}
    */
-  object;
+  objects = new Set();
 
   /**
-   * The full edge endpoint, before accounting for any ratios/splits.
-   * @type {PIXI.Point}
+   * Filter set for walls.
    */
-  edgeA;
+  get walls() { return this.objects.filter(o => o instanceof Wall); }
 
-  /** @type {PIXI.Point} */
-  edgeB;
-
-  // Location on the edge, as a ratio, where the endpoint of the edge is located.
-  /** @type {number} */
-  tA = 0;
-
-  /** @type {number} */
-  tB = 1;
-
-  /** @type {PIXI.Point} */
-  delta = new PIXI.Point();
+  /**
+   * Filter set for tokens.
+   */
+  get tokens() { return this.objects.filter(o => o instanceof Token); }
 
   /**
    * Construct an edge.
    * To be used instead of constructor in most cases.
-   * @param {Point} A                       First edge endpoint
-   * @param {Point} b                       Other edge endpoint
-   * @param {PlaceableObject} object       Object that contains this edge
-   * @param {number} [tA=0]   Where the A endpoint of this edge falls on the object
-   * @param {number} [tB=1]   Where the B endpoint of this edge falls on the object
+   * @param {Point} edgeA                 First object edge endpoint
+   * @param {Point} edgeB                 Other object edge endpoint
+   * @param {PlaceableObject} [object[]]    Object(s) that contains this edge
+   * @param {number} [tA=0]               Where the A endpoint of this edge falls on the object
+   * @param {number} [tB=1]               Where the B endpoint of this edge falls on the object
    * @returns {SegmentTracerEdge}
    */
-  static fromObject(edgeA, edgeB, object, tA = 0, tB = 1) {
+  static fromObjects(edgeA, edgeB, objects, tA = 0, tB = 1) {
     tA = Math.clamped(tA, 0, 1);
     tB = Math.clamped(tB, 0, 1);
     edgeA = PIXI.Point.fromObject(edgeA);
@@ -235,14 +228,33 @@ export class SegmentTracerEdge extends GraphEdge {
     const B = new WallTracerVertex(eB.x, eB.y);
     const dist = PIXI.Point.distanceSquaredBetween(A.point, B.point);
     const edge = new this(A, B, dist);
-
-    edge.tA = tA;
-    edge.tB = tB;
-    edge.object = object;
-    edge.delta = edge.B.point.subtract(edge.A.point);
-    edge.edgeA = edgeA;
-    edge.edgeB = edgeB;
+    if ( objects ) objects.forEach(obj => edge.objects.add(obj));
     return edge;
+  }
+
+  /**
+   * Construct an edge from a wall.
+   * To be used instead of constructor in most cases.
+   * @param {Wall} wall       Wall represented by this edge
+   * @returns {WallTracerEdge}
+   */
+  static fromWall(wall) { return this.fromObject(wall.A, wall.B, [wall]); }
+
+  /**
+   * Construct an array of edges form the constrained token border.
+   * To be used instead of constructor in most cases.
+   * @param {Point} A                       First edge endpoint
+   * @param {Point} b                       Other edge endpoint
+   * @param {PlaceableObject} object       Object that contains this edge
+   * @param {number} [tA=0]   Where the A endpoint of this edge falls on the object
+   * @param {number} [tB=1]   Where the B endpoint of this edge falls on the object
+   * @returns {WallTracerEdge[]}
+   */
+  static fromToken(token) {
+    const edgeIter = token.constrainedTokenBorder.iterateEdges();
+    const edges = [];
+    for ( const edge of edgeIter ) edges.push(this.fromObject(edge.A, edge.B, [token]));
+    return edges;
   }
 
   /**
@@ -253,10 +265,9 @@ export class SegmentTracerEdge extends GraphEdge {
    * @returns {PIXI.Point} The point along the wall line. Ratio 0: endpoint A; 1: endpoint B.
    */
   static pointAtEdgeRatio(edgeA, edgeB, edgeT) {
+    edgeT = Math.roundDecimals(edgeT, WallTracerEdge.PLACES);
     if ( edgeT.almostEqual(0) ) return edgeA;
     if ( edgeT.almostEqual(1) ) return edgeB;
-
-    edgeT = Math.roundDecimals(edgeT, WallTracerEdge.PLACES);
     return edgeA.projectToward(edgeB, edgeT);
   }
 
@@ -264,65 +275,26 @@ export class SegmentTracerEdge extends GraphEdge {
    * Boundary rectangle that encompasses this edge.
    * @type {PIXI.Rectangle}
    */
-  get bounds() {
-    const { A, delta } = this;
-    return new PIXI.Rectangle(A.x, A.y, delta.x, delta.y).normalize();
-  }
-
-  /** @type {string} */
-  get id() { return this.object.id; }
-
-  /** @type {object} */
-  get document() { return this.object.document; }
-
-  /**
-   * Reverse this edge
-   * @returns {GraphEdge}
-   */
-  reverse() {
-    const edge = super.reverse();
-    [edge.tA, edge.tB] = [this.tB, this.tA];
-    [edge.edgeA, edge.edgeB] = [this.edgeB, this.edgeA];
-    edge.object = this.object;
-    edge.delta = edge.B.point.subtract(edge.A.point);
-    return edge;
-  }
-
-  /**
-   * @typedef {object} EdgeTracerCollision
-   * @property {number} objectT             Location of collision on the object's edge, where A = 0 and B = 1
-   * @property {number} edgeT               Location of collision on this edge, where A = 0 and B = 1
-   * @property {Point} pt                   Intersection point.
-   * @property {SegmentEdge} edge           Edge associated with this collision
-   * @property {PlaceableObject} object     Object associated with this collision
-   */
+  get bounds() { return segmentBounds(this.A, this.B); }
 
   /**
    * Find the collision, if any, between this edge and another object's edge.
-   * @param {PIXI.Point} A              First edge endpoint
-   * @param {PIXI.Point} B              Second edge endpoint
-   * @param {PlaceableObject} object    The object for the edge to be tested, for convenience
-   * @returns {EdgeTracerCollision}
+   * @param {PIXI.Point} A              First edge endpoint for the object
+   * @param {PIXI.Point} B              Second edge endpoint for the object
+   * @returns {SegmentIntersection[]}
+   *  Also rounds the t0 and t1 collision percentages to WallTracerEdge.PLACES.
+   *  t0 is the collision point for the A, B object edge.
+   *  t1 is the collision point for this edge.
    */
-  findEdgeCollision(A, B, object) {
-    const { A: eA, B: eB } = this;
-    let out;
-    if ( A.key === eA.key || eA.almostEqual(A) ) out = { objectT: 0, edgeT: 0, pt: A };
-    else if ( A.key === eB.key || eB.almostEqual(A) ) out = { objectT: 0, edgeT: 1, pt: A };
-    else if ( B.key === eA.key || eA.almostEqual(B) ) out = { objectT: 1, edgeT: 0, pt: B };
-    else if ( B.key === eB.key || eB.almostEqual(B) ) out = { objectT: 1, edgeT: 1, pt: B };
-    else if ( foundry.utils.lineSegmentIntersects(A, B, eA, eB) ) {
-      const ix = CONFIG.GeometryLib.utils.lineLineIntersection(A, B, eA, eB, { t1: true });
-      out = {
-        objectT: Math.roundDecimals(ix.t0, WallTracerEdge.PLACES),
-        edgeT: Math.roundDecimals(ix.t1, WallTracerEdge.PLACES),
-        pt: ix };
-    } else return null; // Edge is either completely collinear or does not intersect.
-
-    out.pt = new PIXI.Point(out.pt.x, out.pt.y);
-    out.edge = this;
-    out.object = object;
-    return out;
+  findEdgeCollisions(A, B) {
+    const C = this.A.point;
+    const D = this.B.point;
+    const collisions = endpointIntersection(A, B, C, D)
+      ?? segmentIntersection(A, B, C, D)
+      ?? segmentOverlap(A, B, C, D);
+    if ( !collisions ) return [];
+    if ( !(collisions instanceof Array) ) return [collisions];
+    return collisions;
   }
 
   /**
@@ -335,25 +307,11 @@ export class SegmentTracerEdge extends GraphEdge {
     if ( edgeT.almostEqual(0) || edgeT.almostEqual(1) ) return null;
 
     // Construct two new edges, divided at the edgeT location.
-    const { edgeA, edgeB, object } = this;
-    const objectT = this._tRatioToObjectRatio(edgeT);
-    const edge1 = this.constructor.fromObject(edgeA, edgeB, object, this.tA, objectT);
-    const edge2 = this.constructor.fromObject(edgeA, edgeB, object, objectT, this.tB);
+    const { A, B } = this;
+    const objects = [...this.objects];
+    const edge1 = this.constructor.fromObjects(A, B, objects, 0, edgeT);
+    const edge2 = this.constructor.fromObjects(A, B, objects, edgeT, 1);
     return [edge1, edge2];
-  }
-
-  /**
-   * For a given t ratio for this edge, what is the equivalent object ratio?
-   * @param {number} t
-   * @returns {number}
-   */
-  _tRatioToObjectRatio(t) {
-    if ( t.almostEqual(0) ) return this.tA;
-    if ( t.almostEqual(1) ) return this.tB;
-
-    // Linear mapping where edgeT === 0 --> tA, edgeT === 1 --> tB
-    const dT = this.tB - this.tA;
-    return this.tA + (dT * t);
   }
 
   /**
@@ -362,77 +320,9 @@ export class SegmentTracerEdge extends GraphEdge {
    */
   draw(drawingOptions = {}) {
     Draw.segment(this, drawingOptions);
-
-    // Draw first endpoint in red.
-    drawingOptions.color = Draw.COLORS.red;
     this.A.draw(drawingOptions);
-
-    // Draw second endpoint in blue.
-    drawingOptions.color = Draw.COLORS.blue;
     this.B.draw(drawingOptions);
   }
-}
-
-/**
- * Represents a portion of token border.
- * The border is divided into distinct edges based on intersections with other edges.
- */
-export class TokenTracerEdge extends SegmentTracerEdge {
-  /** @type {Token} */
-  get token() { return this.object; }
-
-  /**
-   * Construct a set of edges for the token.
-   * To be used instead of constructor in most cases.
-   * @param {Point} A                       First edge endpoint
-   * @param {Point} b                       Other edge endpoint
-   * @param {PlaceableObject} object       Object that contains this edge
-   * @param {number} [tA=0]   Where the A endpoint of this edge falls on the object
-   * @param {number} [tB=1]   Where the B endpoint of this edge falls on the object
-   * @returns {SegmentTracerEdge[]}
-   */
-  static fromToken(token) {
-    const edgeIter = token.constrainedTokenBorder.iterateEdges();
-    const edges = [];
-    for ( const edge of edgeIter ) edges.push(this.fromObject(edge.A, edge.B, token))
-    return edges;
-  }
-}
-
-/**
- * Represents a portion of a wall.
- * The wall is divided into distinct edges based on intersections with other edges.
- */
-export class WallTracerEdge extends SegmentTracerEdge {
-  /**
-   * Wall represented by this edge.
-   * The edge may represent the entire wall or just a portion (see tA and tB).
-   * @type {Wall}
-   */
-  get wall() { return this.object; }
-
-  /**
-   * Construct an edge from a wall.
-   * To be used instead of constructor in most cases.
-   * @param {Wall} wall       Wall represented by this edge
-   * @param {number} [tA=0]   Where the A endpoint of this edge falls on the wall
-   * @param {number} [tB=1]   Where the B endpoint of this edge falls on the wall
-   * @returns {WallTracerEdge}
-   */
-  static fromWall(wall, tA = 0, tB = 1) { return this.fromObject(wall.A, wall.B, wall, tA, tB); }
-
-  /** @type {boolean} */
-  get hasActiveRoof() { return this.wall.hasActiveRoof; }
-
-  /** @type {boolean} */
-  get isOpen() { return this.wall.isOpen; }
-
-  /**
-   * Find the collision, if any, between this edge and a wall
-   * @param {Wall} wall               Foundry wall object to test
-   * @returns {EdgeTracerCollision}
-   */
-  findWallCollision(wall) { return this.findEdgeCollision(wall.A, wall.B, wall); }
 }
 
 export class WallTracer extends Graph {
@@ -448,41 +338,38 @@ export class WallTracer extends Graph {
    * @param {WallTracerCollision} c   Collision to group
    * @returns {number} The t0 property, rounded.
    */
-  static _keyGetter(c) { return Math.roundDecimals(c.objectT, WallTracer.PLACES); }
+  static _keyGetter(c) { return Math.roundDecimals(c.t0, WallTracer.PLACES); }
 
   /**
-   * Map of a set of edges for a given wall, keyed to the wall id.
-   * Must be wall id because deleted walls may still need to be accessed here.
+   * Map of a set of edges, keyed to the placeable's id.
+   * Must be id because deleted placeables may still need to be accessed here.
    * @type {Map<string, Set<WallTracerEdge>>}
    */
-  wallEdges = new Map();
+  objectEdges = new Map();
 
   /**
-   * Map of a set of edges for a given token, keyed to the token id.
-   * Must be token id because deleted tokens may still need to be accessed here.
-   * @type {Map<string, Set<TokenTracerEdge>>}
+   * Set of wall ids represented in this graph.
+   * @type {Set<string>}
    */
-  tokenEdges = new Map();
+  wallIds = new Set();
+
+  /**
+   * Set of token ids represented in this graph.
+   * @type {Set<string>}
+   */
+  tokenIds = new Set();
 
   /** @type {CanvasQuadtree} */
   edgesQuadtree = new CanvasQuadtree();
-
-  /**
-   * @type {object}
-   * @property {PIXI.Polygons} least
-   * @property {PIXI.Polygons} most
-   * @property {PIXI.Polygons} combined
-   */
-  cyclePolygonsQuadtree = new CanvasQuadtree();
 
   /**
    * Clear all cached edges, etc. used in the graph.
    */
   clear() {
     this.edgesQuadtree.clear();
-    this.cyclePolygonsQuadtree.clear();
-    this.wallEdges.clear();
-    this.tokenEdges.clear();
+    this.objectEdges.clear();
+    this.wallIds.clear();
+    this.tokenIds.clear();
     super.clear();
   }
 
@@ -494,8 +381,15 @@ export class WallTracer extends Graph {
    */
   addEdge(edge) {
     edge = super.addEdge(edge);
-    const bounds = edge.bounds;
-    this.edgesQuadtree.insert({ r: bounds, t: edge });
+    this.edgesQuadtree.insert({ r: edge.bounds, t: edge });
+
+    // Track the edge objects.
+    edge.objects.forEach(obj => {
+      const id = obj.id;
+      if ( !this.objectEdges.get(id) ) this.objectEdges.set(id, new Set());
+      const edgeSet = this.objectEdges.get(id);
+      edgeSet.add(edge);
+    });
     return edge;
   }
 
@@ -505,106 +399,112 @@ export class WallTracer extends Graph {
    */
   deleteEdge(edge) {
     this.edgesQuadtree.remove(edge);
+
+    // Track the edge objects.
+    edge.objects.forEach(obj => {
+      const edgeSet = this.objectEdges.get(obj.id);
+      if ( edgeSet ) edgeSet.delete(edge);
+    });
+
     super.deleteEdge(edge);
   }
 
   /**
    * Add an edge for an object, splitting based on edges already present in the graph.
+   * If the edge already exists and is exactly the same, simply add the object
+   * to the object set for the edge.
    * @param {PIXI.Point} edgeA                  First edge endpoint
    * @param {PIXI.Point} edgeB                  Other edge endpoint
    * @param {PlaceableObject} object            Object to convert to edge(s)
    * @param {Set<SegmentTracerEdge>} [edgeSet]  Existing edge set to use
    * @param {class} [cl]                        Class to use for the object.
-   * @returns {Set<SegmentTracerEdge>}
    */
-  addObjectEdge(edgeA, edgeB, object, edgeSet, cl) {
-    cl ??= object instanceof Wall ? WallTracerEdge
-      : object instanceof Token ? TokenTracerEdge
-        : SegmentTracerEdge;
-
-    edgeSet ??= new Set();
-
+  addObjectEdge(edgeA, edgeB, object) {
     // Locate collision points for any edges that collide with this edge object.
     // If no collisions, then a single edge can represent this edge object.
-    const collisions = this.findEdgeCollisions(edgeA, edgeB, object);
+    const collisions = this.findEdgeCollisions(edgeA, edgeB);
     if ( !collisions.size ) {
-      const edge = cl.fromObject(edgeA, edgeB, object);
+      const edge = WallTracerEdge.fromObjects(edgeA, edgeB, [object]);
       this.addEdge(edge);
-      return edgeSet.add(edge);
     }
 
-    // Sort the keys so we can progress from A --> B along the wall.
+    // Sort the keys so we can progress from A --> B along the edge.
     const tArr = [...collisions.keys()];
     tArr.sort((a, b) => a - b);
 
-    // For each collision, ordered along this wall from A --> B
+    // For each collision, ordered along the wall from A --> B
     // - construct a new edge for this wall portion
     // - update the collision links for the colliding edge and this new edge
     if ( !collisions.has(1) ) tArr.push(1);
     let priorT = 0;
+    const overlaps = new Set();
     for ( const t of tArr ) {
-      // Build edge for portion of wall between priorT and t, skipping when t === 0
-      if ( t ) {
-        const edge = cl.fromObject(edgeA, edgeB, object, priorT, t);
-        this.addEdge(edge);
-        edgeSet.add(edge);
+      // Check each collision point.
+      // For endpoint collisions, nothing will be added.
+      // For normal intersections, split the other edge.
+      // If overlapping, split the other edge if not at endpoint.
+      // One or more edges may be split at this collision point.
+      // Track when we start or end overlapping on an edge.
+      const cObjs = collisions.get(t) ?? [];
+      let addEdge = Boolean(t); // Don't add an edge for 0 --> 0.
+      for ( const cObj of cObjs ) {
+        const splitEdges = cObj.edge.splitAtT(cObj.t1); // If the split is at the endpoint, will be null.
+        if ( splitEdges ) {
+          // Remove the existing edge and add the new edges.
+          // With overlaps, it is possible the edge was already removed.
+          if ( this.edges.has(cObj.edge.key) ) this.deleteEdge(cObj.edge);
+          splitEdges.forEach(e => this.addEdge(e));
+        }
+
+        if ( cObj.overlap ) {
+          if ( overlaps.has(cObj.edge) ) { // Ending an overlap.
+            overlaps.delete(cObj.edge);
+            if ( splitEdges ) splitEdges[0].objects.add(object); // Share the edge with this object.
+            else cObj.edge.objects.add(object);
+            addEdge = false; // Only want one edge here: the existing.
+          } else {  // Starting a new overlap.
+            overlaps.add(cObj.edge);
+            if ( splitEdges ) splitEdges[1].objects.add(object); // Share the edge with this object.
+          }
+        }
       }
 
-      // One or more edges may be split at this collision point.
-      const cObjs = collisions.get(t) ?? [];
-      for ( const cObj of cObjs ) {
-        const splitEdges = cObj.edge.splitAtT(cObj.edgeT);
-        if ( !splitEdges ) continue; // If the split is at the endpoint, will be null.
-
-        // Remove the existing edge and add the new edges.
-        this.deleteEdge(cObj.edge);
-        const [edge1, edge2] = splitEdges;
-        this.addEdge(edge1);
-        this.addEdge(edge2);
-        edgeSet.add(edge1);
-        edgeSet.add(edge2);
+      // Build edge for portion of wall between priorT and t, skipping when t === 0
+      if ( addEdge ) {
+        const edge = WallTracerEdge.fromObjects(edgeA, edgeB, [object], priorT, t);
+        this.addEdge(edge);
       }
 
       // Cycle to next.
       priorT = t;
     }
-
-    return edgeSet;
   }
 
   /**
    * Split the token edges by edges already in this graph.
    * @param {Token} token   Token to convert to edge(s)
-   * @returns {Set<TokenTracerEdge>}
    */
   addToken(token) {
     const tokenId = token.id;
-    if ( this.tokenEdges.has(tokenId) ) return this.tokenEdges.get(tokenId);
+    if ( this.edges.has(tokenId) ) return;
 
     // Construct a new token edge set.
-    const edgeSet = new Set();
-    this.tokenEdges.set(tokenId, edgeSet);
     const edgeIter = token.constrainedTokenBorder.iterateEdges();
-    for ( const edge of edgeIter ) this.addObjectEdge(edge.A, edge.B, token, edgeSet, TokenTracerEdge);
-    return edgeSet;
+    for ( const edge of edgeIter ) this.addObjectEdge(edge.A, edge.B, token);
+    this.tokenIds.add(tokenId);
   }
 
   /**
    * Split the wall by edges already in this graph.
    * @param {Wall} wall   Wall to convert to edge(s)
-   * @returns {Set<WallTracerEdge>}
    */
   addWall(wall) {
     const wallId = wall.id;
-    if ( this.wallEdges.has(wallId) ) return this.wallEdges.get(wallId);
+    if ( this.edges.has(wallId) ) return;
 
     // Construct a new wall edge set.
-    const edgeSet = new Set();
-    this.wallEdges.set(wallId, edgeSet);
-    return this.addObjectEdge(
-      PIXI.Point.fromObject(wall.A),
-      PIXI.Point.fromObject(wall.B),
-      wall, edgeSet, WallTracerEdge);
+    this.wallIds.add(wallId);
+    this.addObjectEdge(PIXI.Point.fromObject(wall.A), PIXI.Point.fromObject(wall.B), wall);
   }
 
   /**
@@ -612,14 +512,14 @@ export class WallTracer extends Graph {
    * @param {string} id             Id of the edge object to remove
    * @param {Map<string, Set<TokenTracerEdge>>} Map of edges to remove from
    */
-  removeObject(id, objectMap) {
-    const edges = objectMap.get(id);
+  removeObject(id) {
+    const edges = this.objectEdges.get(id);
     if ( !edges || !edges.size ) return;
 
     // Shallow copy the edges b/c they will be removed from the set with destroy.
     const edgesArr = [...edges];
     for ( const edge of edgesArr ) this.deleteEdge(edge);
-    objectMap.delete(id);
+    this.objectEdges.delete(id);
   }
 
   /**
@@ -628,7 +528,8 @@ export class WallTracer extends Graph {
    */
   removeWall(wallId) {
     if ( wallId instanceof Wall ) wallId = wallId.id;
-    return this.removeObject(wallId, this.wallEdges);
+    this.wallIds.delete(wallId);
+    return this.removeObject(wallId);
   }
 
   /**
@@ -637,6 +538,7 @@ export class WallTracer extends Graph {
    */
   removeToken(tokenId) {
     if ( tokenId instanceof Token ) tokenId = tokenId.id;
+    this.tokenIds.delete(tokenId);
     return this.removeObject(tokenId, this.tokenEdges);
   }
 
@@ -646,207 +548,40 @@ export class WallTracer extends Graph {
    * @param {PIXI.Point} edgeB                      Other edge endpoint
    * @returns {Map<number, EdgeTracerCollision[]>}  Map of locations of the collisions
    */
-  findEdgeCollisions(edgeA, edgeB, object) {
-    const collisions = [];
+  findEdgeCollisions(edgeA, edgeB) {
+    const edgeCollisions = [];
     const bounds = segmentBounds(edgeA, edgeB);
     const collisionTest = (o, _rect) => segmentsOverlap(edgeA, edgeB, o.t.A, o.t.B);
     const collidingEdges = this.edgesQuadtree.getObjects(bounds, { collisionTest });
     for ( const edge of collidingEdges ) {
-      const collision = edge.findEdgeCollision(edgeA, edgeB, object);
-      if ( collision ) collisions.push(collision);
-    }
-    return groupBy(collisions, this.constructor._keyGetter);
-  }
+      const collisions = edge.findEdgeCollisions(edgeA, edgeB);
+      if ( !collisions.length ) continue;
+      collisions.forEach(c => c.edge = edge);
 
-  // ----- Polygon handling ---- //
-
-  /**
-   * @type {PIXI.Polygon} GraphCyclePolygon
-   * @type {object} _wallTracerData   Object to store tracer data
-   * @property {Set<Wall>} _wallTracerData.wallSet    Walls that make up the polygon
-   * @property {object} _wallTracerData.restrictionTypes  CONST.WALL_RESTRICTION_TYPES
-   * @property {number} _wallTracerData.restrictionTypes.light
-   * @property {number} _wallTracerData.restrictionTypes.sight
-   * @property {number} _wallTracerData.restrictionTypes.sound
-   * @property {number} _wallTracerData.restrictionTypes.move
-   * @property {object} _wallTracerData.height
-   * @property {number} _wallTracerData.height.min
-   * @property {number} _wallTracerData.height.max
-   * @property {number} _wallTracerData.hasOneWay
-   */
-
-  /**
-   * Convert a single cycle (array of vertices) to a polygon.
-   * Capture the wall set for edges in the polygon.
-   * Determine the minimum limit for each restriction type of all the walls.
-   * @param {WallTracerVertex[]} cycle    Array of vertices that make up the cycle, in order.
-   * @returns {GraphCyclePolygon|null} Polygon, with additional tracer data added.
-   */
-  static cycleToPolygon(cycle) {
-    const nVertices = cycle.length;
-    if ( nVertices < 3 ) return null;
-    const points = Array(nVertices * 2);
-    const wallSet = new Set();
-    const restrictionTypes = {
-      light: CONST.WALL_SENSE_TYPES.NORMAL,
-      sight: CONST.WALL_SENSE_TYPES.NORMAL,
-      sound: CONST.WALL_SENSE_TYPES.NORMAL,
-      move: CONST.WALL_SENSE_TYPES.NORMAL
-    };
-    const height = {
-      min: Number.POSITIVE_INFINITY,
-      max: Number.NEGATIVE_INFINITY
-    };
-    let hasOneWay = false;
-
-    let vertex = cycle[nVertices - 1];
-    for ( let i = 0; i < nVertices; i += 1 ) {
-      const nextVertex = cycle[i];
-      const j = i * 2;
-      points[j] = vertex.x;
-      points[j + 1] = vertex.y;
-
-      const edge = vertex.edges.find(e => e.otherVertex(vertex).key === nextVertex.key); // eslint-disable-line no-loop-func
-      const wall = edge.wall;
-      wallSet.add(wall);
-      const doc = wall.document;
-      restrictionTypes.light = Math.min(restrictionTypes.light, doc.light);
-      restrictionTypes.sight = Math.min(restrictionTypes.sight, doc.sight);
-      restrictionTypes.sound = Math.min(restrictionTypes.sound, doc.sound);
-      restrictionTypes.move = Math.min(restrictionTypes.move, doc.move);
-
-      height.min = Math.min(height.min, wall.bottomZ);
-      height.max = Math.max(height.max, wall.topZ);
-
-      hasOneWay ||= doc.dir;
-
-      vertex = nextVertex;
-    }
-
-    const poly = new PIXI.Polygon(points);
-    poly.clean();
-    poly._wallTracerData = { wallSet, restrictionTypes, height, hasOneWay };
-    return poly;
-  }
-
-  /**
-   * Update the quadtree of cycle polygons
-   */
-  updateCyclePolygons() {
-    // Least, most, none are perform similarly. Most might be a bit faster
-    // (The sort can sometimes mean none is faster, but not always)
-    // Weighting by distance hurts performance.
-    this.cyclePolygonsQuadtree.clear();
-    const cycles = this.getAllCycles({ sortType: Graph.VERTEX_SORT.LEAST, weighted: true });
-    cycles.forEach(cycle => {
-      const poly = WallTracer.cycleToPolygon(cycle);
-      this.cyclePolygonsQuadtree.insert({ r: poly.getBounds(), t: poly });
-    });
-  }
-
-  /**
-   * For a given origin point, find all polygons that encompass it.
-   * Then narrow to the one that has the smallest area.
-   * @param {Point} origin
-   * @param {CONST.WALL_RESTRICTION_TYPES} [type]   Limit to polygons that are CONST.WALL_SENSE_TYPES.NORMAL
-   *                                                for the given type
-   * @returns {PIXI.Polygon|null}
-   */
-  encompassingPolygon(origin, type) {
-    const encompassingPolygons = this.encompassingPolygons(origin, type);
-    return this.smallestPolygon(encompassingPolygons);
-  }
-
-  encompassingPolygons(origin, type) {
-    origin.z ??= 0;
-
-    // Find those polygons that actually contain the origin.
-    // Start by using the bounds, then test containment.
-    const bounds = new PIXI.Rectangle(origin.x - 1, origin.y -1, 2, 2);
-    const collisionTest = (o, _rect) => o.t.contains(origin.x, origin.y);
-    let encompassingPolygons = this.cyclePolygonsQuadtree.getObjects(bounds, { collisionTest });
-
-    if ( type ) encompassingPolygons = encompassingPolygons.filter(poly => {
-      const wallData = poly._wallTracerData;
-
-      if ( wallData.restrictionTypes[type] !== CONST.WALL_SENSE_TYPES.NORMAL
-        || wallData.height.max < origin.z
-        || wallData.height.min > origin.z ) return false;
-
-      if ( !wallData.hasOneWay ) return true;
-
-      // Confirm that each wall is blocking from the origin
-      for ( const wall of wallData.wallSet ) {
-        if ( !wallData.dir ) continue;
-        const side = wall.orientPoint(this.origin);
-        if ( side === wall.document.dir ) return false;
-
+      // If two collisions, there is overlap.
+      // Identify the overlapping objects.
+      if ( collisions.length === 2 ) {
+        collisions[0].overlap = true;
+        collisions[1].overlap = true;
       }
-      return true;
-    });
-
-    return encompassingPolygons;
-  }
-
-  smallestPolygon(polygons) {
-    const res = polygons.reduce((acc, curr) => {
-      const area = curr.area;
-      if ( area < acc.area ) {
-        acc.area = area;
-        acc.poly = curr;
-      }
-      return acc;
-    }, { area: Number.POSITIVE_INFINITY, poly: null});
-
-    return res.poly;
+      edgeCollisions.push(...collisions);
+    }
+    return groupBy(edgeCollisions, this.constructor._keyGetter);
   }
 
   /**
-   * For a given polygon, find all polygons that could be holes within it.
-   * @param {PIXI.Polygon} encompassingPolygon
-   * @param {CONST.WALL_RESTRICTION_TYPES} [type]   Limit to polygons that are CONST.WALL_SENSE_TYPES.NORMAL
-   *                                                for the given type
-   * @returns {encompassingPolygon: {PIXI.Polygon}, holes: {Set<PIXI.Polygon>}}
+   * For debugging.
+   * Draw edges in the graph.
    */
-  _encompassingPolygonsWithHoles(origin, type) {
-    const encompassingPolygons = this.encompassingPolygons(origin, type);
-    const encompassingPolygon = this.smallestPolygon(encompassingPolygons);
-    if ( !encompassingPolygon ) return { encompassingPolygon, holes: [] };
-
-    // Looking for all polygons that are not encompassing but do intersect with or are contained by
-    // the encompassing polygon.
-    const collisionTest = (o, _rect) => {
-      const poly = o.t;
-      if ( encompassingPolygons.some(ep => ep.equals(poly)) ) return false;
-      return poly.overlaps(encompassingPolygon);
-    };
-
-    const holes = this.cyclePolygonsQuadtree.getObjects(encompassingPolygon.getBounds(), { collisionTest });
-    return { encompassingPolygon, holes };
+  drawEdges() {
+    for ( const edge of this.edges.values() ) {
+      const color = (edge.tokens.size && edge.walls.size) ? Draw.COLORS.white
+        : edge.tokens.size ? Draw.COLORS.orange
+          : edge.walls.size ? Draw.COLORS.red
+            : Draw.COLORS.blue;
+      edge.draw({ color });
+    }
   }
-
-  /**
-   * Build the representation of a polygon that encompasses the origin point,
-   * along with any holes for that encompassing polygon.
-   * @param {Point} origin
-   * @param {CONST.WALL_RESTRICTION_TYPES} [type]   Limit to polygons that are CONST.WALL_SENSE_TYPES.NORMAL
-   *                                                for the given type
-   * @returns {PIXI.Polygon[]}
-   */
-  encompassingPolygonWithHoles(origin, type) {
-    const { encompassingPolygon, holes } = this._encompassingPolygonsWithHoles(origin, type);
-    if ( !encompassingPolygon ) return [];
-    if ( !holes.size ) return [encompassingPolygon];
-
-    // Union the holes
-    const paths = ClipperPaths.fromPolygons(holes);
-    const combined = paths.combine();
-
-    // Diff the encompassing polygon against the holes
-    const diffPath = combined.diffPolygon(encompassingPolygon);
-    return diffPath.toPolygons();
-  }
-
 }
 
 /**
@@ -912,6 +647,7 @@ export const SCENE_GRAPH = new WallTracer();
 /* Debugging
 api = game.modules.get("elevationruler").api
 Draw = CONFIG.GeometryLib.Draw
+let { Graph, GraphVertex, GraphEdge } = CONFIG.GeometryLib.Graph
 
 SCENE_GRAPH = api.pathfinding.SCENE_GRAPH
 
@@ -926,4 +662,134 @@ SCENE_GRAPH.tokenEdges.forEach(s => s.forEach(e => e.draw({color: Draw.COLORS.or
 // Draw wall edges
 SCENE_GRAPH.wallEdges.forEach(s => s.forEach(e => e.draw({color: Draw.COLORS.blue})))
 
+// Construct a test graph and add all tokens
+wt = new api.WallTracer()
+
+canvas.walls.placeables.forEach(w => wt.addWall(w))
+canvas.tokens.placeables.forEach(t => wt.addToken(t))
+wt.tokenEdges.forEach(s => s.forEach(e => e.draw({color: Draw.COLORS.orange})))
+
 */
+
+// NOTE: Helper functions
+
+/**
+ * @typedef {object} SegmentIntersection
+ * Represents intersection between two segments, a|b and c|d
+ * @property {PIXI.Point} pt        Point of intersection
+ * @property {number} t0            Intersection location on the a --> b segment
+ * @property {number} t1            Intersection location on the c --> d segment
+ */
+
+/**
+ * Determine if two segments intersect at an endpoint and return t0, t1 based on that intersection.
+ * @param {PIXI.Point} a        Endpoint on a|b segment
+ * @param {PIXI.Point} b        Endpoint on a|b segment
+ * @param {PIXI.Point} c        Endpoint on c|d segment
+ * @param {PIXI.Point} d        Endpoint on c|d segment
+ * @returns {SegmentIntersection|null}
+ */
+function endpointIntersection(a, b, c, d) {
+  // Avoid overlaps
+  // Distinguish a---b|c---d from a---c---b|d. Latter is an overlap.
+  // Okay:
+  // a---b|c---d
+  // b---a|c---d
+  // b---a|d---c
+  // a---b|d---c
+  // Overlap:
+  // a---c---b|d
+  // a---d---b|c
+  // b---c---a|d
+  // b---d---a|c
+  const orient2d = foundry.utils.orient2dFast;
+  if ( orient2d(a, b, c).almostEqual(0) && orient2d(a, b, d).almostEqual(0) ) {
+    const dSquared = PIXI.Point.distanceSquaredBetween;
+    const dAB = dSquared(a, b);
+    if ( dAB > dSquared(a, c) || dAB > dSquared(a, d) ) return null;
+  }
+
+  if ( a.key === c.key || c.almostEqual(a) ) return { t0: 0, t1: 0, pt: a };
+  if ( a.key === d.key || d.almostEqual(a) ) return { t0: 0, t1: 1, pt: a };
+  if ( b.key === c.key || c.almostEqual(b) ) return { t0: 1, t1: 0, pt: b };
+  if ( b.key === d.key || d.almostEqual(b) ) return { t0: 1, t1: 1, pt: b };
+  return null;
+}
+
+/**
+ * Determine if two segments intersect and return t0, t1 based on that intersection.
+ * Generally will detect endpoint intersections but no special handling.
+ * To ensure near-endpoint-intersections are captured, use endpointIntersection.
+ * Will not detect overlap. See segmentOverlap
+ * @param {PIXI.Point} a        Endpoint on a|b segment
+ * @param {PIXI.Point} b        Endpoint on a|b segment
+ * @param {PIXI.Point} c        Endpoint on c|d segment
+ * @param {PIXI.Point} d        Endpoint on c|d segment
+ * @returns {SegmentIntersection|null}
+ */
+function segmentIntersection(a, b, c, d) {
+  if ( !foundry.utils.lineSegmentIntersects(a, b, c, d) ) return null;
+  const ix = CONFIG.GeometryLib.utils.lineLineIntersection(a, b, c, d, { t1: true });
+  ix.pt = PIXI.Point.fromObject(ix);
+  return ix;
+}
+
+/**
+ * Determine if two segments overlap and return the two points at which the segments
+ * begin their overlap.
+ * @param {PIXI.Point} a        Endpoint on a|b segment
+ * @param {PIXI.Point} b        Endpoint on a|b segment
+ * @param {PIXI.Point} c        Endpoint on c|d segment
+ * @param {PIXI.Point} d        Endpoint on c|d segment
+ * @returns {SegmentIntersection[2]|null}
+ *  The 2 intersections will be sorted so that [0] --> [1] is the overlap.
+ */
+function segmentOverlap(a, b, c, d) {
+  // First, ensure the segments are overlapping.
+  const orient2d = foundry.utils.orient2dFast;
+  if ( !orient2d(a, b, c).almostEqual(0) || !orient2d(a, b, d).almostEqual(0) ) return null;
+
+  // To detect overlap, construct small perpendicular lines to the endpoints.
+  const aP = perpendicularPoints(a, b); // Line perpendicular to a|b that intersects a
+  const bP = perpendicularPoints(b, a);
+  const cP = perpendicularPoints(c, d);
+  const dP = perpendicularPoints(d, c);
+
+  // Intersect each segment with the perpendicular lines.
+  const lli = CONFIG.GeometryLib.utils.lineLineIntersection;
+  const ix0 = lli(c, d, aP[0], aP[1]);
+  const ix1 = lli(c, d, bP[0], bP[1]);
+  const ix2 = lli(a, b, cP[0], cP[1]);
+  const ix3 = lli(a, b, dP[0], dP[1]);
+
+  const aIx = ix0.t0.between(0, 1) ? ix0 : null;
+  const bIx = ix1.t0.between(0, 1) ? ix1 : null;
+
+
+  // Overlap: c|d --- aIx|bIx --- aIx|bIx --- c|d
+  if ( aIx && bIx ) return [
+    { t0: 0, t1: aIx.t0, pt: PIXI.Point.fromObject(aIx) },
+    { t0: 1, t1: bIx.t0, pt: PIXI.Point.fromObject(bIx) }
+  ];
+
+  // Overlap: a|b --- cIx|dIx --- cIx|dIx --- a|b
+  const cIx = ix2.t0.between(0, 1) ? ix2 : null;
+  const dIx = ix3.t0.between(0, 1) ? ix3 : null;
+  if ( cIx && dIx ) return [
+    { t0: cIx.t0, t1: 0, pt: PIXI.Point.fromObject(cIx) },
+    { t0: dIx.t0, t1: 1, pt: PIXI.Point.fromObject(dIx) }
+  ];
+
+  // Overlap: a|b --- cIx|dIx --- aIx|bIx --- c|d
+  const abIx = aIx ?? bIx;
+  const cdIx = cIx ?? dIx;
+  if ( abIx && cdIx ) {
+    return [
+      { t0: cdIx.t0, t1: cIx ? 0 : 1, pt: PIXI.Point.fromObject(cdIx) },
+      { t0: aIx ? 0 : 1, t1: abIx.t0, pt: PIXI.Point.fromObject(abIx) }
+    ];
+  }
+
+  // No overlap.
+  return null;
+}
