@@ -182,17 +182,41 @@ function constructPathfindingSegments(segments, segmentMap) {
 export function _getSegmentLabel(wrapped, segment, totalDistance) {
   // Force distance to be between waypoints instead of (possibly pathfinding) segments.
   const origSegmentDistance = segment.distance;
-  segment.distance = segment.waypointDistance;
-  const origLabel = wrapped(segment, totalDistance);
+  const { newSegmentDistance, newMoveDistance, newTotalDistance } = _getDistanceLabels(segment.waypointDistance, segment.waypointMoveDistance, totalDistance);
+  segment.distance = newSegmentDistance;
+  const origLabel = wrapped(segment, newTotalDistance);
   segment.distance = origSegmentDistance;
   let elevLabel = segmentElevationLabel(segment);
   const levelName = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
   if ( levelName ) elevLabel += `\n${levelName}`;
 
   let moveLabel = "";
-  if ( segment.waypointDistance !== segment.waypointMoveDistance ) moveLabel = `\n🥾${Number(segment.waypointMoveDistance.toFixed(2))}`;
+  const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
+  if ( segment.waypointDistance !== segment.waypointMoveDistance ) moveLabel = `\n🥾${newMoveDistance}${units}`;
 
   return `${origLabel}\n${elevLabel}${moveLabel}`;
+}
+
+/**
+ * Return modified segment and total distance labels
+ * @param {number} segmentDistance
+ * @param {number} segmentMoveDistance
+ * @param {number} totalDistance 
+ * @returns {object} 
+ */
+export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance) {
+  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || null;
+  if (canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS || !multiple) return { 
+    newSegmentDistance: segmentDistance,
+    newMoveDistance: Number(moveDistance.toFixed(2)),
+    newTotalDistance: totalDistance
+  };
+
+  const newSegmentDistance = segmentDistance.toNearest(multiple);
+  const newMoveDistance = moveDistance.toNearest(multiple);
+  const newTotalDistance = totalDistance.toNearest(multiple);
+
+  return { newSegmentDistance, newMoveDistance, newTotalDistance };
 }
 
 /**
