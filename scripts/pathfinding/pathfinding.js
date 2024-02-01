@@ -9,7 +9,7 @@ PIXI
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 import { BorderTriangle, BorderEdge } from "./BorderTriangle.js";
-import { boundsForPoint } from "../util.js";
+import { boundsForPoint, log } from "../util.js";
 import { Draw } from "../geometry/Draw.js";
 import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./algorithms.js";
 import { SCENE_GRAPH } from "./WallTracer.js";
@@ -135,10 +135,13 @@ export class Pathfinder {
    * Initialize properties used for pathfinding related to the scene walls.
    */
   static initialize() {
+    const t0 = performance.now();
     this.clear();
     this._buildTriangles();
     this._linkObjectsToEdges();
     this.#dirty &&= false;
+    const t1 = performance.now();
+    log(`Initialized ${Pathfinder.triangleEdges.size} pathfinder edges in ${t1 - t0} ms.`);
   }
 
   static clear() {

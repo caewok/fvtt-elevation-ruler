@@ -15,6 +15,7 @@ Wall
 import { groupBy, segmentBounds, perpendicularPoints } from "../util.js";
 import { Draw } from "../geometry/Draw.js";
 import { Graph, GraphVertex, GraphEdge } from "../geometry/Graph.js";
+import { Settings } from "../settings.js";
 
 /* WallTracerVertex
 
@@ -323,6 +324,77 @@ export class WallTracerEdge extends GraphEdge {
     this.A.draw(drawingOptions);
     this.B.draw(drawingOptions);
   }
+
+  /**
+   * Compilation of tests based on edge type for whether this wall blocks.
+   * @param {Point} origin          Measure wall blocking from perspective of this origin point.
+   * @param {Token} [moveToken]     Optional token doing the move if token edges should be checked.
+   * @returns {boolean}
+   */
+  edgeBlocks(origin, moveToken, tokenBlockType) {
+    return this.objects.some(obj =>
+      (obj instanceof Wall) ? this._wallBlocks(obj, origin)
+        : (obj instanceof Token) ? this._tokenEdgeBlocks(obj, moveToken, tokenBlockType)
+          : false);
+  }
+
+  /**
+   * Does this edge wall block from an origin somewhere else in the triangle?
+   * Tested "live" and not cached so door or wall orientation changes need not be tracked.
+   * @param {Wall} wall       Wall to test
+   * @param {Point} origin    Measure wall blocking from perspective of this origin point.
+   * @returns {boolean}
+   */
+  _wallBlocks(wall, origin) {
+    if ( !wall.document.move || wall.isOpen ) return false;
+
+    // Ignore one-directional walls which are facing away from the center
+    const side = wall.orientPoint(origin);
+
+    /* Unneeded?
+    const wdm = PointSourcePolygon.WALL_DIRECTION_MODES;
+    if ( wall.document.dir
+      && (wallDirectionMode === wdm.NORMAL) === (side === wall.document.dir) ) return false;
+    */
+
+    if ( wall.document.dir
+      && side === wall.document.dir ) return false;
+
+    return true;
+  }
+
+  /**
+   * Does this token edge block from an origin somewhere else in the triangle?
+   * @param {Token} token             Token to test
+   * @param {Token} moveToken         Token doing the move
+   * @param {string} tokenBlockType   What test to use for comparing token dispositions for blocking
+   * @returns {boolean}
+   */
+  _tokenEdgeBlocks(token, moveToken, tokenBlockType) {
+    if ( !moveToken || moveToken === token ) return false;
+
+    tokenBlockType ??= Settings._tokenBlockType();
+    const D = CONST.TOKEN_DISPOSITIONS;
+    const moveTokenD = moveToken.document.disposition;
+    const edgeTokenD = token.document.disposition;
+    switch ( tokenBlockType ) {
+      case D.NEUTRAL: return false;
+      case D.SECRET: return true;
+
+      // Hostile: Block if dispositions are different
+      case D.HOSTILE: return ( edgeTokenD === D.SECRET
+        || moveTokenD === D.SECRET
+        || edgeTokenD !== moveTokenD );
+
+      // Friendly: Block if dispositions are the same
+      case D.FRIENDLY: return ( edgeTokenD === D.SECRET
+        || moveTokenD === D.SECRET
+        || edgeTokenD === moveTokenD );
+
+      default: return true;
+    }
+  }
+
 }
 
 export class WallTracer extends Graph {

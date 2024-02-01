@@ -36,7 +36,7 @@ function createToken(document, _options, _userId) {
  */
 function updateToken(document, changes, _options, _userId) {
   // Only update the edges if the coordinates have changed.
-  if ( !Object.hasOwn(changes, "c") ) return;
+  if ( !(Object.hasOwn(changes, "x") || Object.hasOwn(changes, "y")) ) return;
 
   // Easiest approach is to trash the edges for the wall and re-create them.
   SCENE_GRAPH.removeToken(document.id);

@@ -11,9 +11,10 @@ PIXI
 import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
-import { perpendicularPoints, log } from "./util.js";
+import { perpendicularPoints, log, segmentBounds } from "./util.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
 import { BorderEdge } from "./pathfinding/BorderTriangle.js";
+import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
 
 /**
  * Calculate the elevation for a given waypoint.
@@ -126,8 +127,12 @@ function calculatePathPointsForSegment(segment, token) {
 function hasCollision(A, B, token) {
   BorderEdge.moveToken = token; // Set the token so we can test token edge blocking.
   const lineSegmentIntersects = foundry.utils.lineSegmentIntersects;
-  return Pathfinder.triangleEdges.some(edge => lineSegmentIntersects(A, B, edge.a, edge.b)
-    && edge.edgeBlocks(origin));
+
+  // SCENE_GRAPH has way less edges than Pathfinder and has quadtree for the edges.
+  const edges = SCENE_GRAPH.edgesQuadtree.getObjects(segmentBounds(A, B));
+  const tokenBlockType = Settings._tokenBlockType();
+  return edges.some(edge => lineSegmentIntersects(A, B, edge.A, edge.B)
+    && edge.edgeBlocks(origin, token, tokenBlockType));
 }
 
 /**

@@ -69,7 +69,6 @@ async function _onDragLeftDrop(wrapped, event) {
   ruler._onMouseUp(event);
 }
 
-
 PATCHES.TOKEN_RULER.WRAPS = {
   _onDragLeftStart,
   _onDragLeftMove,
