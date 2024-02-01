@@ -165,3 +165,16 @@ export function groupBy(list, keyGetter) {
   });
   return map;
 }
+
+/**
+ * Helper to get a rectangular bounds between two points.
+ * @param {PIXI.Point} a
+ * @param {PIXI.Point} b
+ * @returns {PIXI.Rectangle}
+ */
+export function segmentBounds(a, b) {
+  if ( !b || a.equals(b) ) return new PIXI.Rectangle(a.x - 1, a.y - 1, 3, 3);
+  const xMinMax = Math.minMax(a.x, b.x);
+  const yMinMax = Math.minMax(a.y, b.y);
+  return new PIXI.Rectangle(xMinMax.min, yMinMax.min, xMinMax.max - xMinMax.min, yMinMax.max - yMinMax.min);
+}
