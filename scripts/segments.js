@@ -298,8 +298,10 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
 
   // Add destination as the final waypoint
   ruler.destination._terrainElevation = ruler.elevationAtLocation(ruler.destination);
-  ruler.destination._userElevationIncrements = ruler._userElevationIncrements;
+  ruler.destination._userElevationIncrements = ruler._userElevationIncrements ?? 0;
   const waypoints = ruler.waypoints.concat([ruler.destination]);
+
+  log(`Destination ${ruler.destination} terrainElevation: ${ruler.destination._terrainElevation} increments: ${ruler.destination._userElevationIncrements}`);
 
   // Add the waypoint elevations to the corresponding segment endpoints.
   // Skip the first waypoint, which will (likely) end up as p0.
