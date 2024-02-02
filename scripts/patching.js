@@ -38,5 +38,6 @@ export function initializePatching() {
   PATCHER.registerGroup("PATHFINDING");
   PATCHER.registerGroup("TOKEN_RULER");
   PATCHER.registerGroup("SPEED_HIGHLIGHTING");
+  PATCHER.registerGroup("MOVEMENT_TRACKING");
 }
 
