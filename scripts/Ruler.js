@@ -19,9 +19,10 @@ import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import {
-  elevationAtOrigin,
-  terrainElevationAtPoint,
-  terrainElevationAtDestination,
+  elevationAtWaypoint,
+  originElevation,
+  destinationElevation,
+  terrainElevationAtLocation,
   elevationAtLocation
 } from "./terrain_elevation.js";
 
@@ -30,8 +31,7 @@ import {
   _getSegmentLabel,
   _animateSegment,
   hasSegmentCollision,
-  _highlightMeasurementSegment,
-  elevationAtWaypoint
+  _highlightMeasurementSegment
 } from "./segments.js";
 
 import {
@@ -118,7 +118,7 @@ function toJSON(wrapper) {
     return newObj;
   });
 
-  myObj._userElevationIncrements = this._ ;
+  myObj._userElevationIncrements = this._userElevationIncrements;
   myObj._unsnap = this._unsnap;
   myObj._unsnappedOrigin = this._unsnappedOrigin;
   myObj.totalDistance = this.totalDistance;
@@ -612,7 +612,7 @@ PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 function incrementElevation() {
   const ruler = canvas.controls.ruler;
   if ( !ruler || !ruler.active ) return;
-
+  ruler._userElevationIncrements ??= 0;
   ruler._userElevationIncrements += 1;
 
   // Weird, but slightly change the destination to trigger a measure
@@ -631,7 +631,7 @@ function incrementElevation() {
 function decrementElevation() {
   const ruler = canvas.controls.ruler;
   if ( !ruler || !ruler.active ) return;
-
+  ruler._userElevationIncrements ??= 0;
   ruler._userElevationIncrements -= 1;
 
   // Weird, but slightly change the destination to trigger a measure
@@ -646,19 +646,20 @@ function decrementElevation() {
 PATCHES.BASIC.METHODS = {
   incrementElevation,
   decrementElevation,
-
-  // From terrain_elevation.js
-  elevationAtOrigin,
-  terrainElevationAtPoint,
-  terrainElevationAtDestination,
-
+  elevationAtLocation,
   _computeTokenSpeed
+};
+
+PATCHES.BASIC.GETTERS = {
+  originElevation,
+  destinationElevation
 };
 
 PATCHES.BASIC.STATIC_METHODS = {
   measureDistance,
   measureMoveDistance,
-  elevationAtWaypoint
+  elevationAtWaypoint,
+  terrainElevationAtLocation
 };
 
 
@@ -677,14 +678,10 @@ function addWaypointElevationIncrements(ruler, point) {
 
   if ( ln === 1 ) {
     const moveToken = ruler._getMovementToken();
-    newWaypoint._terrainElevation = moveToken ? moveToken.elevationE : elevationAtLocation(newWaypoint);
+    newWaypoint._terrainElevation = moveToken ? moveToken.elevationE : Ruler.terrainElevationAtLocation(newWaypoint);
 
   } else {
     newWaypoint._userElevationIncrements = ruler._userElevationIncrements ?? 0;
-    newWaypoint._terrainElevation = ruler.terrainElevationAtPoint(point);
-  }
-
-  if ( !isFinite(newWaypoint._terrainElevation) ) {
-    log(`terrainElevationAtPoint produced invalid value ${newWaypoint._terrainElevation}`);
+    newWaypoint._terrainElevation = ruler.elevationAtLocation(newWaypoint);
   }
 }

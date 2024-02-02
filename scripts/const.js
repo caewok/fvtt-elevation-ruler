@@ -12,7 +12,6 @@ export const MODULES_ACTIVE = { API: {} };
 
 // Hook init b/c game.modules is not initialized at start.
 Hooks.once("init", function() {
-  MODULES_ACTIVE.ENHANCED_TERRAIN_LAYER = game.modules.get("enhanced-terrain-layer")?.active;
   MODULES_ACTIVE.LEVELS = game.modules.get("levels")?.active;
   MODULES_ACTIVE.ELEVATED_VISION = game.modules.get("elevatedvision")?.active;
   MODULES_ACTIVE.TERRAIN_MAPPER = game.modules.get("terrainmapper")?.active;

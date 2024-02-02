@@ -1,3 +1,9 @@
+# 0.8.3
+Add setting for pathfinder to avoid all tokens or hostile tokens. Closes issue #37.
+Misc. fixes to pathfinding to reduce likelihood of it failing to find a path.
+Fix for waypoint elevations not finite. Closes issue #38.
+Refactor of elevation handling to account for Token Ruler tokens versus primary ruler.
+
 # 0.8.2
 Improvements to calculating distance on a grid. Improvements to splitting ruler segments when highlighting based on token speed. Closes issue #35. Improvements to treating tokens as difficult terrain for purposes of token speed highlighting.
 

@@ -29,9 +29,6 @@ const SETTINGS = {
     }
   },
 
-  USE_EV: "enable-elevated-vision-elevation",
-  USE_TERRAIN: "enable-enhanced-terrain-elevation",
-  USE_LEVELS: "enable-levels-elevation",
   USE_LEVELS_LABEL: "levels-use-floor-label",
   LEVELS_LABELS: {
     NEVER: "levels-labels-never",
@@ -70,47 +67,6 @@ export class Settings extends ModuleSettingsAbstract {
    */
   static registerAll() {
     const { KEYS, register, localize } = this;
-
-    if ( !MODULES_ACTIVE.ELEVATED_VISION
-      && !MODULES_ACTIVE.ENHANCED_TERRAINLAYER
-      && !MODULES_ACTIVE.LEVELS ) {
-      register(KEYS.NO_MODS, {
-        name: localize(`${KEYS.NO_MODS}.name`),
-        hint: localize(`${KEYS.NO_MODS}.hint`),
-        scope: "world",
-        config: true,
-        enabled: false,
-        default: true,
-        type: Boolean
-      });
-    }
-
-    register(KEYS.USE_EV, {
-      name: localize(`${KEYS.USE_EV}.name`),
-      hint: localize(`${KEYS.USE_EV}.hint`),
-      scope: "world",
-      config: MODULES_ACTIVE.ELEVATED_VISION,
-      default: MODULES_ACTIVE.ELEVATED_VISION,
-      type: Boolean
-    });
-
-    register(KEYS.USE_TERRAIN, {
-      name: localize(`${KEYS.USE_TERRAIN}.name`),
-      hint: localize(`${KEYS.USE_TERRAIN}.hint`),
-      scope: "world",
-      config: MODULES_ACTIVE.ENHANCED_TERRAIN_LAYER,
-      default: MODULES_ACTIVE.ENHANCED_TERRAIN_LAYER,
-      type: Boolean
-    });
-
-    register(KEYS.USE_LEVELS, {
-      name: localize(`${KEYS.USE_LEVELS}.name`),
-      hint: localize(`${KEYS.USE_LEVELS}.hint`),
-      scope: "world",
-      config: MODULES_ACTIVE.LEVELS,
-      default: MODULES_ACTIVE.LEVELS,
-      type: Boolean
-    });
 
     register(KEYS.USE_LEVELS_LABEL, {
       name: localize(`${KEYS.USE_LEVELS_LABEL}.name`),

@@ -11,21 +11,8 @@
     "elevationruler.keybindings.removeWaypointTokenRuler.name": "Remove Token Ruler Waypoint",
     "elevationruler.keybindings.removeWaypointTokenRuler.hint": "When token ruler is enabled, remove a waypoint while dragging the token.",
 
-
-    "elevationruler.settings.no-modules-message.name": "No elevation-related modules found.",
-    "elevationruler.settings.no-modules-message.hint": "Additional settings will be available here if Elevated Vision, Enhanced Terrain Layer, or Levels modules are active.",
-
-    "elevationruler.settings.enable-elevated-vision-elevation.name": "Use Elevated Vision",
-    "elevationruler.settings.enable-elevated-vision-elevation.hint": "Take into account elevation data from the Elevated Vision module when measuring.",
-
-    "elevationruler.settings.enable-enhanced-terrain-elevation.name": "Use Enhanced Terrain",
-    "elevationruler.settings.enable-enhanced-terrain-elevation.hint": "Take into account  terrain maximum elevation from the Enhanced Terrain Layer module when measuring.",
-
-    "elevationruler.settings.enable-levels-elevation.name": "Use Levels",
-    "elevationruler.settings.enable-levels-elevation.hint": "Take into account elevation information from the Levels module when measuring.",
-
     "elevationruler.settings.levels-use-floor-label.name": "Levels Floor Label",
-    "elevationruler.settings.levels-use-floor-label.hint": "Label the ruler with the current floor, if the Levels UI floors are named.",
+    "elevationruler.settings.levels-use-floor-label.hint": "If Levels module is active, label the ruler with the current floor, if the Levels UI floors are named.",
     "elevationruler.settings.levels-labels-never": "Never",
     "elevationruler.settings.levels-labels-ui": "Only when Levels UI is active",
     "elevationruler.settings.levels-labels-always": "Always",

@@ -3,7 +3,6 @@ canvas
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
-import { elevationAtWaypoint } from "./segments.js";
 import { Settings } from "./settings.js";
 
 // Patches for the Token class

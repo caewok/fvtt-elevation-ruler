@@ -3,8 +3,6 @@
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
-import { elevationAtWaypoint } from "./segments.js";
-
 // Patches for the ClientKeybindings class
 export const PATCHES = {};
 PATCHES.TOKEN_RULER = {}; // Assume this patch is only present if the token ruler setting is enabled.

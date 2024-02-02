@@ -8,25 +8,14 @@ PIXI
 */
 "use strict";
 
-import { SPEED, MODULE_ID } from "./const.js";
+import { SPEED, MODULE_ID, MODULES_ACTIVE } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { perpendicularPoints, log, segmentBounds } from "./util.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
 import { BorderEdge } from "./pathfinding/BorderTriangle.js";
 import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
-
-/**
- * Calculate the elevation for a given waypoint.
- * Terrain elevation + user increment
- * @param {object} waypoint
- * @returns {number}
- */
-export function elevationAtWaypoint(waypoint) {
-  const incr = waypoint._userElevationIncrements ?? 0;
-  const terrainE = waypoint._terrainElevation ?? 0;
-  return terrainE + (incr * canvas.dimensions.distance);
-}
+import { elevationAtWaypoint } from "./terrain_elevation.js";
 
 /**
  * Mixed wrap of  Ruler.prototype._getMeasurementSegments
@@ -308,7 +297,7 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
   const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
 
   // Add destination as the final waypoint
-  ruler.destination._terrainElevation = ruler.terrainElevationAtDestination();
+  ruler.destination._terrainElevation = ruler.elevationAtLocation(ruler.destination);
   ruler.destination._userElevationIncrements = ruler._userElevationIncrements;
   const waypoints = ruler.waypoints.concat([ruler.destination]);
 
@@ -340,8 +329,7 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
  * @returns {boolean}
  */
 function useLevelsLabels() {
-  if ( !game.modules.get("levels")?.active ) return false;
-
+  if ( !MODULES_ACTIVE.LEVELS ) return false;
   const labelOpt = Settings.get(Settings.KEYS.USE_LEVELS_LABEL);
   return labelOpt === Settings.KEYS.LEVELS_LABELS.ALWAYS
     || (labelOpt === Settings.KEYS.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);
