@@ -276,7 +276,7 @@ export class Settings extends ModuleSettingsAbstract {
     blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
     if ( blockSetting === C.NO ) { // Disable
       PATCHER.deregisterGroup("PATHFINDING_TOKENS");
-      for ( const id of SCENE_GRAPH.tokenEdges.keys() ) SCENE_GRAPH.removeToken(id);
+      SCENE_GRAPH.tokenIds.forEach(id => SCENE_GRAPH.removeToken(id));
     } else { // Enable
       PATCHER.registerGroup("PATHFINDING_TOKENS");
       for ( const token of canvas.tokens.placeables ) SCENE_GRAPH.addToken(token);
