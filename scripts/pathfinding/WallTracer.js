@@ -1,6 +1,7 @@
 /* globals
 CanvasQuadtree,
 CONFIG,
+CONST,
 foundry,
 PIXI,
 Token,

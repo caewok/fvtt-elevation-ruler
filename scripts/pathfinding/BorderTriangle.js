@@ -10,7 +10,7 @@ Wall
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 import { Draw } from "../geometry/Draw.js";
-import { WallTracer } from "./WallTracer.js";
+import { WallTracerEdge } from "./WallTracer.js";
 
 /**
  * An edge that makes up the triangle-shaped polygon
@@ -136,10 +136,10 @@ export class BorderEdge {
   edgeBlocks(origin) {
     const { moveToken, tokenBlockType } = this.constructor;
     return this.objects.some(obj => {
-      if ( obj instanceof Wall ) return WallTracer.wallBlocks(obj, origin);
-      if ( obj instanceof Token ) return WallTracker.tokenEdgeBlocks(obj, moveToken, tokenBlockType);
+      if ( obj instanceof Wall ) return WallTracerEdge.wallBlocks(obj, origin);
+      if ( obj instanceof Token ) return WallTracerEdge.tokenEdgeBlocks(obj, moveToken, tokenBlockType);
       return false;
-    }
+    });
   }
 
   /**
@@ -408,7 +408,7 @@ export class BorderTriangle {
   drawTriangle(opts = {}) {
     Object.values(this.edges).forEach(edge => {
       const edgeOpts = {...opts}; // Avoid modification of the original each loop.
-      const blocks = edge.edgeBlocks(this.center)
+      const blocks = edge.edgeBlocks(this.center);
       edgeOpts.alpha ??= blocks ? 1 : 0.25;
       edgeOpts.width ??= blocks ? 2 : 1;
       edge.draw(edgeOpts);
