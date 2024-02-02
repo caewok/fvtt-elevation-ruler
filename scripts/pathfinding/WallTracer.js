@@ -1,6 +1,7 @@
 /* globals
 CanvasQuadtree,
 CONFIG,
+CONST,
 foundry,
 PIXI,
 Token,
@@ -333,19 +334,19 @@ export class WallTracerEdge extends GraphEdge {
    */
   edgeBlocks(origin, moveToken, tokenBlockType) {
     return this.objects.some(obj =>
-      (obj instanceof Wall) ? this._wallBlocks(obj, origin)
-        : (obj instanceof Token) ? this._tokenEdgeBlocks(obj, moveToken, tokenBlockType)
+      (obj instanceof Wall) ? this.constructor.wallBlocks(obj, origin)
+        : (obj instanceof Token) ? this.constructor.tokenEdgeBlocks(obj, moveToken, tokenBlockType)
           : false);
   }
 
   /**
-   * Does this edge wall block from an origin somewhere else in the triangle?
+   * Does this edge wall block from an origin somewhere?
    * Tested "live" and not cached so door or wall orientation changes need not be tracked.
    * @param {Wall} wall       Wall to test
    * @param {Point} origin    Measure wall blocking from perspective of this origin point.
    * @returns {boolean}
    */
-  _wallBlocks(wall, origin) {
+  static wallBlocks(wall, origin) {
     if ( !wall.document.move || wall.isOpen ) return false;
 
     // Ignore one-directional walls which are facing away from the center
@@ -364,13 +365,13 @@ export class WallTracerEdge extends GraphEdge {
   }
 
   /**
-   * Does this token edge block from an origin somewhere else in the triangle?
-   * @param {Token} token             Token to test
+   * Could edges of this token block the moving token?
+   * @param {Token} token             Token whose edges will be tested
    * @param {Token} moveToken         Token doing the move
    * @param {string} tokenBlockType   What test to use for comparing token dispositions for blocking
    * @returns {boolean}
    */
-  _tokenEdgeBlocks(token, moveToken, tokenBlockType) {
+  static tokenEdgeBlocks(token, moveToken, tokenBlockType) {
     if ( !moveToken || moveToken === token ) return false;
 
     tokenBlockType ??= Settings._tokenBlockType();
@@ -394,7 +395,6 @@ export class WallTracerEdge extends GraphEdge {
       default: return true;
     }
   }
-
 }
 
 export class WallTracer extends Graph {
@@ -590,7 +590,13 @@ export class WallTracer extends Graph {
 
     // Shallow copy the edges b/c they will be removed from the set with destroy.
     const edgesArr = [...edges];
-    for ( const edge of edgesArr ) this.deleteEdge(edge);
+    for ( const edge of edgesArr ) {
+      // Remove any object with this id; if no objects left for the edge, remove the edge.
+      edge.objects.forEach(obj => {
+        if ( obj.id === id ) edge.objects.delete(obj);
+      });
+      if ( !edge.objects.size ) this.deleteEdge(edge);
+    }
     this.objectEdges.delete(id);
   }
 
@@ -611,7 +617,7 @@ export class WallTracer extends Graph {
   removeToken(tokenId) {
     if ( tokenId instanceof Token ) tokenId = tokenId.id;
     this.tokenIds.delete(tokenId);
-    return this.removeObject(tokenId, this.tokenEdges);
+    return this.removeObject(tokenId);
   }
 
   /**
@@ -832,6 +838,9 @@ function segmentOverlap(a, b, c, d) {
   const ix1 = lli(c, d, bP[0], bP[1]);
   const ix2 = lli(a, b, cP[0], cP[1]);
   const ix3 = lli(a, b, dP[0], dP[1]);
+
+  // Shouldn't happen unless a,b,c, or d are not distinct points.
+  if ( !(ix0 && ix1 && ix2 && ix3) ) return null;
 
   const aIx = ix0.t0.between(0, 1) ? ix0 : null;
   const bIx = ix1.t0.between(0, 1) ? ix1 : null;

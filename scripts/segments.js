@@ -36,6 +36,7 @@ export function _getMeasurementSegments(wrapped) {
   if ( this.user !== game.user ) {
     // Reconstruct labels if necessary.
     let labelIndex = 0;
+    this.segments ??= [];
     for ( const s of this.segments ) {
       if ( !s.label ) continue; // Not every segment has a label.
       s.label = this.labels.children[labelIndex++];
@@ -44,7 +45,7 @@ export function _getMeasurementSegments(wrapped) {
   }
 
   // Elevate the segments
-  const segments = elevateSegments(this, wrapped());
+  const segments = elevateSegments(this, wrapped()) ?? [];
   const token = this._getMovementToken();
 
   // If no movement token, then no pathfinding.
@@ -53,7 +54,7 @@ export function _getMeasurementSegments(wrapped) {
   // If no segments present, clear the path map and return.
   // No segments are present if dragging back to the origin point.
   const segmentMap = this._pathfindingSegmentMap ??= new Map();
-  if ( !segments || !segments.length ) {
+  if ( !segments.length ) {
     segmentMap.clear();
     return segments;
   }
@@ -99,7 +100,7 @@ function calculatePathPointsForSegment(segment, token) {
   const path = pf.runPath(A, B);
   let pathPoints = Pathfinder.getPathPoints(path);
   const t1 = performance.now();
-  log(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`);
+  log(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`, pathPoints);
 
   // Clean the path
   const t2 = performance.now();
@@ -132,7 +133,7 @@ function hasCollision(A, B, token) {
   const edges = SCENE_GRAPH.edgesQuadtree.getObjects(segmentBounds(A, B));
   const tokenBlockType = Settings._tokenBlockType();
   return edges.some(edge => lineSegmentIntersects(A, B, edge.A, edge.B)
-    && edge.edgeBlocks(origin, token, tokenBlockType));
+    && edge.edgeBlocks(A, token, tokenBlockType));
 }
 
 /**
@@ -201,12 +202,12 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
  * Return modified segment and total distance labels
  * @param {number} segmentDistance
  * @param {number} segmentMoveDistance
- * @param {number} totalDistance 
- * @returns {object} 
+ * @param {number} totalDistance
+ * @returns {object}
  */
 export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance) {
   const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || null;
-  if (canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS || !multiple) return { 
+  if (canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS || !multiple) return {
     newSegmentDistance: segmentDistance,
     newMoveDistance: Number(moveDistance.toFixed(2)),
     newTotalDistance: totalDistance

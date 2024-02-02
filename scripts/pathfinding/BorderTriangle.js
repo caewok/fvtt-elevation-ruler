@@ -10,7 +10,7 @@ Wall
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 import { Draw } from "../geometry/Draw.js";
-
+import { WallTracerEdge } from "./WallTracer.js";
 
 /**
  * An edge that makes up the triangle-shaped polygon
@@ -134,64 +134,12 @@ export class BorderEdge {
    * @returns {boolean}
    */
   edgeBlocks(origin) {
-    return this.objects.some(obj =>
-      (obj instanceof Wall) ? this._wallBlocks(obj, origin)
-        : (obj instanceof Token) ? this._tokenEdgeBlocks(obj)
-          : false);
-  }
-
-  /**
-   * Does this edge wall block from an origin somewhere else in the triangle?
-   * Tested "live" and not cached so door or wall orientation changes need not be tracked.
-   * @param {Point} origin    Measure wall blocking from perspective of this origin point.
-   * @returns {boolean}
-   */
-  _wallBlocks(wall, origin) {
-    if ( !wall.document.move || wall.isOpen ) return false;
-
-    // Ignore one-directional walls which are facing away from the center
-    const side = wall.orientPoint(origin);
-
-    /* Unneeded?
-    const wdm = PointSourcePolygon.WALL_DIRECTION_MODES;
-    if ( wall.document.dir
-      && (wallDirectionMode === wdm.NORMAL) === (side === wall.document.dir) ) return false;
-    */
-
-    if ( wall.document.dir
-      && side === wall.document.dir ) return false;
-
-    return true;
-  }
-
-  /**
-   * Does this token edge block from an origin somewhere else in the triangle?
-   * @param {Point} origin    Measure edge blocking from perspective of this origin point.
-   * @returns {boolean}
-   */
-  _tokenEdgeBlocks(token) {
-    const moveToken = this.constructor.moveToken;
-    if ( !moveToken || moveToken === token ) return false;
-
-    const D = CONST.TOKEN_DISPOSITIONS;
-    const moveTokenD = moveToken.document.disposition;
-    const edgeTokenD = token.document.disposition;
-    switch ( this.constructor.tokenBlockType ) {
-      case D.NEUTRAL: return false;
-      case D.SECRET: return true;
-
-      // Hostile: Block if dispositions are different
-      case D.HOSTILE: return ( edgeTokenD === D.SECRET
-        || moveTokenD === D.SECRET
-        || edgeTokenD !== moveTokenD );
-
-      // Friendly: Block if dispositions are the same
-      case D.FRIENDLY: return ( edgeTokenD === D.SECRET
-        || moveTokenD === D.SECRET
-        || edgeTokenD === moveTokenD );
-
-      default: return true;
-    }
+    const { moveToken, tokenBlockType } = this.constructor;
+    return this.objects.some(obj => {
+      if ( obj instanceof Wall ) return WallTracerEdge.wallBlocks(obj, origin);
+      if ( obj instanceof Token ) return WallTracerEdge.tokenEdgeBlocks(obj, moveToken, tokenBlockType);
+      return false;
+    });
   }
 
   /**
@@ -460,7 +408,7 @@ export class BorderTriangle {
   drawTriangle(opts = {}) {
     Object.values(this.edges).forEach(edge => {
       const edgeOpts = {...opts}; // Avoid modification of the original each loop.
-      const blocks = edge.edgeBlocks(this.center)
+      const blocks = edge.edgeBlocks(this.center);
       edgeOpts.alpha ??= blocks ? 1 : 0.25;
       edgeOpts.width ??= blocks ? 2 : 1;
       edge.draw(edgeOpts);

@@ -412,15 +412,16 @@ function cleanGridPath(pathPoints) {
       const nextGridPos = canvas.grid.grid.getGridPositionFromPixels(next.x, next.y);
       if ( currGridPos[0] === nextGridPos[0]
         && currGridPos[1] === nextGridPos[1]
-        && !ClockwiseSweepPolygon.testCollision(curr, next, config) ) {
+        && !ClockwiseSweepPolygon.testCollision(prev, next, config) ) {
         curr = next;
         continue;
       }
     }
 
     // Test if we can move the current point to the center of the grid without a collision.
+    // Don't overlap points, which can cause collisions.
     const currCenter = getGridCenterPoint(curr);
-    if ( !ClockwiseSweepPolygon.testCollision(prev, currCenter, config) ) curr = currCenter;
+    if ( !prev.equals(currCenter) && !ClockwiseSweepPolygon.testCollision(prev, currCenter, config) ) curr = currCenter;
     newPath.push(curr);
     prev = curr;
     curr = next;

@@ -205,10 +205,11 @@ function _getMeasurementDestination(wrapped, destination) {
 }
 
 /**
- * Wrap Ruler.prototype._animateMovement
+ * Mixed wrap Ruler.prototype._animateMovement
  * Add additional controlled tokens to the move, if permitted.
  */
 async function _animateMovement(wrapped, token) {
+  if ( !this.segments.length ) return; // Ruler._animateMovement expects at least one segment.
   const promises = [wrapped(token)];
   for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;
@@ -585,9 +586,6 @@ PATCHES.BASIC.WRAPS = {
   // Wraps related to segments
   _getSegmentLabel,
 
-  // Move token methods
-  _animateMovement,
-
   // Events
   _onDragStart,
   _onClickLeft,
@@ -597,7 +595,7 @@ PATCHES.BASIC.WRAPS = {
   _canMove
 };
 
-PATCHES.BASIC.MIXES = { _animateSegment, _getMovementToken, _getMeasurementSegments };
+PATCHES.BASIC.MIXES = { _animateMovement, _animateSegment, _getMovementToken, _getMeasurementSegments };
 
 PATCHES.BASIC.OVERRIDES = { _computeDistance };
 
