@@ -23,7 +23,9 @@ import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
  * @returns {number}
  */
 export function elevationAtWaypoint(waypoint) {
-  return waypoint._terrainElevation + (waypoint._userElevationIncrements * canvas.dimensions.distance);
+  const incr = waypoint._userElevationIncrements ?? 0;
+  const terrainE = waypoint._terrainElevation ?? 0;
+  return terrainE + (incr * canvas.dimensions.distance);
 }
 
 /**
