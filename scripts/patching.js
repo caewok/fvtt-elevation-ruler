@@ -17,16 +17,16 @@ import { PATCHES as PATCHES_TokenPF } from "./pathfinding/Token.js";
 import { PATCHES as PATCHES_Wall } from "./pathfinding/Wall.js";
 
 // Settings
-import { PATCHES as PATCHES_Settings } from "./ModuleSettingsAbstract.js";
+import { PATCHES as PATCHES_ClientSettings } from "./ModuleSettingsAbstract.js";
 
 const PATCHES = {
   BaseGrid: PATCHES_BaseGrid,
   ClientKeybindings: PATCHES_ClientKeybindings,
+  ClientSettings: PATCHES_ClientSettings,
   GridLayer: PATCHES_GridLayer,
   HexagonalGrid: PATCHES_HexagonalGrid,
   Ruler: PATCHES_Ruler,
   Token: foundry.utils.mergeObject(PATCHES_Token, PATCHES_TokenPF),
-  Settings: PATCHES_Settings,
   Wall: PATCHES_Wall
 };
 

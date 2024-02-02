@@ -16,13 +16,12 @@ PATCHES.BASIC = {};
 /**
  * Wipe the settings cache on update
  */
-function updateSetting(document, change, options, userId) {  // eslint-disable-line no-unused-vars
-  const [module, ...arr] = document.key.split(".");
-  const key = arr.join("."); // If the key has periods, multiple will be returned by split.
-  if ( module === MODULE_ID && ModuleSettingsAbstract.cache.has(key) ) ModuleSettingsAbstract.cache.delete(key);
+async function set(wrapper, namespace, key, value, options) {
+  if ( namespace === MODULE_ID ) ModuleSettingsAbstract.cache.delete(key);
+  return wrapper(namespace, key, value, options);
 }
 
-PATCHES.BASIC.HOOKS = { updateSetting };
+PATCHES.BASIC.WRAPS = { set };
 
 export class ModuleSettingsAbstract {
   /** @type {Map<string, *>} */
@@ -64,10 +63,7 @@ export class ModuleSettingsAbstract {
    * @param {*} value
    * @returns {Promise<boolean>}
    */
-  static async set(key, value) {
-    this.cache.delete(key);
-    return game.settings.set(MODULE_ID, key, value);
-  }
+  static async set(key, value) { return game.settings.set(MODULE_ID, key, value); }
 
   static async toggle(key) {
     const curr = this.get(key);
