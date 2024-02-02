@@ -21,7 +21,8 @@ import { Ray3d } from "./geometry/3d/Ray3d.js";
 import {
   elevationAtOrigin,
   terrainElevationAtPoint,
-  terrainElevationAtDestination
+  terrainElevationAtDestination,
+  elevationAtLocation
 } from "./terrain_elevation.js";
 
 import {
@@ -29,7 +30,8 @@ import {
   _getSegmentLabel,
   _animateSegment,
   hasSegmentCollision,
-  _highlightMeasurementSegment
+  _highlightMeasurementSegment,
+  elevationAtWaypoint
 } from "./segments.js";
 
 import {
@@ -116,7 +118,7 @@ function toJSON(wrapper) {
     return newObj;
   });
 
-  myObj._userElevationIncrements = this._userElevationIncrements;
+  myObj._userElevationIncrements = this._ ;
   myObj._unsnap = this._unsnap;
   myObj._unsnappedOrigin = this._unsnappedOrigin;
   myObj.totalDistance = this.totalDistance;
@@ -655,7 +657,8 @@ PATCHES.BASIC.METHODS = {
 
 PATCHES.BASIC.STATIC_METHODS = {
   measureDistance,
-  measureMoveDistance
+  measureMoveDistance,
+  elevationAtWaypoint
 };
 
 
@@ -667,12 +670,21 @@ PATCHES.BASIC.STATIC_METHODS = {
 function addWaypointElevationIncrements(ruler, point) {
   const ln = ruler.waypoints.length;
   const newWaypoint = ruler.waypoints[ln - 1];
-  if ( ln === 1) {
-    // Origin waypoint -- cache using elevationAtOrigin
-    ruler.elevationAtOrigin();
-    ruler._userElevationIncrements = 0;
+
+  // Set defaults.
+  newWaypoint._terrainElevation = 0;
+  newWaypoint._userElevationIncrements = 0;
+
+  if ( ln === 1 ) {
+    const moveToken = ruler._getMovementToken();
+    newWaypoint._terrainElevation = moveToken ? moveToken.elevationE : elevationAtLocation(newWaypoint);
+
   } else {
+    newWaypoint._userElevationIncrements = ruler._userElevationIncrements ?? 0;
     newWaypoint._terrainElevation = ruler.terrainElevationAtPoint(point);
-    newWaypoint._userElevationIncrements = ruler._userElevationIncrements;
+  }
+
+  if ( !isFinite(newWaypoint._terrainElevation) ) {
+    log(`terrainElevationAtPoint produced invalid value ${newWaypoint._terrainElevation}`);
   }
 }

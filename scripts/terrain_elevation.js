@@ -17,44 +17,21 @@ import { elevationAtWaypoint } from "./segments.js";
 
 /**
  * Add Ruler.prototype.elevationAtOrigin
- * Retrieve the elevation at the current ruler origin.
- * This is either the measuring token elevation or terrain elevation or 0.
- * Cached during a ruler movement
- */
-export function elevationAtOrigin() {
-  const origin = this.waypoints[0];
-  if ( !origin ) return undefined;
-  if ( typeof origin._terrainElevation !== "undefined" ) return origin._terrainElevation;
-
-  let value = Number.NEGATIVE_INFINITY;
-  const measuringToken = this._getMovementToken();
-  if ( measuringToken ) value = tokenElevation(measuringToken);
-  else value = elevationAtLocation(origin, measuringToken);
-
-  origin._terrainElevation = value;
-  origin._userElevationIncrements = 0;
-  return value;
-}
-
-/**
- * Retrieve the token elevation, using:
- * 1. Wall Height / Levels
- * 2. Foundry default
- * @param {Token} token
+ * Retrieve the elevation at the current ruler origin waypoint.
  * @returns {number}
  */
-function tokenElevation(token) {
-  return token?.document?.elevation ?? 0;
-}
+export function elevationAtOrigin() { return elevationAtWaypoint(this.waypoints[0]); }
+
 
 /**
  * Determine if token elevation should be preferred
  * @returns {boolean}
  */
 function preferTokenElevation() {
-  if ( !Settings.get(Settings.KEYS.CONTROLS.PREFER_TOKEN_ELEVATION) ) return false;
+  const PREFER_TOKEN_ELEVATION = Settings.KEYS.CONTROLS.PREFER_TOKEN_ELEVATION;
+  if ( !Settings.get(PREFER_TOKEN_ELEVATION) ) return false;
   const token_controls = ui.controls.controls.find(elem => elem.name === "token");
-  const prefer_token_control = token_controls.tools.find(elem => elem.name === Settings.KEYS.CONTROLS.PREFER_TOKEN_ELEVATION);
+  const prefer_token_control = token_controls.tools.find(elem => elem.name === PREFER_TOKEN_ELEVATION);
   return prefer_token_control.active;
 }
 
@@ -71,18 +48,17 @@ export function terrainElevationAtDestination({ considerTokens = true } = {}) {
  * Measure elevation for a given rule position
  * Try the following, in order:
  * 1. If measuring token, the measuring token elevation.
- * 2. If currently selected token && EV, consider tiles
+ * 2. If currently selected token && EV
  * 3. If currently selected token && Levels, current layer
  * 4. If Levels UI, current layer
  * 5. If enhanced terrain layer, terrain layer
- * 5. If EV, point measure
  * 6. 0
  * @param {Point} location
  * @param {Token} [measuringToken]
  * @param {number} [startingElevation=Number.NEGATIVE_INFINITY]
  * @returns {number}
  */
-function elevationAtLocation(location, measuringToken, startingElevation = Number.NEGATIVE_INFINITY) {
+export function elevationAtLocation(location, measuringToken, startingElevation = Number.NEGATIVE_INFINITY) {
   const ignoreBelow = (measuringToken && preferTokenElevation()) ? startingElevation : Number.NEGATIVE_INFINITY;
   log(`Checking Elevation at (${location.x}, ${location.y})\n\tstarting elevation ${startingElevation}\n\tignoring below ${ignoreBelow}`);
 
@@ -95,23 +71,23 @@ function elevationAtLocation(location, measuringToken, startingElevation = Numbe
     // Is the point within the token control area?
     // Issue #33: bounds can apparently be undefined in some systems?
     if ( !t.bounds || !t.bounds.contains(location.x, location.y) ) return e;
-    return Math.max(tokenElevation(t), e);
+    return Math.max(measuringToken.elevationE, e);
   }, Number.NEGATIVE_INFINITY);
   if ( isFinite(max_token_elevation) && max_token_elevation >= ignoreBelow ) return max_token_elevation;
-
-  // Try Enhanced Terrain Layer
-  // Terrain layers trumps all others
-  const terrain_elevation = TerrainLayerElevationAtPoint(location);
-  if ( terrain_elevation !== undefined && terrain_elevation > ignoreBelow ) return terrain_elevation;
 
   // Try Elevated Vision
   // If EV is present, it should handle Levels elevation as well
   const ev_elevation = EVElevationAtPoint(location, measuringToken, startingElevation);
-  if ( ev_elevation !== undefined && ev_elevation > ignoreBelow ) return ev_elevation;
+  if ( isFinite(ev_elevation) && ev_elevation !== undefined && ev_elevation > ignoreBelow ) return ev_elevation;
 
   // Try Levels
   const levels_elevation = LevelsElevationAtPoint(location, { startingElevation });
-  if ( levels_elevation !== undefined && levels_elevation > ignoreBelow ) return levels_elevation;
+  if ( isFinite(levels_elevation) && levels_elevation > ignoreBelow ) return levels_elevation;
+
+  // Try Enhanced Terrain Layer
+  // Terrain layers trumps all others
+  const terrain_elevation = TerrainLayerElevationAtPoint(location);
+  if ( isFinite(terrain_elevation) && terrain_elevation > ignoreBelow ) return terrain_elevation;
 
   // Default to 0 elevation for the point
   return Math.max(ignoreBelow, 0);
@@ -133,9 +109,9 @@ function elevationAtLocation(location, measuringToken, startingElevation = Numbe
  */
 export function terrainElevationAtPoint(p, { startingElevation } = {}) {
   const measuringToken = this._getMovementToken();
-  startingElevation ??= this.waypoints.length
-    ? elevationAtWaypoint(this.waypoints[this.waypoints.length - 1]) : measuringToken
-      ? tokenElevation(measuringToken) : Number.NEGATIVE_INFINITY;
+  startingElevation ??= this.waypoints.length ? elevationAtWaypoint(this.waypoints.at(-1))
+    : measuringToken ? measuringToken.elevationE
+      : Number.NEGATIVE_INFINITY;
 
   return elevationAtLocation(p, measuringToken, startingElevation);
 }
