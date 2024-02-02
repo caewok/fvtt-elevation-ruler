@@ -412,7 +412,7 @@ function cleanGridPath(pathPoints) {
       const nextGridPos = canvas.grid.grid.getGridPositionFromPixels(next.x, next.y);
       if ( currGridPos[0] === nextGridPos[0]
         && currGridPos[1] === nextGridPos[1]
-        && !ClockwiseSweepPolygon.testCollision(curr, next, config) ) {
+        && !ClockwiseSweepPolygon.testCollision(prev, next, config) ) {
         curr = next;
         continue;
       }
