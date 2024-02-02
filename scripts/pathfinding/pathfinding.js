@@ -419,8 +419,9 @@ function cleanGridPath(pathPoints) {
     }
 
     // Test if we can move the current point to the center of the grid without a collision.
+    // Don't overlap points, which can cause collisions.
     const currCenter = getGridCenterPoint(curr);
-    if ( !ClockwiseSweepPolygon.testCollision(prev, currCenter, config) ) curr = currCenter;
+    if ( !prev.equals(currCenter) && !ClockwiseSweepPolygon.testCollision(prev, currCenter, config) ) curr = currCenter;
     newPath.push(curr);
     prev = curr;
     curr = next;
