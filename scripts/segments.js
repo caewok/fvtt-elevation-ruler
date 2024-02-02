@@ -132,7 +132,7 @@ function hasCollision(A, B, token) {
   const edges = SCENE_GRAPH.edgesQuadtree.getObjects(segmentBounds(A, B));
   const tokenBlockType = Settings._tokenBlockType();
   return edges.some(edge => lineSegmentIntersects(A, B, edge.A, edge.B)
-    && edge.edgeBlocks(origin, token, tokenBlockType));
+    && edge.edgeBlocks(A, token, tokenBlockType));
 }
 
 /**
