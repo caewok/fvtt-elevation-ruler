@@ -1,6 +1,7 @@
 /* globals
 canvas,
 game,
+CONFIG,
 Hooks,
 ui
 */
@@ -9,7 +10,7 @@ ui
 
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
-import { MODULE_ID, MOVEMENT_TYPES, SPEED } from "./const.js";
+import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS } from "./const.js";
 import { iterateGridUnderLine } from "./util.js";
 import { registerGeometry } from "./geometry/registration.js";
 
@@ -30,14 +31,21 @@ Hooks.once("init", function() {
   registerGeometry();
 
   // Configuration
-  CONFIG[MODULE_ID] = { debug: false };
+  CONFIG[MODULE_ID] = {
+    // Configurations related to measuring token speed for ruler highlighting.
+    SPEED,
+
+    // Font awesome identifiers for the Token HUD speed selection.
+    MOVEMENT_BUTTONS,
+
+    debug: false
+  };
 
 
   game.modules.get(MODULE_ID).api = {
     iterateGridUnderLine,
     PATCHER,
     MOVEMENT_TYPES,
-    SPEED,
 
     // Pathfinding
     pathfinding: {
@@ -87,7 +95,7 @@ const PREFER_TOKEN_CONTROL = {
 const PATHFINDING_CONTROL = {
   name: Settings.KEYS.CONTROLS.PATHFINDING,
   title: `${MODULE_ID}.controls.${Settings.KEYS.CONTROLS.PATHFINDING}.name`,
-  icon:"fa-solid fa-route",
+  icon: "fa-solid fa-route",
   toggle: true
 };
 

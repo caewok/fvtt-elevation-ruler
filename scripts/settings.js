@@ -5,14 +5,7 @@ canvas
 */
 "use strict";
 
-import {
-  MODULE_ID,
-  MODULES_ACTIVE,
-  SPEED,
-  defaultWalkAttribute,
-  defaultFlyAttribute,
-  defaultBurrowAttribute,
-  defaultDashMultiplier } from "./const.js";
+import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { log } from "./util.js";
 import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
@@ -48,12 +41,6 @@ const SETTINGS = {
     ENABLED: "enable-token-ruler",
     ROUND_TO_MULTIPLE: "round-to-multiple",
     SPEED_HIGHLIGHTING: "token-ruler-highlighting",
-    SPEED_PROPERTIES: {
-      WALK: "token-speed-property", // For backwards compatibility
-      FLY: "token-fly-property",
-      BURROW: "token-burrow-property",
-      MULTIPLIER: "token-speed-multiplier"
-    },
     TOKEN_MULTIPLIER: "token-terrain-multiplier"
   }
 };
@@ -180,57 +167,6 @@ export class Settings extends ModuleSettingsAbstract {
         step: 0.1
       }
     });
-
-    register(KEYS.TOKEN_RULER.SPEED_PROPERTIES.WALK, {
-      name: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.WALK}.name`),
-      hint: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.WALK}.hint`),
-      scope: "world",
-      config: true,
-      default: defaultWalkAttribute(),
-      type: String,
-      onChange: value => SPEED.ATTRIBUTES.WALK = value
-    });
-
-    register(KEYS.TOKEN_RULER.SPEED_PROPERTIES.FLY, {
-      name: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.FLY}.name`),
-      hint: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.FLY}.hint`),
-      scope: "world",
-      config: true,
-      default: defaultFlyAttribute(),
-      type: String,
-      onChange: value => SPEED.ATTRIBUTES.FLY = value
-    });
-
-    register(KEYS.TOKEN_RULER.SPEED_PROPERTIES.BURROW, {
-      name: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.BURROW}.name`),
-      hint: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.BURROW}.hint`),
-      scope: "world",
-      config: true,
-      default: defaultBurrowAttribute(),
-      type: String,
-      onChange: value => SPEED.ATTRIBUTES.BURROW = value
-    });
-
-    register(KEYS.TOKEN_RULER.SPEED_PROPERTIES.MULTIPLIER, {
-      name: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.MULTIPLIER}.name`),
-      hint: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.MULTIPLIER}.hint`),
-      scope: "world",
-      config: true,
-      default: defaultDashMultiplier(),
-      type: Number,
-      range: {
-        max: 10,
-        min: 0,
-        step: 0.1
-      },
-      onChange: value => SPEED.MULTIPLIER = value
-    });
-
-    // Initialize the Token Ruler properties.
-    SPEED.ATTRIBUTES.WALK = this.get(KEYS.TOKEN_RULER.SPEED_PROPERTIES.WALK);
-    SPEED.ATTRIBUTES.FLY = this.get(KEYS.TOKEN_RULER.SPEED_PROPERTIES.FLY);
-    SPEED.ATTRIBUTES.BURROW = this.get(KEYS.TOKEN_RULER.SPEED_PROPERTIES.BURROW);
-    SPEED.MULTIPLIER = this.get(KEYS.TOKEN_RULER.SPEED_PROPERTIES.MULTIPLIER);
   }
 
   static registerKeybindings() {
@@ -274,8 +210,6 @@ export class Settings extends ModuleSettingsAbstract {
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
   }
-
-  static setSpeedProperty(value) { SPEED.ATTRIBUTE = value; }
 
   static toggleTokenBlocksPathfinding(blockSetting) {
     const C = this.KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES;
