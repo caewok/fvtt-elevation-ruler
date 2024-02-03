@@ -8,6 +8,10 @@ Hooks
 export const MODULE_ID = "elevationruler";
 export const EPSILON = 1e-08;
 
+export const FLAGS = {
+  MOVEMENT_SELECTION: "selectedMovementType"
+};
+
 export const MODULES_ACTIVE = { API: {} };
 
 // Hook init b/c game.modules is not initialized at start.
@@ -27,6 +31,30 @@ export const DIAGONAL_RULES = {
   555: 1,
   5105: 2,
   MANHATTAN: 3
+};
+
+
+export const MOVEMENT_TYPES = {
+  AUTO: -1,
+  BURROW: 0,
+  WALK: 1,
+  FLY: 2
+};
+
+// Store the flipped key/values.
+Object.entries(MOVEMENT_TYPES).forEach(([key, value]) => MOVEMENT_TYPES[value] = key);
+
+export const MOVEMENT_BUTTONS = {
+  [MOVEMENT_TYPES.AUTO]: "road-lock",
+  [MOVEMENT_TYPES.BURROW]: "person-digging",
+  [MOVEMENT_TYPES.WALK]: "person-walking-with-cane",
+  [MOVEMENT_TYPES.FLY]: "dove"
+};
+
+export const SPEED_ATTRIBUTES = {
+  [MOVEMENT_TYPES.BURROW]: "",
+  [MOVEMENT_TYPES.WALK]: "",
+  [MOVEMENT_TYPES.FLY]: ""
 };
 
 /**
@@ -57,7 +85,7 @@ SOFTWARE.
 */
 
 export const SPEED = {
-  ATTRIBUTE: "",
+  ATTRIBUTES: { WALK: "", BURROW: "", FLY: ""},
   MULTIPLIER: 0,
   TYPES: {
     WALK: 0,
@@ -78,15 +106,18 @@ SPEED.COLORS[SPEED.TYPES.MAXIMUM] = SPEED.COLORS.MAXIMUM;
 
 // Avoid testing for the system id each time.
 Hooks.once("init", function() {
-  SPEED.ATTRIBUTE = defaultSpeedAttribute();
+  SPEED.ATTRIBUTES.WALK = defaultWalkAttribute();
+  SPEED.ATTRIBUTES.BURROW = defaultBurrowAttribute();
+  SPEED.ATTRIBUTES.FLY = defaultFlyAttribute();
   SPEED.MULTIPLIER = defaultDashMultiplier();
 });
 
-function defaultSpeedAttribute() {
+export function defaultWalkAttribute() {
   switch (game.system.id) {
     case "CoC7":
       return "actor.system.attribs.mov.value";
     case "dcc":
+      return "actor.system.attributes.speed.value";
     case "sfrpg":
       return "actor.system.attributes.speed.value";
     case "dnd4e":
@@ -114,7 +145,53 @@ function defaultSpeedAttribute() {
   return "";
 }
 
-function defaultDashMultiplier() {
+export function defaultFlyAttribute() {
+  switch (game.system.id) {
+    // Missing attribute case "CoC7":
+    // Missing attribute case "dcc":
+    case "sfrpg":
+      return "actor.system.attributes.flying.value";
+    // Missing attribute case "dnd4e":
+    case "dnd5e":
+      return "actor.system.attributes.movement.fly";
+    // Missing attribute case "lancer":
+    case "pf1":
+    case "D35E":
+      return "actor.system.attributes.speed.fly.total";
+    // Missing attribute case "shadowrun5e":
+    // Missing attribute case "swade":
+    // Missing attribute case "ds4":
+    // Missing attribute case "splittermond":
+    // Missing attribute case "wfrp4e":
+    // Missing attribute case "crucible":
+  }
+  return "";
+}
+
+export function defaultBurrowAttribute() {
+  switch (game.system.id) {
+    // Missing attribute case "CoC7":
+    // Missing attribute case "dcc":
+    case "sfrpg":
+      return "actor.system.attributes.burrowing.value";
+    // Missing attribute case "dnd4e":
+    case "dnd5e":
+      return "actor.system.attributes.movement.burrow";
+    // Missing attribute case "lancer":
+    case "pf1":
+    case "D35E":
+      return "actor.system.attributes.speed.burrow.total";
+    // Missing attribute case "shadowrun5e":
+    // Missing attribute case "swade":
+    // Missing attribute case "ds4":
+    // Missing attribute case "splittermond":
+    // Missing attribute case "wfrp4e":
+    // Missing attribute case "crucible":
+  }
+  return "";
+}
+
+export function defaultDashMultiplier() {
   switch (game.system.id) {
     case "dcc":
     case "dnd4e":

@@ -5,7 +5,14 @@ canvas
 */
 "use strict";
 
-import { MODULE_ID, MODULES_ACTIVE, SPEED } from "./const.js";
+import {
+  MODULE_ID,
+  MODULES_ACTIVE,
+  SPEED,
+  defaultWalkAttribute,
+  defaultFlyAttribute,
+  defaultBurrowAttribute,
+  defaultDashMultiplier } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { log } from "./util.js";
 import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
@@ -35,12 +42,18 @@ const SETTINGS = {
     UI_ONLY: "levels-labels-ui",
     ALWAYS: "levels-labels-always"
   },
+
   NO_MODS: "no-modules-message",
   TOKEN_RULER: {
     ENABLED: "enable-token-ruler",
     ROUND_TO_MULTIPLE: "round-to-multiple",
     SPEED_HIGHLIGHTING: "token-ruler-highlighting",
-    SPEED_PROPERTY: "token-speed-property",
+    SPEED_PROPERTIES: {
+      WALK: "token-speed-property", // For backwards compatibility
+      FLY: "token-fly-property",
+      BURROW: "token-burrow-property",
+      MULTIPLIER: "token-speed-multiplier"
+    },
     TOKEN_MULTIPLIER: "token-terrain-multiplier"
   }
 };
@@ -146,16 +159,6 @@ export class Settings extends ModuleSettingsAbstract {
       requiresReload: false
     });
 
-    register(KEYS.TOKEN_RULER.SPEED_PROPERTY, {
-      name: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTY}.name`),
-      hint: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTY}.hint`),
-      scope: "world",
-      config: true,
-      default: SPEED.ATTRIBUTE,
-      type: String,
-      onChange: value => this.setSpeedProperty(value)
-    });
-
     register(KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE, {
       name: localize(`${KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE}.name`),
       hint: localize(`${KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE}.hint`),
@@ -178,8 +181,56 @@ export class Settings extends ModuleSettingsAbstract {
       }
     });
 
-    // Initialize the Token Ruler.
-    this.setSpeedProperty(this.get(KEYS.TOKEN_RULER.SPEED_PROPERTY));
+    register(KEYS.TOKEN_RULER.SPEED_PROPERTIES.WALK, {
+      name: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.WALK}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.WALK}.hint`),
+      scope: "world",
+      config: true,
+      default: defaultWalkAttribute(),
+      type: String,
+      onChange: value => SPEED.ATTRIBUTES.WALK = value
+    });
+
+    register(KEYS.TOKEN_RULER.SPEED_PROPERTIES.FLY, {
+      name: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.FLY}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.FLY}.hint`),
+      scope: "world",
+      config: true,
+      default: defaultFlyAttribute(),
+      type: String,
+      onChange: value => SPEED.ATTRIBUTES.FLY = value
+    });
+
+    register(KEYS.TOKEN_RULER.SPEED_PROPERTIES.BURROW, {
+      name: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.BURROW}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.BURROW}.hint`),
+      scope: "world",
+      config: true,
+      default: defaultBurrowAttribute(),
+      type: String,
+      onChange: value => SPEED.ATTRIBUTES.BURROW = value
+    });
+
+    register(KEYS.TOKEN_RULER.SPEED_PROPERTIES.MULTIPLIER, {
+      name: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.MULTIPLIER}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.SPEED_PROPERTIES.MULTIPLIER}.hint`),
+      scope: "world",
+      config: true,
+      default: defaultDashMultiplier(),
+      type: Number,
+      range: {
+        max: 10,
+        min: 0,
+        step: 0.1
+      },
+      onChange: value => SPEED.MULTIPLIER = value
+    });
+
+    // Initialize the Token Ruler properties.
+    SPEED.ATTRIBUTES.WALK = this.get(KEYS.TOKEN_RULER.SPEED_PROPERTIES.WALK);
+    SPEED.ATTRIBUTES.FLY = this.get(KEYS.TOKEN_RULER.SPEED_PROPERTIES.FLY);
+    SPEED.ATTRIBUTES.BURROW = this.get(KEYS.TOKEN_RULER.SPEED_PROPERTIES.BURROW);
+    SPEED.MULTIPLIER = this.get(KEYS.TOKEN_RULER.SPEED_PROPERTIES.MULTIPLIER);
   }
 
   static registerKeybindings() {
@@ -228,7 +279,6 @@ export class Settings extends ModuleSettingsAbstract {
 
   static toggleTokenBlocksPathfinding(blockSetting) {
     const C = this.KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES;
-    const D = CONST.TOKEN_DISPOSITIONS;
     blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
     if ( blockSetting === C.NO ) { // Disable
       PATCHER.deregisterGroup("PATHFINDING_TOKENS");

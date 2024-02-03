@@ -298,7 +298,9 @@ function _computeTokenSpeed(gridSpaces) {
   // Requires a movement token and a defined token speed.
   const token = this._getMovementToken();
   if ( !token ) return;
-  const tokenSpeed = Number(getProperty(token, SPEED.ATTRIBUTE));
+
+  const speedAttribute = SPEED.ATTRIBUTES[token.movementType] ?? SPEED.ATTRIBUTES.WALK;
+  const tokenSpeed = Number(getProperty(token, speedAttribute));
   if ( !tokenSpeed ) return;
 
   // Other constants
