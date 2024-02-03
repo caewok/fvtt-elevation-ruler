@@ -10,6 +10,8 @@ Move settings related to speed properties to `CONFIG.elevationruler.SPEED`.
 
 Add getter `Token.prototype.lastMoveDistance` that tracks the last token move. If combat is active, this returns 0 if the token has not yet moved this round. Use `Token.prototype._lastMoveDistance` to find the actual last distance moved regardless of combat.
 
+Add setting to round ruler measurements, for use with gridless scenes. Thanks @Larkinabout for the PR!
+
 # 0.8.2
 Improvements to calculating distance on a grid. Improvements to splitting ruler segments when highlighting based on token speed. Closes issue #35. Improvements to treating tokens as difficult terrain for purposes of token speed highlighting.
 
