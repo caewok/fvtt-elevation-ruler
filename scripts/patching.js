@@ -16,9 +16,14 @@ import { PATCHES as PATCHES_TokenPF } from "./pathfinding/Token.js";
 // Pathfinding
 import { PATCHES as PATCHES_Wall } from "./pathfinding/Wall.js";
 
+// Movement tracking
+import { PATCHES as PATCHES_TokenHUD } from "./token_hud.js";
+
 // Settings
 import { PATCHES as PATCHES_ClientSettings } from "./ModuleSettingsAbstract.js";
 
+
+const mergeObject = foundry.utils.mergeObject;
 const PATCHES = {
   BaseGrid: PATCHES_BaseGrid,
   ClientKeybindings: PATCHES_ClientKeybindings,
@@ -26,7 +31,7 @@ const PATCHES = {
   GridLayer: PATCHES_GridLayer,
   HexagonalGrid: PATCHES_HexagonalGrid,
   Ruler: PATCHES_Ruler,
-  Token: foundry.utils.mergeObject(PATCHES_Token, PATCHES_TokenPF),
+  Token: mergeObject(mergeObject(PATCHES_Token, PATCHES_TokenPF), PATCHES_TokenHUD),
   Wall: PATCHES_Wall
 };
 
@@ -39,5 +44,6 @@ export function initializePatching() {
   PATCHER.registerGroup("TOKEN_RULER");
   PATCHER.registerGroup("SPEED_HIGHLIGHTING");
   PATCHER.registerGroup("MOVEMENT_TRACKING");
+  PATCHER.registerGroup("MOVEMENT_SELECTION");
 }
 

@@ -8,6 +8,10 @@ Hooks
 export const MODULE_ID = "elevationruler";
 export const EPSILON = 1e-08;
 
+export const FLAGS = {
+  MOVEMENT_SELECTION: "selectedMovementType"
+};
+
 export const MODULES_ACTIVE = { API: {} };
 
 // Hook init b/c game.modules is not initialized at start.
@@ -27,6 +31,30 @@ export const DIAGONAL_RULES = {
   555: 1,
   5105: 2,
   MANHATTAN: 3
+};
+
+
+export const MOVEMENT_TYPES = {
+  AUTO: -1,
+  BURROW: 0,
+  WALK: 1,
+  FLY: 2
+};
+
+// Store the flipped key/values.
+Object.entries(MOVEMENT_TYPES).forEach(([key, value]) => MOVEMENT_TYPES[value] = key);
+
+export const MOVEMENT_BUTTONS = {
+  [MOVEMENT_TYPES.AUTO]: "road-lock",
+  [MOVEMENT_TYPES.BURROW]: "person-digging",
+  [MOVEMENT_TYPES.WALK]: "person-walking-with-cane",
+  [MOVEMENT_TYPES.FLY]: "dove"
+};
+
+export const SPEED_ATTRIBUTES = {
+  [MOVEMENT_TYPES.BURROW]: "",
+  [MOVEMENT_TYPES.WALK]: "",
+  [MOVEMENT_TYPES.FLY]: ""
 };
 
 /**
