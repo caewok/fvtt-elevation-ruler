@@ -1,18 +1,34 @@
 /* globals
 canvas,
 CONFIG,
+CONST,
 foundry,
-PIXI
+PIXI,
+Token,
+Wall
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 import { Draw } from "../geometry/Draw.js";
-
+import { WallTracerEdge } from "./WallTracer.js";
 
 /**
  * An edge that makes up the triangle-shaped polygon
  */
 export class BorderEdge {
+  /**
+   * If CONST.TOKEN_DISPOSITIONS.NEUTRAL, blocks none.
+   * If CONST.TOKEN_DISPOSITIONS.FRIENDLY, blocks if the tokenDisposition is same as token edge
+   * If CONST.TOKEN_DISPOSITIONS.HOSTILE, blocks if the tokenDisposition is opposite from token edge
+   * Otherwise, blocks all.
+   * Tokens with secret dispositions always block unless tokenBlockType is 0.
+   * @type {CONST.TOKEN_DISPOSITIONS}
+   */
+  static tokenBlockType = CONST.TOKEN_DISPOSITIONS.SECRET;
+
+  /** @type {Token} */
+  static moveToken;
+
   /** @type {PIXI.Point} */
   a = new PIXI.Point();
 
@@ -28,8 +44,11 @@ export class BorderEdge {
   /** @type {BorderTriangle} */
   ccwTriangle;
 
-  /** @type {Wall} */
-  wall;
+  /**
+   * Placeable objects represented by this edge.
+   * @type {Set<PlaceableObject>}
+   */
+  objects = new Set();
 
   constructor(a, b) {
     this.a.copyFrom(a);
@@ -82,8 +101,8 @@ export class BorderEdge {
 
     // No destination if edge is smaller than 2x spacer unless it is a door.
     // Cheat a little on the spacing so tokens exactly the right size will fit.
-    if ( !this.wall?.isOpen
-      && (length < (spacer * 1.9) || this.wallBlocks(origin)) ) return destinations;
+    if ( this.edgeBlocks(origin)
+      || (!this.isOpenDoor && (length < (spacer * 1.9))) ) return destinations;
     destinations.push(this.median);
 
     // Skip corners if not at least spacer away from median.
@@ -98,28 +117,29 @@ export class BorderEdge {
     return destinations;
   }
 
+  /**
+   * Determine if this is an open door with nothing else blocking.
+   * @returns {boolean}
+   */
+  isOpenDoor() {
+    return this.objects.every(obj =>
+      (obj instanceof Wall) ? obj.isOpen
+        : (obj instanceof Token ) ? !this._tokenEdgeBlocks(obj)
+          : true);
+  }
 
   /**
-   * Does this edge wall block from an origin somewhere else in the triangle?
-   * Tested "live" and not cached so door or wall orientation changes need not be tracked.
+   * Compilation of tests based on edge type for whether this wall blocks.
    * @param {Point} origin    Measure wall blocking from perspective of this origin point.
    * @returns {boolean}
    */
-  wallBlocks(origin) {
-    const wall = this.wall;
-    if ( !wall ) return false;
-    if ( !wall.document.move || wall.isOpen ) return false;
-
-    // Ignore one-directional walls which are facing away from the center
-    const side = wall.orientPoint(origin);
-//    const wdm = PointSourcePolygon.WALL_DIRECTION_MODES;
-//     if ( wall.document.dir
-//       && (wallDirectionMode === wdm.NORMAL) === (side === wall.document.dir) ) return false;
-
-    if ( wall.document.dir
-      && side === wall.document.dir ) return false;
-
-    return true;
+  edgeBlocks(origin) {
+    const { moveToken, tokenBlockType } = this.constructor;
+    return this.objects.some(obj => {
+      if ( obj instanceof Wall ) return WallTracerEdge.wallBlocks(obj, origin);
+      if ( obj instanceof Token ) return WallTracerEdge.tokenEdgeBlocks(obj, moveToken, tokenBlockType);
+      return false;
+    });
   }
 
   /**
@@ -144,7 +164,15 @@ export class BorderEdge {
    * Draw this edge.
    */
   draw(opts = {}) {
-    opts.color ??= this.wall ? Draw.COLORS.red : Draw.COLORS.blue;
+    if ( !Object.hasOwn(opts, "color") ) {
+      const hasWall = this.objects.some(obj => obj instanceof Wall);
+      const hasToken = this.objects.some(obj => obj instanceof Token);
+      opts.color = (hasWall && hasToken) ? Draw.COLORS.white
+        : hasWall ? Draw.COLORS.red
+          : hasToken ? Draw.COLORS.orange
+            : Draw.COLORS.blue;
+    }
+
     Draw.segment({ A: this.a, B: this.b }, opts);
   }
 }
@@ -284,12 +312,12 @@ export class BorderTriangle {
     const center = this.center;
     for ( const edge of Object.values(this.edges) ) {
       const entryTriangle = edge.otherTriangle(this); // Neighbor
-      if ( !entryTriangle || priorTriangle && priorTriangle === entryTriangle ) continue;
+      if ( !entryTriangle || (priorTriangle && priorTriangle === entryTriangle) ) continue;
       const pts = edge.getValidDestinations(center, spacer);
       pts.forEach(entryPoint => {
         destinations.push({
           entryPoint,
-          key: entryPoint.key, // Key needs to be unique for each point,
+          key: `${entryPoint.key}_${entryTriangle.id}`, // Key needs to be unique for each point and triangle!
           entryTriangle, // Needed to locate neighbors in the next iteration.
           priorTriangle: this // Needed to eliminate irrelevant neighbors in the next iteration.
         });
@@ -374,6 +402,20 @@ export class BorderTriangle {
   }
 
   /**
+   * For debugging.
+   * Draw edges, identifying the different types and whether they block.
+   */
+  drawTriangle(opts = {}) {
+    Object.values(this.edges).forEach(edge => {
+      const edgeOpts = {...opts}; // Avoid modification of the original each loop.
+      const blocks = edge.edgeBlocks(this.center);
+      edgeOpts.alpha ??= blocks ? 1 : 0.25;
+      edgeOpts.width ??= blocks ? 2 : 1;
+      edge.draw(edgeOpts);
+    });
+  }
+
+  /**
    * For debugging. Draw edges on the canvas.
    */
   drawEdges(opts = {}) { Object.values(this.edges).forEach(e => e.draw(opts)); }
@@ -387,7 +429,7 @@ export class BorderTriangle {
       const other = edge.otherTriangle(this);
       if ( other ) {
         const B = toMedian ? edge.median : other.center;
-        const color = edge.wallBlocks(center) ? Draw.COLORS.orange : Draw.COLORS.green;
+        const color = edge.edgeBlocks(center) ? Draw.COLORS.orange : Draw.COLORS.green;
         Draw.segment({ A: center, B }, { color });
       }
     }
@@ -425,7 +467,7 @@ export class BorderTriangle {
         if ( edge.cwTriangle && edge.ccwTriangle ) continue; // Already linked.
         const aSet = pointMap.get(edge.a.key);
         const bSet = pointMap.get(edge.b.key);
-        const ixSet = aSet.intersection(bSet)
+        const ixSet = aSet.intersection(bSet);
 
         // Debug: should always have 2 elements: this borderTriangle and the other.
         if ( ixSet.size > 2 ) {

@@ -2,26 +2,20 @@
 canvas,
 CONFIG,
 CONST,
+foundry,
 game,
 PIXI
 */
 "use strict";
 
-import { SPEED, MODULE_ID } from "./const.js";
+import { SPEED, MODULE_ID, MODULES_ACTIVE } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
-import { perpendicularPoints, log } from "./util.js";
+import { perpendicularPoints, log, segmentBounds } from "./util.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
-
-/**
- * Calculate the elevation for a given waypoint.
- * Terrain elevation + user increment
- * @param {object} waypoint
- * @returns {number}
- */
-export function elevationAtWaypoint(waypoint) {
-  return waypoint._terrainElevation + (waypoint._userElevationIncrements * canvas.dimensions.distance);
-}
+import { BorderEdge } from "./pathfinding/BorderTriangle.js";
+import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
+import { elevationAtWaypoint } from "./terrain_elevation.js";
 
 /**
  * Mixed wrap of  Ruler.prototype._getMeasurementSegments
@@ -33,6 +27,7 @@ export function _getMeasurementSegments(wrapped) {
   if ( this.user !== game.user ) {
     // Reconstruct labels if necessary.
     let labelIndex = 0;
+    this.segments ??= [];
     for ( const s of this.segments ) {
       if ( !s.label ) continue; // Not every segment has a label.
       s.label = this.labels.children[labelIndex++];
@@ -41,7 +36,7 @@ export function _getMeasurementSegments(wrapped) {
   }
 
   // Elevate the segments
-  const segments = elevateSegments(this, wrapped());
+  const segments = elevateSegments(this, wrapped()) ?? [];
   const token = this._getMovementToken();
 
   // If no movement token, then no pathfinding.
@@ -50,7 +45,7 @@ export function _getMeasurementSegments(wrapped) {
   // If no segments present, clear the path map and return.
   // No segments are present if dragging back to the origin point.
   const segmentMap = this._pathfindingSegmentMap ??= new Map();
-  if ( !segments || !segments.length ) {
+  if ( !segments.length ) {
     segmentMap.clear();
     return segments;
   }
@@ -78,7 +73,16 @@ export function _getMeasurementSegments(wrapped) {
  */
 function calculatePathPointsForSegment(segment, token) {
   const { A, B } = segment.ray;
-  if ( !token.checkCollision(B, { origin: A, type: "move", mode: "any" }) ) return [];
+
+  // If no collision present, no pathfinding required.
+  const tC = performance.now();
+  if ( !hasCollision(A, B, token) ) {
+    const tEnd = performance.now();
+    log(`Determined no collision for ${Pathfinder.triangleEdges.size} edges in ${tEnd - tC} ms.`);
+    return [];
+  }
+  const tEnd = performance.now();
+  log(`Found collision for ${Pathfinder.triangleEdges.size} edges in ${tEnd - tC} ms.`);
 
   // Find path between last waypoint and destination.
   const t0 = performance.now();
@@ -87,7 +91,7 @@ function calculatePathPointsForSegment(segment, token) {
   const path = pf.runPath(A, B);
   let pathPoints = Pathfinder.getPathPoints(path);
   const t1 = performance.now();
-  log(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`);
+  log(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`, pathPoints);
 
   // Clean the path
   const t2 = performance.now();
@@ -102,6 +106,25 @@ function calculatePathPointsForSegment(segment, token) {
   }
 
   return pathPoints;
+}
+
+/**
+ * Instead of a typical `token.checkCollision` test, test for collisions against the edge graph.
+ * With this approach, collisions with enemy tokens trigger pathfinding.
+ * @param {PIXI.Point} A          Origin point for the move
+ * @param {PIXI.Point} B          Destination point for the move
+ * @param {Token} token           Token that is moving
+ * @returns {boolean}
+ */
+function hasCollision(A, B, token) {
+  BorderEdge.moveToken = token; // Set the token so we can test token edge blocking.
+  const lineSegmentIntersects = foundry.utils.lineSegmentIntersects;
+
+  // SCENE_GRAPH has way less edges than Pathfinder and has quadtree for the edges.
+  const edges = SCENE_GRAPH.edgesQuadtree.getObjects(segmentBounds(A, B));
+  const tokenBlockType = Settings._tokenBlockType();
+  return edges.some(edge => lineSegmentIntersects(A, B, edge.A, edge.B)
+    && edge.edgeBlocks(A, token, tokenBlockType));
 }
 
 /**
@@ -151,17 +174,41 @@ function constructPathfindingSegments(segments, segmentMap) {
 export function _getSegmentLabel(wrapped, segment, totalDistance) {
   // Force distance to be between waypoints instead of (possibly pathfinding) segments.
   const origSegmentDistance = segment.distance;
-  segment.distance = segment.waypointDistance;
-  const origLabel = wrapped(segment, totalDistance);
+  const { newSegmentDistance, newMoveDistance, newTotalDistance } = _getDistanceLabels(segment.waypointDistance, segment.waypointMoveDistance, totalDistance);
+  segment.distance = newSegmentDistance;
+  const origLabel = wrapped(segment, newTotalDistance);
   segment.distance = origSegmentDistance;
   let elevLabel = segmentElevationLabel(segment);
   const levelName = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
-  if ( levelName ) elevLabel += `\n${level_name}`;
+  if ( levelName ) elevLabel += `\n${levelName}`;
 
   let moveLabel = "";
-  if ( segment.waypointDistance !== segment.waypointMoveDistance ) moveLabel = `\n🥾${Number(segment.waypointMoveDistance.toFixed(2))}`;
+  const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
+  if ( segment.waypointDistance !== segment.waypointMoveDistance ) moveLabel = `\n🥾${newMoveDistance}${units}`;
 
   return `${origLabel}\n${elevLabel}${moveLabel}`;
+}
+
+/**
+ * Return modified segment and total distance labels
+ * @param {number} segmentDistance
+ * @param {number} segmentMoveDistance
+ * @param {number} totalDistance
+ * @returns {object}
+ */
+export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance) {
+  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || null;
+  if (canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS || !multiple) return {
+    newSegmentDistance: segmentDistance,
+    newMoveDistance: Number(moveDistance.toFixed(2)),
+    newTotalDistance: totalDistance
+  };
+
+  const newSegmentDistance = segmentDistance.toNearest(multiple);
+  const newMoveDistance = moveDistance.toNearest(multiple);
+  const newTotalDistance = totalDistance.toNearest(multiple);
+
+  return { newSegmentDistance, newMoveDistance, newTotalDistance };
 }
 
 /**
@@ -250,9 +297,11 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
   const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
 
   // Add destination as the final waypoint
-  ruler.destination._terrainElevation = ruler.terrainElevationAtDestination();
-  ruler.destination._userElevationIncrements = ruler._userElevationIncrements;
+  ruler.destination._terrainElevation = ruler.elevationAtLocation(ruler.destination);
+  ruler.destination._userElevationIncrements = ruler._userElevationIncrements ?? 0;
   const waypoints = ruler.waypoints.concat([ruler.destination]);
+
+  log(`Destination ${ruler.destination} terrainElevation: ${ruler.destination._terrainElevation} increments: ${ruler.destination._userElevationIncrements}`);
 
   // Add the waypoint elevations to the corresponding segment endpoints.
   // Skip the first waypoint, which will (likely) end up as p0.
@@ -282,8 +331,7 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
  * @returns {boolean}
  */
 function useLevelsLabels() {
-  if ( !game.modules.get("levels")?.active ) return false;
-
+  if ( !MODULES_ACTIVE.LEVELS ) return false;
   const labelOpt = Settings.get(Settings.KEYS.USE_LEVELS_LABEL);
   return labelOpt === Settings.KEYS.LEVELS_LABELS.ALWAYS
     || (labelOpt === Settings.KEYS.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);

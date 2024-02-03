@@ -3,14 +3,12 @@ canvas
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
-import { elevationAtWaypoint } from "./segments.js";
-import { ConstrainedTokenBorder } from "./ConstrainedTokenBorder.js";
 import { Settings } from "./settings.js";
 
 // Patches for the Token class
 export const PATCHES = {};
 PATCHES.TOKEN_RULER = {}; // Assume this patch is only present if the token ruler setting is enabled.
-PATCHES.ConstrainedTokenBorder = {};
+PATCHES.MOVEMENT_TRACKING = {};
 
 /**
  * Wrap Token.prototype._onDragLeftStart
@@ -71,6 +69,37 @@ async function _onDragLeftDrop(wrapped, event) {
   ruler._onMouseUp(event);
 }
 
+/**
+ * Token.prototype.lastMoveDistance
+ * Return the last move distance. If combat is active, return the last move since this token
+ * started its turn.
+ * @param {boolean} [sinceCombatTurn=true]     Should the combat turn zero out the movement distance.
+ * @returns {number}
+ */
+function lastMoveDistance() {
+  if ( game.combat?.active && this._lastCombatRoundMove < game.combat.round ) return 0;
+  return this._lastMoveDistance ?? 0
+}
+
+/**
+ * Hook updateToken to track token movement.
+ * @param {Document} document                       The existing Document which was updated
+ * @param {object} change                           Differential data that was used to update the document
+ * @param {DocumentModificationContext} options     Additional options which modified the update request
+ * @param {string} userId                           The ID of the User who triggered the update workflow
+ */
+function updateToken(document, changes, _options, _userId) {
+  const token = document.object;
+  if ( token.isPreview ||
+    !(Object.hasOwn(changes, "x")
+      || Object.hasOwn(changes, "y")
+      || Object.hasOwn(changes, "elevation")) ) return;
+
+  if ( game.combat?.active ) token._lastCombatRoundMove = game.combat.round;
+  const ruler = canvas.controls.ruler;
+  if ( ruler.active && ruler._getMovementToken() === token ) token._lastMoveDistance = ruler.totalMoveDistance;
+  else token._lastMoveDistance = Ruler.measureMoveDistance(token.position, token.document, token).moveDistance;
+}
 
 PATCHES.TOKEN_RULER.WRAPS = {
   _onDragLeftStart,
@@ -80,59 +109,6 @@ PATCHES.TOKEN_RULER.WRAPS = {
 
 PATCHES.TOKEN_RULER.MIXES = { _onDragLeftDrop };
 
-// ----- NOTE: Getters ----- //
-
-/**
- * New getter: Token.prototype.constrainedTokenBorder
- * Determine the constrained border shape for this token.
- * @returns {ConstrainedTokenShape|PIXI.Rectangle}
- */
-function constrainedTokenBorder() { return ConstrainedTokenBorder.get(this).constrainedBorder(); }
-
-/**
- * New getter: Token.prototype.isConstrainedTokenBorder
- * Determine whether the border is currently constrained for this token.
- * I.e., the token overlaps a wall.
- * @returns {boolean}
- */
-function isConstrainedTokenBorder() { return !ConstrainedTokenBorder.get(this)._unrestricted; }
-
-/**
- * New getter: Token.prototype.tokenBorder
- * Determine the correct border shape for this token. Utilize the cached token shape.
- * @returns {PIXI.Polygon|PIXI.Rectangle}
- */
-function tokenBorder() { return this.tokenShape.translate(this.x, this.y); }
-
-/**
- * New getter: Token.prototype.tokenShape
- * Cache the token shape.
- * @type {PIXI.Polygon|PIXI.Rectangle}
- */
-function tokenShape() { return this._tokenShape || (this._tokenShape = calculateTokenShape(this)); }
-
-PATCHES.ConstrainedTokenBorder.GETTERS = {
-  constrainedTokenBorder,
-  tokenBorder,
-  tokenShape,
-  isConstrainedTokenBorder
-};
-
-// ----- NOTE: Helper functions ----- //
-/**
- * Theoretical token shape at 0,0 origin.
- * @returns {PIXI.Polygon|PIXI.Rectangle}
- */
-function calculateTokenShape(token) {
-  // TODO: Use RegularPolygon shapes for use with WeilerAtherton
-  // Hexagon (for width .5 or 1)
-  // Square (for width === height)
-  let shape;
-  if ( canvas.grid.isHex ) {
-    const pts = canvas.grid.grid.getBorderPolygon(token.document.width, token.document.height, 0);
-    if ( pts ) shape = new PIXI.Polygon(pts);
-  }
-
-  return shape || new PIXI.Rectangle(0, 0, token.w, token.h);
-}
+PATCHES.MOVEMENT_TRACKING.HOOKS = { updateToken };
+PATCHES.MOVEMENT_TRACKING.GETTERS = { lastMoveDistance };
 

@@ -1,3 +1,15 @@
+# 0.8.3
+Add setting for pathfinder to avoid all tokens or hostile tokens. Closes issue #37.
+Misc. fixes to pathfinding to reduce likelihood of it failing to find a path or finding an incorrect path.
+Fix for waypoint elevations not finite. Closes issue #38.
+Refactor of elevation handling to account for Token Ruler tokens versus primary ruler.
+
+Add selector to Token HUD to choose between walk/fly/burrow movement types. Default is to automatically choose based on elevation. Closes issue #33.
+
+Move settings related to speed properties to `CONFIG.elevationruler.SPEED`.
+
+Add getter `Token.prototype.lastMoveDistance` that tracks the last token move. If combat is active, this returns 0 if the token has not yet moved this round. Use `Token.prototype._lastMoveDistance` to find the actual last distance moved regardless of combat.
+
 # 0.8.2
 Improvements to calculating distance on a grid. Improvements to splitting ruler segments when highlighting based on token speed. Closes issue #35. Improvements to treating tokens as difficult terrain for purposes of token speed highlighting.
 

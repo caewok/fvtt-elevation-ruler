@@ -19,9 +19,11 @@ import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import {
-  elevationAtOrigin,
-  terrainElevationAtPoint,
-  terrainElevationAtDestination
+  elevationAtWaypoint,
+  originElevation,
+  destinationElevation,
+  terrainElevationAtLocation,
+  elevationAtLocation
 } from "./terrain_elevation.js";
 
 import {
@@ -205,10 +207,11 @@ function _getMeasurementDestination(wrapped, destination) {
 }
 
 /**
- * Wrap Ruler.prototype._animateMovement
+ * Mixed wrap Ruler.prototype._animateMovement
  * Add additional controlled tokens to the move, if permitted.
  */
 async function _animateMovement(wrapped, token) {
+  if ( !this.segments.length ) return; // Ruler._animateMovement expects at least one segment.
   const promises = [wrapped(token)];
   for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;
@@ -295,7 +298,9 @@ function _computeTokenSpeed(gridSpaces) {
   // Requires a movement token and a defined token speed.
   const token = this._getMovementToken();
   if ( !token ) return;
-  const tokenSpeed = Number(getProperty(token, SPEED.ATTRIBUTE));
+
+  const speedAttribute = SPEED.ATTRIBUTES[token.movementType] ?? SPEED.ATTRIBUTES.WALK;
+  const tokenSpeed = Number(getProperty(token, speedAttribute));
   if ( !tokenSpeed ) return;
 
   // Other constants
@@ -585,9 +590,6 @@ PATCHES.BASIC.WRAPS = {
   // Wraps related to segments
   _getSegmentLabel,
 
-  // Move token methods
-  _animateMovement,
-
   // Events
   _onDragStart,
   _onClickLeft,
@@ -597,7 +599,7 @@ PATCHES.BASIC.WRAPS = {
   _canMove
 };
 
-PATCHES.BASIC.MIXES = { _animateSegment, _getMovementToken, _getMeasurementSegments };
+PATCHES.BASIC.MIXES = { _animateMovement, _animateSegment, _getMovementToken, _getMeasurementSegments };
 
 PATCHES.BASIC.OVERRIDES = { _computeDistance };
 
@@ -612,7 +614,7 @@ PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 function incrementElevation() {
   const ruler = canvas.controls.ruler;
   if ( !ruler || !ruler.active ) return;
-
+  ruler._userElevationIncrements ??= 0;
   ruler._userElevationIncrements += 1;
 
   // Weird, but slightly change the destination to trigger a measure
@@ -631,7 +633,7 @@ function incrementElevation() {
 function decrementElevation() {
   const ruler = canvas.controls.ruler;
   if ( !ruler || !ruler.active ) return;
-
+  ruler._userElevationIncrements ??= 0;
   ruler._userElevationIncrements -= 1;
 
   // Weird, but slightly change the destination to trigger a measure
@@ -646,18 +648,20 @@ function decrementElevation() {
 PATCHES.BASIC.METHODS = {
   incrementElevation,
   decrementElevation,
-
-  // From terrain_elevation.js
-  elevationAtOrigin,
-  terrainElevationAtPoint,
-  terrainElevationAtDestination,
-
+  elevationAtLocation,
   _computeTokenSpeed
+};
+
+PATCHES.BASIC.GETTERS = {
+  originElevation,
+  destinationElevation
 };
 
 PATCHES.BASIC.STATIC_METHODS = {
   measureDistance,
-  measureMoveDistance
+  measureMoveDistance,
+  elevationAtWaypoint,
+  terrainElevationAtLocation
 };
 
 
@@ -669,12 +673,17 @@ PATCHES.BASIC.STATIC_METHODS = {
 function addWaypointElevationIncrements(ruler, point) {
   const ln = ruler.waypoints.length;
   const newWaypoint = ruler.waypoints[ln - 1];
-  if ( ln === 1) {
-    // Origin waypoint -- cache using elevationAtOrigin
-    ruler.elevationAtOrigin();
-    ruler._userElevationIncrements = 0;
+
+  // Set defaults.
+  newWaypoint._terrainElevation = 0;
+  newWaypoint._userElevationIncrements = 0;
+
+  if ( ln === 1 ) {
+    const moveToken = ruler._getMovementToken();
+    newWaypoint._terrainElevation = moveToken ? moveToken.elevationE : Ruler.terrainElevationAtLocation(newWaypoint);
+
   } else {
-    newWaypoint._terrainElevation = ruler.terrainElevationAtPoint(point);
-    newWaypoint._userElevationIncrements = ruler._userElevationIncrements;
+    newWaypoint._userElevationIncrements = ruler._userElevationIncrements ?? 0;
+    newWaypoint._terrainElevation = ruler.elevationAtLocation(newWaypoint);
   }
 }
