@@ -317,7 +317,7 @@ export class BorderTriangle {
       pts.forEach(entryPoint => {
         destinations.push({
           entryPoint,
-          key: entryPoint.key, // Key needs to be unique for each point,
+          key: `${entryPoint.key}_${entryTriangle.id}`, // Key needs to be unique for each point and triangle!
           entryTriangle, // Needed to locate neighbors in the next iteration.
           priorTriangle: this // Needed to eliminate irrelevant neighbors in the next iteration.
         });
