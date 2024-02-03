@@ -30,6 +30,7 @@ SOFTWARE.
 */
 
 import { MODULE_ID, FLAGS, MOVEMENT_TYPES, MOVEMENT_BUTTONS, MODULES_ACTIVE } from "./const.js";
+import { LevelsElevationAtPoint } from "./terrain_elevation.js";
 
 export const PATCHES = {};
 PATCHES.MOVEMENT_SELECTION = {};
@@ -65,17 +66,15 @@ PATCHES.MOVEMENT_SELECTION.GETTERS = { movementType };
  * @returns {MOVEMENT_TYPE}
  */
 function determineMovementType(token) {
-  let tokenElevation;
   let groundElevation;
   if ( MODULES_ACTIVE.ELEVATED_VISION ) {
     const calc = new canvas.elevation.TokenElevationCalculator(token);
-    tokenElevation = calc.elevation;
     groundElevation = calc.groundElevation();
-  } else {
-    tokenElevation = token.elevationE;
-    groundElevation = 0;
-  }
-  return MOVEMENT_TYPES[Math.sign(tokenElevation - groundElevation) + 1];
+  } else if ( MODULES_ACTIVE.LEVELS ) {
+    groundElevation = LevelsElevationAtPoint(token.center, { startingElevation: token.elevationE }) ?? 0;
+  } else groundElevation = 0;
+
+  return MOVEMENT_TYPES[Math.sign(token.elevationE - groundElevation) + 1];
 }
 
 /**

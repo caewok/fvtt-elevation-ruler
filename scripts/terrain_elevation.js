@@ -189,7 +189,7 @@ function EVElevationAtPoint(location, measuringToken, startingElevation = 0) {
  * @param {PIXI.Point} p    Point to measure, in {x, y} format.
  * @return {Number|undefined} Levels elevation or undefined if levels is inactive or no levels found.
  */
-function LevelsElevationAtPoint(p, { startingElevation = 0 } = {}) {
+export function LevelsElevationAtPoint(p, { startingElevation = 0 } = {}) {
   let tiles = [...levelsTilesAtPoint(p)];
   if ( !tiles.length ) return undefined;
 
