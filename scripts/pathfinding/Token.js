@@ -40,6 +40,16 @@ function updateToken(document, changes, _options, _userId) {
 
   // Easiest approach is to trash the edges for the wall and re-create them.
   SCENE_GRAPH.removeToken(document.id);
+
+  // Debugging: None of the edges should have this token.
+  if ( CONFIG[MODULE_ID].debug ) {
+    const token = document.object;
+    SCENE_GRAPH.edges.forEach((edge, key) => {
+      if ( edge.objects.has(token) ) console.debug(`Edge ${key} has ${token.name} ${token.id} after deletion.`);
+    })
+  }
+
+
   SCENE_GRAPH.addToken(document.object);
 
   // Need to re-do the triangulation because the change to the wall could have added edges if intersected.
