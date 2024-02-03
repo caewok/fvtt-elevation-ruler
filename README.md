@@ -53,9 +53,11 @@ It has been tested on dnd5e. Because it adds to the functionality of the underly
 
 To use, start measuring with the Foundry measurement ruler as normal. While doing so, hit '[' to increase the elevation at the destination by one step. A step is equal to the grid size (typically 5 feet). Hit ']' to decrease the elevation at the destination by one step.
 
-## Settings
-- Change the elevation increment hotkeys
-- Toggle using terrain for elevation measurement. Requires Enhanced Terrain Layer.
+If you enable the Token Ruler in settings, dragging tokens will also display the ruler.
+
+If you enable Token Speed Highlighting in settings, token speed will be estimated using different colors. Use the Token HUD (right-click on a token on the canvas) if you want to switch from automatic guess of whether the token is walking/flying/burrowing to manual. If the token does not have movement speed for the given movement type (or if Elevation Ruler does not know how to find that movement attribute for the system) the speed highlighter will not change colors.
+
+You can modify the system attributes used for walk/fly/burrow as well as the colors used in `CONFIG.elevationruler.SPEED`.
 
 # Details
 
@@ -78,41 +80,23 @@ Finally, the DnD Euclidean rule relies on Pythagorean's Theorem, rounded to the 
 
 ![Screenshot DnD 5e Euclidean Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/measurement_dnd_euclidean.jpg)
 
-## Terrain measurement
-
-To use terrain measurement, first set up one or more terrains using Enhanced Terrain Layer. Set a maximum value for the terrain layer.
-
-![Screenshot Terrain Setup](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/terrain-setup.jpg)
-
-Now when you drag the ruler over a terrain area, the ruler will automatically adjust the elevation based on the terrain maximum height. Note that this is based on the center-point of the current ruler position. You can still increment the values up or down manually, and those values will persist as you move the ruler around.
-
-![Screenshot Terrain Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/terrain-measure.jpg)
 
 ## Token measurement
 
-Similarly, as you can see in the previous screenshot, if you drag the ruler over a token that has been elevated or lowered, the ruler will reflect the elevation of that token (plus or minus manually incremented values).
+If you drag the ruler over a token that has been elevated or lowered, the ruler will reflect the elevation of that token (plus or minus manually incremented values). (This does not happen if you are dragging tokens; you must use the ruler tool.)
 
 This is particularly useful where you have an elevated character at the origin, and want to fire or move downwards. Or vice-versa where you are aiming at an elevated token and need total distance to the elevated target.
-
-This video shows both terrain and token measurement in action.
-
-![Video Terrain Measurement](https://github.com/caewok/fvtt-elevation-ruler/raw/feature/media/media/terrain-measure.mov)
-
-## Levels measurement
-
-For a multi-level scene using the Levels module, the ruler will pick up on holes and Levels-enabled tiles.
-
-In general, when the ruler endpoint is within a Levels-enabled tile, the bottom-most elevation of the bottom tile will be displayed.
-
-If you start the ruler on a token, the ruler will stay at the bottom-most elevation of the current floor for that token, unless it encounters a hole, a token, or an area that is not within a Levels-enabled tile.
-
-Hitting spacebar can move the token between levels if you start the ruler measurement at your token. Note that this may allow players to move between levels at points other than at stairs, holes, or elevators, just as directly adjusting a token's elevation would.
 
 ## Elevation changes when moving the token with spacebar
 
 As with the normal Foundry ruler, if you begin a measurement at your token, you can hit spacebar to move the token. Elevation is modified at the end of each waypoint segment move. This may allow you, for example, to jump over a wall if that wall has a maximum height under your current elevation as can be set up using the Wall Height module (or Levels + Wall Height).
 
+# API
 
+You can modify the system attributes used for walk/fly/burrow as well as the colors used in `CONFIG.elevationruler.SPEED`. You can modify the Token HUD icons in `CONFIG.elevationruler.MOVEMENT_BUTTONS`.
 
+Elevation Ruler adds a token property to get the token movement type: `_token.movementType`. You may also want the enumerated movement types: `game.modules.get("elevationruler").api.MOVEMENT_TYPES`.
 
-
+Elevation Ruler adds token properties to track the last movement made by the token:
+- `_token.lastMoveDistance`: Movement units expended on the last move. May not be physical distance; this instead accounts for additional movement due to difficult terrain. If the token has not moved this combat round, this value will be 0.
+- `_token._lastMoveDistance`: Same as above, but does not account for combat rounds.
