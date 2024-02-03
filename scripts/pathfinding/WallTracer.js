@@ -456,12 +456,7 @@ export class WallTracer extends Graph {
     this.edgesQuadtree.insert({ r: edge.bounds, t: edge });
 
     // Track the edge objects.
-    edge.objects.forEach(obj => {
-      const id = obj.id;
-      if ( !this.objectEdges.get(id) ) this.objectEdges.set(id, new Set());
-      const edgeSet = this.objectEdges.get(id);
-      edgeSet.add(edge);
-    });
+    edge.objects.forEach(obj => this._addEdgeToObjectSet(obj.id, edge));
     return edge;
   }
 
@@ -473,12 +468,29 @@ export class WallTracer extends Graph {
     this.edgesQuadtree.remove(edge);
 
     // Track the edge objects.
-    edge.objects.forEach(obj => {
-      const edgeSet = this.objectEdges.get(obj.id);
-      if ( edgeSet ) edgeSet.delete(edge);
-    });
-
+    edge.objects.forEach(obj => this._removeEdgeFromObjectSet(obj.id, edge));
     super.deleteEdge(edge);
+  }
+
+  /**
+   * Add an edge to the object's edge set.
+   * @param {string} id             Id of the object
+   * @param {WallTracerEdge} edge   Edge to add
+   */
+  _addEdgeToObjectSet(id, edge) {
+    if ( !this.objectEdges.get(id) ) this.objectEdges.set(id, new Set());
+    const edgeSet = this.objectEdges.get(id);
+    edgeSet.add(edge);
+  }
+
+  /**
+   * Remove an edge from the object's set.
+   * @param {string} id               Id of the object
+   * @param {WallTracerEdge} edge     Edge to remove
+   */
+  _removeEdgeFromObjectSet(id, edge) {
+    const edgeSet = this.objectEdges.get(id);
+    if ( edgeSet ) edgeSet.delete(edge);
   }
 
   /**
@@ -521,23 +533,27 @@ export class WallTracer extends Graph {
       let addEdge = Boolean(t); // Don't add an edge for 0 --> 0.
       for ( const cObj of cObjs ) {
         const splitEdges = cObj.edge.splitAtT(cObj.t1); // If the split is at the endpoint, will be null.
-        if ( splitEdges ) {
-          // Remove the existing edge and add the new edges.
-          // With overlaps, it is possible the edge was already removed.
-          if ( this.edges.has(cObj.edge.key) ) this.deleteEdge(cObj.edge);
-          splitEdges.forEach(e => this.addEdge(e));
-        }
-
         if ( cObj.overlap ) {
           if ( overlaps.has(cObj.edge) ) { // Ending an overlap.
             overlaps.delete(cObj.edge);
             if ( splitEdges ) splitEdges[0].objects.add(object); // Share the edge with this object.
-            else cObj.edge.objects.add(object);
+            else {
+              cObj.edge.objects.add(object);
+
+              // Make sure the object's edges include this cObj.edge.
+              this._addEdgeToObjectSet(object.id, cObj.edge);
+            }
             addEdge = false; // Only want one edge here: the existing.
           } else {  // Starting a new overlap.
             overlaps.add(cObj.edge);
             if ( splitEdges ) splitEdges[1].objects.add(object); // Share the edge with this object.
           }
+        }
+        if ( splitEdges ) {
+          // Remove the existing edge and add the new edges.
+          // With overlaps, it is possible the edge was already removed.
+          if ( this.edges.has(cObj.edge.key) ) this.deleteEdge(cObj.edge);
+          splitEdges.forEach(e => this.addEdge(e));
         }
       }
 
@@ -592,10 +608,15 @@ export class WallTracer extends Graph {
     const edgesArr = [...edges];
     for ( const edge of edgesArr ) {
       // Remove any object with this id; if no objects left for the edge, remove the edge.
-      edge.objects.forEach(obj => {
-        if ( obj.id === id ) edge.objects.delete(obj);
+      edge.objects
+        .filter(obj => obj.id === id)
+        .forEach(obj => {
+          edge.objects.delete(obj);
+          this._removeEdgeFromObjectSet(id, edge);
       });
-      if ( !edge.objects.size ) this.deleteEdge(edge);
+      // Works but not clear why edges sometimes exist but are not in the edge set.
+      // Removing the test for if the edge is in the edges set results in occasional warnings.
+      if ( !edge.objects.size && this.edges.has(edge.key) ) this.deleteEdge(edge);
     }
     this.objectEdges.delete(id);
   }

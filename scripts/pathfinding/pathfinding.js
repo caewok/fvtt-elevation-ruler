@@ -269,8 +269,14 @@ export class Pathfinder {
     const endTri = this.constructor.trianglesAtPoint(endPoint).first();
 
     // Build PathNode for start and end.
-    const start = { key: startPoint.key, entryTriangle: startTri, entryPoint: PIXI.Point.fromObject(startPoint) };
-    const end = { key: endPoint.key, entryTriangle: endTri, entryPoint: endPoint };
+    const start = {
+      key: `${startPoint.key}_${startTri.id}`,
+      entryTriangle: startTri,
+      entryPoint: PIXI.Point.fromObject(startPoint) };
+    const end = {
+      key: `${endPoint.key}_${endTri.id}`,
+      entryTriangle: endTri,
+      entryPoint: endPoint };
     return { start, end };
   }
 
@@ -330,7 +336,7 @@ export class Pathfinder {
     let curr = pathMap.goal;
     const pts = [];
     while ( curr && pts.length < 1000 ) {
-      pts.push(PIXI.Point.invertKey(curr.key));
+      pts.push(PIXI.Point.invertKey(curr.entryPoint.key));
       curr = pathMap.get(curr.key);
     }
     return pts.reverse();

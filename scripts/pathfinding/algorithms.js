@@ -95,11 +95,11 @@ export class BreadthFirstPathSearch {
       const path = [PIXI.Point.invertKey(key)];
       paths.push(path);
       while ( pathMap.has(curr.key) ) {
-        path.push(PIXI.Point.invertKey(curr.key))
+        path.push(PIXI.Point.invertKey(curr.key));
         curr = pathMap.get(curr.key);
       }
       path.push(PIXI.Point.invertKey(curr.key));
-      path.reverse()
+      path.reverse();
     }
     return paths;
   }
