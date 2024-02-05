@@ -408,6 +408,78 @@ function cleanGridPath(pathPoints) {
   if ( nPoints < 3 ) return pathPoints;
   // Debug: pathPoints.forEach(pt => Draw.point(pt, { alpha: 0.5, color: Draw.COLORS.blue }))
 
+  const slowMethod = cleanGridPathSlow(pathPoints);
+
+  const orient2d = foundry.utils.orient2dFast;
+  const config = { mode: "any", type: "move" };
+  let prev = pathPoints[0];
+  let curr = pathPoints[1];
+  let newPath = [prev];
+  for ( let i = 2; i < nPoints; i += 1 ) {
+    const next = pathPoints[i];
+
+    // Move points to the center of the grid square if no collision for previous or next.
+    const currCenter = getGridCenterPoint(curr);
+    if ( !(ClockwiseSweepPolygon.testCollision(prev, currCenter, config)
+      || ClockwiseSweepPolygon.testCollision(currCenter, next, config)) ) curr = currCenter;
+
+    // Remove duplicate points.
+    if ( curr.almostEqual(prev) ) {
+      curr = next;
+      continue;
+    }
+
+    newPath.push(curr);
+    prev = curr;
+    curr = next;
+  }
+
+  newPath.push(pathPoints.at(-1));
+
+  // Remove points in middle of straight line.
+  nPoints = newPath.length;
+  prev = newPath[0];
+  curr = newPath[1];
+  let filteredPath = [prev];
+  for ( let i = 2; i < nPoints; i += 1 ) {
+    const next = newPath[i];
+    if ( orient2d(prev, curr, next).almostEqual(0) ) {
+      curr = next;
+      continue;
+    }
+    filteredPath.push(curr);
+    prev = curr;
+    curr = next;
+  }
+  filteredPath.push(newPath.at(-1));
+
+  if ( slowMethod.length !== filteredPath.length ) console.debug("Slow Method returned different path", [...slowMethod], [...filteredPath]);
+  for ( let i = 0; i < slowMethod.length; i += 1 ) {
+    if ( !slowMethod[i].to2d().equals(filteredPath[i].to2d()) ) {
+      console.debug("Slow Method returned different path", [...slowMethod], [...filteredPath]);
+      break;
+    }
+  }
+
+
+  return filteredPath;
+}
+
+
+/**
+ * For given point on a grid:
+ * - if next point shares this grid square, delete if prev --> next has no collision.
+ * - temporarily move to the grid center.
+ * - if collision, move back and go to next point. Otherwise keep at center.
+ * Don't move the start or end points.
+ * @param {PIXI.Point[]} pathPoints
+ * @returns {PIXI.Point[]}
+ */
+function cleanGridPathSlow(pathPoints) {
+  let nPoints = pathPoints.length;
+  if ( nPoints < 3 ) return pathPoints;
+  // Debug: pathPoints.forEach(pt => Draw.point(pt, { alpha: 0.5, color: Draw.COLORS.blue }))
+
   // Move points to the center of the grid square if no collision for previous or next.
   const config = { mode: "any", type: "move" };
   let prev = pathPoints[0];
@@ -426,7 +498,7 @@ function cleanGridPath(pathPoints) {
   // Debug: centeredPath.forEach(pt => Draw.point(pt, { alpha: 0.5, color: Draw.COLORS.green }))
 
   // Remove duplicate points.
-  prev = pathPoints[0];
+  prev = centeredPath[0];
   let dedupedPath = [prev];
   for ( let i = 1; i < nPoints; i += 1 ) {
     const curr = centeredPath[i];
@@ -439,8 +511,8 @@ function cleanGridPath(pathPoints) {
   // Remove points in middle of straight line.
   const orient2d = foundry.utils.orient2dFast;
   nPoints = dedupedPath.length;
-  prev = pathPoints[0];
-  curr = pathPoints[1];
+  prev = dedupedPath[0];
+  curr = dedupedPath[1];
   let filteredPath = [prev];
   for ( let i = 2; i < nPoints; i += 1 ) {
     const next = dedupedPath[i];
@@ -452,7 +524,7 @@ function cleanGridPath(pathPoints) {
     prev = curr;
     curr = next;
   }
-  filteredPath.push(pathPoints.at(-1));
+  filteredPath.push(dedupedPath.at(-1));
   // Debug: filteredPath.forEach(pt => Draw.point(pt))
 
   return filteredPath;
