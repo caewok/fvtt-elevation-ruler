@@ -227,8 +227,6 @@ export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance)
 export async function _animateSegment(wrapped, token, segment, destination) {
   // If the token is already at the destination, _animateSegment will throw an error when the animation is undefined.
   // This can happen when setting artificial segments for highlighting or pathfinding.
-  console.log(`Animating segment ${segment.idx}. First: ${segment.first}. Last: ${segment.last}`);
-
   if ( token.document.x !== destination.x
     || token.document.y !== destination.y ) {
     // Same as wrapped but pass an option.

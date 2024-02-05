@@ -111,28 +111,18 @@ function _onUpdate(wrapped, data, options, userId) {
     options.animation.easing = options.firstRulerSegment ? noEndEase(options.animation.easing)
       : options.lastRulerSegment ? noStartEase(options.animation.easing)
         : undefined;
-
-    if ( !options.animation.easing ) console.debug("No easing");
   }
   return wrapped(data, options, userId);
 }
 
 function noStartEase(easing) {
   if ( typeof easing === "string" ) easing = CanvasAnimation[easing];
-  return pt => {
-    const res = (pt < 0.5) ? pt : easing(pt);
-    console.debug(`No Start Easing ${pt} --> ${res}`);
-    return res;
-  };
+  return pt => (pt < 0.5) ? pt : easing(pt);
 }
 
 function noEndEase(easing) {
   if ( typeof easing === "string" ) easing = CanvasAnimation[easing];
-  return pt => {
-    const res = (pt > 0.5) ? pt : easing(pt);
-    console.debug(`No End Easing ${pt} --> ${res}`);
-    return res;
-  };
+  return pt => (pt > 0.5) ? pt : easing(pt);
 }
 
 PATCHES.TOKEN_RULER.WRAPS = {
