@@ -440,8 +440,10 @@ function cleanGridPath(pathPoints) {
   }
 
   // Remove point in middle of straight line at the end of the path.
-  if ( newPath.length > 1 && orient2d(newPath.at(-2), newPath.at(-1), pathPoints.at(-1)).almostEqual(0) ) newPath.pop();
-  newPath.push(pathPoints.at(-1));
+  const lastPoint = pathPoints.at(-1);
+  if ( newPath.length > 1
+    && orient2d(prev2, prev, lastPoint).almostEqual(0) ) newPath.pop();
+  newPath.push(lastPoint);
 
 
   // Remove points in middle of straight line.
