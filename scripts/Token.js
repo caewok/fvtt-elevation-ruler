@@ -1,5 +1,8 @@
 /* globals
-canvas
+canvas,
+CanvasAnimation,
+game,
+Ruler
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -9,6 +12,7 @@ import { Settings } from "./settings.js";
 export const PATCHES = {};
 PATCHES.TOKEN_RULER = {}; // Assume this patch is only present if the token ruler setting is enabled.
 PATCHES.MOVEMENT_TRACKING = {};
+PATCHES.PATHFINDING = {};
 
 /**
  * Wrap Token.prototype._onDragLeftStart
@@ -78,7 +82,7 @@ async function _onDragLeftDrop(wrapped, event) {
  */
 function lastMoveDistance() {
   if ( game.combat?.active && this._lastCombatRoundMove < game.combat.round ) return 0;
-  return this._lastMoveDistance ?? 0
+  return this._lastMoveDistance ?? 0;
 }
 
 /**
@@ -90,10 +94,8 @@ function lastMoveDistance() {
  */
 function updateToken(document, changes, _options, _userId) {
   const token = document.object;
-  if ( token.isPreview ||
-    !(Object.hasOwn(changes, "x")
-      || Object.hasOwn(changes, "y")
-      || Object.hasOwn(changes, "elevation")) ) return;
+  if ( token.isPreview
+    || !(Object.hasOwn(changes, "x")|| Object.hasOwn(changes, "y") || Object.hasOwn(changes, "elevation")) ) return;
 
   if ( game.combat?.active ) token._lastCombatRoundMove = game.combat.round;
   const ruler = canvas.controls.ruler;
@@ -101,11 +103,45 @@ function updateToken(document, changes, _options, _userId) {
   else token._lastMoveDistance = Ruler.measureMoveDistance(token.position, token.document, token).moveDistance;
 }
 
+/**
+ * Wrap Token.prototype._onUpdate to remove easing for pathfinding segments.
+ */
+function _onUpdate(wrapped, data, options, userId) {
+  if ( options.rulerSegment && options.animation.easing ) {
+    options.animation.easing = options.firstRulerSegment ? noEndEase(options.animation.easing)
+      : options.lastRulerSegment ? noStartEase(options.animation.easing)
+        : undefined;
+
+    if ( !options.animation.easing ) console.debug("No easing");
+  }
+  return wrapped(data, options, userId);
+}
+
+function noStartEase(easing) {
+  if ( typeof easing === "string" ) easing = CanvasAnimation[easing];
+  return pt => {
+    const res = (pt < 0.5) ? pt : easing(pt);
+    console.debug(`No Start Easing ${pt} --> ${res}`);
+    return res;
+  };
+}
+
+function noEndEase(easing) {
+  if ( typeof easing === "string" ) easing = CanvasAnimation[easing];
+  return pt => {
+    const res = (pt > 0.5) ? pt : easing(pt);
+    console.debug(`No End Easing ${pt} --> ${res}`);
+    return res;
+  };
+}
+
 PATCHES.TOKEN_RULER.WRAPS = {
   _onDragLeftStart,
   _onDragLeftMove,
   _onDragLeftCancel
 };
+
+PATCHES.PATHFINDING.WRAPS = { _onUpdate };
 
 PATCHES.TOKEN_RULER.MIXES = { _onDragLeftDrop };
 

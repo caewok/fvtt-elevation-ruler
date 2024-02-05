@@ -215,6 +215,8 @@ async function _animateMovement(wrapped, token) {
 
   log(`Moving ${token.name} ${this.segments.length} segments.`, [...this.segments]);
 
+  this.segments.forEach((s, idx) => s.idx = idx);
+
   const promises = [wrapped(token)];
   for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;
@@ -253,7 +255,6 @@ function _computeDistance(gridSpaces) {
   // Determine the distance of each segment.
   _computeSegmentDistances.call(this, gridSpaces);
   if ( Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING) ) _computeTokenSpeed.call(this, gridSpaces);
-  if ( this.segments.length ) this.segments.at(-1).last = true;
 
   // Debugging
   if ( this.segments.some(s => !s) ) console.error("Segment is undefined.");
@@ -271,6 +272,12 @@ function _computeDistance(gridSpaces) {
     waypointMoveDistance += segment.moveDistance;
     segment.waypointDistance = waypointDistance;
     segment.waypointMoveDistance = waypointMoveDistance;
+    segment.first = false;
+    segment.last = false;
+  }
+  if ( this.segments.length ) {
+    this.segments[0].first = true;
+    this.segments.at(-1).last = true;
   }
 }
 
@@ -293,6 +300,7 @@ function _computeSegmentDistances(gridSpaces) {
     totalMoveDistance += segment.moveDistance;
     segment.last = false;
   }
+
   this.totalDistance = totalDistance;
   this.totalMoveDistance = totalMoveDistance;
 }

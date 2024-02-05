@@ -1,5 +1,6 @@
 /* globals
 canvas,
+CanvasAnimation,
 CONFIG,
 CONST,
 foundry,
@@ -177,7 +178,10 @@ function constructPathfindingSegments(segments, segmentMap) {
 export function _getSegmentLabel(wrapped, segment, totalDistance) {
   // Force distance to be between waypoints instead of (possibly pathfinding) segments.
   const origSegmentDistance = segment.distance;
-  const { newSegmentDistance, newMoveDistance, newTotalDistance } = _getDistanceLabels(segment.waypointDistance, segment.waypointMoveDistance, totalDistance);
+  const {
+    newSegmentDistance,
+    newMoveDistance,
+    newTotalDistance } = _getDistanceLabels(segment.waypointDistance, segment.waypointMoveDistance, totalDistance);
   segment.distance = newSegmentDistance;
   const origLabel = wrapped(segment, newTotalDistance);
   segment.distance = origSegmentDistance;
@@ -215,15 +219,27 @@ export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance)
 }
 
 /**
- * Wrap Ruler.prototype._animateSegment
+ * Mixed wrap Ruler.prototype._animateSegment
  * When moving the token along the segments, update the token elevation to the destination + increment
  * for the given segment.
+ * Mark the token update if pathfinding for this segment.
  */
 export async function _animateSegment(wrapped, token, segment, destination) {
   // If the token is already at the destination, _animateSegment will throw an error when the animation is undefined.
   // This can happen when setting artificial segments for highlighting or pathfinding.
+  console.log(`Animating segment ${segment.idx}. First: ${segment.first}. Last: ${segment.last}`);
+
   if ( token.document.x !== destination.x
-    || token.document.y !== destination.y ) await wrapped(token, segment, destination);
+    || token.document.y !== destination.y ) {
+    // Same as wrapped but pass an option.
+    await token.document.update(destination, {
+      rulerSegment: this.segments.length > 1,
+      firstRulerSegment: segment.first,
+      lastRulerSegment: segment.last
+    });
+    const anim = CanvasAnimation.getAnimation(token.animationName);
+    await anim.promise;
+  }
 
   // Update elevation after the token move.
   if ( segment.ray.A.z !== segment.ray.B.z ) {
