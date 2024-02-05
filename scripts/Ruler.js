@@ -212,6 +212,9 @@ function _getMeasurementDestination(wrapped, destination) {
  */
 async function _animateMovement(wrapped, token) {
   if ( !this.segments.length ) return; // Ruler._animateMovement expects at least one segment.
+
+  log(`Moving ${token.name} ${this.segments.length} segments.`, [...this.segments]);
+
   const promises = [wrapped(token)];
   for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;

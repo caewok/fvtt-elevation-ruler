@@ -97,7 +97,7 @@ function calculatePathPointsForSegment(segment, token) {
   const t2 = performance.now();
   pathPoints = Pathfinder.cleanPath(pathPoints);
   const t3 = performance.now();
-  log(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t3 - t2} ms.`);
+  log(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t3 - t2} ms.`, pathPoints);
 
   // If less than 3 points after cleaning, just use the original segment.
   if ( pathPoints.length < 2 ) {
@@ -154,7 +154,9 @@ function constructPathfindingSegments(segments, segmentMap) {
     for ( let i = 1; i < nPoints; i += 1 ) {
       const currPt = pathPoints[i];
       currPt.z = A.z;
-      newSegments.push({ ray: new Ray3d(prevPt, currPt) });
+      const newSegment = { ray: new Ray3d(prevPt, currPt) };
+      newSegment.ray.pathfinding = true; // Used by  canvas.grid.grid._getRulerDestination.
+      newSegments.push(newSegment);
       prevPt = currPt;
     }
 
@@ -162,6 +164,7 @@ function constructPathfindingSegments(segments, segmentMap) {
     if ( lastPathSegment ) {
       lastPathSegment.ray.B.z = B.z;
       lastPathSegment.label = segment.label;
+      lastPathSegment.ray.pathfinding = false;
     }
   }
   return newSegments;

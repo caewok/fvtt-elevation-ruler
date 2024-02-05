@@ -4,6 +4,7 @@ CanvasQuadtree,
 ClockwiseSweepPolygon,
 CONFIG,
 CONST,
+foundry,
 PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -403,37 +404,58 @@ export class Pathfinder {
  * @returns {PIXI.Point[]}
  */
 function cleanGridPath(pathPoints) {
-  const nPoints = pathPoints.length;
+  let nPoints = pathPoints.length;
   if ( nPoints < 3 ) return pathPoints;
+  // Debug: pathPoints.forEach(pt => Draw.point(pt, { alpha: 0.5, color: Draw.COLORS.blue }))
 
+  // Move points to the center of the grid square if no collision for previous or next.
   const config = { mode: "any", type: "move" };
   let prev = pathPoints[0];
   let curr = pathPoints[1];
-  const newPath = [prev];
+  let centeredPath = [prev];
   for ( let i = 2; i < nPoints; i += 1 ) {
     const next = pathPoints[i];
-    if ( next ) {
-      // If next shares this grid space, test if we can remove current.
-      const currGridPos = canvas.grid.grid.getGridPositionFromPixels(curr.x, curr.y);
-      const nextGridPos = canvas.grid.grid.getGridPositionFromPixels(next.x, next.y);
-      if ( currGridPos[0] === nextGridPos[0]
-        && currGridPos[1] === nextGridPos[1]
-        && !ClockwiseSweepPolygon.testCollision(prev, next, config) ) {
-        curr = next;
-        continue;
-      }
-    }
-
-    // Test if we can move the current point to the center of the grid without a collision.
-    // Don't overlap points, which can cause collisions.
     const currCenter = getGridCenterPoint(curr);
-    if ( !prev.equals(currCenter) && !ClockwiseSweepPolygon.testCollision(prev, currCenter, config) ) curr = currCenter;
-    newPath.push(curr);
+    if ( !(ClockwiseSweepPolygon.testCollision(prev, currCenter, config)
+      || ClockwiseSweepPolygon.testCollision(currCenter, next, config)) ) curr = currCenter;
+    centeredPath.push(curr);
     prev = curr;
     curr = next;
   }
-  newPath.push(pathPoints.at(-1));
-  return newPath;
+  centeredPath.push(pathPoints.at(-1));
+  // Debug: centeredPath.forEach(pt => Draw.point(pt, { alpha: 0.5, color: Draw.COLORS.green }))
+
+  // Remove duplicate points.
+  prev = pathPoints[0];
+  let dedupedPath = [prev];
+  for ( let i = 1; i < nPoints; i += 1 ) {
+    const curr = centeredPath[i];
+    if ( curr.almostEqual(prev) ) continue;
+    dedupedPath.push(curr);
+    prev = curr;
+  }
+  // Debug: dedupedPath.forEach(pt => Draw.point(pt, { color: Draw.COLORS.orange }))
+
+  // Remove points in middle of straight line.
+  const orient2d = foundry.utils.orient2dFast;
+  nPoints = dedupedPath.length;
+  prev = pathPoints[0];
+  curr = pathPoints[1];
+  let filteredPath = [prev];
+  for ( let i = 2; i < nPoints; i += 1 ) {
+    const next = dedupedPath[i];
+    if ( orient2d(prev, curr, next).almostEqual(0) ) {
+      curr = next;
+      continue;
+    }
+    filteredPath.push(curr);
+    prev = curr;
+    curr = next;
+  }
+  filteredPath.push(pathPoints.at(-1));
+  // Debug: filteredPath.forEach(pt => Draw.point(pt))
+
+  return filteredPath;
 }
 
 function getGridCenterPoint(pt) {
