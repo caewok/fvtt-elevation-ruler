@@ -408,7 +408,7 @@ function cleanGridPath(pathPoints) {
   if ( nPoints < 3 ) return pathPoints;
   // Debug: pathPoints.forEach(pt => Draw.point(pt, { alpha: 0.5, color: Draw.COLORS.blue }))
 
-  const slowMethod = cleanGridPathSlow(pathPoints);
+  // const slowMethod = cleanGridPathSlow(pathPoints);
 
   const orient2d = foundry.utils.orient2dFast;
   const config = { mode: "any", type: "move" };
@@ -463,13 +463,13 @@ function cleanGridPath(pathPoints) {
 //   }
 //   filteredPath.push(newPath.at(-1));
 
-  if ( slowMethod.length !== newPath.length ) console.debug("Slow Method returned different path", [...slowMethod], [...newPath]);
-  for ( let i = 0; i < slowMethod.length; i += 1 ) {
-    if ( !slowMethod[i].to2d().equals(newPath[i].to2d()) ) {
-      console.debug("Slow Method returned different path", [...slowMethod], [...newPath]);
-      break;
-    }
-  }
+//   if ( slowMethod.length !== newPath.length ) console.debug("Slow Method returned different path", [...slowMethod], [...newPath]);
+//   for ( let i = 0; i < slowMethod.length; i += 1 ) {
+//     if ( !slowMethod[i].to2d().equals(newPath[i].to2d()) ) {
+//       console.debug("Slow Method returned different path", [...slowMethod], [...newPath]);
+//       break;
+//     }
+//   }
 
 
   return newPath;
