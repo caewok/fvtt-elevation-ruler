@@ -97,7 +97,7 @@ function calculatePathPointsForSegment(segment, token) {
   const t2 = performance.now();
   pathPoints = Pathfinder.cleanPath(pathPoints);
   const t3 = performance.now();
-  log(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t3 - t2} ms.`);
+  log(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t3 - t2} ms.`, pathPoints);
 
   // If less than 3 points after cleaning, just use the original segment.
   if ( pathPoints.length < 2 ) {
