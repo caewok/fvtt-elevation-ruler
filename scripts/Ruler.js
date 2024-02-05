@@ -211,7 +211,7 @@ function _getMeasurementDestination(wrapped, destination) {
  * Add additional controlled tokens to the move, if permitted.
  */
 async function _animateMovement(wrapped, token) {
-  if ( !this.segments.length ) return; // Ruler._animateMovement expects at least one segment.
+  if ( !this.segments || !this.segments.length ) return; // Ruler._animateMovement expects at least one segment.
 
   log(`Moving ${token.name} ${this.segments.length} segments.`, [...this.segments]);
 
