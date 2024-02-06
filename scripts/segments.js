@@ -151,7 +151,7 @@ function constructPathfindingSegments(segments, segmentMap) {
 
     const nPoints = pathPoints.length;
     let prevPt = pathPoints[0];
-    prevPt.z = segment.ray.A.z; // TODO: Handle 3d in path points?
+    prevPt.z = segment.ray.A.z;
     for ( let i = 1; i < nPoints; i += 1 ) {
       const currPt = pathPoints[i];
       currPt.z = A.z;
