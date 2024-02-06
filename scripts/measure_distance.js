@@ -18,6 +18,15 @@ import { Point3d } from "./geometry/3d/Point3d.js";
 
 // Specialized distance measurement methods that can handle grids.
 
+/** @type {enum} */
+const CHANGE = {
+  NONE: 0,
+  V: 1,
+  H: 2,
+  D: 3,
+  E: 4
+};
+
 /**
  * Measure physical distance between two points, accounting for grid rules.
  * @param {Point} a                     Starting point for the segment
@@ -28,13 +37,6 @@ import { Point3d } from "./geometry/3d/Point3d.js";
  *  Instead of mathematical shortcuts from center, actual grid squares are counted.
  *  Euclidean on a grid also uses grid squares, but measures using actual diagonal from center to center.
  */
-const CHANGE = {
-  NONE: 0,
-  V: 1,
-  H: 2,
-  D: 3,
-  E: 4
-};
 export function measureDistance(a, b, { gridless = false } = {}) {
   gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
   if ( gridless ) return CONFIG.GeometryLib.utils.pixelsToGridUnits(Point3d.distanceBetween(a, b));
@@ -68,21 +70,35 @@ export function measureDistance(a, b, { gridless = false } = {}) {
   return d;
 }
 
+/**
+ * @typedef {object} GridlessMoveDistanceMeasurement
+ * @property {number} distance        Physical euclidean distance.
+ * @property {number} moveDistance    Distance adjusted for difficult terrain(s) encountered.
+ * @property {number} endElevationZ   End elevation, which may differ from segment b.z if stopTarget is defined.
+ * @property {Point3d} endPoint       End point, which may differ from segment b if stopTarget is defined.
+ */
+
+/**
+ * @typedef {object} GriddedMoveDistanceMeasurement
+ * @property {number} distance        Physical distance given the grid type and grid rules.
+ * @property {number} moveDistance    Distance adjusted for difficult terrain(s) encountered.
+ * @property {number} endElevationZ   End elevation, which may differ from segment b.z if stopTarget is defined.
+ * @property {Number[2]} endGridCoords  End grid square/hex coordinates
+ * @property {number} remainingElevationSteps   Number of elevation grid steps remaining.
+ *   (Number of grid squares straight down required to reach segment b.z elevation. )
+ */
 
 /**
  * Measure the move distance between two points, taking into account terrain and tokens.
  * This uses the `Ruler.prototype.measureDistance` approach for counting grid moves.
  * Each grid move is penalized based on the amount of terrain within the grid.
- *
+ * A segment wholly within a square may be 0 distance.
  * @param {Point} a                     Starting point for the segment
  * @param {Point} b                     Ending point for the segment
  * @param {Token} token                 Token that is moving.
  * @param {boolean} [gridless=false]    If true, use the euclidean distance, ignoring grid.
  * @param {boolean} [useAllElevation=true]  If true, on gridless ensure elevation at end is b.z.
- * @returns {object}
- *  - {number} distance       Distance measurement
- *  - {number} moveDistance   Distance after move penalty applied.
- *  A segment wholly within a square may be 0 distance.
+ * @returns {GriddedMoveDistanceMeasurement|GridlessMoveDistanceMeasurement}
  */
 export function measureMoveDistance(a, b, token, { gridless = false, useAllElevation = true, stopTarget } = {}) {
   gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
@@ -92,14 +108,18 @@ export function measureMoveDistance(a, b, token, { gridless = false, useAllEleva
   else return griddedMoveDistance(a, b, token, { useAllElevation, stopTarget });
 }
 
+// ----- NOTE: Gridless ----- //
+
 /**
  * Calculate the move distance for gridless.
- * @param {PIXI.Point|Point3d} a                      Starting point for the segment
- * @param {PIXI.Point|Point3d} b                      Ending point for the segment
- * @param {Token} token                       Token that is moving.
- * @returns {object}
- *  - {number} distance       Distance measurement in grid units.
- *  - {number} moveDistance   Distance after move penalty applied.
+ * @param {PIXI.Point|Point3d} a              Starting point for the segment
+ * @param {PIXI.Point|Point3d} b              Ending point for the segment
+ * @param {Token} [token]                     Token that is moving.
+ * @param {object} [opts]                     Options that affect the measurement
+ * @param {number} [opts.stopTarget]          Maximum move distance, in canvas scene units, to measure.
+ *   If set, the measurement may terminate early.
+ *   This can be used to project a ray from point a for a specific move distance.
+ * @returns {GridlessMoveDistanceMeasurement}
  */
 function gridlessMoveDistance(a, b, token, { stopTarget } = {}) {
   // Recursively calls gridlessMoveDistance without a stop target to find a breakpoint.
@@ -120,16 +140,17 @@ function gridlessMoveDistance(a, b, token, { stopTarget } = {}) {
 /**
  * Search for the best point at which to split a segment on a gridless Canvas so that
  * the first half of the segment is splitMoveDistance.
- * @param {RulerMeasurementSegment} segment       Segment, with ray property, to split
- * @param {number} splitMoveDistance              Distance, in grid units, of the desired first subsegment move distance
- * @param {Token} token                           Token to use when measuring move distance
+ * @param {PIXI.Point|Point3d} a              Starting point for the segment
+ * @param {PIXI.Point|Point3d} b              Ending point for the segment
+ * @param {Token} [token]                     Token to use when measuring move distance
+ * @param {number} [splitMoveDistance]        Distance, in grid units, of the desired first subsegment move distance
  * @returns {Point3d}
  */
 function findGridlessBreakpoint(a, b, token, splitMoveDistance) {
   // Binary search to find a reasonably close t value for the split move distance.
   // Because the move distance can vary depending on terrain.
   const MAX_ITER = 20;
-  const { moveDistance: fullMoveDistance } = gridlessMoveDistance(A, B, token);
+  const { moveDistance: fullMoveDistance } = gridlessMoveDistance(a, b, token);
 
   let t = splitMoveDistance / fullMoveDistance;
   if ( t <= 0 ) return a;
@@ -158,143 +179,11 @@ function findGridlessBreakpoint(a, b, token, splitMoveDistance) {
 }
 
 /**
- * Calculate the move distance for gridded.
- * Similar to measureDistance.
- * @param {Point3d} a                      Starting point for the segment
- * @param {Point3d} b                      Ending point for the segment
- * @returns {object}
- *  - {number} distance       Distance measurement in grid units.
- *  - {number} moveDistance   Distance after move penalty applied.
- */
-function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget } = {}) {
-  const iter = iterateGridUnderLine(a, b);
-  let prev = iter.next().value;
-  if ( !prev ) return 0; // Should never happen, as passing the same point as a,b returns a single square.
-
-  // Step over each grid shape in turn.
-  let dTotal = 0;
-  let dMoveTotal = 0;
-  let currElevSteps = 0;
-  let prevStep = prev;
-  let finalElev = 0;
-  const distanceGridStepFn = distanceForGridStepFunction(prev, a, b, token);
-  for ( const next of iter ) {
-    const { distance, movePenalty, elevSteps, currElev } = distanceGridStepFn(next);
-
-    // Early stop if the stop target is met.
-    const moveDistance = (distance * movePenalty);
-    if ( stopTarget && (dMoveTotal + moveDistance) > stopTarget ) break;
-
-    dTotal += distance;
-    dMoveTotal += (distance * movePenalty);
-    currElevSteps = elevSteps;
-    prevStep = next;
-    finalElev = currElev;
-  }
-
-  // Handle remaining elevation change, if any, by moving directly up/down.
-  if ( useAllElevation ) {
-    while ( currElevSteps > 0 ) {
-      const { distance, movePenalty, elevSteps, currElev } = distanceGridStepFn(prevStep);
-      dTotal += distance;
-      dMoveTotal += (distance * movePenalty);
-      currElevSteps = elevSteps;
-      finalElev = currElev;
-    }
-  }
-
-  return {
-    distance: dTotal,
-    moveDistance: dMoveTotal,
-    remainingElevationSteps: currElevSteps,
-    endElevationZ: finalElev,
-    endGridCoords: prevStep
-  };
-}
-
-/**
- * Calculate terrain penalty between two points.
- * Multiply this by distance to get the move distance.
- * @param {}
- * @param {PIXI.Point} a                      Starting point for the segment
- * @param {PIXI.Point} b                      Ending point for the segment
- * @param {Token} token                       Token that is moving.
- * @returns {number} Percent penalty
- */
-function terrainMovePenalty(a, b, token) {
-  const terrainAPI = MODULES_ACTIVE.API.TERRAIN_MAPPER;
-  if ( !terrainAPI || !token ) return 1;
-  return terrainAPI.Terrain.percentMovementForTokenAlongPath(token, a, b) || 1;
-}
-
-/**
- * Helper to get the number of grid moves: horizontal, vertical, diagonal.
- * @param {PIXI.Point|Point3d} a                 Starting point for the segment
- * @param {PIXI.Point|Point3d} b                   Ending point for the segment
- * @returns {Uint32Array[4]|0} Counts of changes: none, vertical, horizontal, diagonal.
- */
-function countGridMoves(a, b) {
-  const iter = iterateGridUnderLine(a, b);
-  let prev = iter.next().value;
-  if ( !prev ) return 0; // Should never happen, as passing the same point as a,b returns a single square.
-
-  // No change, vertical change, horizontal change, diagonal change.
-  const changeCount = new Uint32Array([0, 0, 0, 0]);
-  if ( prev ) {
-    for ( const next of iter ) {
-      const xChange = prev[1] !== next[1]; // Column is x
-      const yChange = prev[0] !== next[0]; // Row is y
-      changeCount[((xChange * 2) + yChange)] += 1;
-      prev = next;
-    }
-  }
-  const elevSteps = numElevationGridSteps(Math.abs(b.z - a.z));
-  return elevationChangeCount(elevSteps, changeCount);
-}
-
-/**
- * Count number of grid spaces needed for an elevation change.
- * @param {number} e      Elevation in pixel units
- * @returns {number} Number of grid steps
- */
-function numElevationGridSteps(e) {
-  const gridE = CONFIG.GeometryLib.utils.pixelsToGridUnits(e || 0);
-  return Math.ceil(gridE / canvas.dimensions.distance);
-}
-
-/**
- * Modify the change count by elevation moves.
- * Assume diagonal can move one elevation.
- * If no diagonal available, convert horizontal/vertical to diagonal.
- * If no moves available, add horizontal (don't later convert to diagonal).
- * @param {number} elevSteps
- * @param {Uint32Array[4]} changeCount
- * @returns {Uint32Array[4]} The same changeCount array, for convenience.
- */
-function elevationChangeCount(elevSteps, changeCount) {
-  let availableDiags = changeCount[CHANGE.D];
-  let addedH = 0;
-  while ( elevSteps > 0 ) { // Just in case we screw this up and send elevSteps negative.
-    if ( availableDiags ) availableDiags -= 1;
-    else if ( changeCount[CHANGE.H] ) {
-      changeCount[CHANGE.H] -= 1;
-      changeCount[CHANGE.D] += 1;
-    } else if ( changeCount[CHANGE.V] ) {
-      changeCount[CHANGE.V] -= 1;
-      changeCount[CHANGE.D] += 1;
-    } else addedH += 1; // Add an additional move "down."
-    elevSteps -= 1;
-  }
-  changeCount[CHANGE.H] += addedH;
-  return changeCount;
-}
-
-/**
  * Get speed multiplier for tokens between two points, assuming gridless.
  * Multiplier based on the percentage of the segment that overlaps 1+ tokens.
- * @param {PIXI.Point} a                  Starting point for the segment
- * @param {PIXI.Point} b                    Ending point for the segment
- * @param {Token} token                       Token to use
+ * @param {Point3d} a                     Starting point for the segment
+ * @param {Point3d} b                     Ending point for the segment
+ * @param {Token} [token]                 Token to use
  * @returns {number} Percent penalty
  */
 function terrainTokenGridlessMoveMultiplier(a, b, token) {
@@ -368,12 +257,206 @@ function terrainTokenGridlessMoveMultiplier(a, b, token) {
   return ((totalDistance - distInside) + (distInside * mult)) / totalDistance;
 }
 
+// ----- NOTE: Gridded ----- //
+
+/**
+ * Calculate the move distance for gridded.
+ * Similar to measureDistance.
+ * @param {Point3d} a                      Starting point for the segment
+ * @param {Point3d} b                      Ending point for the segment
+ * @param {Token} [token]                     Token that is moving.
+ * @param {object} [opts]                     Options that affect the measurement
+ * @param {number} [opts.stopTarget]          Maximum move distance, in grid units, to measure.
+ * @param {boolean} [opts.useAllElevation]    If false, elevation will be decreased one grid unit
+ *   for each step from a to b (or a to stopTarget). But remaining elevation, if any, will not
+ *   be accounted for in the distance measurement or moveDistance measurement.
+ *   Used for multiple segment moves, where elevation can be further decreased in a future segment move.
+ * @returns {GriddedMoveDistanceMeasurement}
+ */
+function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget } = {}) {
+  const iter = iterateGridUnderLine(a, b);
+  let prev = iter.next().value;
+  if ( !prev ) return 0; // Should never happen, as passing the same point as a,b returns a single square.
+
+  // Step over each grid shape in turn.
+  let dTotal = 0;
+  let dMoveTotal = 0;
+  let currElevSteps = 0;
+  let prevStep = prev;
+  let finalElev = 0;
+  const distanceGridStepFn = distanceForGridStepFunction(prev, a, b, token);
+  for ( const next of iter ) {
+    const { distance, movePenalty, elevSteps, currElev } = distanceGridStepFn(next);
+
+    // Early stop if the stop target is met.
+    const moveDistance = (distance * movePenalty);
+    if ( stopTarget && (dMoveTotal + moveDistance) > stopTarget ) break;
+
+    dTotal += distance;
+    dMoveTotal += (distance * movePenalty);
+    currElevSteps = elevSteps;
+    prevStep = next;
+    finalElev = currElev;
+  }
+
+  // Handle remaining elevation change, if any, by moving directly up/down.
+  if ( useAllElevation ) {
+    while ( currElevSteps > 0 ) {
+      const { distance, movePenalty, elevSteps, currElev } = distanceGridStepFn(prevStep);
+      dTotal += distance;
+      dMoveTotal += (distance * movePenalty);
+      currElevSteps = elevSteps;
+      finalElev = currElev;
+    }
+  }
+
+  return {
+    distance: dTotal,
+    moveDistance: dMoveTotal,
+    remainingElevationSteps: currElevSteps,
+    endElevationZ: finalElev,
+    endGridCoords: prevStep
+  };
+}
+
+/**
+ * Count the number of horizontal, vertical, diagonal, elevation grid moves.
+ * @param {PIXI.Point|Point3d} a                 Starting point for the segment
+ * @param {PIXI.Point|Point3d} b                   Ending point for the segment
+ * @returns {Uint32Array[4]|0} Counts of changes: none, vertical, horizontal, diagonal.
+ */
+function countGridMoves(a, b) {
+  const iter = iterateGridUnderLine(a, b);
+  let prev = iter.next().value;
+  if ( !prev ) return 0; // Should never happen, as passing the same point as a,b returns a single square.
+
+  // No change, vertical change, horizontal change, diagonal change.
+  const changeCount = new Uint32Array([0, 0, 0, 0]);
+  if ( prev ) {
+    for ( const next of iter ) {
+      const xChange = prev[1] !== next[1]; // Column is x
+      const yChange = prev[0] !== next[0]; // Row is y
+      changeCount[((xChange * 2) + yChange)] += 1;
+      prev = next;
+    }
+  }
+  const elevSteps = numElevationGridSteps(Math.abs(b.z - a.z));
+  return elevationChangeCount(elevSteps, changeCount);
+}
+
+/**
+ * Helper to determine the center of a grid shape given a grid position.
+ * @param {Array[2]} gridCoords     Grid coordinates, [row, col]
+ * @returns {Point}
+ */
+function gridCenterFromGridCoordinates(gridCoords) {
+  const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[0], gridCoords[1]);
+  const [cx, cy] = canvas.grid.grid.getCenter(x, y);
+  return new PIXI.Point(cx, cy);
+}
+
+/**
+ * Helper to get the terrain penalty for a given move from previous point to next point
+ * across a grid square/hex.
+ * @param {PIXI.Rectangle|PIXI.Polygon} gridShape
+ * @param {Point3d} startPt
+ * @param {Point3d} endPt
+ * @param {Token} token
+ * @returns {number} Terrain penalty, averaged across the two portions.
+ */
+function terrainPenaltyForGridStep(gridShape, startPt, endPt, token) {
+  const ixs = gridShape
+    .segmentIntersections(startPt, endPt)
+    .map(ix => PIXI.Point.fromObject(ix));
+  const ix = PIXI.Point.fromObject(ixs[0] ?? PIXI.Point.midPoint(startPt, endPt));
+
+  // Build 3d points for calculating the terrain intersections
+  const midPt = Point3d.fromObject(ix);
+  midPt.z = (startPt.z + endPt.z) * 0.5;
+
+  // Get penalty percentages, which might be 3d.
+  const terrainPenaltyPrev = terrainMovePenalty(startPt, midPt, token);
+  const terrainPenaltyCurr = terrainMovePenalty(midPt, endPt, token);
+
+  // TODO: Does it matter that the 3d distance may be different than the 2d distance?
+  return (terrainPenaltyCurr + terrainPenaltyPrev) * 0.5;
+}
+
+/**
+ * Helper to determine the grid shape from grid coordiantes
+ * @param {Array[2]} gridCoords     Grid coordinates, [row, col]
+ * @returns {PIXI.Rectangle|PIXI.Polygon}
+ */
+export function gridShapeFromGridCoordinates(gridCoords) {
+  const gridShapeFn = canvas.grid.type === CONST.GRID_TYPES.SQUARE ? squareGridShape : hexGridShape;
+  const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[0], gridCoords[1]);
+  return gridShapeFn({x, y});
+}
+
+/**
+ * Determine if at least one token overlaps this grid square/hex.
+ * @param {PIXI.Rectangle|PIXI.Polygon} gridShape
+ * @param {number} prevElev     top/bottom of the grid
+ * @param {number} currElev     top/bottom of the grid
+ */
+function doTokensOverlapGridShape(tokens, shape, prevElev = 0, currElev = 0) {
+  return tokens.some(t => {
+    // Token must be at the correct elevation to intersect the move.
+    if ( !minMaxOverlap(prevElev, currElev, t.bottomZ, t.topZ, true) ) return false;
+
+    // Token constrained border, shrunk to avoid false positives from adjacent grid squares.
+    const border = t.constrainedTokenBorder ?? t.bounds;
+    border.pad(-2);
+    return border.overlaps(shape);
+  });
+}
+
+/**
+ * Count number of grid spaces needed for an elevation change.
+ * @param {number} e      Elevation in pixel units
+ * @returns {number} Number of grid steps
+ */
+function numElevationGridSteps(e) {
+  const gridE = CONFIG.GeometryLib.utils.pixelsToGridUnits(e || 0);
+  return Math.ceil(gridE / canvas.dimensions.distance);
+}
+
+/**
+ * Modify the change count by elevation moves.
+ * Assume diagonal can move one elevation.
+ * If no diagonal available, convert horizontal/vertical to diagonal.
+ * If no moves available, add horizontal (don't later convert to diagonal).
+ * @param {number} elevSteps
+ * @param {Uint32Array[4]} changeCount
+ * @returns {Uint32Array[4]} The same changeCount array, for convenience.
+ */
+function elevationChangeCount(elevSteps, changeCount) {
+  let availableDiags = changeCount[CHANGE.D];
+  let addedH = 0;
+  while ( elevSteps > 0 ) { // Just in case we screw this up and send elevSteps negative.
+    if ( availableDiags ) availableDiags -= 1;
+    else if ( changeCount[CHANGE.H] ) {
+      changeCount[CHANGE.H] -= 1;
+      changeCount[CHANGE.D] += 1;
+    } else if ( changeCount[CHANGE.V] ) {
+      changeCount[CHANGE.V] -= 1;
+      changeCount[CHANGE.D] += 1;
+    } else addedH += 1; // Add an additional move "down."
+    elevSteps -= 1;
+  }
+  changeCount[CHANGE.H] += addedH;
+  return changeCount;
+}
+
 /**
  * Return a function that tracks the grid steps from a previous square/hex to a new square/hex.
  * The function returns the distance and move distance for a given move.
- * @param {Token} token
+ * @param {number[2]} prev                    Column, row of the starting grid square
+ * @param {PIXI.Point|Point3d} a              Starting point for the segment
+ * @param {PIXI.Point|Point3d} b              Ending point for the segment
+ * @param {Token} [token]                     Token that is moving.
  * @returns {function}
- *   - @param {Array[2]} next    column, grid of the next square
+ *   - @param {number[2]} next    column, row of the next square
  */
 function distanceForGridStepFunction(prev, a, b, token ) {
   const zUnitDistance = CONFIG.GeometryLib.utils.gridUnitsToPixels(canvas.scene.dimensions.distance);
@@ -401,7 +484,7 @@ function distanceForGridStepFunction(prev, a, b, token ) {
   // Track if token overlaps this space
   const gridShape = gridShapeFromGridCoordinates(prev);
   let tokenOverlapsPrev = (tokenMult === 1 || !tokens.size) ? false
-    : doTokensOverlap(tokens, gridShape, prevElev, currElev);
+    : doTokensOverlapGridShape(tokens, gridShape, prevElev, currElev);
 
   // Find the center of this grid shape.
   const prevCenter = Point3d.fromObject(gridCenterFromGridCoordinates(prev));
@@ -422,7 +505,7 @@ function distanceForGridStepFunction(prev, a, b, token ) {
     // Do one or more token constrained borders overlap this grid space?
     const gridShape = gridShapeFromGridCoordinates(next);
     const tokenOverlaps = (tokenMult === 1 || !tokens.size) ? false
-      : doTokensOverlap(tokens, gridShape, prevElev, currElev);
+      : doTokensOverlapGridShape(tokens, gridShape, prevElev, currElev);
 
     // Locate the center of this grid shape.
     const currCenter = Point3d.fromObject(gridCenterFromGridCoordinates(next));
@@ -503,22 +586,22 @@ function countGridStep(prev, elevSteps = 0) {
   };
 }
 
-/**
- * Determine if at least one token overlaps this grid square/hex.
- * @param {PIXI.Rectangle|PIXI.Polygon} gridShape
- * @param {number} prevElev     top/bottom of the grid
- * @param {number} currElev     top/bottom of the grid
- */
-function doTokensOverlap(tokens, shape, prevElev = 0, currElev = 0) {
-  return tokens.some(t => {
-    // Token must be at the correct elevation to intersect the move.
-    if ( !minMaxOverlap(prevElev, currElev, t.bottomZ, t.topZ, true) ) return false;
 
-    // Token constrained border, shrunk to avoid false positives from adjacent grid squares.
-    const border = t.constrainedTokenBorder ?? t.bounds;
-    border.pad(-2);
-    return border.overlaps(shape);
-  });
+// ----- NOTE: Helper methods ----- //
+
+/**
+ * Calculate terrain penalty between two points.
+ * Multiply this by distance to get the move distance.
+ * @param {}
+ * @param {PIXI.Point} a                      Starting point for the segment
+ * @param {PIXI.Point} b                      Ending point for the segment
+ * @param {Token} token                       Token that is moving.
+ * @returns {number} Percent penalty
+ */
+function terrainMovePenalty(a, b, token) {
+  const terrainAPI = MODULES_ACTIVE.API.TERRAIN_MAPPER;
+  if ( !terrainAPI || !token ) return 1;
+  return terrainAPI.Terrain.percentMovementForTokenAlongPath(token, a, b) || 1;
 }
 
 /**
@@ -537,53 +620,4 @@ function minMaxOverlap(a0, a1, b0, b1, inclusive = true) {
     || aMinMax.max.between(bMinMax.min, bMinMax.max, inclusive)
     || bMinMax.min.between(aMinMax.min, aMinMax.max, inclusive)
     || bMinMax.max.between(aMinMax.min, aMinMax.max, inclusive);
-}
-
-/**
- * Helper to determine the center of a grid shape given a grid position.
- * @param {Array[2]} gridCoords     Grid coordinates, [row, col]
- * @returns {Point}
- */
-function gridCenterFromGridCoordinates(gridCoords) {
-  const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[0], gridCoords[1]);
-  const [cx, cy] = canvas.grid.grid.getCenter(x, y);
-  return new PIXI.Point(cx, cy);
-}
-
-/**
- * Helper to get the terrain penalty for a given move from previous point to next point
- * across a grid square/hex.
- * @param {PIXI.Rectangle|PIXI.Polygon} gridShape
- * @param {Point3d} startPt
- * @param {Point3d} endPt
- * @param {Token} token
- * @returns {number} Terrain penalty, averaged across the two portions.
- */
-function terrainPenaltyForGridStep(gridShape, startPt, endPt, token) {
-  const ixs = gridShape
-    .segmentIntersections(startPt, endPt)
-    .map(ix => PIXI.Point.fromObject(ix));
-  const ix = PIXI.Point.fromObject(ixs[0] ?? PIXI.Point.midPoint(startPt, endPt));
-
-  // Build 3d points for calculating the terrain intersections
-  const midPt = Point3d.fromObject(ix);
-  midPt.z = (startPt.z + endPt.z) * 0.5;
-
-  // Get penalty percentages, which might be 3d.
-  const terrainPenaltyPrev = terrainMovePenalty(startPt, midPt, token);
-  const terrainPenaltyCurr = terrainMovePenalty(midPt, endPt, token);
-
-  // TODO: Does it matter that the 3d distance may be different than the 2d distance?
-  return (terrainPenaltyCurr + terrainPenaltyPrev) * 0.5;
-}
-
-/**
- * Helper to determine the grid shape from grid coordiantes
- * @param {Array[2]} gridCoords     Grid coordinates, [row, col]
- * @returns {PIXI.Rectangle|PIXI.Polygon}
- */
-export function gridShapeFromGridCoordinates(gridCoords) {
-  const gridShapeFn = canvas.grid.type === CONST.GRID_TYPES.SQUARE ? squareGridShape : hexGridShape;
-  const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[0], gridCoords[1]);
-  return gridShapeFn({x, y});
 }

@@ -278,7 +278,7 @@ function _computeDistance(gridSpaces) {
  */
 function _computeSegmentDistances(gridSpaces) {
   const token = this._getMovementToken();
-  const gridless = !gridSpaces;
+  const gridless = !gridSpaces || canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
   const measureMoveDistance = this.constructor.measureMoveDistance;
 
   // Loop over each segment in turn, adding the physical distance and the move distance.
@@ -314,7 +314,7 @@ function _computeTokenSpeed(gridSpaces) {
   if ( !tokenSpeed ) return;
 
   // Other constants
-  const gridless = !gridSpaces;
+  const gridless = !gridSpaces || canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
   const walkDistance = tokenSpeed;
   const dashDistance = tokenSpeed * SPEED.MULTIPLIER;
 
