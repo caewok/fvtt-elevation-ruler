@@ -35,9 +35,9 @@ const CHANGE = {
   D: 3,
   E: 4
 };
-export function measureDistance(a, b, gridless = false) {
+export function measureDistance(a, b, { gridless = false } = {}) {
   gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
-  if ( gridless ) return CONFIG.GeometryLib.utils.pixelsToGridUnits(PIXI.Point.distanceBetween(a, b));
+  if ( gridless ) return CONFIG.GeometryLib.utils.pixelsToGridUnits(Point3d.distanceBetween(a, b));
 
   a = Point3d.fromObject(a);
   b = Point3d.fromObject(b);
@@ -78,18 +78,18 @@ export function measureDistance(a, b, gridless = false) {
  * @param {Point} b                     Ending point for the segment
  * @param {Token} token                 Token that is moving.
  * @param {boolean} [gridless=false]    If true, use the euclidean distance, ignoring grid.
+ * @param {boolean} [useAllElevation=true]  If true, on gridless ensure elevation at end is b.z.
  * @returns {object}
  *  - {number} distance       Distance measurement
  *  - {number} moveDistance   Distance after move penalty applied.
  *  A segment wholly within a square may be 0 distance.
  */
-export function measureMoveDistance(a, b, token, gridless = false) {
+export function measureMoveDistance(a, b, token, { gridless = false, useAllElevation = true, stopTarget } = {}) {
   gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
   a = Point3d.fromObject(a);
   b = Point3d.fromObject(b);
-
-  if ( gridless ) return gridlessMoveDistance(a, b, token);
-  else return griddedMoveDistance(a, b, token);
+  if ( gridless ) return gridlessMoveDistance(a, b, token, { stopTarget });
+  else return griddedMoveDistance(a, b, token, { useAllElevation, stopTarget });
 }
 
 /**
@@ -101,14 +101,60 @@ export function measureMoveDistance(a, b, token, gridless = false) {
  *  - {number} distance       Distance measurement in grid units.
  *  - {number} moveDistance   Distance after move penalty applied.
  */
-function gridlessMoveDistance(a, b, token) {
+function gridlessMoveDistance(a, b, token, { stopTarget } = {}) {
+  // Recursively calls gridlessMoveDistance without a stop target to find a breakpoint.
+  if ( stopTarget ) b = findGridlessBreakpoint(a, b, token, stopTarget);
+
+  // Determine penalty proportion of the a|b segment.
   const terrainPenalty = terrainMovePenalty(a, b, token);
   const tokenPenalty = terrainTokenGridlessMoveMultiplier(a, b, token);
-  const d = CONFIG.GeometryLib.utils.pixelsToGridUnits(PIXI.Point.distanceBetween(a, b));
+  const d = CONFIG.GeometryLib.utils.pixelsToGridUnits(Point3d.distanceBetween(a, b));
   return {
     distance: d,
-    moveDistance: d * terrainPenalty * tokenPenalty
+    moveDistance: d * terrainPenalty * tokenPenalty,
+    endElevationZ: b.z,
+    endPoint: b
   };
+}
+
+/**
+ * Search for the best point at which to split a segment on a gridless Canvas so that
+ * the first half of the segment is splitMoveDistance.
+ * @param {RulerMeasurementSegment} segment       Segment, with ray property, to split
+ * @param {number} splitMoveDistance              Distance, in grid units, of the desired first subsegment move distance
+ * @param {Token} token                           Token to use when measuring move distance
+ * @returns {Point3d}
+ */
+function findGridlessBreakpoint(a, b, token, splitMoveDistance) {
+  // Binary search to find a reasonably close t value for the split move distance.
+  // Because the move distance can vary depending on terrain.
+  const MAX_ITER = 20;
+  const { moveDistance: fullMoveDistance } = gridlessMoveDistance(A, B, token);
+
+  let t = splitMoveDistance / fullMoveDistance;
+  if ( t <= 0 ) return a;
+  if ( t >= 1 ) return b;
+
+  let maxHigh = 1;
+  let maxLow = 0;
+  let testSplitPoint;
+  for ( let i = 0; i < MAX_ITER; i += 1 ) {
+    testSplitPoint = a.projectToward(b, t);
+    const { moveDistance } = gridlessMoveDistance(a, testSplitPoint, token);
+
+    // Adjust t by half the distance to the max/min t value.
+    // Need not be all that exact but must be over the target distance.
+    if ( moveDistance.almostEqual(splitMoveDistance, .01) ) break;
+    if ( moveDistance > splitMoveDistance ) {
+      maxHigh = t;
+      t -= ((t - maxLow) * 0.5);
+    } else {
+      maxLow = t;
+      t += ((maxHigh - t) * 0.5);
+
+    }
+  }
+  return testSplitPoint;
 }
 
 /**
@@ -120,7 +166,7 @@ function gridlessMoveDistance(a, b, token) {
  *  - {number} distance       Distance measurement in grid units.
  *  - {number} moveDistance   Distance after move penalty applied.
  */
-function griddedMoveDistance(a, b, token) {
+function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget } = {}) {
   const iter = iterateGridUnderLine(a, b);
   let prev = iter.next().value;
   if ( !prev ) return 0; // Should never happen, as passing the same point as a,b returns a single square.
@@ -130,26 +176,39 @@ function griddedMoveDistance(a, b, token) {
   let dMoveTotal = 0;
   let currElevSteps = 0;
   let prevStep = prev;
+  let finalElev = 0;
   const distanceGridStepFn = distanceForGridStepFunction(prev, a, b, token);
   for ( const next of iter ) {
-    const { distance, movePenalty, elevSteps } = distanceGridStepFn(next);
+    const { distance, movePenalty, elevSteps, currElev } = distanceGridStepFn(next);
+
+    // Early stop if the stop target is met.
+    const moveDistance = (distance * movePenalty);
+    if ( stopTarget && (dMoveTotal + moveDistance) > stopTarget ) break;
+
     dTotal += distance;
     dMoveTotal += (distance * movePenalty);
     currElevSteps = elevSteps;
     prevStep = next;
+    finalElev = currElev;
   }
 
   // Handle remaining elevation change, if any, by moving directly up/down.
-  while ( currElevSteps > 0 ) {
-    const { distance, movePenalty, elevSteps } = distanceGridStepFn(prevStep);
-    dTotal += distance;
-    dMoveTotal += (distance * movePenalty);
-    currElevSteps = elevSteps;
+  if ( useAllElevation ) {
+    while ( currElevSteps > 0 ) {
+      const { distance, movePenalty, elevSteps, currElev } = distanceGridStepFn(prevStep);
+      dTotal += distance;
+      dMoveTotal += (distance * movePenalty);
+      currElevSteps = elevSteps;
+      finalElev = currElev;
+    }
   }
 
   return {
     distance: dTotal,
-    moveDistance: dMoveTotal
+    moveDistance: dMoveTotal,
+    remainingElevationSteps: currElevSteps,
+    endElevationZ: finalElev,
+    endGridCoords: prevStep
   };
 }
 
@@ -266,7 +325,7 @@ function terrainTokenGridlessMoveMultiplier(a, b, token) {
     // See Foundry issue #10336. Don't trust the t0 values.
     ixs.forEach(ix => {
       // See PIXI.Point.prototype.towardsPoint
-      const distance = PIXI.Point.distanceBetween(a, ix);
+      const distance = Point3d.distanceBetween(a, ix);
       ix.t0 = distance / deltaMag;
     });
     ixs.sort((a, b) => a.t0 - b.t0);
@@ -291,7 +350,7 @@ function terrainTokenGridlessMoveMultiplier(a, b, token) {
     else if ( nInside === 1 ) { // Inside is false and we are now outside.
       const startPt = a.projectToward(b, prevT);
       const endPt = a.projectToward(b, tValue.t);
-      distInside += PIXI.Point.distanceBetween(startPt, endPt);
+      distInside += Point3d.distanceBetween(startPt, endPt);
       nInside = 0;
       prevT = undefined;
     }
@@ -300,12 +359,12 @@ function terrainTokenGridlessMoveMultiplier(a, b, token) {
   // If still inside, we can go all the way to t = 1
   if ( nInside > 0 ) {
     const startPt = a.projectToward(b, prevT);
-    distInside += PIXI.Point.distanceBetween(startPt, b);
+    distInside += Point3d.distanceBetween(startPt, b);
   }
 
   if ( !distInside ) return 1;
 
-  const totalDistance = PIXI.Point.distanceBetween(a, b);
+  const totalDistance = Point3d.distanceBetween(a, b);
   return ((totalDistance - distInside) + (distInside * mult)) / totalDistance;
 }
 
@@ -317,7 +376,6 @@ function terrainTokenGridlessMoveMultiplier(a, b, token) {
  *   - @param {Array[2]} next    column, grid of the next square
  */
 function distanceForGridStepFunction(prev, a, b, token ) {
-  const gridShapeFn = canvas.grid.type === CONST.GRID_TYPES.SQUARE ? squareGridShape : hexGridShape;
   const zUnitDistance = CONFIG.GeometryLib.utils.gridUnitsToPixels(canvas.scene.dimensions.distance);
   const tokenMult = Settings.get(Settings.KEYS.TOKEN_RULER.TOKEN_MULTIPLIER) || 1;
   const distance = canvas.dimensions.distance;
@@ -341,8 +399,7 @@ function distanceForGridStepFunction(prev, a, b, token ) {
   tokens.delete(token);
 
   // Track if token overlaps this space
-  const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(prev[0], prev[1]);
-  const gridShape = gridShapeFn({x, y});
+  const gridShape = gridShapeFromGridCoordinates(prev);
   let tokenOverlapsPrev = (tokenMult === 1 || !tokens.size) ? false
     : doTokensOverlap(tokens, gridShape, prevElev, currElev);
 
@@ -363,8 +420,7 @@ function distanceForGridStepFunction(prev, a, b, token ) {
     currElev = elevDir > 0 ? Math.min(b.z, currElev) : Math.max(b.z, currElev);
 
     // Do one or more token constrained borders overlap this grid space?
-    const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(next[0], next[1]);
-    const gridShape = gridShapeFn({x, y});
+    const gridShape = gridShapeFromGridCoordinates(next);
     const tokenOverlaps = (tokenMult === 1 || !tokens.size) ? false
       : doTokensOverlap(tokens, gridShape, prevElev, currElev);
 
@@ -391,7 +447,7 @@ function distanceForGridStepFunction(prev, a, b, token ) {
     const tokenPenalty = ((tokenOverlaps ? tokenMult : 1) + (tokenOverlapsPrev ? tokenMult : 1)) * 0.5;
     log(`griddedMoveDistance|${prevCenter.x},${prevCenter.y},${prevCenter.z} -> ${currCenter.x},${currCenter.y},${currCenter.z}\n\ttokenPenalty: ${tokenPenalty}\n\tterrainPenalty: ${terrainPenalty}`);
     if ( !isFinite(currCenter.z) || !isFinite(prevCenter.z) ) {
-      log("Non-finite z value in distanceForGridStepFunction")
+      log("Non-finite z value in distanceForGridStepFunction");
     }
 
 
@@ -402,7 +458,7 @@ function distanceForGridStepFunction(prev, a, b, token ) {
     prevElev = currElev;
     elevSteps = Math.max(elevSteps - 1, 0);
 
-    return { distance: d, movePenalty: terrainPenalty * tokenPenalty, elevSteps };
+    return { distance: d, movePenalty: terrainPenalty * tokenPenalty, elevSteps, currElev };
   };
 }
 
@@ -519,4 +575,15 @@ function terrainPenaltyForGridStep(gridShape, startPt, endPt, token) {
 
   // TODO: Does it matter that the 3d distance may be different than the 2d distance?
   return (terrainPenaltyCurr + terrainPenaltyPrev) * 0.5;
+}
+
+/**
+ * Helper to determine the grid shape from grid coordiantes
+ * @param {Array[2]} gridCoords     Grid coordinates, [row, col]
+ * @returns {PIXI.Rectangle|PIXI.Polygon}
+ */
+export function gridShapeFromGridCoordinates(gridCoords) {
+  const gridShapeFn = canvas.grid.type === CONST.GRID_TYPES.SQUARE ? squareGridShape : hexGridShape;
+  const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[0], gridCoords[1]);
+  return gridShapeFn({x, y});
 }
