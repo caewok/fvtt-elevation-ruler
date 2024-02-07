@@ -1,3 +1,13 @@
+# 0.8.4
+Improve path cleaning algorithm to remove multiple straight-line points. Closes issue #40.
+Refactor measurement of distances and move distances to better account for 3d distance. Closes issue #41.
+Add `CONFIG` settings to change the unicode symbol displayed when the ruler is over terrain (or tokens, if tokens count as difficult terrain).
+- `CONFIG.elevationruler.SPEED.terrainSymbol`: You can use any text string here. Paste in a unicode symbol if you want a different symbol. For Font Awesome icons, use, e.g., "\uf0e7".
+- `CONFIG.elevationruler.SPEED.useFontAwesome`: Set to true to interpet the `terrainSymbol` as FA unicode.
+
+## Breaking changes
+The added methods `Ruler.measureDistance` and `Ruler.measureMoveDistance` were refactored and now take different parameters.
+
 # 0.8.3
 Add setting for pathfinder to avoid all tokens or hostile tokens. Closes issue #37.
 Misc. fixes to pathfinding to reduce likelihood of it failing to find a path or finding an incorrect path.

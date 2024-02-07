@@ -194,9 +194,8 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
   if ( segment.waypointDistance !== segment.waypointMoveDistance ) {
     if ( CONFIG[MODULE_ID].SPEED.useFontAwesome ) {
       const style = segment.label.style;
-      if ( !style.fontFamily.includes("fontAwesome") ) style.fontFamily += ",fontAwesome"
+      if ( !style.fontFamily.includes("fontAwesome") ) style.fontFamily += ",fontAwesome";
       moveLabel = `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${newMoveDistance}${units}`;
-      // moveLabel = `\n \uf0e7 ${newMoveDistance}${units}`;
     } else moveLabel = `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${newMoveDistance}${units}`;
   }
 
