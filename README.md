@@ -95,6 +95,10 @@ As with the normal Foundry ruler, if you begin a measurement at your token, you 
 
 You can modify the system attributes used for walk/fly/burrow as well as the colors used in `CONFIG.elevationruler.SPEED`. You can modify the Token HUD icons in `CONFIG.elevationruler.MOVEMENT_BUTTONS`.
 
+You can modify the icon used when hovering over difficult terrain:
+- `CONFIG.elevationruler.SPEED.terrainSymbol`: You can use any text string here. Paste in a unicode symbol if you want a different symbol. For Font Awesome icons, use, e.g., "\uf0e7". (This is the code for [FA lightning bolt](https://fontawesome.com/icons/bolt?f=classic&s=solid).)
+- `CONFIG.elevationruler.SPEED.useFontAwesome`: Set to true to interpet the `terrainSymbol` as FA unicode.
+
 Elevation Ruler adds a token property to get the token movement type: `_token.movementType`. You may also want the enumerated movement types: `game.modules.get("elevationruler").api.MOVEMENT_TYPES`.
 
 Elevation Ruler adds token properties to track the last movement made by the token:
