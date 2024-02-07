@@ -96,7 +96,11 @@ export const SPEED = {
     WALK: Color.from(0x00ff00),
     DASH: Color.from(0xffff00),
     MAXIMUM: Color.from(0xff0000)
-  }
+  },
+
+  // Use Font Awesome font unicode instead of basic unicode for displaying terrain symbol.
+  useFontAwesome: false, // Set to true to use Font Awesome unicode
+  terrainSymbol: "🥾"  // For Font Awesome, https://fontawesome.com/icons/bolt?f=classic&s=solid would be "\uf0e7".
 };
 
 // Add the inversions for lookup
