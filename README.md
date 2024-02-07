@@ -80,7 +80,6 @@ Finally, the DnD Euclidean rule relies on Pythagorean's Theorem, rounded to the 
 
 ![Screenshot DnD 5e Euclidean Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/measurement_dnd_euclidean.jpg)
 
-
 ## Token measurement
 
 If you drag the ruler over a token that has been elevated or lowered, the ruler will reflect the elevation of that token (plus or minus manually incremented values). (This does not happen if you are dragging tokens; you must use the ruler tool.)
@@ -94,6 +93,10 @@ As with the normal Foundry ruler, if you begin a measurement at your token, you 
 # API
 
 You can modify the system attributes used for walk/fly/burrow as well as the colors used in `CONFIG.elevationruler.SPEED`. You can modify the Token HUD icons in `CONFIG.elevationruler.MOVEMENT_BUTTONS`.
+
+You can modify the icon used when hovering over difficult terrain:
+- `CONFIG.elevationruler.SPEED.terrainSymbol`: You can use any text string here. Paste in a unicode symbol if you want a different symbol. For Font Awesome icons, use, e.g., "\uf0e7". (This is the code for [FA lightning bolt](https://fontawesome.com/icons/bolt?f=classic&s=solid).)
+- `CONFIG.elevationruler.SPEED.useFontAwesome`: Set to true to interpet the `terrainSymbol` as FA unicode.
 
 Elevation Ruler adds a token property to get the token movement type: `_token.movementType`. You may also want the enumerated movement types: `game.modules.get("elevationruler").api.MOVEMENT_TYPES`.
 

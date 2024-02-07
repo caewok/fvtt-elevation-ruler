@@ -91,7 +91,7 @@ export function perpendicularPoints(A, B, distance = 1) {
 export function * iterateGridUnderLine(origin, destination, { reverse = false } = {}) {
   if ( reverse ) [origin, destination] = [destination, origin];
 
-  const distance = PIXI.Point.distanceBetween(origin, destination);
+  const distance = PIXI.Point.distanceBetween(origin, destination); // We want 2d here.
   const spacer = canvas.scene.grid.type === CONST.GRID_TYPES.SQUARE ? 1.41 : 1;
   const nMax = Math.max(Math.floor(distance / (spacer * Math.min(canvas.grid.w, canvas.grid.h))), 1);
   const tMax = Array.fromRange(nMax+1).map(t => t / nMax);

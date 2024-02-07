@@ -1,11 +1,10 @@
 /* globals
 canvas,
-CONFIG
 CONST,
 duplicate,
 game,
 getProperty,
-PIXI,
+Ruler,
 ui
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -18,6 +17,7 @@ PATCHES.SPEED_HIGHLIGHTING = {};
 import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
+import { Point3d } from "./geometry/3d/Point3d.js";
 import {
   elevationAtWaypoint,
   originElevation,
@@ -36,14 +36,12 @@ import {
 
 import {
   tokenIsSnapped,
-  iterateGridUnderLine,
-  squareGridShape,
-  hexGridShape,
   log } from "./util.js";
 
 import {
   measureDistance,
-  measureMoveDistance
+  measureMoveDistance,
+  gridShapeFromGridCoordinates
 } from "./measure_distance.js";
 
 /**
@@ -211,7 +209,12 @@ function _getMeasurementDestination(wrapped, destination) {
  * Add additional controlled tokens to the move, if permitted.
  */
 async function _animateMovement(wrapped, token) {
-  if ( !this.segments.length ) return; // Ruler._animateMovement expects at least one segment.
+  if ( !this.segments || !this.segments.length ) return; // Ruler._animateMovement expects at least one segment.
+
+  log(`Moving ${token.name} ${this.segments.length} segments.`, [...this.segments]);
+
+  this.segments.forEach((s, idx) => s.idx = idx);
+
   const promises = [wrapped(token)];
   for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;
@@ -250,7 +253,6 @@ function _computeDistance(gridSpaces) {
   // Determine the distance of each segment.
   _computeSegmentDistances.call(this, gridSpaces);
   if ( Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING) ) _computeTokenSpeed.call(this, gridSpaces);
-  if ( this.segments.length ) this.segments.at(-1).last = true;
 
   // Debugging
   if ( this.segments.some(s => !s) ) console.error("Segment is undefined.");
@@ -276,20 +278,28 @@ function _computeDistance(gridSpaces) {
  */
 function _computeSegmentDistances(gridSpaces) {
   const token = this._getMovementToken();
-  const gridless = !gridSpaces;
+  const gridless = !gridSpaces || canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
   const measureMoveDistance = this.constructor.measureMoveDistance;
 
   // Loop over each segment in turn, adding the physical distance and the move distance.
   let totalDistance = 0;
   let totalMoveDistance = 0;
+  if ( this.segments.length ) {
+    this.segments[0].first = true;
+    this.segments.at(-1).last = true;
+  }
   for ( const segment of this.segments ) {
-    const { distance, moveDistance } = measureMoveDistance(segment.ray.A, segment.ray.B, token, gridless);
+    const { distance, moveDistance } = measureMoveDistance(
+      segment.ray.A,
+      segment.ray.B,
+      token,
+      { gridless, useAllElevation: segment.last });
     segment.distance = distance;
     segment.moveDistance = moveDistance;
     totalDistance += segment.distance;
     totalMoveDistance += segment.moveDistance;
-    segment.last = false;
   }
+
   this.totalDistance = totalDistance;
   this.totalMoveDistance = totalMoveDistance;
 }
@@ -304,7 +314,7 @@ function _computeTokenSpeed(gridSpaces) {
   if ( !tokenSpeed ) return;
 
   // Other constants
-  const gridless = !gridSpaces;
+  const gridless = !gridSpaces || canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
   const walkDistance = tokenSpeed;
   const dashDistance = tokenSpeed * SPEED.MULTIPLIER;
 
@@ -399,111 +409,45 @@ function _computeTokenSpeed(gridSpaces) {
  */
 function splitSegment(segment, splitMoveDistance, token, gridless) {
   if ( splitMoveDistance <= 0 ) return [];
-  if ( splitMoveDistance > segment.moveDistance ) return [segment];
-  if ( !segment.moveDistance ) return [segment]; // Segment is length 0 for the move.
+  if ( !segment.moveDistance || splitMoveDistance > segment.moveDistance ) return [segment];
 
-  // Determine where on the segment ray the cutoff occurs.
-  // Use canvas grid distance measurements to handle 5-5-5, 5-10-5, other measurement configs.
-  // At this point, the segment is too long for the cutoff.
-  // If we are using a grid, split the segment at grid/square hex.
-  // Find where the segment intersects the last grid square/hex before the cutoff.
-  const rulerClass = CONFIG.Canvas.rulerClass;
+  // Attempt to move the split distance and determine the split location.
   const { A, B } = segment.ray;
-  gridless ||= (canvas.grid.type === CONST.GRID_TYPES.GRIDLESS);
-  const breakPoint = gridless
-    ? findGridlessBreakpoint(segment, splitMoveDistance, token)
-    : findGriddedBreakpoint(segment, splitMoveDistance, token);
+  const res = Ruler.measureMoveDistance(A, B, token,
+    { gridless, useAllElevation: false, stopTarget: splitMoveDistance });
+
+  let breakPoint;
+  if ( gridless ) breakPoint = res.endPoint; // We can get the exact split point.
+  else {
+    // We can get the end grid.
+    // Use halfway between the intersection points for this grid shape.
+    const gridShape = gridShapeFromGridCoordinates(res.endGridCoords);
+    const ixs = gridShape.segmentIntersections(A, B);
+    if ( !ixs || ixs.length === 0 ) breakPoint = A;
+    else if ( ixs.length === 1 ) breakPoint = B;
+    else {
+      breakPoint = Point3d.midPoint(ixs[0], ixs[1]);
+      breakPoint.z = res.endElevationZ;
+    }
+  }
 
   if ( breakPoint.almostEqual(B) ) return [segment];
   if ( breakPoint.almostEqual(A) ) return [];
 
   // Split the segment into two at the break point.
-  const newSegments = [];
-  for ( const [start, end] of [[A, breakPoint], [breakPoint, B]]) {
-    const s = {...segment};
-    newSegments.push(s);
-    s.ray = new Ray3d(start, end);
-    const { distance, moveDistance } = rulerClass.measureMoveDistance(start, end, token, gridless);
-    s.distance = distance;
-    s.moveDistance = moveDistance;
-  }
-  return newSegments;
-}
+  const s0 = {...segment};
+  s0.ray = new Ray3d(A, breakPoint);
+  s0.distance = res.distance;
+  s0.moveDistance = res.moveDistance;
 
-/**
- * Search for the best point at which to split a segment on a gridless Canvas so that
- * the first half of the segment is splitMoveDistance.
- * @param {RulerMeasurementSegment} segment       Segment, with ray property, to split
- * @param {number} splitMoveDistance              Distance, in grid units, of the desired first subsegment move distance
- * @param {Token} token                           Token to use when measuring move distance
- * @returns {PIXI.Point}
- */
-function findGridlessBreakpoint(segment, splitMoveDistance, token) {
-  // Binary search to find a reasonably close t value for the split move distance.
-  // Because the move distance can vary depending on terrain.
-  const { A, B } = segment.ray;
-  const MAX_ITER = 20;
-  let t = splitMoveDistance / segment.moveDistance;
-  let maxHigh = 1;
-  let maxLow = 0;
-  let testSplitPoint;
-  for ( let i = 0; i < MAX_ITER; i += 1 ) {
-    testSplitPoint = A.projectToward(B, t);
-    const { moveDistance } = measureMoveDistance(A, testSplitPoint, token, true);
+  const s1 = {...segment};
+  s1.ray = new Ray3d(breakPoint, B);
+  s1.distance = segment.distance - res.distance;
+  s1.moveDistance = segment.moveDistance - res.moveDistance;
 
-    // Adjust t by half the distance to the max/min t value.
-    // Need not be all that exact but must be over the target distance.
-    if ( moveDistance.almostEqual(splitMoveDistance, .01) ) break;
-    if ( moveDistance > splitMoveDistance ) {
-      maxHigh = t;
-      t -= ((t - maxLow) * 0.5);
-    } else {
-      maxLow = t;
-      t += ((maxHigh - t) * 0.5);
-
-    }
-  }
-  return testSplitPoint;
-}
-
-/**
- * Search for the best point at which to split a segment on a gridded Canvas so that
- * the first half of the segment is splitMoveDistance.
- * @param {RulerMeasurementSegment} segment       Segment, with ray property, to split
- * @param {number} splitMoveDistance              Distance, in grid units, of the desired first subsegment move distance
- * @param {Token} token                           Token to use when measuring move distance
- * @returns {PIXI.Point}
- */
-function findGriddedBreakpoint(segment, splitMoveDistance, token) {
-  const { A, B } = segment.ray;
-  const gridShapeFn = canvas.grid.type === CONST.GRID_TYPES.SQUARE ? squareGridShape : hexGridShape;
-  const rulerClass = CONFIG.Canvas.rulerClass;
-
-  // Determine all the grid positions, and add each in turn.
-  const gridIter = iterateGridUnderLine(A, B);
-  let breakPoint = A;
-  for ( const [r1, c1] of gridIter ) {
-    const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(r1, c1);
-    const shape = gridShapeFn({x, y});
-    const ixs = shape
-      .segmentIntersections(A, B)
-      .map(ix => PIXI.Point.fromObject(ix));
-    if ( !ixs.length ) continue;
-
-    // Find the midpoint so we avoid the grid edges.
-    const testBreakPoint = ixs.length === 1
-      ? PIXI.Point.midPoint(breakPoint, ixs[0])
-      : PIXI.Point.midPoint(ixs[0], ixs[1]);
-
-    // Calculate the distance from A to the current test breakpoint.
-    // If we have exceeded move distance, we are done.
-    const { moveDistance } = rulerClass.measureMoveDistance(A, testBreakPoint, token, false);
-    if ( moveDistance > splitMoveDistance ) break;
-
-    // Cycle to next iteration.
-    breakPoint = testBreakPoint;
-  }
-  return breakPoint;
+  if ( segment.first ) { s1.first = false; }
+  if ( segment.last ) { s0.last = false; }
+  return [s0, s1];
 }
 
 // ----- NOTE: Event handling ----- //
@@ -670,7 +614,7 @@ PATCHES.BASIC.STATIC_METHODS = {
 /**
  * Helper to add elevation increments to waypoint
  */
-function addWaypointElevationIncrements(ruler, point) {
+function addWaypointElevationIncrements(ruler, _point) {
   const ln = ruler.waypoints.length;
   const newWaypoint = ruler.waypoints[ln - 1];
 

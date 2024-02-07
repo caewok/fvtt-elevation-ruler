@@ -1,5 +1,6 @@
 /* globals
 canvas,
+CanvasAnimation,
 CONFIG,
 CONST,
 foundry,
@@ -97,7 +98,7 @@ function calculatePathPointsForSegment(segment, token) {
   const t2 = performance.now();
   pathPoints = Pathfinder.cleanPath(pathPoints);
   const t3 = performance.now();
-  log(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t3 - t2} ms.`);
+  log(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t3 - t2} ms.`, pathPoints);
 
   // If less than 3 points after cleaning, just use the original segment.
   if ( pathPoints.length < 2 ) {
@@ -150,11 +151,13 @@ function constructPathfindingSegments(segments, segmentMap) {
 
     const nPoints = pathPoints.length;
     let prevPt = pathPoints[0];
-    prevPt.z = segment.ray.A.z; // TODO: Handle 3d in path points?
+    prevPt.z = segment.ray.A.z;
     for ( let i = 1; i < nPoints; i += 1 ) {
       const currPt = pathPoints[i];
       currPt.z = A.z;
-      newSegments.push({ ray: new Ray3d(prevPt, currPt) });
+      const newSegment = { ray: new Ray3d(prevPt, currPt) };
+      newSegment.ray.pathfinding = true; // Used by  canvas.grid.grid._getRulerDestination.
+      newSegments.push(newSegment);
       prevPt = currPt;
     }
 
@@ -162,6 +165,7 @@ function constructPathfindingSegments(segments, segmentMap) {
     if ( lastPathSegment ) {
       lastPathSegment.ray.B.z = B.z;
       lastPathSegment.label = segment.label;
+      lastPathSegment.ray.pathfinding = false;
     }
   }
   return newSegments;
@@ -174,7 +178,10 @@ function constructPathfindingSegments(segments, segmentMap) {
 export function _getSegmentLabel(wrapped, segment, totalDistance) {
   // Force distance to be between waypoints instead of (possibly pathfinding) segments.
   const origSegmentDistance = segment.distance;
-  const { newSegmentDistance, newMoveDistance, newTotalDistance } = _getDistanceLabels(segment.waypointDistance, segment.waypointMoveDistance, totalDistance);
+  const {
+    newSegmentDistance,
+    newMoveDistance,
+    newTotalDistance } = _getDistanceLabels(segment.waypointDistance, segment.waypointMoveDistance, totalDistance);
   segment.distance = newSegmentDistance;
   const origLabel = wrapped(segment, newTotalDistance);
   segment.distance = origSegmentDistance;
@@ -184,7 +191,13 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
 
   let moveLabel = "";
   const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
-  if ( segment.waypointDistance !== segment.waypointMoveDistance ) moveLabel = `\n🥾${newMoveDistance}${units}`;
+  if ( segment.waypointDistance !== segment.waypointMoveDistance ) {
+    if ( CONFIG[MODULE_ID].SPEED.useFontAwesome ) {
+      const style = segment.label.style;
+      if ( !style.fontFamily.includes("fontAwesome") ) style.fontFamily += ",fontAwesome";
+      moveLabel = `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${newMoveDistance}${units}`;
+    } else moveLabel = `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${newMoveDistance}${units}`;
+  }
 
   return `${origLabel}\n${elevLabel}${moveLabel}`;
 }
@@ -212,15 +225,25 @@ export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance)
 }
 
 /**
- * Wrap Ruler.prototype._animateSegment
+ * Mixed wrap Ruler.prototype._animateSegment
  * When moving the token along the segments, update the token elevation to the destination + increment
  * for the given segment.
+ * Mark the token update if pathfinding for this segment.
  */
 export async function _animateSegment(wrapped, token, segment, destination) {
   // If the token is already at the destination, _animateSegment will throw an error when the animation is undefined.
   // This can happen when setting artificial segments for highlighting or pathfinding.
   if ( token.document.x !== destination.x
-    || token.document.y !== destination.y ) await wrapped(token, segment, destination);
+    || token.document.y !== destination.y ) {
+    // Same as wrapped but pass an option.
+    await token.document.update(destination, {
+      rulerSegment: this.segments.length > 1,
+      firstRulerSegment: segment.first,
+      lastRulerSegment: segment.last
+    });
+    const anim = CanvasAnimation.getAnimation(token.animationName);
+    await anim.promise;
+  }
 
   // Update elevation after the token move.
   if ( segment.ray.A.z !== segment.ray.B.z ) {
