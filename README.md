@@ -80,7 +80,6 @@ Finally, the DnD Euclidean rule relies on Pythagorean's Theorem, rounded to the 
 
 ![Screenshot DnD 5e Euclidean Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/measurement_dnd_euclidean.jpg)
 
-
 ## Token measurement
 
 If you drag the ruler over a token that has been elevated or lowered, the ruler will reflect the elevation of that token (plus or minus manually incremented values). (This does not happen if you are dragging tokens; you must use the ruler tool.)
