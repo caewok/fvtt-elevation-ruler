@@ -191,7 +191,13 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
 
   let moveLabel = "";
   const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
-  if ( segment.waypointDistance !== segment.waypointMoveDistance ) moveLabel = `\n🥾${newMoveDistance}${units}`;
+  if ( segment.waypointDistance !== segment.waypointMoveDistance ) {
+    if ( CONFIG[MODULE_ID].SPEED.useFontAwesome ) {
+      const style = segment.label.style;
+      if ( !style.fontFamily.includes("fontAwesome") ) style.fontFamily += ",fontAwesome";
+      moveLabel = `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${newMoveDistance}${units}`;
+    } else moveLabel = `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${newMoveDistance}${units}`;
+  }
 
   return `${origLabel}\n${elevLabel}${moveLabel}`;
 }
