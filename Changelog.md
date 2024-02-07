@@ -4,6 +4,7 @@ Refactor measurement of distances and move distances to better account for 3d di
 Add `CONFIG` settings to change the unicode symbol displayed when the ruler is over terrain (or tokens, if tokens count as difficult terrain).
 - `CONFIG.elevationruler.SPEED.terrainSymbol`: You can use any text string here. Paste in a unicode symbol if you want a different symbol. For Font Awesome icons, use, e.g., "\uf0e7".
 - `CONFIG.elevationruler.SPEED.useFontAwesome`: Set to true to interpet the `terrainSymbol` as FA unicode.
+Update geometry lib to v0.2.15.
 
 ## Breaking changes
 The added methods `Ruler.measureDistance` and `Ruler.measureMoveDistance` were refactored and now take different parameters.
