@@ -1,3 +1,7 @@
+# 0.8.5
+Fix for undefined `constrainedTokenBounds.contains`.
+
+
 # 0.8.4
 Improve path cleaning algorithm to remove multiple straight-line points. Closes issue #40.
 Refactor measurement of distances and move distances to better account for 3d distance. Closes issue #41.
