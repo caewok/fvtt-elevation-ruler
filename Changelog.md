@@ -1,6 +1,6 @@
 # 0.8.5
 Fix for undefined `constrainedTokenBounds.contains`.
-
+Update lib geometry to v0.2.16.
 
 # 0.8.4
 Improve path cleaning algorithm to remove multiple straight-line points. Closes issue #40.
@@ -9,7 +9,7 @@ Remove animation easing for intermediate segments while keeping easing-in for th
 Add `CONFIG` settings to change the unicode symbol displayed when the ruler is over terrain (or tokens, if tokens count as difficult terrain).
 - `CONFIG.elevationruler.SPEED.terrainSymbol`: You can use any text string here. Paste in a unicode symbol if you want a different symbol. For Font Awesome icons, use, e.g., "\uf0e7".
 - `CONFIG.elevationruler.SPEED.useFontAwesome`: Set to true to interpet the `terrainSymbol` as FA unicode.
-Update geometry lib to v0.2.15.
+Update lib geometry to v0.2.15.
 
 ## Breaking changes
 The added methods `Ruler.measureDistance` and `Ruler.measureMoveDistance` were refactored and now take different parameters.
