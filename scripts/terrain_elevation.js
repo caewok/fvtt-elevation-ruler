@@ -120,7 +120,7 @@ export function elevationAtLocation(location, token) {
   // If normal ruler and not prioritizing the token elevation, use elevation of other tokens at this point.
   if ( !isTokenRuler && !preferTokenElevation() ) {
     const maxTokenE = retrieveVisibleTokens()
-      .filter(t => t.constrainedTokenBounds.contains(location.x, location.y))
+      .filter(t => t.constrainedTokenBorder.contains(location.x, location.y))
       .reduce((e, t) => Math.max(t.elevationE, e), Number.NEGATIVE_INFINITY);
     if ( isFinite(maxTokenE) ) return maxTokenE;
   }
