@@ -27,6 +27,9 @@ const CHANGE = {
   E: 4
 };
 
+// Store the flipped key/values.
+Object.entries(CHANGE).forEach(([key, value]) => CHANGE[value] = key);
+
 /**
  * Measure physical distance between two points, accounting for grid rules.
  * @param {Point} a                     Starting point for the segment
@@ -621,3 +624,209 @@ function minMaxOverlap(a0, a1, b0, b1, inclusive = true) {
     || bMinMax.min.between(aMinMax.min, aMinMax.max, inclusive)
     || bMinMax.max.between(aMinMax.min, aMinMax.max, inclusive);
 }
+
+/**
+ * From a given origin, move horizontally the total 2d distance between A and B.
+ * Then move vertically up/down in elevation.
+ * Return an iterator for that movement.
+ * @param {Point3d} origin
+ * @param {Point3d} destination
+ * @return Iterator, which in turn
+ *   returns [row, col] Array for each grid point under the line.
+ */
+function iterateGridProjectedElevation(origin, destination) {
+  const dist2d = PIXI.Point.distanceBetween(origin, destination);
+  let elev = destination.z - origin.z;
+
+  // Must round up to the next grid step for elevation.
+  const size = canvas.dimensions.size;
+  if ( elev % size ) elev = (Math.floor(elev / size) + 1) * size;
+
+  // For hexagonal grids, move in the straight line (row or col) to represent elevation.
+  const b = isHexRow()
+    ? new PIXI.Point(origin.x + elev, origin.y + dist2d)
+    : new PIXI.Point(origin.x + dist2d, origin.y + elev);
+  return iterateGridUnderLine(origin, b);
+}
+
+/**
+ * @returns {boolean} True if the grid is a row hex.
+ */
+function isHexRow() {
+  return canvas.grid.type === CONST.GRID_TYPES.HEXODDR || canvas.grid.type === CONST.GRID_TYPES.HEXEVENR;
+}
+
+/**
+ * Type of change between two grid coordinates.
+ * @param {number[2]} prevGridCoord
+ * @param {number[2]} nextGridCoord
+ * @returns {CHANGE}
+ */
+function gridChangeType(prevGridCoord, nextGridCoord) {
+  const xChange = prevGridCoord[1] !== nextGridCoord[1]; // Column is x
+  const yChange = prevGridCoord[0] !== nextGridCoord[0]; // Row is y
+  return CHANGE[((xChange * 2) + yChange)];
+}
+
+
+function * iterateHexGridMoves(origin, destination) {
+  const iter2d = iterateGridUnderLine(origin, destination);
+  const iterElevation = iterateGridProjectedElevation(origin, destination);
+  // First coordinate is always the origin grid.
+  let prev2d = iter2d.next().value;
+  let prevElevation = iterElevation.next().value;
+  let movementChange = { H: 0, V: 0, D: 0, E: 0 };
+
+  yield {
+    movementChange,
+    gridCoords: prev2d
+  }
+
+  // Moving along the aligned column/row of the hex grid represents elevation-only change.
+  // Moves in other direction represents 2d movement.
+  // Assume no reverse-elevation, so elevation must always go the same direction.
+  // Hex grid is represented as smaller square grid in Foundry.
+
+  const elevOnlyMoveType = isHexRow() ? "H" : "V";
+  const elevOnlyIndex = isHexRow() ? 1 : 0;
+  const elevSign = Math.sign(destination.z - origin.z);
+  const elevTest = elevSign ? (a, b) => a > b : (a, b) => a < b;
+  let currElev = prevElevation[elevOnlyIndex];
+  movementChange = { H: 0, V: 0, D: 0, E: 0 }; // Copy; don't keep same object.
+
+  // Use the elevation iteration to tell us when to move to the next 2d step.
+  // Horizontal or diagonal elevation moves indicate next step.
+  for ( const nextElevation of iterElevation ) {
+    const elevChangeType = gridChangeType(prevElevation, nextElevation)
+    switch ( elevChangeType ) {
+      case "NONE": console.warn("iterateGridMoves unexpected elevChangeType === NONE"); break;
+      case elevOnlyMoveType: {
+        currElev = nextElevation[elevOnlyIndex];
+        movementChange.E += 1;
+        break;
+      }
+      default: {
+        const next2d = iter2d.next().value ?? prev2d;
+        const moveType = gridChangeType(prev2d, next2d)
+        prev2d = next2d;
+        const newElev = nextElevation[elevOnlyIndex];
+        if ( elevTest(newElev, currElev) ) {
+          currElev = newElev;
+          movementChange.E += 1;
+        }
+        movementChange[moveType] += 1;
+        yield {
+          movementChange,
+          gridCoords: next2d
+        }
+        movementChange = { H: 0, V: 0, D: 0, E: 0 };
+      }
+    }
+    prevElevation = nextElevation;
+  }
+
+  if ( movementChange.E ) {
+    yield {
+      movementChange,
+      gridCoords: prev2d
+    }
+  }
+}
+
+/**
+ * From a given origin to a destination, iterate over each grid coordinate in turn.
+ * Track data related to the move at each iteration, taking the delta from the previous.
+ * @param {Point3d} origin
+ * @param {Point3d} destination
+ * @returnIterator, which in turn returns {object}
+ *   - @prop {number[2]} gridCoords
+ *   - @prop {number[5]} movementChange
+ *   - @prop {number[5]} totalMovementChange
+ */
+function * iterateGridMoves(origin, destination) {
+  const iter2d = iterateGridUnderLine(origin, destination);
+  const iterElevation = iterateGridProjectedElevation(origin, destination);
+  // First coordinate is always the origin grid.
+  let prev2d = iter2d.next().value;
+  let prevElevation = iterElevation.next().value;
+  let movementChange = { H: 0, V: 0, D: 0, E: 0 };
+
+  yield {
+    movementChange,
+    gridCoords: prev2d
+  }
+
+  movementChange = { H: 0, V: 0, D: 0, E: 0 }; // Copy; don't keep same object.
+
+  // Use the elevation iteration to tell us when to move to the next 2d step.
+  // Horizontal or diagonal elevation moves indicate next step.
+  for ( const nextElevation of iterElevation ) {
+    const elevChangeType = gridChangeType(prevElevation, nextElevation)
+    switch ( elevChangeType ) {
+      case "NONE": console.warn("iterateGridMoves unexpected elevChangeType === NONE"); break;
+      case "V": {
+        movementChange.E += 1;
+        break;
+      }
+      case "D": movementChange.E += 1;
+      case "H": {
+        const next2d = iter2d.next().value ?? prev2d;
+        const moveType = gridChangeType(prev2d, next2d);
+        prev2d = next2d;
+        movementChange[moveType] += 1;
+        yield {
+          movementChange,
+          gridCoords: next2d
+        }
+        movementChange = { H: 0, V: 0, D: 0, E: 0 };
+      }
+    }
+    prevElevation = nextElevation;
+  }
+
+  if ( movementChange.E ) {
+    yield {
+      movementChange,
+      gridCoords: prev2d
+    }
+  }
+}
+
+
+
+/* Testing
+Draw = CONFIG.GeometryLib.Draw
+
+
+gridCoords = [...iterateGridUnderLine(origin, destination)]
+gridCoords = [...iterateGridProjectedElevation(origin, destination)]
+
+gridMoves = [...iterateHexGridMoves(origin, destination)]
+
+
+Draw.clearDrawings()
+gridMoves = [...iterateGridMoves(origin, destination)]
+gridCoords = gridMoves.map(elem => elem.gridCoords)
+
+
+rulerPts = [];
+for ( let i = 0; i < gridCoords.length; i += 1 ) {
+  const [tlx, tly] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[i][0], gridCoords[i][1]);
+  const [x, y] = canvas.grid.grid.getCenter(tlx, tly);
+  rulerPts.push({x, y})
+}
+rulerPts.forEach(pt => Draw.point(pt, { color: Draw.COLORS.green }))
+
+rulerShapes = [];
+for ( let i = 0; i < gridCoords.length; i += 1 ) {
+  rulerShapes.push(gridShapeFromGridCoords([gridCoords[i][0], gridCoords[i][1]]))
+}
+rulerShapes.forEach(shape => Draw.shape(shape, { color: Draw.COLORS.green }))
+
+Draw.point(origin);
+Draw.point(destination)
+
+moveArr = gridMoves.map(elem => elem.movementChange);
+console.table(moveArr)
+
+*/
