@@ -47,8 +47,8 @@ const SETTINGS = {
   GRID_TERRAIN: {
     ALGORITHM: "grid-terrain-algorithm",
     CHOICES: {
-      CENTER_POINT: "grid-terrain-choice-center-point",
-      PERCENT_AREA: "grid-terrain-choice-percent-area",
+      CENTER: "grid-terrain-choice-center-point",
+      PERCENT: "grid-terrain-choice-percent-area",
       EUCLIDEAN: "grid-terrain-choice-euclidean"
     },
     AREA_THRESHOLD: "grid-terrain-area-threshold"
@@ -187,8 +187,8 @@ export class Settings extends ModuleSettingsAbstract {
       config: true,
       type: String,
       choices: {
-        [KEYS.GRID_TERRAIN.CHOICES.CENTER_POINT]: localize(`${KEYS.GRID_TERRAIN.CHOICES.CENTER_POINT}`),
-        [KEYS.GRID_TERRAIN.CHOICES.PERCENT_AREA]: localize(`${KEYS.GRID_TERRAIN.CHOICES.PERCENT_AREA}`),
+        [KEYS.GRID_TERRAIN.CHOICES.CENTER]: localize(`${KEYS.GRID_TERRAIN.CHOICES.CENTER}`),
+        [KEYS.GRID_TERRAIN.CHOICES.PERCENT]: localize(`${KEYS.GRID_TERRAIN.CHOICES.PERCENT}`),
         [KEYS.GRID_TERRAIN.CHOICES.EUCLIDEAN]: localize(`${KEYS.GRID_TERRAIN.CHOICES.EUCLIDEAN}`)
       }
     });
