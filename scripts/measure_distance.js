@@ -668,7 +668,31 @@ function gridChangeType(prevGridCoord, nextGridCoord) {
   return CHANGE[((xChange * 2) + yChange)];
 }
 
+/**
+ * From a given origin to a destination, iterate over each grid coordinate in turn.
+ * Track data related to the move at each iteration, taking the delta from the previous.
+ * @param {Point3d} origin
+ * @param {Point3d} destination
+ * @returnIterator, which in turn returns {object}
+ *   - @prop {number[2]} gridCoords
+ *   - @prop {object} movementChange
+ */
+function iterateGridMoves(origin, destination) {
+  if ( canvas.grid.type === CONST.GRID_TYPES.SQUARE
+    || canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) return iterateNonHexGridMoves(origin, destination);
+  return iterateHexGridMoves(origin, destination);
+}
 
+/**
+ * For hex grids.
+ * From a given origin to a destination, iterate over each grid coordinate in turn.
+ * Track data related to the move at each iteration, taking the delta from the previous.
+ * @param {Point3d} origin
+ * @param {Point3d} destination
+ * @returnIterator, which in turn returns {object}
+ *   - @prop {number[2]} gridCoords
+ *   - @prop {object} movementChange
+ */
 function * iterateHexGridMoves(origin, destination) {
   const iter2d = iterateGridUnderLine(origin, destination);
   const iterElevation = iterateGridProjectedElevation(origin, destination);
@@ -734,6 +758,7 @@ function * iterateHexGridMoves(origin, destination) {
 }
 
 /**
+ * For square grids.
  * From a given origin to a destination, iterate over each grid coordinate in turn.
  * Track data related to the move at each iteration, taking the delta from the previous.
  * @param {Point3d} origin
@@ -743,7 +768,7 @@ function * iterateHexGridMoves(origin, destination) {
  *   - @prop {number[5]} movementChange
  *   - @prop {number[5]} totalMovementChange
  */
-function * iterateGridMoves(origin, destination) {
+function * iterateNonHexGridMoves(origin, destination) {
   const iter2d = iterateGridUnderLine(origin, destination);
   const iterElevation = iterateGridProjectedElevation(origin, destination);
   // First coordinate is always the origin grid.
