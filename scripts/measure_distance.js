@@ -323,28 +323,47 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
 }
 
 /**
+ * Helper to adjust a single grid move by elevation change.
+ * If moving horizontal or vertical with elevation, move diagonally instead.
+ * Sum the remaining elevation and add to diagonal.
+ * @param {object} gridMove
+ * @returns {gridMove} For convenience. Modified in place.
+ */
+function adjustGridMoveForElevation(gridMove) {
+  let totalE = gridMove.E;
+  while ( totalE > 0 && gridMove.H > 0 ) {
+    totalE -= 1;
+    gridMove.H -= 1;
+    gridMove.D += 1;
+  }
+  while ( totalE > 0 && gridMove.V > 0 ) {
+    totalE -= 1;
+    gridMove.V -= 1;
+    gridMove.D += 1;
+  }
+  gridMove.D += totalE;
+
+  return gridMove;
+}
+
+
+
+/**
  * Count the number of horizontal, vertical, diagonal, elevation grid moves.
+ * Adjusts vertical and diagonal for elevation.
  * @param {PIXI.Point|Point3d} a                 Starting point for the segment
  * @param {PIXI.Point|Point3d} b                   Ending point for the segment
  * @returns {Uint32Array[4]|0} Counts of changes: none, vertical, horizontal, diagonal.
  */
-function countGridMoves(a, b) {
-  const iter = iterateGridUnderLine(a, b);
-  let prev = iter.next().value;
-  if ( !prev ) return 0; // Should never happen, as passing the same point as a,b returns a single square.
-
-  // No change, vertical change, horizontal change, diagonal change.
-  const changeCount = new Uint32Array([0, 0, 0, 0]);
-  if ( prev ) {
-    for ( const next of iter ) {
-      const xChange = prev[1] !== next[1]; // Column is x
-      const yChange = prev[0] !== next[0]; // Row is y
-      changeCount[((xChange * 2) + yChange)] += 1;
-      prev = next;
-    }
+function sumGridMoves(a, b) {
+  const iter = iterateGridMoves(a, b);
+  const totalChangeCount = { H: 0, V: 0, D: 0, E: 0 }
+  for ( const move of iter ) {
+    const movementChange = move.movementChange;
+    adjustGridMoveForElevation(movementChange);
+    Object.keys(totalChangeCount).forEach(key => totalChangeCount[key] += movementChange[key]);
   }
-  const elevSteps = numElevationGridSteps(Math.abs(b.z - a.z));
-  return elevationChangeCount(elevSteps, changeCount);
+  return totalChangeCount;
 }
 
 /**
@@ -636,7 +655,7 @@ function minMaxOverlap(a0, a1, b0, b1, inclusive = true) {
  */
 function iterateGridProjectedElevation(origin, destination) {
   const dist2d = PIXI.Point.distanceBetween(origin, destination);
-  let elev = destination.z - origin.z;
+  let elev = (destination.z ?? 0) - (origin.z ?? 0);
 
   // Must round up to the next grid step for elevation.
   const size = canvas.dimensions.size;
@@ -853,5 +872,7 @@ Draw.point(destination)
 
 moveArr = gridMoves.map(elem => elem.movementChange);
 console.table(moveArr)
+
+sumGridMoves(origin, destination)
 
 */
