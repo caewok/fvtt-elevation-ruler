@@ -384,7 +384,7 @@ function levelNameAtElevation(e) {
  */
 function segmentElevationLabel(s) {
   const units = canvas.scene.grid.units;
-  const increment = s.ray.dz;
+  const increment = s.waypointElevationIncrement;
   const Bz = s.ray.B.z;
 
   const segmentArrow = (increment > 0) ? "↑"

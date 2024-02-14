@@ -4,6 +4,7 @@ CONST,
 duplicate,
 game,
 getProperty,
+PIXI,
 Ruler,
 ui
 */
@@ -254,6 +255,18 @@ function _computeDistance(gridSpaces) {
   _computeSegmentDistances.call(this, gridSpaces);
   if ( Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING) ) _computeTokenSpeed.call(this, gridSpaces);
 
+  switch ( this.segments.length ) {
+    case 1: break;
+    case 2: break;
+    case 3: break;
+    case 4: break;
+    case 5: break;
+    case 6: break;
+    case 7: break;
+    case 8: break;
+    case 9: break;
+  }
+
   // Debugging
   if ( this.segments.some(s => !s) ) console.error("Segment is undefined.");
 
@@ -261,15 +274,18 @@ function _computeDistance(gridSpaces) {
   const waypointKeys = new Set(this.waypoints.map(w => w.key));
   let waypointDistance = 0;
   let waypointMoveDistance = 0;
+  let waypointStartingElevation = 0;
   for ( const segment of this.segments ) {
     if ( waypointKeys.has(segment.ray.A.to2d().key) ) {
       waypointDistance = 0;
       waypointMoveDistance = 0;
+      waypointStartingElevation = segment.ray.A.z;
     }
     waypointDistance += segment.distance;
     waypointMoveDistance += segment.moveDistance;
     segment.waypointDistance = waypointDistance;
     segment.waypointMoveDistance = waypointMoveDistance;
+    segment.waypointElevationIncrement = segment.ray.B.z - waypointStartingElevation;
   }
 }
 
@@ -298,6 +314,14 @@ function _computeSegmentDistances(gridSpaces) {
     segment.moveDistance = moveDistance;
     totalDistance += segment.distance;
     totalMoveDistance += segment.moveDistance;
+  }
+
+  if ( totalMoveDistance > 30 ) {
+    log({ totalMoveDistance });
+  }
+
+  if ( totalMoveDistance > 60 ) {
+    log({ totalMoveDistance });
   }
 
   this.totalDistance = totalDistance;
