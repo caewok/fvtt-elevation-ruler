@@ -281,16 +281,24 @@ export function hasSegmentCollision(token, segments) {
  * Wrap Ruler.prototype._highlightMeasurementSegment
  */
 export function _highlightMeasurementSegment(wrapped, segment) {
-  if ( !(this.user === game.user
-      && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING)) ) return wrapped(segment);
+  // Temporarily ensure the ray distance is two-dimensional, so highlighting selects correct squares.
+  // Otherwise the highlighting algorithm can get confused for high-elevation segments.
+  segment.ray._distance = PIXI.Point.distanceBetween(segment.ray.A, segment.ray.B);
 
+  // Adjust the color if this user has selected speed highlighting.
+  const priorColor = this.color;
   const token = this._getMovementToken();
-  if ( !token ) return wrapped(segment);
+  const doSpeedHighlighting = token
+    && this.user === game.user
+    && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING);
 
   // Highlight each split in turn, changing highlight color each time.
-  const priorColor = this.color;
-  this.color = SPEED.COLORS[segment.speed];
-  wrapped(segment);
+  if ( doSpeedHighlighting ) this.color = SPEED.COLORS[segment.speed];
+
+  // Call Foundry version and return if not speed highlighting.
+  const res = wrapped(segment);
+  segment.ray._distance = undefined; // Reset the distance measurement.
+  if ( !doSpeedHighlighting ) return res;
 
   // If gridless, highlight a rectangular shaped portion of the line.
   if ( canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) {
