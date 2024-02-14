@@ -421,14 +421,10 @@ function splitSegment(segment, splitMoveDistance, token, gridless) {
   else {
     // We can get the end grid.
     // Use halfway between the intersection points for this grid shape.
-    const gridShape = gridShapeFromGridCoordinates(res.endGridCoords);
-    const ixs = gridShape.segmentIntersections(A, B);
-    if ( !ixs || ixs.length === 0 ) breakPoint = A;
-    else if ( ixs.length === 1 ) breakPoint = B;
-    else {
-      breakPoint = Point3d.midPoint(ixs[0], ixs[1]);
-      breakPoint.z = res.endElevationZ;
-    }
+    breakPoint = Point3d.fromObject(segmentGridHalfIntersection(res.endGridCoords, A, B));
+    if ( !breakPoint ) breakPoint = A;
+    if ( breakPoint === A ) breakPoint.z = A.z;
+    else breakPoint.z = res.endElevationZ;
   }
 
   if ( breakPoint.almostEqual(B) ) return [segment];
@@ -449,6 +445,24 @@ function splitSegment(segment, splitMoveDistance, token, gridless) {
   if ( segment.last ) { s0.last = false; }
   return [s0, s1];
 }
+
+/**
+ * For a given segment, locate its intersection at a grid shape.
+ * The intersection point is on the segment, halfway between the two intersections for the shape.
+ * @param {number[]} gridCoords
+ * @param {PIXI.Point} a
+ * @param {PIXI.Point} b
+ * @returns {PIXI.Point|undefined} Undefined if no intersection. If only one intersection, the
+ *   endpoint contained within the shape.
+ */
+function segmentGridHalfIntersection(gridCoords, a, b) {
+  const gridShape = gridShapeFromGridCoordinates(gridCoords);
+  const ixs = gridShape.segmentIntersections(a, b);
+  if ( !ixs || ixs.length === 0 ) return null;
+  if ( ixs.length === 1 ) return gridShape.contains(a.x, a.y) ? a : b;
+  return PIXI.Point.midPoint(ixs[0], ixs[1]);
+}
+
 
 // ----- NOTE: Event handling ----- //
 

@@ -50,7 +50,15 @@
     "elevationruler.settings.pathfinding_tokens_block_hostile": "Hostile only",
     "elevationruler.settings.pathfinding_tokens_block_all": "All",
 
+    "elevationruler.settings.grid-terrain-algorithm.name": "Terrain Grid Measurement",
+    "elevationruler.settings.grid-terrain-algorithm.hint": "When on a grid, how to account for movement penalties or bonuses from terrain and tokens? Center: apply if the terrain/token overlaps the grid center; Percent Area: apply if the terrain/token covers at least this much of the grid square/hex; Euclidean: prorate based on percent of line segment within the terrain/token between this grid square/hex and the previous.",
+    "elevationruler.settings.grid-terrain-choice-center-point": "Center Point",
+    "elevationruler.settings.grid-terrain-choice-percent-area": "Percent Area",
+    "elevationruler.settings.grid-terrain-choice-euclidean": "Euclidean",
+
+    "elevationruler.settings.grid-terrain-area-threshold.name": "Percent Area Threshold",
+    "elevationruler.settings.grid-terrain-area-threshold.hint": "If 'Percent Area' is selected for Terrain Grid Measurement, this determines the percent overlap required for the terrain/token to count when measuring on grids.",
+
     "elevationruler.controls.prefer-token-elevation.name": "Prefer Token Elevation",
     "elevationruler.controls.pathfinding-control.name": "Use Pathfinding"
-
 }
