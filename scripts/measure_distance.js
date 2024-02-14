@@ -6,9 +6,8 @@ PIXI
 */
 "use strict";
 
-import { DIAGONAL_RULES, MODULES_ACTIVE } from "./const.js";
+import { DIAGONAL_RULES, MODULES_ACTIVE, SPEED } from "./const.js";
 import {
-  log,
   iterateGridUnderLine,
   squareGridShape,
   hexGridShape,
@@ -51,28 +50,50 @@ export function measureDistance(a, b, { gridless = false } = {}) {
   const changeCount = sumGridMoves(a, b);
 
   // Convert each grid step into a distance value.
+  // Sum the horizontal and vertical moves.
+  let d = (changeCount.V + changeCount.H) * canvas.dimensions.distance;
+
+  // Add diagonal distance based on varying diagonal rules.
+  const diagAdder = diagonalDistanceAdder();
+  d += diagAdder(changeCount.D);
+
+  return d;
+}
+
+/**
+ * Additional distance for diagonal moves.
+ * @returns {function}
+ *  - @param {number} nDiag
+ *  - @returns {number} Diagonal distance, accounting for the diagonal 5105 rule.
+ */
+function diagonalDistanceAdder() {
+  const distance = canvas.dimensions.distance;
+  const diagonalDist = diagonalDistanceMultiplier();
+  const diagonalRule = DIAGONAL_RULES[canvas.grid.diagonalRule] ?? DIAGONAL_RULES["555"];
+  switch ( diagonalRule ) {
+    case DIAGONAL_RULES["5105"]: {
+      let totalDiag = 0;
+      return nDiag => {
+        const nEven = ~~(nDiag * 0.5) + (totalDiag % 2);
+        totalDiag += nDiag;
+        return (nDiag + nEven) * diagonalDist;
+      };
+    }
+    case DIAGONAL_RULES.MANHATTAN: return nDiag => (nDiag + nDiag) * distance;
+    default: return nDiag => nDiag * diagonalDist;
+  }
+}
+
+/**
+ * Determine the diagonal distance multiplier.
+ */
+function diagonalDistanceMultiplier() {
   const distance = canvas.dimensions.distance;
   const diagonalRule = DIAGONAL_RULES[canvas.grid.diagonalRule] ?? DIAGONAL_RULES["555"];
   let diagonalDist = distance;
-  if ( !canvas.grid.isHex && diagonalRule === DIAGONAL_RULES.EUCL ) diagonalDist = Math.hypot(distance, distance);
-
-  // Sum the horizontal, vertical, and diagonal grid moves.
-  let d = (changeCount.V * distance)
-    + (changeCount.H * distance)
-    + (changeCount.D * diagonalDist);
-
-  // If diagonal is 5-10-5, every even move gets an extra 5.
-  if ( !canvas.grid.isHex && diagonalRule === DIAGONAL_RULES["5105"] ) {
-    const nEven = ~~(changeCount.D * 0.5);
-    d += (nEven * distance);
-  }
-
-  // For manhattan, every diagonal is done in two steps, so add an additional distance for each diagonal move.
-  else if ( !canvas.grid.isHex && diagonalRule === DIAGONAL_RULES.MANHATTAN ) {
-    d += (changeCount.D * diagonalDist);
-  }
-
-  return d;
+  if ( !canvas.grid.isHex
+    && diagonalRule === DIAGONAL_RULES.EUCL ) diagonalDist = Math.hypot(distance, distance);
+  return diagonalDist;
 }
 
 /**
@@ -279,52 +300,77 @@ function terrainTokenGridlessMoveMultiplier(a, b, token) {
  */
 function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget } = {}) {
   const iter = iterateGridMoves(a, b);
-  let prev = iter.next().value;
+  let prevGridCoords = iter.next().value.gridCoords;
 
-  if ( !prev ) {
-    // Should never happen, as passing the same point as a,b returns a single square.
+  // Should never happen, as passing the same point as a,b returns a single square.
+  if ( !prevGridCoords ) {
     console.warn("griddedMoveDistance|iterateGridMoves return undefined first value.");
     return 0;
   }
 
   // Step over each grid shape in turn.
+  const diagAdder = diagonalDistanceAdder();
+  const distance = canvas.dimensions.distance;
+  const size = canvas.scene.dimensions.size;
   let dTotal = 0;
   let dMoveTotal = 0;
-  let currElevSteps = 0;
-  let prevStep = prev;
-  let finalElev = 0;
-  const distanceGridStepFn = distanceForGridStepFunction(prev, a, b, token);
-  for ( const next of iter ) {
-    const { distance, movePenalty, elevSteps, currElev } = distanceGridStepFn(next);
+  let prevElev = a.z;
+  let elevSteps = 0;
+  for ( const { movementChange, gridCoords } of iter ) {
+    adjustGridMoveForElevation(movementChange);
+    const currElev = prevElev + (movementChange.E * size); // In pixel units.
+
+    // Determine move penalty.
+    const tokenMovePenalty = griddedTokenMovePenalty(token, gridCoords, prevGridCoords, currElev, prevElev);
+    const terrainMovePenalty = griddedTerrainMovePenalty(token, gridCoords, prevGridCoords, currElev, prevElev);
+    if ( !tokenMovePenalty || tokenMovePenalty < 0 ) console.warn("griddedMoveDistance", { tokenMovePenalty });
+    if ( !terrainMovePenalty || terrainMovePenalty < 0 ) console.warn("griddedMoveDistance", { terrainMovePenalty });
+
+    // Calculate the distance for this step.
+    let d = (movementChange.V + movementChange.H) * distance;
+    d += diagAdder(movementChange.D);
+
+    // Apply move penalty, if any.
+    const dMove = d * (tokenMovePenalty * terrainMovePenalty);
 
     // Early stop if the stop target is met.
-    const moveDistance = (distance * movePenalty);
-    if ( stopTarget && (dMoveTotal + moveDistance) > stopTarget ) break;
+    if ( stopTarget && (dMoveTotal + dMove) > stopTarget ) break;
 
-    dTotal += distance;
-    dMoveTotal += (distance * movePenalty);
-    currElevSteps = elevSteps;
-    prevStep = next;
-    finalElev = currElev;
+    // Update distance totals.
+    dTotal += d;
+    dMoveTotal += dMove;
+    elevSteps += movementChange.E;
+
+    // Cycle to next.
+    prevGridCoords = gridCoords;
+    prevElev = currElev;
   }
 
   // Handle remaining elevation change, if any, by moving directly up/down.
-  if ( useAllElevation ) {
-    while ( currElevSteps > 0 ) {
-      const { distance, movePenalty, elevSteps, currElev } = distanceGridStepFn(prevStep);
-      dTotal += distance;
-      dMoveTotal += (distance * movePenalty);
-      currElevSteps = elevSteps;
-      finalElev = currElev;
-    }
+  const targetElevSteps = numElevationGridSteps(Math.abs(b.z - a.z));
+  let elevStepsNeeded = Math.max(targetElevSteps - elevSteps, 0);
+  if ( useAllElevation && !stopTarget && elevStepsNeeded ) {
+    // Determine move penalty.
+    const tokenMovePenalty = griddedTokenMovePenalty(token, prevGridCoords, prevGridCoords, b.z, prevElev);
+    const terrainMovePenalty = griddedTerrainMovePenalty(token, prevGridCoords, prevGridCoords, b.z, prevElev);
+    const d = elevStepsNeeded * distance;
+    dTotal += d;
+    dMoveTotal += (d * (tokenMovePenalty * terrainMovePenalty));
+    elevStepsNeeded = 0;
+    prevElev = b.z;
   }
+
+  // Force to not go beyond b.z.
+  if ( b.z > a.z ) prevElev = Math.min(b.z, prevElev);
+  else if ( b.z < a.z ) prevElev = Math.max(b.z, prevElev);
+  else prevElev = b.z;
 
   return {
     distance: dTotal,
     moveDistance: dMoveTotal,
-    remainingElevationSteps: currElevSteps,
-    endElevationZ: finalElev,
-    endGridCoords: prevStep
+    remainingElevationSteps: elevStepsNeeded,
+    endElevationZ: prevElev,
+    endGridCoords: prevGridCoords
   };
 }
 
@@ -352,8 +398,6 @@ function adjustGridMoveForElevation(gridMove) {
   return gridMove;
 }
 
-
-
 /**
  * Count the number of horizontal, vertical, diagonal, elevation grid moves.
  * Adjusts vertical and diagonal for elevation.
@@ -373,44 +417,6 @@ function sumGridMoves(a, b) {
 }
 
 /**
- * Helper to determine the center of a grid shape given a grid position.
- * @param {Array[2]} gridCoords     Grid coordinates, [row, col]
- * @returns {Point}
- */
-function gridCenterFromGridCoordinates(gridCoords) {
-  const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[0], gridCoords[1]);
-  const [cx, cy] = canvas.grid.grid.getCenter(x, y);
-  return new PIXI.Point(cx, cy);
-}
-
-/**
- * Helper to get the terrain penalty for a given move from previous point to next point
- * across a grid square/hex.
- * @param {PIXI.Rectangle|PIXI.Polygon} gridShape
- * @param {Point3d} startPt
- * @param {Point3d} endPt
- * @param {Token} token
- * @returns {number} Terrain penalty, averaged across the two portions.
- */
-function terrainPenaltyForGridStep(gridShape, startPt, endPt, token) {
-  const ixs = gridShape
-    .segmentIntersections(startPt, endPt)
-    .map(ix => PIXI.Point.fromObject(ix));
-  const ix = PIXI.Point.fromObject(ixs[0] ?? PIXI.Point.midPoint(startPt, endPt));
-
-  // Build 3d points for calculating the terrain intersections
-  const midPt = Point3d.fromObject(ix);
-  midPt.z = (startPt.z + endPt.z) * 0.5;
-
-  // Get penalty percentages, which might be 3d.
-  const terrainPenaltyPrev = terrainMovePenalty(startPt, midPt, token);
-  const terrainPenaltyCurr = terrainMovePenalty(midPt, endPt, token);
-
-  // TODO: Does it matter that the 3d distance may be different than the 2d distance?
-  return (terrainPenaltyCurr + terrainPenaltyPrev) * 0.5;
-}
-
-/**
  * Helper to determine the grid shape from grid coordiantes
  * @param {Array[2]} gridCoords     Grid coordinates, [row, col]
  * @returns {PIXI.Rectangle|PIXI.Polygon}
@@ -422,58 +428,13 @@ export function gridShapeFromGridCoordinates(gridCoords) {
 }
 
 /**
- * Determine if at least one token overlaps this grid square/hex.
- * @param {PIXI.Rectangle|PIXI.Polygon} gridShape
- * @param {number} prevElev     top/bottom of the grid
- * @param {number} currElev     top/bottom of the grid
- */
-function doTokensOverlapGridShape(tokens, shape, prevElev = 0, currElev = 0) {
-  return tokens.some(t => {
-    // Token must be at the correct elevation to intersect the move.
-    if ( !minMaxOverlap(prevElev, currElev, t.bottomZ, t.topZ, true) ) return false;
-
-    // Token constrained border, shrunk to avoid false positives from adjacent grid squares.
-    const border = t.constrainedTokenBorder ?? t.bounds;
-    border.pad(-2);
-    return border.overlaps(shape);
-  });
-}
-
-/**
  * Count number of grid spaces needed for an elevation change.
- * @param {number} e      Elevation in pixel units
+ * @param {number} elevZ      Elevation in pixel units
  * @returns {number} Number of grid steps
  */
-function numElevationGridSteps(e) {
-  const gridE = CONFIG.GeometryLib.utils.pixelsToGridUnits(e || 0);
+function numElevationGridSteps(elevZ) {
+  const gridE = CONFIG.GeometryLib.utils.pixelsToGridUnits(elevZ || 0);
   return Math.ceil(gridE / canvas.dimensions.distance);
-}
-
-/**
- * Modify the change count by elevation moves.
- * Assume diagonal can move one elevation.
- * If no diagonal available, convert horizontal/vertical to diagonal.
- * If no moves available, add horizontal (don't later convert to diagonal).
- * @param {number} elevSteps
- * @param {Uint32Array[4]} changeCount
- * @returns {Uint32Array[4]} The same changeCount array, for convenience.
- */
-function elevationChangeCount(elevSteps, changeCount) {
-  let availableDiags = changeCount[CHANGE.D];
-  let addedH = 0;
-  while ( elevSteps > 0 ) { // Just in case we screw this up and send elevSteps negative.
-    if ( availableDiags ) availableDiags -= 1;
-    else if ( changeCount[CHANGE.H] ) {
-      changeCount[CHANGE.H] -= 1;
-      changeCount[CHANGE.D] += 1;
-    } else if ( changeCount[CHANGE.V] ) {
-      changeCount[CHANGE.V] -= 1;
-      changeCount[CHANGE.D] += 1;
-    } else addedH += 1; // Add an additional move "down."
-    elevSteps -= 1;
-  }
-  changeCount[CHANGE.H] += addedH;
-  return changeCount;
 }
 
 /**
@@ -497,6 +458,7 @@ function griddedTokenMovePenalty(currGridCoords, prevGridCoords, currElev = 0, p
   let prevCenter;
   switch ( alg ) {
     case GT.CHOICES.CENTER: {
+      const gridShape = gridShapeFromGridCoords(currGridCoords);
       currCenter = gridCenterFromGridCoords(currGridCoords);
       collisionTest = o => o.t.constrainedTokenBorder.contains(currCenter.x, currCenter.y);
       bounds = gridShape.getBounds();
@@ -542,7 +504,7 @@ function griddedTokenMovePenalty(currGridCoords, prevGridCoords, currElev = 0, p
  * @param {(PIXI.Polygon|PIXI.Rectangle)[]} shapes
  * @returns {number}
  */
-percentageShapeIntersection(a, b, shapes = []) {
+function percentageShapeIntersection(a, b, shapes = []) {
   const tValues = [];
   const deltaMag = b.to2d().subtract(a).magnitude();
 
@@ -600,7 +562,7 @@ percentageShapeIntersection(a, b, shapes = []) {
   if ( !distInside ) return 1;
 
   const totalDistance = Point3d.distanceBetween(a, b);
-  return distanceInside / totalDistance;
+  return distInside / totalDistance;
 }
 
 /**
@@ -642,7 +604,8 @@ function griddedTerrainMovePenalty(token, currGridCoords, prevGridCoords, currEl
     case GT.CHOICES.PERCENT: {
       const gridShape = gridShapeFromGridCoords(currGridCoords);
       const percentThreshold = Settings.get(GT.AREA_THRESHOLD);
-      return Terrain.percentMovementChangeForTokenWithinShape(token, gridShape, percentThreshold, speedAttribute, currElev);
+      return Terrain.percentMovementChangeForTokenWithinShape(token, gridShape,
+        percentThreshold, speedAttribute, currElev);
     }
 
     case GT.CHOICES.EUCLIDEAN: {
@@ -654,145 +617,6 @@ function griddedTerrainMovePenalty(token, currGridCoords, prevGridCoords, currEl
     }
   }
 }
-
-/**
- * Return a function that tracks the grid steps from a previous square/hex to a new square/hex.
- * The function returns the distance and move distance for a given move.
- * @param {number[2]} prev                    Column, row of the starting grid square
- * @param {PIXI.Point|Point3d} a              Starting point for the segment
- * @param {PIXI.Point|Point3d} b              Ending point for the segment
- * @param {Token} [token]                     Token that is moving.
- * @returns {function}
- *   - @param {number[2]} next    column, row of the next square
- */
-function distanceForGridStepFunction(prev, a, b, token ) {
-  const zUnitDistance = CONFIG.GeometryLib.utils.gridUnitsToPixels(canvas.scene.dimensions.distance);
-  const tokenMult = Settings.get(Settings.KEYS.TOKEN_RULER.TOKEN_MULTIPLIER) || 1;
-  const distance = canvas.dimensions.distance;
-
-  // Rule for measuring diagonal distance.
-  const diagonalRule = DIAGONAL_RULES[canvas.grid.diagonalRule] ?? DIAGONAL_RULES["555"];
-  let diagonalDist = distance;
-  if ( diagonalRule === DIAGONAL_RULES.EUCL ) diagonalDist = Math.hypot(distance, distance);
-  let nDiag = 0;
-
-  // Track elevation changes.
-  let elevSteps = numElevationGridSteps(Math.abs(b.z - a.z));
-  const elevDir = Math.sign(b.z - a.z);
-  let currElev = a.z || 0;
-  let prevElev = a.z || 0;
-
-  // Find tokens along the ray whose constrained borders intersect the ray.
-  const bounds = segmentBounds(a, b);
-  const collisionTest = o => o.t.constrainedTokenBorder.lineSegmentIntersects(a, b, { inside: true });
-  const tokens = canvas.tokens.quadtree.getObjects(bounds, { collisionTest });
-  tokens.delete(token);
-
-  // Track if token overlaps this space
-  const gridShape = gridShapeFromGridCoordinates(prev);
-  let tokenOverlapsPrev = (tokenMult === 1 || !tokens.size) ? false
-    : doTokensOverlapGridShape(tokens, gridShape, prevElev, currElev);
-
-  // Find the center of this grid shape.
-  const prevCenter = Point3d.fromObject(gridCenterFromGridCoordinates(prev));
-  prevCenter.z = a.z;
-
-  // Function to track movement changes
-  const gridStepFn = countGridStep(prev, elevSteps);
-
-  // Return a function that calculates distance between previous and next grid spaces.
-  return next => {
-    // Track movement changes from previous grid square/hex to next.
-    const changeCount = gridStepFn(next);
-
-    // Track current elevation. Ensure it is bounded between a.z and b.z.
-    currElev += (zUnitDistance * changeCount[CHANGE.E] * elevDir);
-    currElev = elevDir > 0 ? Math.min(b.z, currElev) : Math.max(b.z, currElev);
-
-    // Do one or more token constrained borders overlap this grid space?
-    const gridShape = gridShapeFromGridCoordinates(next);
-    const tokenOverlaps = (tokenMult === 1 || !tokens.size) ? false
-      : doTokensOverlapGridShape(tokens, gridShape, prevElev, currElev);
-
-    // Locate the center of this grid shape.
-    const currCenter = Point3d.fromObject(gridCenterFromGridCoordinates(next));
-    currCenter.z = currElev;
-
-    // Calculate the terrain penalty as an average of the previous grid and current grid shape.
-    const terrainPenalty = terrainPenaltyForGridStep(gridShape, prevCenter, currCenter, token);
-
-    // Moves this iteration.
-    let d = (changeCount[CHANGE.V] * distance)
-    + (changeCount[CHANGE.H] * distance)
-    + (changeCount[CHANGE.D] * diagonalDist);
-
-    // If diagonal is 5-10-5, every even move gets an extra 5.
-    nDiag += changeCount[CHANGE.D];
-    if ( diagonalRule === DIAGONAL_RULES["5105"] ) {
-      const nEven = ~~(nDiag * 0.5);
-      d += (nEven * distance);
-    }
-
-    // Average
-    const tokenPenalty = ((tokenOverlaps ? tokenMult : 1) + (tokenOverlapsPrev ? tokenMult : 1)) * 0.5;
-    log(`griddedMoveDistance|${prevCenter.x},${prevCenter.y},${prevCenter.z} -> ${currCenter.x},${currCenter.y},${currCenter.z}\n\ttokenPenalty: ${tokenPenalty}\n\tterrainPenalty: ${terrainPenalty}`);
-    if ( !isFinite(currCenter.z) || !isFinite(prevCenter.z) ) {
-      log("Non-finite z value in distanceForGridStepFunction");
-    }
-
-
-    // Cycle to next.
-    tokenOverlapsPrev = tokenOverlaps;
-    prevCenter.copyFrom(currCenter);
-    prev = next;
-    prevElev = currElev;
-    elevSteps = Math.max(elevSteps - 1, 0);
-
-    return { distance: d, movePenalty: terrainPenalty * tokenPenalty, elevSteps, currElev };
-  };
-}
-
-/**
- * Helper to count the moves for a given step.
- * @param {number} elevSteps    Number of steps of elevation
- * @returns {function} Function that will count a step change.
- *  Function will take:
- *  @param {Array[2]} prev    column, grid of the previous square
- *  @param {Array[2]} next    column, grid of the next square
- *  @returns {A}
- */
-function countGridStep(prev, elevSteps = 0) {
-  const changeCount = new Uint32Array([0, 0, 0, 0, 0]);
-  return next => {
-    changeCount.fill(0);
-    // Count the move direction.
-    if ( next ) {
-      const xChange = prev[1] !== next[1]; // Column is x
-      const yChange = prev[0] !== next[0]; // Row is y
-      changeCount[((xChange * 2) + yChange)] += 1;
-    }
-
-    // Account for an elevation change of maximum 1 grid space. See elevationChangeCount.
-    if ( elevSteps > 0 ) {
-      if ( changeCount[CHANGE.D] ) {
-        // Do nothing.
-      } else if ( changeCount[CHANGE.H] ) {
-        changeCount[CHANGE.H] -= 1;
-        changeCount[CHANGE.D] += 1;
-      } else if ( changeCount[CHANGE.V] ) {
-        changeCount[CHANGE.V] -= 1;
-        changeCount[CHANGE.D] += 1;
-      } else {
-        changeCount[CHANGE.H] += 1; // Add an additional move "down."
-      }
-      elevSteps -= 1;
-      changeCount[CHANGE.E] += 1;
-    }
-    prev = next;
-    return changeCount;
-  };
-}
-
 
 // ----- NOTE: Helper methods ----- //
 
@@ -809,24 +633,6 @@ function terrainMovePenalty(a, b, token) {
   const terrainAPI = MODULES_ACTIVE.API.TERRAIN_MAPPER;
   if ( !terrainAPI || !token ) return 1;
   return terrainAPI.Terrain.percentMovementForTokenAlongPath(token, a, b) || 1;
-}
-
-/**
- * Does one number range overlap another?
- * @param {number} a0
- * @param {number} a1
- * @param {number} b0
- * @param {number} b1
- * @param {boolean} [inclusive=true]
- * @returns {boolean}
- */
-function minMaxOverlap(a0, a1, b0, b1, inclusive = true) {
-  const aMinMax = Math.minMax(a0, a1);
-  const bMinMax = Math.minMax(b0, b1);
-  return aMinMax.min.between(bMinMax.min, bMinMax.max, inclusive)
-    || aMinMax.max.between(bMinMax.min, bMinMax.max, inclusive)
-    || bMinMax.min.between(aMinMax.min, aMinMax.max, inclusive)
-    || bMinMax.max.between(aMinMax.min, aMinMax.max, inclusive);
 }
 
 /**
@@ -998,8 +804,8 @@ function * iterateNonHexGridMoves(origin, destination) {
         movementChange.E += 1;
         break;
       }
-      case "D": movementChange.E += 1; // eslint-disable-line no-fallthrough
-      case "H": {
+      case "D": movementChange.E += 1;
+      case "H": {  // eslint-disable-line no-fallthrough
         const next2d = iter2d.next().value ?? prev2d;
         const moveType = gridChangeType(prev2d, next2d);
         prev2d = next2d;
