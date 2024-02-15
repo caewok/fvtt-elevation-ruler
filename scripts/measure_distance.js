@@ -310,12 +310,13 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
 
   // Step over each grid shape in turn.
   const diagAdder = diagonalDistanceAdder();
-  const distance = canvas.dimensions.distance;
-  const size = canvas.scene.dimensions.size;
+  const { distance, size } = canvas.scene.dimensions;
   let dTotal = 0;
   let dMoveTotal = 0;
   let prevElev = a.z;
   let elevSteps = 0;
+  let tokenMovePenalty = false;
+  let terrainMovePenalty = false;
   for ( const { movementChange, gridCoords } of iter ) {
     adjustGridMoveForElevation(movementChange);
     const currElev = prevElev + (movementChange.E * size); // In pixel units.
@@ -325,6 +326,8 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
     const terrainMovePenalty = griddedTerrainMovePenalty(token, gridCoords, prevGridCoords, currElev, prevElev);
     if ( !tokenMovePenalty || tokenMovePenalty < 0 ) console.warn("griddedMoveDistance", { tokenMovePenalty });
     if ( !terrainMovePenalty || terrainMovePenalty < 0 ) console.warn("griddedMoveDistance", { terrainMovePenalty });
+    tokenMovePenalty ||= (tokenMovePenalty !== 1);
+    terrainMovePenalty ||= (terrainMovePenalty !== 1);
 
     // Calculate the distance for this step.
     let d = (movementChange.V + movementChange.H) * distance;
@@ -353,6 +356,8 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
     // Determine move penalty.
     const tokenMovePenalty = griddedTokenMovePenalty(token, prevGridCoords, prevGridCoords, b.z, prevElev);
     const terrainMovePenalty = griddedTerrainMovePenalty(token, prevGridCoords, prevGridCoords, b.z, prevElev);
+    tokenMovePenalty ||= (tokenMovePenalty !== 1);
+    terrainMovePenalty ||= (terrainMovePenalty !== 1);
     const d = elevStepsNeeded * distance;
     dTotal += d;
     dMoveTotal += (d * (tokenMovePenalty * terrainMovePenalty));
@@ -370,7 +375,9 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
     moveDistance: dMoveTotal,
     remainingElevationSteps: elevStepsNeeded,
     endElevationZ: prevElev,
-    endGridCoords: prevGridCoords
+    endGridCoords: prevGridCoords,
+    tokenMovePenalty,
+    terrainMovePenalty
   };
 }
 

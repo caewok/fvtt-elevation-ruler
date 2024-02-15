@@ -11,7 +11,7 @@ ui
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS } from "./const.js";
-import { iterateGridUnderLine } from "./util.js";
+import { iterateGridUnderLine, gridShapeFromGridCoords } from "./util.js";
 import { registerGeometry } from "./geometry/registration.js";
 
 // Pathfinding
@@ -24,6 +24,8 @@ import { benchPathfinding } from "./pathfinding/benchmark.js";
 
 // Wall updates for pathfinding
 import { SCENE_GRAPH, WallTracer, WallTracerEdge, WallTracerVertex } from "./pathfinding/WallTracer.js";
+
+import { iterateGridProjectedElevation, iterateGridMoves, sumGridMoves } from "./measure_distance.js";
 
 Hooks.once("init", function() {
   // Cannot access localization until init.
@@ -44,6 +46,10 @@ Hooks.once("init", function() {
 
   game.modules.get(MODULE_ID).api = {
     iterateGridUnderLine,
+    iterateGridProjectedElevation,
+    iterateGridMoves,
+    sumGridMoves,
+    gridShapeFromGridCoords,
     PATCHER,
     MOVEMENT_TYPES,
 

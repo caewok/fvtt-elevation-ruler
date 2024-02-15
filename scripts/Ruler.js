@@ -316,7 +316,7 @@ function _computeSegmentDistances(gridSpaces) {
     totalMoveDistance += segment.moveDistance;
   }
 
-  if ( totalMoveDistance > 30 ) {
+  if ( totalMoveDistance > 40 ) {
     log({ totalMoveDistance });
   }
 
@@ -445,8 +445,7 @@ function splitSegment(segment, splitMoveDistance, token, gridless) {
   else {
     // We can get the end grid.
     // Use halfway between the intersection points for this grid shape.
-    breakPoint = Point3d.fromObject(segmentGridHalfIntersection(res.endGridCoords, A, B));
-    if ( !breakPoint ) breakPoint = A;
+    breakPoint = Point3d.fromObject(segmentGridHalfIntersection(res.endGridCoords, A, B) ?? A);
     if ( breakPoint === A ) breakPoint.z = A.z;
     else breakPoint.z = res.endElevationZ;
   }

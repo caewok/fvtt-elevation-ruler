@@ -1,5 +1,12 @@
 # 0.8.5
+
+## New Features
+Added settings for selecting how terrain and other tokens are measured for grid squares. GM can choose to count difficult terrain if it covers the grid center, covers a fixed percentage of a grid square/hex, or by the percent for which it overlaps a line between the previous grid shape center to the current grid shape center ("euclidean").
+
+## Bug fixes
 Fix for undefined `constrainedTokenBounds.contains`.
+Fix for highlighting incorrect squares with high elevation changes.
+Refactor (again!) measurement of distances and move distances. Addresses issues with movement measurement calculating incorrectly when speed highlighting adds temporary waypoints.
 Update lib geometry to v0.2.16.
 
 # 0.8.4
