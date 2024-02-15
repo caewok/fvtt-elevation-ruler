@@ -580,9 +580,9 @@ PATCHES.BASIC.WRAPS = {
   _canMove
 };
 
-PATCHES.BASIC.MIXES = { _animateMovement, _animateSegment, _getMovementToken, _getMeasurementSegments };
+PATCHES.BASIC.MIXES = { _animateMovement, _getMovementToken, _getMeasurementSegments };
 
-PATCHES.BASIC.OVERRIDES = { _computeDistance };
+PATCHES.BASIC.OVERRIDES = { _computeDistance, _animateSegment };
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 
