@@ -13,6 +13,7 @@ import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS } from "./const.js";
 import { iterateGridUnderLine, gridShapeFromGridCoords } from "./util.js";
 import { registerGeometry } from "./geometry/registration.js";
+import { registerElevationConfig } from "./geometry/elevation_configs.js";
 
 // Pathfinding
 import { BorderTriangle, BorderEdge } from "./pathfinding/BorderTriangle.js";
@@ -81,6 +82,7 @@ Hooks.once("setup", function() {
   Settings.registerKeybindings(); // Should go before registering settings, so hotkey group is defined
   Settings.registerAll();
   initializePatching();
+  registerElevationConfig("DrawingConfig", "Elevation Ruler");
 });
 
 // For https://github.com/League-of-Foundry-Developers/foundryvtt-devMode
