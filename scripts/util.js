@@ -213,3 +213,14 @@ export function segmentBounds(a, b) {
   const yMinMax = Math.minMax(a.y, b.y);
   return new PIXI.Rectangle(xMinMax.min, yMinMax.min, xMinMax.max - xMinMax.min, yMinMax.max - yMinMax.min);
 }
+
+
+/**
+ * Helper to inject configuration html into the application config.
+ */
+export async function injectConfiguration(app, html, data, template, findString) {
+  const myHTML = await renderTemplate(template, data);
+  const form = html.find(findString);
+  form.append(myHTML);
+  app.setPosition(app.position);
+}

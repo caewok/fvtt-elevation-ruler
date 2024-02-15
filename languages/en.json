@@ -1,4 +1,5 @@
 {
+    "elevationruler.name": "Elevation Ruler",
     "elevationruler.keybindings.decrementElevation.name": "Decrement Ruler Elevation",
     "elevationruler.keybindings.decrementElevation.hint": "Decrease the elevation in grid increments when using the ruler.",
 
@@ -60,5 +61,8 @@
     "elevationruler.settings.grid-terrain-area-threshold.hint": "If 'Percent Area' is selected for Terrain Grid Measurement, this determines the percent overlap required for the terrain/token to count when measuring on grids.",
 
     "elevationruler.controls.prefer-token-elevation.name": "Prefer Token Elevation",
-    "elevationruler.controls.pathfinding-control.name": "Use Pathfinding"
+    "elevationruler.controls.pathfinding-control.name": "Use Pathfinding",
+
+    "elevationruler.drawingconfig.movementPenalty.name": "Movement Bonus/Penalty",
+    "elevationruler.drawingconfig.movementPenalty.hint": "Set to 1 for no penalty. Values greater than one penalize movement by that percent; values less than one effectively grant a bonus to movement. For example, set to 2 to double movement through this area."
 }
