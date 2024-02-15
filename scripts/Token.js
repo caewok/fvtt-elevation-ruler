@@ -107,7 +107,7 @@ function updateToken(document, changes, _options, _userId) {
  * Wrap Token.prototype._onUpdate to remove easing for pathfinding segments.
  */
 function _onUpdate(wrapped, data, options, userId) {
-  if ( options.rulerSegment && options.animation.easing ) {
+  if ( options?.rulerSegment && options?.animation?.easing ) {
     options.animation.easing = options.firstRulerSegment ? noEndEase(options.animation.easing)
       : options.lastRulerSegment ? noStartEase(options.animation.easing)
         : undefined;

@@ -230,7 +230,7 @@ export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance)
  * for the given segment.
  * Mark the token update if pathfinding for this segment.
  */
-export async function _animateSegment(wrapped, token, segment, destination) {
+export async function _animateSegment(token, segment, destination) {
   // If the token is already at the destination, _animateSegment will throw an error when the animation is undefined.
   // This can happen when setting artificial segments for highlighting or pathfinding.
   if ( token.document.x !== destination.x
