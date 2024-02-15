@@ -310,12 +310,13 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
 
   // Step over each grid shape in turn.
   const diagAdder = diagonalDistanceAdder();
-  const distance = canvas.dimensions.distance;
-  const size = canvas.scene.dimensions.size;
+  const { distance, size } = canvas.scene.dimensions;
   let dTotal = 0;
   let dMoveTotal = 0;
   let prevElev = a.z;
   let elevSteps = 0;
+  let tokenMovePenalty = false;
+  let terrainMovePenalty = false;
   for ( const { movementChange, gridCoords } of iter ) {
     adjustGridMoveForElevation(movementChange);
     const currElev = prevElev + (movementChange.E * size); // In pixel units.
@@ -325,6 +326,8 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
     const terrainMovePenalty = griddedTerrainMovePenalty(token, gridCoords, prevGridCoords, currElev, prevElev);
     if ( !tokenMovePenalty || tokenMovePenalty < 0 ) console.warn("griddedMoveDistance", { tokenMovePenalty });
     if ( !terrainMovePenalty || terrainMovePenalty < 0 ) console.warn("griddedMoveDistance", { terrainMovePenalty });
+    tokenMovePenalty ||= (tokenMovePenalty !== 1);
+    terrainMovePenalty ||= (terrainMovePenalty !== 1);
 
     // Calculate the distance for this step.
     let d = (movementChange.V + movementChange.H) * distance;
@@ -353,6 +356,8 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
     // Determine move penalty.
     const tokenMovePenalty = griddedTokenMovePenalty(token, prevGridCoords, prevGridCoords, b.z, prevElev);
     const terrainMovePenalty = griddedTerrainMovePenalty(token, prevGridCoords, prevGridCoords, b.z, prevElev);
+    tokenMovePenalty ||= (tokenMovePenalty !== 1);
+    terrainMovePenalty ||= (terrainMovePenalty !== 1);
     const d = elevStepsNeeded * distance;
     dTotal += d;
     dMoveTotal += (d * (tokenMovePenalty * terrainMovePenalty));
@@ -370,19 +375,28 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
     moveDistance: dMoveTotal,
     remainingElevationSteps: elevStepsNeeded,
     endElevationZ: prevElev,
-    endGridCoords: prevGridCoords
+    endGridCoords: prevGridCoords,
+    tokenMovePenalty,
+    terrainMovePenalty
   };
 }
 
 /**
  * Helper to adjust a single grid move by elevation change.
  * If moving horizontal or vertical with elevation, move diagonally instead.
+ * If moving diagonally, include elevation move in that diagonal move.
  * Sum the remaining elevation and add to diagonal.
  * @param {object} gridMove
  * @returns {gridMove} For convenience. Modified in place.
  */
 function adjustGridMoveForElevation(gridMove) {
   let totalE = gridMove.E;
+  let totalD = gridMove.D;
+  while ( totalE > 0 && totalD > 0 ) {
+    totalE -= 1;
+    totalD -= 1;
+  }
+
   while ( totalE > 0 && gridMove.H > 0 ) {
     totalE -= 1;
     gridMove.H -= 1;
@@ -393,7 +407,9 @@ function adjustGridMoveForElevation(gridMove) {
     gridMove.V -= 1;
     gridMove.D += 1;
   }
-  gridMove.D += totalE;
+
+  // All other elevation moves, if any, can be vertical.
+  gridMove.V += totalE;
 
   return gridMove;
 }
@@ -405,9 +421,9 @@ function adjustGridMoveForElevation(gridMove) {
  * @param {PIXI.Point|Point3d} b                   Ending point for the segment
  * @returns {Uint32Array[4]|0} Counts of changes: none, vertical, horizontal, diagonal.
  */
-function sumGridMoves(a, b) {
+export function sumGridMoves(a, b) {
   const iter = iterateGridMoves(a, b);
-  const totalChangeCount = { H: 0, V: 0, D: 0, E: 0 };
+  const totalChangeCount = { NONE: 0, H: 0, V: 0, D: 0, E: 0 };
   for ( const move of iter ) {
     const movementChange = move.movementChange;
     adjustGridMoveForElevation(movementChange);
@@ -445,7 +461,7 @@ function numElevationGridSteps(elevZ) {
  * @param {number} prevElev                 Elevation at current grid point, in pixel units
  * @returns {number} Percent move penalty to apply. Returns 1 if no penalty.
  */
-function griddedTokenMovePenalty(currGridCoords, prevGridCoords, currElev = 0, prevElev = 0) {
+function griddedTokenMovePenalty(token, currGridCoords, prevGridCoords, currElev = 0, prevElev = 0) {
   const mult = Settings.get(Settings.KEYS.TOKEN_RULER.TOKEN_MULTIPLIER);
   if ( mult === 1 ) return 1;
 
@@ -486,6 +502,7 @@ function griddedTokenMovePenalty(currGridCoords, prevGridCoords, currElev = 0, p
   // Check that elevation is within the token height.
   const tokens = canvas.tokens.quadtree.getObjects(bounds, { collisionTest })
     .filter(t => currElev.between(t.bottomZ, t.topZ));
+  tokens.delete(token);
   if ( alg !== GT.CHOICES.EUCLIDEAN ) return tokens.size ? mult : 1;
 
   // For Euclidean, determine the percentage intersect.
@@ -630,6 +647,7 @@ function griddedTerrainMovePenalty(token, currGridCoords, prevGridCoords, currEl
  * @returns {number} Percent penalty
  */
 function terrainMovePenalty(a, b, token) {
+  if ( !token ) return 1;
   const terrainAPI = MODULES_ACTIVE.API.TERRAIN_MAPPER;
   if ( !terrainAPI || !token ) return 1;
   return terrainAPI.Terrain.percentMovementForTokenAlongPath(token, a, b) || 1;
@@ -644,7 +662,7 @@ function terrainMovePenalty(a, b, token) {
  * @return Iterator, which in turn
  *   returns [row, col] Array for each grid point under the line.
  */
-function iterateGridProjectedElevation(origin, destination) {
+export function iterateGridProjectedElevation(origin, destination) {
   const dist2d = PIXI.Point.distanceBetween(origin, destination);
   let elev = (destination.z ?? 0) - (origin.z ?? 0);
 
@@ -688,7 +706,7 @@ function gridChangeType(prevGridCoord, nextGridCoord) {
  *   - @prop {number[2]} gridCoords
  *   - @prop {object} movementChange
  */
-function iterateGridMoves(origin, destination) {
+export function iterateGridMoves(origin, destination) {
   if ( canvas.grid.type === CONST.GRID_TYPES.SQUARE
     || canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) return iterateNonHexGridMoves(origin, destination);
   return iterateHexGridMoves(origin, destination);
@@ -710,7 +728,7 @@ function * iterateHexGridMoves(origin, destination) {
   // First coordinate is always the origin grid.
   let prev2d = iter2d.next().value;
   let prevElevation = iterElevation.next().value;
-  let movementChange = { H: 0, V: 0, D: 0, E: 0 };
+  let movementChange = { NONE: 0, H: 0, V: 0, D: 0, E: 0 };
 
   yield {
     movementChange,
@@ -727,7 +745,7 @@ function * iterateHexGridMoves(origin, destination) {
   const elevSign = Math.sign(destination.z - origin.z);
   const elevTest = elevSign ? (a, b) => a > b : (a, b) => a < b;
   let currElev = prevElevation[elevOnlyIndex];
-  movementChange = { H: 0, V: 0, D: 0, E: 0 }; // Copy; don't keep same object.
+  movementChange = { NONE: 0, H: 0, V: 0, D: 0, E: 0 }; // Copy; don't keep same object.
 
   // Use the elevation iteration to tell us when to move to the next 2d step.
   // Horizontal or diagonal elevation moves indicate next step.
@@ -754,7 +772,7 @@ function * iterateHexGridMoves(origin, destination) {
           movementChange,
           gridCoords: next2d
         };
-        movementChange = { H: 0, V: 0, D: 0, E: 0 };
+        movementChange = {  NONE: 0, H: 0, V: 0, D: 0, E: 0 };
       }
     }
     prevElevation = nextElevation;
@@ -785,14 +803,14 @@ function * iterateNonHexGridMoves(origin, destination) {
   // First coordinate is always the origin grid.
   let prev2d = iter2d.next().value;
   let prevElevation = iterElevation.next().value;
-  let movementChange = { H: 0, V: 0, D: 0, E: 0 };
+  let movementChange = { NONE: 0, H: 0, V: 0, D: 0, E: 0 };
 
   yield {
     movementChange,
     gridCoords: prev2d
   };
 
-  movementChange = { H: 0, V: 0, D: 0, E: 0 }; // Copy; don't keep same object.
+  movementChange = {  NONE: 0, H: 0, V: 0, D: 0, E: 0 }; // Copy; don't keep same object.
 
   // Use the elevation iteration to tell us when to move to the next 2d step.
   // Horizontal or diagonal elevation moves indicate next step.
@@ -814,7 +832,7 @@ function * iterateNonHexGridMoves(origin, destination) {
           movementChange,
           gridCoords: next2d
         };
-        movementChange = { H: 0, V: 0, D: 0, E: 0 };
+        movementChange = { NONE: 0, H: 0, V: 0, D: 0, E: 0 };
       }
     }
     prevElevation = nextElevation;
@@ -829,6 +847,12 @@ function * iterateNonHexGridMoves(origin, destination) {
 }
 
 /* Testing
+api = game.modules.get("elevationruler").api
+iterateGridUnderLine = api.iterateGridUnderLine
+iterateGridProjectedElevation = api.iterateGridProjectedElevation
+iterateGridMoves = api.iterateGridMoves
+sumGridMoves = api.sumGridMoves
+
 Draw = CONFIG.GeometryLib.Draw
 
 
