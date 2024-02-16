@@ -158,12 +158,16 @@ function gridlessMoveDistance(a, b, token, { stopTarget } = {}) {
   // Determine penalty proportion of the a|b segment.
   const terrainPenalty = terrainMovePenalty(a, b, token);
   const tokenPenalty = terrainTokenGridlessMoveMultiplier(a, b, token);
+  const drawingPenalty = terrainDrawingGridlessMoveMultiplier(a, b);
   const d = CONFIG.GeometryLib.utils.pixelsToGridUnits(Point3d.distanceBetween(a, b));
   return {
     distance: d,
-    moveDistance: d * terrainPenalty * tokenPenalty,
+    moveDistance: d * terrainPenalty * tokenPenalty * drawingPenalty,
     endElevationZ: b.z,
-    endPoint: b
+    endPoint: b,
+    terrainPenalty,
+    tokenPenalty,
+    drawingPenalty
   };
 }
 
@@ -227,64 +231,33 @@ function terrainTokenGridlessMoveMultiplier(a, b, token) {
   if ( !tokens.size ) return 1;
 
   // Determine the percentage of the ray that intersects the constrained token shapes.
-  const tValues = [];
-  const deltaMag = b.to2d().subtract(a).magnitude();
-  for ( const t of tokens ) {
-    const border = t.constrainedTokenBorder;
-    let inside = false;
-    if ( border.contains(a) ) {
-      inside = true;
-      tValues.push({ t: 0, inside });
-    }
-
-    // At each intersection, we switch between inside and outside.
-    const ixs = border.segmentIntersections(a, b); // Can we assume the ixs are sorted by t0?
-
-    // See Foundry issue #10336. Don't trust the t0 values.
-    ixs.forEach(ix => {
-      // See PIXI.Point.prototype.towardsPoint
-      const distance = Point3d.distanceBetween(a, ix);
-      ix.t0 = distance / deltaMag;
-    });
-    ixs.sort((a, b) => a.t0 - b.t0);
-
-    ixs.forEach(ix => {
-      inside ^= true;
-      tValues.push({ t: ix.t0, inside });
-    });
-  }
-
-  // Sort tValues and calculate distance between inside start/end.
-  // May be multiple inside/outside entries.
-  tValues.sort((a, b) => a.t0 - b.t0);
-  let nInside = 0;
-  let prevT = undefined;
-  let distInside = 0;
-  for ( const tValue of tValues ) {
-    if ( tValue.inside ) {
-      nInside += 1;
-      prevT ??= tValue.t; // Store only the first t to take us inside.
-    } else if ( nInside > 2 ) nInside -= 1;
-    else if ( nInside === 1 ) { // Inside is false and we are now outside.
-      const startPt = a.projectToward(b, prevT);
-      const endPt = a.projectToward(b, tValue.t);
-      distInside += Point3d.distanceBetween(startPt, endPt);
-      nInside = 0;
-      prevT = undefined;
-    }
-  }
-
-  // If still inside, we can go all the way to t = 1
-  if ( nInside > 0 ) {
-    const startPt = a.projectToward(b, prevT);
-    distInside += Point3d.distanceBetween(startPt, b);
-  }
-
-  if ( !distInside ) return 1;
-
-  const totalDistance = Point3d.distanceBetween(a, b);
-  return ((totalDistance - distInside) + (distInside * mult)) / totalDistance;
+  return percentagePenaltyShapeIntersection(a, b, tokens.map(t => t.constrainedTokenBorder), mult);
 }
+
+/**
+ * Get speed multiplier for drawings between two points, assuming gridless.
+ * Multiplier based on the percentage of the segment that overlaps 1+ drawings.
+ * @param {Point3d} a                     Starting point for the segment
+ * @param {Point3d} b                     Ending point for the segment
+ * @returns {number} Percent penalty
+ */
+function terrainDrawingGridlessMoveMultiplier(a, b) {
+  // Find drawings along the ray whose borders intersect the ray.
+  const bounds = segmentBounds(a, b);
+  const collisionTest = o => o.t.bounds.lineSegmentIntersects(a, b, { inside: true });
+  const drawings = canvas.tokens.quadtree.getObjects(bounds, { collisionTest })
+    .filter(d => hasActiveDrawingTerrain(d, b.z ?? 0, a.z ?? 0));
+  if ( !drawings.size ) return 1;
+
+  // Determine the percentage of the ray that intersects the constrained token shapes.
+  return percentagePenaltyShapeIntersection(
+    a,
+    b,
+    drawings.map(d => shapeForDrawing(d)),
+    drawings.map(d => d.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) || 1 )
+  );
+}
+
 
 // ----- NOTE: Gridded ----- //
 
@@ -468,14 +441,20 @@ function numElevationGridSteps(elevZ) {
  * Determine the percentage of the ray that intersects a set of shapes.
  * @param {PIXI.Point} a
  * @param {PIXI.Point} b
- * @param {(PIXI.Polygon|PIXI.Rectangle)[]} [shapes=[]]
+ * @param {Set<PIXI.Polygon|PIXI.Rectangle>|Array} [shapes=[]]
  * @param {number[]} [penalties]
  * @returns {number}
  */
-function percentageShapeIntersection(a, b, shapes = [], penalties) { // eslint-disable-line default-param-last
+function percentagePenaltyShapeIntersection(a, b, shapes, penalties) { // eslint-disable-line default-param-last
+  if ( !shapes ) return 1;
+
+  if ( !Array.isArray(shapes) ) shapes = [...shapes];
   const nShapes = shapes.length;
-  if ( !nShapes ) return 0;
-  if ( !penalties ) penalties = Array(nShapes).fill(1);
+  if ( !nShapes ) return 1;
+
+  if ( Number.isNumeric(penalties) ) penalties = Array(nShapes).fill(penalties ?? 1);
+  if ( !Array.isArray(penalties) ) penalties = [...penalties];
+
   const tValues = [];
   const deltaMag = b.to2d().subtract(a).magnitude();
 
@@ -484,7 +463,7 @@ function percentageShapeIntersection(a, b, shapes = [], penalties) { // eslint-d
     const shape = shapes[i];
     const penalty = penalties[i] ?? 1;
     let inside = false;
-    if ( shape.contains(a) ) {
+    if ( shape.contains(a.x, a.y) ) {
       inside = true;
       tValues.push({ t: 0, inside, penalty });
     }
@@ -512,22 +491,29 @@ function percentageShapeIntersection(a, b, shapes = [], penalties) { // eslint-d
   let nInside = 0;
   let prevT = 0;
   let distInside = 0;
+  let distOutside = 0;
   let penaltyDistInside = 0;
   let currPenalty = 1;
   for ( const tValue of tValues ) {
     if ( tValue.inside ) {
       nInside += 1;
-      if ( !tValue.t ) continue; // Skip because t is 0 so no distance moved yet.
+      if ( !tValue.t ) {
+        currPenalty *= tValue.penalty;
+        continue; // Skip because t is 0 so no distance moved yet.
+      }
 
       // Calculate distance for this segment
       const startPt = a.projectToward(b, prevT ?? 0);
       const endPt = a.projectToward(b, tValue.t);
       const dist = Point3d.distanceBetween(startPt, endPt);
-      distInside += dist;
-      penaltyDistInside += (dist * currPenalty); // Penalty before this point.
-      currPenalty *= tValue.penalty;
+      if ( nInside === 1 ) distOutside += dist;
+      else {
+        distInside += dist;
+        penaltyDistInside += (dist * currPenalty); // Penalty before this point.
+      }
 
       // Cycle to next.
+      currPenalty *= tValue.penalty;
       prevT = tValue.t;
 
     } else if ( nInside > 2 ) {  // !tValue.inside
@@ -539,9 +525,9 @@ function percentageShapeIntersection(a, b, shapes = [], penalties) { // eslint-d
       const dist = Point3d.distanceBetween(startPt, endPt);
       distInside += dist;
       penaltyDistInside += (dist * currPenalty); // Penalty before this point.
-      currPenalty *= (1 / tValue.penalty);
 
       // Cycle to next.
+      currPenalty *= (1 / tValue.penalty);
       prevT = tValue.t;
     }
     else if ( nInside === 1 ) { // Inside is false and we are now outside.
@@ -553,24 +539,27 @@ function percentageShapeIntersection(a, b, shapes = [], penalties) { // eslint-d
       const dist = Point3d.distanceBetween(startPt, endPt);
       distInside += dist;
       penaltyDistInside += (dist * currPenalty); // Penalty before this point.
-      currPenalty *= (1 / tValue.penalty);
+
 
       // Cycle to next.
+      currPenalty *= (1 / tValue.penalty);
       prevT = tValue.t;
     }
   }
 
   // If still inside, we can go all the way to t = 1
+  const startPt = a.projectToward(b, prevT);
+  const dist = Point3d.distanceBetween(startPt, b);
   if ( nInside > 0 ) {
-    const startPt = a.projectToward(b, prevT);
-    const dist = Point3d.distanceBetween(startPt, b);
     distInside += dist;
     penaltyDistInside += (dist * currPenalty); // Penalty before this point.
-  }
+  } else distOutside += dist;
+
 
   if ( !distInside ) return 1;
+
   const totalDistance = Point3d.distanceBetween(a, b);
-  return penaltyDistInside / totalDistance;
+  return (distOutside + penaltyDistInside) / totalDistance;
 }
 
 /**
@@ -582,8 +571,8 @@ function percentageShapeIntersection(a, b, shapes = [], penalties) { // eslint-d
 function percentOverlap(overlapShape, areaShape, totalArea) {
   if ( !overlapShape.overlaps(areaShape) ) return 0;
   const intersection = overlapShape.intersectPolygon(areaShape.toPolygon());
-  const ixArea = intersection.area();
-  totalArea ??= areaShape.area();
+  const ixArea = intersection.area;
+  totalArea ??= areaShape.area;
   return ixArea / totalArea;
 }
 
@@ -620,8 +609,8 @@ function griddedTokenMovePenalty(token, currGridCoords, prevGridCoords, currElev
     case GT.CHOICES.PERCENT: {
       const gridShape = gridShapeFromGridCoords(currGridCoords);
       const percentThreshold = Settings.get(GT.AREA_THRESHOLD);
-      const totalArea = gridShape.area();
-      collisionTest = o => percentOverlap(o.t.constrainedBorder, gridShape, totalArea) >= percentThreshold;
+      const totalArea = gridShape.area;
+      collisionTest = o => percentOverlap(o.t.constrainedTokenBorder, gridShape, totalArea) >= percentThreshold;
       bounds = gridShape.getBounds();
       break;
     }
@@ -639,14 +628,15 @@ function griddedTokenMovePenalty(token, currGridCoords, prevGridCoords, currElev
   const tokens = canvas.tokens.quadtree.getObjects(bounds, { collisionTest })
     .filter(t => currElev.between(t.bottomZ, t.topZ));
   tokens.delete(token);
-  if ( alg !== GT.CHOICES.EUCLIDEAN ) return tokens.size ? mult : 1;
+  if ( !tokens.size ) return 1;
+  if ( alg !== GT.CHOICES.EUCLIDEAN ) return mult;
 
   // For Euclidean, determine the percentage intersect.
   prevCenter = Point3d.fromObject(prevCenter);
   currCenter = Point3d.fromObject(currCenter);
   prevCenter.z = prevElev;
   currCenter.z = currElev;
-  return mult * percentageShapeIntersection(prevCenter, currCenter, tokens.map(t => t.constrainedTokenBorder));
+  return percentagePenaltyShapeIntersection(prevCenter, currCenter, tokens.map(t => t.constrainedTokenBorder), mult);
 }
 
 /**
@@ -676,7 +666,7 @@ function griddedDrawingMovePenalty(currGridCoords, prevGridCoords, currElev = 0,
     case GT.CHOICES.PERCENT: {
       const gridShape = gridShapeFromGridCoords(currGridCoords);
       const percentThreshold = Settings.get(GT.AREA_THRESHOLD);
-      const totalArea = gridShape.area();
+      const totalArea = gridShape.area;
       collisionTest = o => percentOverlap(shapeForDrawing(o.t), gridShape, totalArea) >= percentThreshold;
       bounds = gridShape.getBounds();
       break;
@@ -685,7 +675,7 @@ function griddedDrawingMovePenalty(currGridCoords, prevGridCoords, currElev = 0,
     case GT.CHOICES.EUCLIDEAN: {
       currCenter = gridCenterFromGridCoords(currGridCoords);
       prevCenter = gridCenterFromGridCoords(prevGridCoords);
-      collisionTest = o => o.t.border.lineSegmentIntersects(prevCenter, currCenter, { inside: true });
+      collisionTest = o => o.t.bounds.lineSegmentIntersects(prevCenter, currCenter, { inside: true });
       bounds = segmentBounds(prevCenter, currCenter);
       break;
     }
@@ -695,16 +685,16 @@ function griddedDrawingMovePenalty(currGridCoords, prevGridCoords, currElev = 0,
   // Infinite elevations mean all elevations count
   if ( alg !== GT.CHOICES.EUCLIDEAN ) prevElev = undefined; // So hasActiveDrawingTerrain works.
   const drawings = canvas.drawings.quadtree.getObjects(bounds, { collisionTest })
-    .filter(t => hasActiveDrawingTerrain(t, currElev, prevElev));
-  if ( alg !== GT.CHOICES.EUCLIDEAN ) return drawings.size ? calculateDrawingsMovePenalty(drawings) : 1;
+    .filter(d => hasActiveDrawingTerrain(d, currElev, prevElev));
+  if ( !drawings.size ) return 1;
+  if ( alg !== GT.CHOICES.EUCLIDEAN ) return calculateDrawingsMovePenalty(drawings);
 
   // For Euclidean, determine the percentage intersect.
   prevCenter = Point3d.fromObject(prevCenter);
   currCenter = Point3d.fromObject(currCenter);
   prevCenter.z = prevElev;
   currCenter.z = currElev;
-
-  percentageShapeIntersection(
+  return percentagePenaltyShapeIntersection(
     prevCenter,
     currCenter,
     drawings.map(d => shapeForDrawing(d)),

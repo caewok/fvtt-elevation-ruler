@@ -3,14 +3,14 @@
 ## New Features
 Added settings for selecting how terrain and other tokens are measured for grid squares. GM can choose to count difficult terrain if it covers the grid center, covers a fixed percentage of a grid square/hex, or by the percent for which it overlaps a line between the previous grid shape center to the current grid shape center ("euclidean").
 
-Added selection in Drawings to treat a drawing as imposing a move bonus/penalty. May be changed to accommodate Foundry v12 scene regions in the future.
+Added selection in Drawings to treat a drawing as imposing a move bonus/penalty. May be changed or dropped to accommodate Foundry v12 scene regions in the future.
 
 ## Bug fixes
 Fix for the token apparent position disconnecting from actual token position when dragging or moving token with the ruler.
 Fix for undefined `constrainedTokenBounds.contains`. Closes issue #46.
 Fix for highlighting incorrect squares with high elevation changes.
 Refactor (again!) measurement of distances and move distances. Addresses issues with movement measurement calculating incorrectly when speed highlighting adds temporary waypoints.
-Update lib geometry to v0.2.16.
+Update lib geometry to v0.2.17.
 
 # 0.8.4
 Improve path cleaning algorithm to remove multiple straight-line points. Closes issue #40.
