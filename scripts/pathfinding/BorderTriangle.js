@@ -119,12 +119,14 @@ export class BorderEdge {
 
   /**
    * Determine if this is an open door with nothing else blocking.
-   * @returns {boolean}
+   * @type {boolean}
    */
-  isOpenDoor() {
+  get isOpenDoor() {
+    if ( !this.objects.size ) return false;
+    const { moveToken, tokenBlockType } = this.constructor;
     return this.objects.every(obj =>
       (obj instanceof Wall) ? obj.isOpen
-        : (obj instanceof Token ) ? !this._tokenEdgeBlocks(obj)
+        : (obj instanceof Token ) ? !WallTracerEdge.tokenEdgeBlocks(obj, moveToken, tokenBlockType)
           : true);
   }
 

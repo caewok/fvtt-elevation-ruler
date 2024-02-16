@@ -343,6 +343,20 @@ export class Pathfinder {
     return pts.reverse();
   }
 
+  /**
+   * Identify triangles for a path in order.
+   * @returns {BorderTriangle[]}
+   */
+  static getPathTriangles(pathMap) {
+    let curr = pathMap.goal;
+    const tri = [];
+    while ( curr && tri.length < 1000 ) {
+      tri.push(curr)
+      curr = pathMap.get(curr.key);
+    }
+    return tri.reverse();
+  }
+
   drawPath(pathPoints, opts) {
     const nPts = pathPoints.length;
     let prior = pathPoints[0];
