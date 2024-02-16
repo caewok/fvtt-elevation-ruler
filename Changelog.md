@@ -1,3 +1,6 @@
+# 0.8.6
+Fix for pathfinding slipping through small cracks between walls. Unless the wall is a door, the path should be limited to half the token min(width, height).
+
 # 0.8.5
 
 ## New Features
