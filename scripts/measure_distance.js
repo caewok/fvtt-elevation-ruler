@@ -616,11 +616,11 @@ function griddedTokenMovePenalty(token, currGridCoords, prevGridCoords, currElev
     }
 
     case GT.CHOICES.EUCLIDEAN: {
-      currCenter = gridCenterFromGridCoords(currGridCoords);
-      prevCenter = gridCenterFromGridCoords(prevGridCoords);
-      collisionTest = o => o.t.constrainedTokenBorder.lineSegmentIntersects(prevCenter, currCenter, { inside: true });
-      bounds = segmentBounds(prevCenter, currCenter);
-      break;
+      prevCenter = Point3d.fromObject(prevCenter);
+      currCenter = Point3d.fromObject(currCenter);
+      prevCenter.z = prevElev;
+      currCenter.z = currElev;
+      return terrainTokenGridlessMoveMultiplier(prevCenter, currCenter, token);
     }
   }
 
@@ -629,14 +629,7 @@ function griddedTokenMovePenalty(token, currGridCoords, prevGridCoords, currElev
     .filter(t => currElev.between(t.bottomZ, t.topZ));
   tokens.delete(token);
   if ( !tokens.size ) return 1;
-  if ( alg !== GT.CHOICES.EUCLIDEAN ) return mult;
-
-  // For Euclidean, determine the percentage intersect.
-  prevCenter = Point3d.fromObject(prevCenter);
-  currCenter = Point3d.fromObject(currCenter);
-  prevCenter.z = prevElev;
-  currCenter.z = currElev;
-  return percentagePenaltyShapeIntersection(prevCenter, currCenter, tokens.map(t => t.constrainedTokenBorder), mult);
+  return mult;
 }
 
 /**
