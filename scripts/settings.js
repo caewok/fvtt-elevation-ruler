@@ -185,6 +185,7 @@ export class Settings extends ModuleSettingsAbstract {
       hint: localize(`${KEYS.GRID_TERRAIN.ALGORITHM}.hint`),
       scope: "world",
       config: true,
+      default: KEYS.GRID_TERRAIN.CHOICES.CENTER,
       type: String,
       choices: {
         [KEYS.GRID_TERRAIN.CHOICES.CENTER]: localize(`${KEYS.GRID_TERRAIN.CHOICES.CENTER}`),
