@@ -192,7 +192,7 @@ export class Pathfinder {
   _spacer = 0;
 
   get spacer() {
-    return this._spacer || (this.token.w * 0.5) || (canvas.dimensions.size * 0.5);
+    return this._spacer || (Math.min(this.token.w, this.token.h) * 0.5) || (canvas.dimensions.size * 0.5);
   }
 
   /** @enum {BreadthFirstPathSearch} */
@@ -341,6 +341,20 @@ export class Pathfinder {
       curr = pathMap.get(curr.key);
     }
     return pts.reverse();
+  }
+
+  /**
+   * Identify triangles for a path in order.
+   * @returns {BorderTriangle[]}
+   */
+  static getPathTriangles(pathMap) {
+    let curr = pathMap.goal;
+    const tri = [];
+    while ( curr && tri.length < 1000 ) {
+      tri.push(curr);
+      curr = pathMap.get(curr.key);
+    }
+    return tri.reverse();
   }
 
   drawPath(pathPoints, opts) {
