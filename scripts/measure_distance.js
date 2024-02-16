@@ -673,33 +673,21 @@ function griddedDrawingMovePenalty(currGridCoords, prevGridCoords, currElev = 0,
     }
 
     case GT.CHOICES.EUCLIDEAN: {
-      currCenter = gridCenterFromGridCoords(currGridCoords);
-      prevCenter = gridCenterFromGridCoords(prevGridCoords);
-      collisionTest = o => o.t.bounds.lineSegmentIntersects(prevCenter, currCenter, { inside: true });
-      bounds = segmentBounds(prevCenter, currCenter);
-      break;
+      prevCenter = Point3d.fromObject(prevCenter);
+      currCenter = Point3d.fromObject(currCenter);
+      prevCenter.z = prevElev;
+      currCenter.z = currElev;
+      return terrainDrawingGridlessMoveMultiplier(prevCenter, currCenter);
     }
   }
 
   // Check that the drawing has a movement penalty and is within elevation.
   // Infinite elevations mean all elevations count
-  if ( alg !== GT.CHOICES.EUCLIDEAN ) prevElev = undefined; // So hasActiveDrawingTerrain works.
+  prevElev = undefined; // So hasActiveDrawingTerrain works.
   const drawings = canvas.drawings.quadtree.getObjects(bounds, { collisionTest })
     .filter(d => hasActiveDrawingTerrain(d, currElev, prevElev));
   if ( !drawings.size ) return 1;
-  if ( alg !== GT.CHOICES.EUCLIDEAN ) return calculateDrawingsMovePenalty(drawings);
-
-  // For Euclidean, determine the percentage intersect.
-  prevCenter = Point3d.fromObject(prevCenter);
-  currCenter = Point3d.fromObject(currCenter);
-  prevCenter.z = prevElev;
-  currCenter.z = currElev;
-  return percentagePenaltyShapeIntersection(
-    prevCenter,
-    currCenter,
-    drawings.map(d => shapeForDrawing(d)),
-    drawings.map(d => d.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) || 1 )
-  );
+  return calculateDrawingsMovePenalty(drawings);
 }
 
 /**
