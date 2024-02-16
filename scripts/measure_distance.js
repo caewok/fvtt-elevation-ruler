@@ -300,9 +300,9 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
     const currElev = prevElev + (movementChange.E * size); // In pixel units.
 
     // Determine move penalty.
-    const tokenPenalty = griddedTokenMovePenalty(token, gridCoords, prevGridCoords, currElev, prevElev);
     const terrainPenalty = griddedTerrainMovePenalty(token, gridCoords, prevGridCoords, currElev, prevElev);
-    const drawingPenalty = griddedDrawingMovePenalty(gridCoords, prevGridCoords, currElev, prevElev);
+    const tokenPenalty = griddedMovePenalty(gridCoords, prevGridCoords, { currElev, prevElev, token });
+    const drawingPenalty = griddedMovePenalty(gridCoords, prevGridCoords, { currElev, prevElev });
     if ( !tokenPenalty || tokenPenalty < 0 ) console.warn("griddedMoveDistance", { tokenPenalty });
     if ( !terrainPenalty || terrainPenalty < 0 ) console.warn("griddedMoveDistance", { terrainPenalty });
     if ( !drawingPenalty || drawingPenalty < 0 ) console.warn("griddedMoveDistance", { drawingPenalty });
@@ -325,8 +325,8 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
     // Cycle to next.
     prevGridCoords = gridCoords;
     prevElev = currElev;
-    tokenMovePenalty ||= (tokenPenalty !== 1);
     terrainMovePenalty ||= (terrainPenalty !== 1);
+    tokenMovePenalty ||= (tokenPenalty !== 1);
     drawingMovePenalty ||= (drawingPenalty !== 1);
   }
 
@@ -335,16 +335,16 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
   let elevStepsNeeded = Math.max(targetElevSteps - elevSteps, 0);
   if ( useAllElevation && !stopTarget && elevStepsNeeded ) {
     // Determine move penalty.
-    const tokenPenalty = griddedTokenMovePenalty(token, prevGridCoords, prevGridCoords, b.z, prevElev);
     const terrainPenalty = griddedTerrainMovePenalty(token, prevGridCoords, prevGridCoords, b.z, prevElev);
-    const drawingPenalty = griddedDrawingMovePenalty(prevGridCoords, prevGridCoords, b.z, prevElev);
+    const tokenPenalty = griddedMovePenalty(prevGridCoords, prevGridCoords, { currElev: b.z, prevElev, token });
+    const drawingPenalty = griddedMovePenalty(prevGridCoords, prevGridCoords, { currElev: b.z, prevElev });
     const d = elevStepsNeeded * distance;
     dTotal += d;
     dMoveTotal += (d * (tokenPenalty * terrainPenalty * drawingPenalty));
     elevStepsNeeded = 0;
     prevElev = b.z;
-    tokenMovePenalty ||= (tokenPenalty !== 1);
     terrainMovePenalty ||= (terrainPenalty !== 1);
+    tokenMovePenalty ||= (tokenPenalty !== 1);
     drawingMovePenalty ||= (drawingPenalty !== 1);
   }
 
@@ -616,10 +616,14 @@ function griddedTokenMovePenalty(token, currGridCoords, prevGridCoords, currElev
     }
 
     case GT.CHOICES.EUCLIDEAN: {
-      prevCenter = Point3d.fromObject(prevCenter);
+      currCenter = gridCenterFromGridCoords(currGridCoords);
       currCenter = Point3d.fromObject(currCenter);
-      prevCenter.z = prevElev;
       currCenter.z = currElev;
+
+      prevCenter = gridCenterFromGridCoords(prevGridCoords);
+      prevCenter = Point3d.fromObject(prevCenter);
+      prevCenter.z = prevElev;
+
       return terrainTokenGridlessMoveMultiplier(prevCenter, currCenter, token);
     }
   }
@@ -666,10 +670,14 @@ function griddedDrawingMovePenalty(currGridCoords, prevGridCoords, currElev = 0,
     }
 
     case GT.CHOICES.EUCLIDEAN: {
-      prevCenter = Point3d.fromObject(prevCenter);
+      currCenter = gridCenterFromGridCoords(currGridCoords);
       currCenter = Point3d.fromObject(currCenter);
-      prevCenter.z = prevElev;
       currCenter.z = currElev;
+
+      prevCenter = gridCenterFromGridCoords(prevGridCoords);
+      prevCenter = Point3d.fromObject(prevCenter);
+      prevCenter.z = prevElev;
+
       return terrainDrawingGridlessMoveMultiplier(prevCenter, currCenter);
     }
   }
@@ -682,6 +690,83 @@ function griddedDrawingMovePenalty(currGridCoords, prevGridCoords, currElev = 0,
   if ( !drawings.size ) return 1;
   return calculateDrawingsMovePenalty(drawings);
 }
+
+/**
+ * Determine whether this grid space applies a move penalty/bonus because one or more drawings or tokens occupy it.
+ * @param {number[2]} currGridCoords        The row,col coordinates for the grid space to test
+ * @param {number[2]} [prevGridCoords]      Previous grid coordinates; required for Euclidean setting; otherwise ignored
+ * @param {object} [opts]                   Options needed for some settings
+ * @param {number} [opts.currElev=0]                Elevation at current grid point, in pixel units
+ * @param {number} [opts.prevElev=0]                Elevation at current grid point, in pixel units
+ * @param {Token} [opts.token]                      If using token measurement, token to exclude
+ * @returns {number} Percent move penalty to apply. Returns 1 if no penalty.
+ */
+function griddedMovePenalty(currGridCoords, prevGridCoords, { currElev = 0, prevElev = 0, token } = {}) {
+  let mult;
+  let objectBoundsFn;
+  let filterFn;
+  let quadtree
+  if ( token ) {
+    mult = Settings.get(Settings.KEYS.TOKEN_RULER.TOKEN_MULTIPLIER);
+    objectBoundsFn = t => t.constrainedTokenBorder;
+    filterFn = t => currElev.between(t.bottomZ, t.topZ);
+    quadtree = canvas.tokens.quadtree;
+  } else {
+    objectBoundsFn = shapeForDrawing;
+    filterFn = hasActiveDrawingTerrain;
+    quadtree = canvas.drawings.quadtree;
+  }
+  if ( mult === 1 ) return 1;
+
+  // Get the bounds and collision test for the algorithm type.
+  const GT = Settings.KEYS.GRID_TERRAIN;
+  const alg = Settings.get(GT.ALGORITHM);
+  let collisionTest;
+  let bounds;
+  let currCenter;
+  let prevCenter;
+  switch ( alg ) {
+    case GT.CHOICES.CENTER: {
+      const gridShape = gridShapeFromGridCoords(currGridCoords);
+      currCenter = gridCenterFromGridCoords(currGridCoords);
+      collisionTest = o => objectBoundsFn(o.t).contains(currCenter.x, currCenter.y);
+      bounds = gridShape.getBounds();
+      break;
+    }
+
+    case GT.CHOICES.PERCENT: {
+      const gridShape = gridShapeFromGridCoords(currGridCoords);
+      const percentThreshold = Settings.get(GT.AREA_THRESHOLD);
+      const totalArea = gridShape.area;
+      collisionTest = o => percentOverlap(objectBoundsFn(o.t), gridShape, totalArea) >= percentThreshold;
+      bounds = gridShape.getBounds();
+      break;
+    }
+
+    case GT.CHOICES.EUCLIDEAN: {
+      currCenter = gridCenterFromGridCoords(currGridCoords);
+      currCenter = Point3d.fromObject(currCenter);
+      currCenter.z = currElev;
+
+      prevCenter = gridCenterFromGridCoords(prevGridCoords);
+      prevCenter = Point3d.fromObject(prevCenter);
+      prevCenter.z = prevElev;
+
+      const fn = token ? terrainTokenGridlessMoveMultiplier : terrainDrawingGridlessMoveMultiplier;
+      return fn(prevCenter, currCenter, token);
+    }
+  }
+
+  // Check that the drawing has a movement penalty and is within elevation.
+  // Infinite elevations mean all elevations count
+  prevElev = undefined; // So hasActiveDrawingTerrain works.
+  const objects = quadtree.getObjects(bounds, { collisionTest })
+    .filter(o => filterFn(o, currElev, prevElev));
+  if ( token ) objects.delete(token);
+  if ( !objects.size ) return 1;
+  return token ? mult : calculateDrawingsMovePenalty(objects);
+}
+
 
 /**
  * Helper to calculate the percentage penalty for a set of drawings.
