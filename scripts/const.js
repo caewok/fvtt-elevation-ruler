@@ -8,8 +8,13 @@ Hooks
 export const MODULE_ID = "elevationruler";
 export const EPSILON = 1e-08;
 
+export const TEMPLATES = {
+  DRAWING_CONFIG: `modules/${MODULE_ID}/templates/drawing-config.html`
+};
+
 export const FLAGS = {
-  MOVEMENT_SELECTION: "selectedMovementType"
+  MOVEMENT_SELECTION: "selectedMovementType",
+  MOVEMENT_PENALTY: "movementPenalty"
 };
 
 export const MODULES_ACTIVE = { API: {} };

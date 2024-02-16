@@ -131,6 +131,7 @@ export class Patcher {
               isStatic: typeName.includes("STATIC") };
             switch ( typeName ) {
               case "HOOKS": patchCl = HookPatch; break;
+
               case "STATIC_OVERRIDES": // eslint-disable-line no-fallthrough
               case "OVERRIDES":
               case "STATIC_MIXES":
@@ -142,10 +143,20 @@ export class Patcher {
                   ? libWrapper.OVERRIDE : typeName.includes("MIXES")
                     ? libWrapper.MIXED : libWrapper.WRAPPER;
                 break;
-              case "STATIC_GETTERS":  // eslint-disable-line no-fallthrough
+
+              case "STATIC_GETTERS": // eslint-disable-line no-fallthrough
               case "GETTERS":
                 cfg.isGetter = true;
-              default: // eslint-disable-line no-fallthrough
+                patchCl = MethodPatch;
+                break;
+
+              case "STATIC_SETTERS": // eslint-disable-line no-fallthrough
+              case "SETTERS":
+                cfg.isSetter = true;
+                patchCl = MethodPatch;
+                break;
+
+              default:
                 patchCl = MethodPatch;
             }
             const thePatch = patchCl.create(patchName, patch, cfg);
@@ -166,11 +177,20 @@ export class Patcher {
    * @param {boolean} [opts.optional]   True if the getter should not be set if it already exists.
    * @returns {undefined|object<id{string}} Either undefined if the getter already exists or the cl.prototype.name.
    */
-  static addClassMethod(cl, name, fn, { getter = false, optional = false } = {}) {
+  static addClassMethod(cl, name, fn, { getter = false, setter = false, optional = false } = {}) {
     if ( optional && Object.hasOwn(cl, name) ) return undefined;
     const descriptor = { configurable: true };
-    if ( getter ) descriptor.get = fn;
-    else {
+
+    // For getters and setters, keep the getter when creating a setter and vice-versa
+    if ( getter ) {
+      descriptor.get = fn;
+      const currentSetter = Object.getOwnPropertyDescriptor(cl, name)?.set;
+      if ( currentSetter ) descriptor.set = currentSetter;
+    } else if ( setter ) {
+      descriptor.set = fn;
+      const currentGetter = Object.getOwnPropertyDescriptor(cl, name)?.get;
+      if ( currentGetter ) descriptor.get = currentGetter;
+    } else {
       descriptor.writable = true;
       descriptor.value = fn;
     }
@@ -351,6 +371,9 @@ export class MethodPatch extends AbstractPatch {
     }
 
     cfg.isGetter = Boolean(config.isGetter);
+    cfg.isSetter = Boolean(config.isSetter);
+    if ( cfg.isGetter && cfg.isSetter ) console.warn("Patcher|Getter and Setter both true; you probably only want 1 at a time!");
+
     cfg.isStatic = Boolean(config.isStatic);
     this.cl = config.className;
   }
@@ -374,9 +397,10 @@ export class MethodPatch extends AbstractPatch {
 
     this.prevMethod = Object.getOwnPropertyDescriptor(this.#cl, this.target);
     if ( this.config.isGetter ) this.prevMethod = this.prevMethod?.get;
+    else if ( this.config.isSetter ) this.prevMethod = this.prevMethod?.set;
     else this.prevMethod = this.prevMethod?.value;
 
-    this.regId = Patcher.addClassMethod(this.#cl, this.target, this.patchFn, { getter: this.config.isGetter });
+    this.regId = Patcher.addClassMethod(this.#cl, this.target, this.patchFn, { getter: this.config.isGetter, setter: this.config.isSetter });
   }
 
   /**
@@ -388,7 +412,7 @@ export class MethodPatch extends AbstractPatch {
 
     // Add back the original, if any.
     if ( this.prevMethod ) {
-      Patcher.addClassMethod(this.#cl, this.target, this.prevMethod, { getter: this.config.isGetter });
+      Patcher.addClassMethod(this.#cl, this.target, this.prevMethod, { getter: this.config.isGetter, setter: this.config.isSetter });
       this.prevMethod = undefined;
     }
     this.regId = undefined;

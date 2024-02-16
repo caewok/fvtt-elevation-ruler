@@ -1,3 +1,17 @@
+# 0.8.5
+
+## New Features
+Added settings for selecting how terrain and other tokens are measured for grid squares. GM can choose to count difficult terrain if it covers the grid center, covers a fixed percentage of a grid square/hex, or by the percent for which it overlaps a line between the previous grid shape center to the current grid shape center ("euclidean").
+
+Added selection in Drawings to treat a drawing as imposing a move bonus/penalty. May be changed or dropped to accommodate Foundry v12 scene regions in the future.
+
+## Bug fixes
+Fix for the token apparent position disconnecting from actual token position when dragging or moving token with the ruler.
+Fix for undefined `constrainedTokenBounds.contains`. Closes issue #46.
+Fix for highlighting incorrect squares with high elevation changes.
+Refactor (again!) measurement of distances and move distances. Addresses issues with movement measurement calculating incorrectly when speed highlighting adds temporary waypoints.
+Update lib geometry to v0.2.17.
+
 # 0.8.4
 Improve path cleaning algorithm to remove multiple straight-line points. Closes issue #40.
 Refactor measurement of distances and move distances to better account for 3d distance. Closes issue #41.
@@ -5,7 +19,7 @@ Remove animation easing for intermediate segments while keeping easing-in for th
 Add `CONFIG` settings to change the unicode symbol displayed when the ruler is over terrain (or tokens, if tokens count as difficult terrain).
 - `CONFIG.elevationruler.SPEED.terrainSymbol`: You can use any text string here. Paste in a unicode symbol if you want a different symbol. For Font Awesome icons, use, e.g., "\uf0e7".
 - `CONFIG.elevationruler.SPEED.useFontAwesome`: Set to true to interpet the `terrainSymbol` as FA unicode.
-Update geometry lib to v0.2.15.
+Update lib geometry to v0.2.15.
 
 ## Breaking changes
 The added methods `Ruler.measureDistance` and `Ruler.measureMoveDistance` were refactored and now take different parameters.

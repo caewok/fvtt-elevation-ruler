@@ -4,6 +4,7 @@ CONST,
 duplicate,
 game,
 getProperty,
+PIXI,
 Ruler,
 ui
 */
@@ -254,6 +255,18 @@ function _computeDistance(gridSpaces) {
   _computeSegmentDistances.call(this, gridSpaces);
   if ( Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING) ) _computeTokenSpeed.call(this, gridSpaces);
 
+  switch ( this.segments.length ) {
+    case 1: break;
+    case 2: break;
+    case 3: break;
+    case 4: break;
+    case 5: break;
+    case 6: break;
+    case 7: break;
+    case 8: break;
+    case 9: break;
+  }
+
   // Debugging
   if ( this.segments.some(s => !s) ) console.error("Segment is undefined.");
 
@@ -261,15 +274,18 @@ function _computeDistance(gridSpaces) {
   const waypointKeys = new Set(this.waypoints.map(w => w.key));
   let waypointDistance = 0;
   let waypointMoveDistance = 0;
+  let waypointStartingElevation = 0;
   for ( const segment of this.segments ) {
     if ( waypointKeys.has(segment.ray.A.to2d().key) ) {
       waypointDistance = 0;
       waypointMoveDistance = 0;
+      waypointStartingElevation = segment.ray.A.z;
     }
     waypointDistance += segment.distance;
     waypointMoveDistance += segment.moveDistance;
     segment.waypointDistance = waypointDistance;
     segment.waypointMoveDistance = waypointMoveDistance;
+    segment.waypointElevationIncrement = segment.ray.B.z - waypointStartingElevation;
   }
 }
 
@@ -298,6 +314,14 @@ function _computeSegmentDistances(gridSpaces) {
     segment.moveDistance = moveDistance;
     totalDistance += segment.distance;
     totalMoveDistance += segment.moveDistance;
+  }
+
+  if ( totalMoveDistance > 40 ) {
+    log({ totalMoveDistance });
+  }
+
+  if ( totalMoveDistance > 60 ) {
+    log({ totalMoveDistance });
   }
 
   this.totalDistance = totalDistance;
@@ -421,14 +445,9 @@ function splitSegment(segment, splitMoveDistance, token, gridless) {
   else {
     // We can get the end grid.
     // Use halfway between the intersection points for this grid shape.
-    const gridShape = gridShapeFromGridCoordinates(res.endGridCoords);
-    const ixs = gridShape.segmentIntersections(A, B);
-    if ( !ixs || ixs.length === 0 ) breakPoint = A;
-    else if ( ixs.length === 1 ) breakPoint = B;
-    else {
-      breakPoint = Point3d.midPoint(ixs[0], ixs[1]);
-      breakPoint.z = res.endElevationZ;
-    }
+    breakPoint = Point3d.fromObject(segmentGridHalfIntersection(res.endGridCoords, A, B) ?? A);
+    if ( breakPoint === A ) breakPoint.z = A.z;
+    else breakPoint.z = res.endElevationZ;
   }
 
   if ( breakPoint.almostEqual(B) ) return [segment];
@@ -449,6 +468,24 @@ function splitSegment(segment, splitMoveDistance, token, gridless) {
   if ( segment.last ) { s0.last = false; }
   return [s0, s1];
 }
+
+/**
+ * For a given segment, locate its intersection at a grid shape.
+ * The intersection point is on the segment, halfway between the two intersections for the shape.
+ * @param {number[]} gridCoords
+ * @param {PIXI.Point} a
+ * @param {PIXI.Point} b
+ * @returns {PIXI.Point|undefined} Undefined if no intersection. If only one intersection, the
+ *   endpoint contained within the shape.
+ */
+function segmentGridHalfIntersection(gridCoords, a, b) {
+  const gridShape = gridShapeFromGridCoordinates(gridCoords);
+  const ixs = gridShape.segmentIntersections(a, b);
+  if ( !ixs || ixs.length === 0 ) return null;
+  if ( ixs.length === 1 ) return gridShape.contains(a.x, a.y) ? a : b;
+  return PIXI.Point.midPoint(ixs[0], ixs[1]);
+}
+
 
 // ----- NOTE: Event handling ----- //
 
@@ -543,9 +580,9 @@ PATCHES.BASIC.WRAPS = {
   _canMove
 };
 
-PATCHES.BASIC.MIXES = { _animateMovement, _animateSegment, _getMovementToken, _getMeasurementSegments };
+PATCHES.BASIC.MIXES = { _animateMovement, _getMovementToken, _getMeasurementSegments };
 
-PATCHES.BASIC.OVERRIDES = { _computeDistance };
+PATCHES.BASIC.OVERRIDES = { _computeDistance, _animateSegment };
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 

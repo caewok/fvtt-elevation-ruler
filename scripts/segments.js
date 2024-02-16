@@ -230,7 +230,7 @@ export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance)
  * for the given segment.
  * Mark the token update if pathfinding for this segment.
  */
-export async function _animateSegment(wrapped, token, segment, destination) {
+export async function _animateSegment(token, segment, destination) {
   // If the token is already at the destination, _animateSegment will throw an error when the animation is undefined.
   // This can happen when setting artificial segments for highlighting or pathfinding.
   if ( token.document.x !== destination.x
@@ -281,16 +281,24 @@ export function hasSegmentCollision(token, segments) {
  * Wrap Ruler.prototype._highlightMeasurementSegment
  */
 export function _highlightMeasurementSegment(wrapped, segment) {
-  if ( !(this.user === game.user
-      && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING)) ) return wrapped(segment);
+  // Temporarily ensure the ray distance is two-dimensional, so highlighting selects correct squares.
+  // Otherwise the highlighting algorithm can get confused for high-elevation segments.
+  segment.ray._distance = PIXI.Point.distanceBetween(segment.ray.A, segment.ray.B);
 
+  // Adjust the color if this user has selected speed highlighting.
+  const priorColor = this.color;
   const token = this._getMovementToken();
-  if ( !token ) return wrapped(segment);
+  const doSpeedHighlighting = token
+    && this.user === game.user
+    && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING);
 
   // Highlight each split in turn, changing highlight color each time.
-  const priorColor = this.color;
-  this.color = SPEED.COLORS[segment.speed];
-  wrapped(segment);
+  if ( doSpeedHighlighting ) this.color = SPEED.COLORS[segment.speed];
+
+  // Call Foundry version and return if not speed highlighting.
+  const res = wrapped(segment);
+  segment.ray._distance = undefined; // Reset the distance measurement.
+  if ( !doSpeedHighlighting ) return res;
 
   // If gridless, highlight a rectangular shaped portion of the line.
   if ( canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) {
@@ -384,7 +392,7 @@ function levelNameAtElevation(e) {
  */
 function segmentElevationLabel(s) {
   const units = canvas.scene.grid.units;
-  const increment = s.ray.dz;
+  const increment = s.waypointElevationIncrement;
   const Bz = s.ray.B.z;
 
   const segmentArrow = (increment > 0) ? "↑"

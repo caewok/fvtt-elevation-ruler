@@ -31,16 +31,34 @@ export function gridShape(p) {
 }
 
 /**
+ * Helper to get the grid shape from grid coordinates.
+ * @param {number[2]} gridCoords
+ * @returns {null|PIXI.Rectangle|PIXI.Polygon}
+ */
+export function gridShapeFromGridCoords(gridCoords) {
+  if ( canvas.grid.isHex ) return hexGridShapeFromGridCoords(gridCoords);
+  return squareGridShapeFromGridCoords(gridCoords)
+}
+
+/**
  * From ElevatedVision ElevationLayer.js
  * Return the rectangle corresponding to the grid square at this point.
  * @param {x: number, y: number} p    Location within the square.
  * @returns {PIXI.Rectangle}
  */
-export function squareGridShape(p) {
-  // Get the top left corner
-  const [tlx, tly] = canvas.grid.grid.getTopLeft(p.x, p.y);
+function squareGridShapeFromTopLeft(tlx, tly) {
   const { w, h } = canvas.grid;
   return new PIXI.Rectangle(tlx, tly, w, h);
+}
+
+function squareGridShapeFromGridCoords(gridCoords) {
+  const [tlx, tly] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[0], gridCoords[1]);
+  return squareGridShapeFromTopLeft(tlx, tly)
+}
+
+export function squareGridShape(p) {
+  const [tlx, tly] = canvas.grid.grid.getTopLeft(p.x, p.y);
+  return squareGridShapeFromTopLeft(tlx, tly);
 }
 
 /**
@@ -49,17 +67,34 @@ export function squareGridShape(p) {
  * @param {x: number, y: number} p    Location within the square.
  * @returns {PIXI.Rectangle}
  */
-export function hexGridShape(p, { width = 1, height = 1 } = {}) {
-  // Canvas.grid.grid.getBorderPolygon will return null if width !== height.
-  if ( width !== height ) return null;
-
-  // Get the top left corner
-  const [tlx, tly] = canvas.grid.grid.getTopLeft(p.x, p.y);
+function hexGridShapeFromTopLeft(tlx, tly, { width = 1, height = 1 } = {}) {
+  if ( width !== height ) return null; // Canvas.grid.grid.getBorderPolygon will return null if width !== height.
   const points = canvas.grid.grid.getBorderPolygon(width, height, 0); // TO-DO: Should a border be included to improve calc?
   const pointsTranslated = [];
   const ln = points.length;
   for ( let i = 0; i < ln; i += 2) pointsTranslated.push(points[i] + tlx, points[i+1] + tly);
   return new PIXI.Polygon(pointsTranslated);
+}
+
+function hexGridShapeFromGridCoords(gridCoords, opts) {
+  const [tlx, tly] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[0], gridCoords[1]);
+  return hexGridShapeFromTopLeft(tlx, tly, opts);
+}
+
+export function hexGridShape(p, opts) {
+  const [tlx, tly] = canvas.grid.grid.getTopLeft(p.x, p.y);
+  return hexGridShapeFromTopLeft(tlx, tly, opts);
+}
+
+/**
+ * Find the grid center given grid coordinates.
+ * @param {number[]} gridCoords
+ * @returns {PIXI.Point}
+ */
+export function gridCenterFromGridCoords(gridCoords) {
+  const [tlx, tly] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[0], gridCoords[1]);
+  const [cx, cy] = canvas.grid.grid.getCenter(tlx, tly);
+  return new PIXI.Point(cx, cy);
 }
 
 /**
@@ -177,4 +212,15 @@ export function segmentBounds(a, b) {
   const xMinMax = Math.minMax(a.x, b.x);
   const yMinMax = Math.minMax(a.y, b.y);
   return new PIXI.Rectangle(xMinMax.min, yMinMax.min, xMinMax.max - xMinMax.min, yMinMax.max - yMinMax.min);
+}
+
+
+/**
+ * Helper to inject configuration html into the application config.
+ */
+export async function injectConfiguration(app, html, data, template, findString) {
+  const myHTML = await renderTemplate(template, data);
+  const form = html.find(findString);
+  form.append(myHTML);
+  app.setPosition(app.position);
 }
