@@ -245,7 +245,7 @@ function terrainDrawingGridlessMoveMultiplier(a, b) {
   // Find drawings along the ray whose borders intersect the ray.
   const bounds = segmentBounds(a, b);
   const collisionTest = o => o.t.bounds.lineSegmentIntersects(a, b, { inside: true });
-  const drawings = canvas.tokens.quadtree.getObjects(bounds, { collisionTest })
+  const drawings = canvas.drawings.quadtree.getObjects(bounds, { collisionTest })
     .filter(d => hasActiveDrawingTerrain(d, b.z ?? 0, a.z ?? 0));
   if ( !drawings.size ) return 1;
 
