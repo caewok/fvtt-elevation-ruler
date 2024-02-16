@@ -2,11 +2,12 @@
 canvas,
 CONFIG,
 CONST,
+getProperty,
 PIXI
 */
 "use strict";
 
-import { DIAGONAL_RULES, MODULES_ACTIVE, SPEED } from "./const.js";
+import { DIAGONAL_RULES, MODULES_ACTIVE, SPEED, MODULE_ID, FLAGS } from "./const.js";
 import {
   iterateGridUnderLine,
   squareGridShape,
@@ -16,6 +17,9 @@ import {
   gridCenterFromGridCoords } from "./util.js";
 import { Settings } from "./settings.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
+import { CenteredRectangle } from "./geometry/CenteredPolygon/CenteredRectangle.js";
+import { CenteredPolygon } from "./geometry/CenteredPolygon/CenteredPolygon.js";
+import { Ellipse } from "./geometry/Ellipse.js";
 
 // Specialized distance measurement methods that can handle grids.
 
@@ -317,24 +321,25 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
   let elevSteps = 0;
   let tokenMovePenalty = false;
   let terrainMovePenalty = false;
+  let drawingMovePenalty = false;
   for ( const { movementChange, gridCoords } of iter ) {
     adjustGridMoveForElevation(movementChange);
     const currElev = prevElev + (movementChange.E * size); // In pixel units.
 
     // Determine move penalty.
-    const tokenMovePenalty = griddedTokenMovePenalty(token, gridCoords, prevGridCoords, currElev, prevElev);
-    const terrainMovePenalty = griddedTerrainMovePenalty(token, gridCoords, prevGridCoords, currElev, prevElev);
-    if ( !tokenMovePenalty || tokenMovePenalty < 0 ) console.warn("griddedMoveDistance", { tokenMovePenalty });
-    if ( !terrainMovePenalty || terrainMovePenalty < 0 ) console.warn("griddedMoveDistance", { terrainMovePenalty });
-    tokenMovePenalty ||= (tokenMovePenalty !== 1);
-    terrainMovePenalty ||= (terrainMovePenalty !== 1);
+    const tokenPenalty = griddedTokenMovePenalty(token, gridCoords, prevGridCoords, currElev, prevElev);
+    const terrainPenalty = griddedTerrainMovePenalty(token, gridCoords, prevGridCoords, currElev, prevElev);
+    const drawingPenalty = griddedDrawingMovePenalty(gridCoords, prevGridCoords, currElev, prevElev);
+    if ( !tokenPenalty || tokenPenalty < 0 ) console.warn("griddedMoveDistance", { tokenPenalty });
+    if ( !terrainPenalty || terrainPenalty < 0 ) console.warn("griddedMoveDistance", { terrainPenalty });
+    if ( !drawingPenalty || drawingPenalty < 0 ) console.warn("griddedMoveDistance", { drawingPenalty });
 
     // Calculate the distance for this step.
     let d = (movementChange.V + movementChange.H) * distance;
     d += diagAdder(movementChange.D);
 
     // Apply move penalty, if any.
-    const dMove = d * (tokenMovePenalty * terrainMovePenalty);
+    const dMove = d * (tokenPenalty * terrainPenalty * drawingPenalty);
 
     // Early stop if the stop target is met.
     if ( stopTarget && (dMoveTotal + dMove) > stopTarget ) break;
@@ -347,6 +352,9 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
     // Cycle to next.
     prevGridCoords = gridCoords;
     prevElev = currElev;
+    tokenMovePenalty ||= (tokenPenalty !== 1);
+    terrainMovePenalty ||= (terrainPenalty !== 1);
+    drawingMovePenalty ||= (drawingPenalty !== 1);
   }
 
   // Handle remaining elevation change, if any, by moving directly up/down.
@@ -354,15 +362,17 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
   let elevStepsNeeded = Math.max(targetElevSteps - elevSteps, 0);
   if ( useAllElevation && !stopTarget && elevStepsNeeded ) {
     // Determine move penalty.
-    const tokenMovePenalty = griddedTokenMovePenalty(token, prevGridCoords, prevGridCoords, b.z, prevElev);
-    const terrainMovePenalty = griddedTerrainMovePenalty(token, prevGridCoords, prevGridCoords, b.z, prevElev);
-    tokenMovePenalty ||= (tokenMovePenalty !== 1);
-    terrainMovePenalty ||= (terrainMovePenalty !== 1);
+    const tokenPenalty = griddedTokenMovePenalty(token, prevGridCoords, prevGridCoords, b.z, prevElev);
+    const terrainPenalty = griddedTerrainMovePenalty(token, prevGridCoords, prevGridCoords, b.z, prevElev);
+    const drawingPenalty = griddedDrawingMovePenalty(prevGridCoords, prevGridCoords, b.z, prevElev);
     const d = elevStepsNeeded * distance;
     dTotal += d;
-    dMoveTotal += (d * (tokenMovePenalty * terrainMovePenalty));
+    dMoveTotal += (d * (tokenPenalty * terrainPenalty * drawingPenalty));
     elevStepsNeeded = 0;
     prevElev = b.z;
+    tokenMovePenalty ||= (tokenPenalty !== 1);
+    terrainMovePenalty ||= (terrainPenalty !== 1);
+    drawingMovePenalty ||= (drawingPenalty !== 1);
   }
 
   // Force to not go beyond b.z.
@@ -377,7 +387,8 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
     endElevationZ: prevElev,
     endGridCoords: prevGridCoords,
     tokenMovePenalty,
-    terrainMovePenalty
+    terrainMovePenalty,
+    drawingMovePenalty
   };
 }
 
@@ -454,6 +465,131 @@ function numElevationGridSteps(elevZ) {
 }
 
 /**
+ * Determine the percentage of the ray that intersects a set of shapes.
+ * @param {PIXI.Point} a
+ * @param {PIXI.Point} b
+ * @param {(PIXI.Polygon|PIXI.Rectangle)[]} [shapes=[]]
+ * @param {number[]} [penalties]
+ * @returns {number}
+ */
+function percentageShapeIntersection(a, b, shapes = [], penalties) { // eslint-disable-line default-param-last
+  const nShapes = shapes.length;
+  if ( !nShapes ) return 0;
+  if ( !penalties ) penalties = Array(nShapes).fill(1);
+  const tValues = [];
+  const deltaMag = b.to2d().subtract(a).magnitude();
+
+  // Determine the percentage of the a|b segment that intersects the shapes.
+  for ( let i = 0; i < nShapes; i += 1 ) {
+    const shape = shapes[i];
+    const penalty = penalties[i] ?? 1;
+    let inside = false;
+    if ( shape.contains(a) ) {
+      inside = true;
+      tValues.push({ t: 0, inside, penalty });
+    }
+
+    // At each intersection, we switch between inside and outside.
+    const ixs = shape.segmentIntersections(a, b); // Can we assume the ixs are sorted by t0?
+
+    // See Foundry issue #10336. Don't trust the t0 values.
+    ixs.forEach(ix => {
+      // See PIXI.Point.prototype.towardsPoint
+      const distance = Point3d.distanceBetween(a, ix);
+      ix.t0 = distance / deltaMag;
+    });
+    ixs.sort((a, b) => a.t0 - b.t0);
+
+    ixs.forEach(ix => {
+      inside ^= true;
+      tValues.push({ t: ix.t0, inside, penalty });
+    });
+  }
+
+  // Sort tValues and calculate distance between inside start/end.
+  // May be multiple inside/outside entries.
+  tValues.sort((a, b) => a.t0 - b.t0);
+  let nInside = 0;
+  let prevT = 0;
+  let distInside = 0;
+  let penaltyDistInside = 0;
+  let currPenalty = 1;
+  for ( const tValue of tValues ) {
+    if ( tValue.inside ) {
+      nInside += 1;
+      if ( !tValue.t ) continue; // Skip because t is 0 so no distance moved yet.
+
+      // Calculate distance for this segment
+      const startPt = a.projectToward(b, prevT ?? 0);
+      const endPt = a.projectToward(b, tValue.t);
+      const dist = Point3d.distanceBetween(startPt, endPt);
+      distInside += dist;
+      penaltyDistInside += (dist * currPenalty); // Penalty before this point.
+      currPenalty *= tValue.penalty;
+
+      // Cycle to next.
+      prevT = tValue.t;
+
+    } else if ( nInside > 2 ) {  // !tValue.inside
+      nInside -= 1;
+
+      // Calculate distance for this segment
+      const startPt = a.projectToward(b, prevT ?? 0);
+      const endPt = a.projectToward(b, tValue.t);
+      const dist = Point3d.distanceBetween(startPt, endPt);
+      distInside += dist;
+      penaltyDistInside += (dist * currPenalty); // Penalty before this point.
+      currPenalty *= (1 / tValue.penalty);
+
+      // Cycle to next.
+      prevT = tValue.t;
+    }
+    else if ( nInside === 1 ) { // Inside is false and we are now outside.
+      nInside = 0;
+
+      // Calculate distance for this segment
+      const startPt = a.projectToward(b, prevT);
+      const endPt = a.projectToward(b, tValue.t);
+      const dist = Point3d.distanceBetween(startPt, endPt);
+      distInside += dist;
+      penaltyDistInside += (dist * currPenalty); // Penalty before this point.
+      currPenalty *= (1 / tValue.penalty);
+
+      // Cycle to next.
+      prevT = tValue.t;
+    }
+  }
+
+  // If still inside, we can go all the way to t = 1
+  if ( nInside > 0 ) {
+    const startPt = a.projectToward(b, prevT);
+    const dist = Point3d.distanceBetween(startPt, b);
+    distInside += dist;
+    penaltyDistInside += (dist * currPenalty); // Penalty before this point.
+  }
+
+  if ( !distInside ) return 1;
+  const totalDistance = Point3d.distanceBetween(a, b);
+  return penaltyDistInside / totalDistance;
+}
+
+/**
+ * Calculate the percent area overlap of one shape on another.
+ * @param {PIXI.Rectangle|PIXI.Polygon} overlapShape
+ * @param {PIXI.Rectangle|PIXI.Polygon} areaShape
+ * @returns {number} Value between 0 and 1.
+ */
+function percentOverlap(overlapShape, areaShape, totalArea) {
+  if ( !overlapShape.overlaps(areaShape) ) return 0;
+  const intersection = overlapShape.intersectPolygon(areaShape.toPolygon());
+  const ixArea = intersection.area();
+  totalArea ??= areaShape.area();
+  return ixArea / totalArea;
+}
+
+// ----- NOTE: Movement penalty methods ----- //
+
+/**
  * Determine whether this grid space applies a move penalty because one or more tokens occupy it.
  * @param {number[2]} currGridCoords
  * @param {number[2]} [prevGridCoords]      Required for Euclidean setting; otherwise ignored.
@@ -510,90 +646,113 @@ function griddedTokenMovePenalty(token, currGridCoords, prevGridCoords, currElev
   currCenter = Point3d.fromObject(currCenter);
   prevCenter.z = prevElev;
   currCenter.z = currElev;
-  return percentageShapeIntersection(prevCenter, currCenter, tokens.map(t => t.constrainedTokenBorder));
+  return mult * percentageShapeIntersection(prevCenter, currCenter, tokens.map(t => t.constrainedTokenBorder));
 }
 
+/**
+ * Determine whether this grid space applies a move penalty/bonus because one or more drawings occupy it.
+ * @param {number[2]} currGridCoords
+ * @param {number[2]} [prevGridCoords]      Required for Euclidean setting; otherwise ignored.
+ * @param {number} currElev                 Elevation at current grid point, in pixel units
+ * @param {number} prevElev                 Elevation at current grid point, in pixel units
+ * @returns {number} Percent move penalty to apply. Returns 1 if no penalty.
+ */
+function griddedDrawingMovePenalty(currGridCoords, prevGridCoords, currElev = 0, prevElev = 0) {
+  // Locate drawings that overlap this grid space.
+  const GT = Settings.KEYS.GRID_TERRAIN;
+  const alg = Settings.get(GT.ALGORITHM);
+  let collisionTest;
+  let bounds;
+  let currCenter;
+  let prevCenter;
+  switch ( alg ) {
+    case GT.CHOICES.CENTER: {
+      const gridShape = gridShapeFromGridCoords(currGridCoords);
+      currCenter = gridCenterFromGridCoords(currGridCoords);
+      bounds = gridShape.getBounds();
+      break;
+    }
+
+    case GT.CHOICES.PERCENT: {
+      const gridShape = gridShapeFromGridCoords(currGridCoords);
+      const percentThreshold = Settings.get(GT.AREA_THRESHOLD);
+      const totalArea = gridShape.area();
+      collisionTest = o => percentOverlap(shapeForDrawing(o.t), gridShape, totalArea) >= percentThreshold;
+      bounds = gridShape.getBounds();
+      break;
+    }
+
+    case GT.CHOICES.EUCLIDEAN: {
+      currCenter = gridCenterFromGridCoords(currGridCoords);
+      prevCenter = gridCenterFromGridCoords(prevGridCoords);
+      collisionTest = o => o.t.border.lineSegmentIntersects(prevCenter, currCenter, { inside: true });
+      bounds = segmentBounds(prevCenter, currCenter);
+      break;
+    }
+  }
+
+  // Check that the drawing has a movement penalty and is within elevation.
+  // Infinite elevations mean all elevations count
+  if ( alg !== GT.CHOICES.EUCLIDEAN ) prevElev = undefined; // So hasActiveDrawingTerrain works.
+  const drawings = canvas.drawings.quadtree.getObjects(bounds, { collisionTest })
+    .filter(t => hasActiveDrawingTerrain(t, currElev, prevElev));
+  if ( alg !== GT.CHOICES.EUCLIDEAN ) return drawings.size ? calculateDrawingsMovePenalty(drawings) : 1;
+
+  // For Euclidean, determine the percentage intersect.
+  prevCenter = Point3d.fromObject(prevCenter);
+  currCenter = Point3d.fromObject(currCenter);
+  prevCenter.z = prevElev;
+  currCenter.z = currElev;
+
+  percentageShapeIntersection(
+    prevCenter,
+    currCenter,
+    drawings.map(d => shapeForDrawing(d)),
+    drawings.map(d => d.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) || 1 )
+  );
+}
 
 /**
- * Determine the percentage of the ray that intersects a set of shapes.
- * @param {PIXI.Point} a
- * @param {PIXI.Point} b
- * @param {(PIXI.Polygon|PIXI.Rectangle)[]} shapes
+ * Helper to calculate the percentage penalty for a set of drawings.
+ * @param {Set<Drawing>} drawings
  * @returns {number}
  */
-function percentageShapeIntersection(a, b, shapes = []) {
-  const tValues = [];
-  const deltaMag = b.to2d().subtract(a).magnitude();
+function calculateDrawingsMovePenalty(drawings) {
+  return drawings.reduce((acc, curr) => {
+    const penalty = curr.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) || 1;
+    return acc * penalty;
+  }, 1);
+}
 
-  // Determine the percentage of the a|b segment that intersects the shapes.
-  for ( const shape of shapes ) {
-    let inside = false;
-    if ( shape.contains(a) ) {
-      inside = true;
-      tValues.push({ t: 0, inside });
-    }
-
-    // At each intersection, we switch between inside and outside.
-    const ixs = shape.segmentIntersections(a, b); // Can we assume the ixs are sorted by t0?
-
-    // See Foundry issue #10336. Don't trust the t0 values.
-    ixs.forEach(ix => {
-      // See PIXI.Point.prototype.towardsPoint
-      const distance = Point3d.distanceBetween(a, ix);
-      ix.t0 = distance / deltaMag;
-    });
-    ixs.sort((a, b) => a.t0 - b.t0);
-
-    ixs.forEach(ix => {
-      inside ^= true;
-      tValues.push({ t: ix.t0, inside });
-    });
+/** Helper to calculate a shape for a given drawing.
+ * @param {Drawing} drawing
+ * @returns {CenteredPolygon|CenteredRectangle|PIXI.Circle}
+ */
+function shapeForDrawing(drawing) {
+  switch ( drawing.type ) {
+    case CONST.DRAWING_TYPES.RECTANGLE: return CenteredRectangle.fromDrawing(drawing);
+    case CONST.DRAWING_TYPES.POLYGON: return CenteredPolygon.fromDrawing(drawing);
+    case CONST.DRAWING_TYPES.ELLIPSE: return Ellipse.fromDrawing(drawing);
+    default: return drawing.bounds;
   }
-
-  // Sort tValues and calculate distance between inside start/end.
-  // May be multiple inside/outside entries.
-  tValues.sort((a, b) => a.t0 - b.t0);
-  let nInside = 0;
-  let prevT = undefined;
-  let distInside = 0;
-  for ( const tValue of tValues ) {
-    if ( tValue.inside ) {
-      nInside += 1;
-      prevT ??= tValue.t; // Store only the first t to take us inside.
-    } else if ( nInside > 2 ) nInside -= 1;
-    else if ( nInside === 1 ) { // Inside is false and we are now outside.
-      const startPt = a.projectToward(b, prevT);
-      const endPt = a.projectToward(b, tValue.t);
-      distInside += Point3d.distanceBetween(startPt, endPt);
-      nInside = 0;
-      prevT = undefined;
-    }
-  }
-
-  // If still inside, we can go all the way to t = 1
-  if ( nInside > 0 ) {
-    const startPt = a.projectToward(b, prevT);
-    distInside += Point3d.distanceBetween(startPt, b);
-  }
-
-  if ( !distInside ) return 1;
-
-  const totalDistance = Point3d.distanceBetween(a, b);
-  return distInside / totalDistance;
 }
 
 /**
- * Calculate the percent area overlap of one shape on another.
- * @param {PIXI.Rectangle|PIXI.Polygon} overlapShape
- * @param {PIXI.Rectangle|PIXI.Polygon} areaShape
- * @returns {number} Value between 0 and 1.
+ * Helper to test if a drawing has a terrain that is active for this elevation.
+ * @param {Drawing} drawing       Placeable drawing to test
+ * @param {number} currElev       Elevation to test
+ * @param {number} [prevElev]     If defined, drawing must be between prevElev and currElev.
+ *   If not defined, drawing must be at currElev
+ * @returns {boolean}
  */
-function percentOverlap(overlapShape, areaShape, totalArea) {
-  if ( !overlapShape.overlaps(areaShape) ) return 0;
-  const intersection = overlapShape.intersectPolygon(areaShape.toPolygon());
-  const ixArea = intersection.area();
-  totalArea ??= areaShape.area();
-  return ixArea / totalArea;
+function hasActiveDrawingTerrain(drawing, currElev, prevElev) {
+  if ( !drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) ) return false;
+  const drawingE = getProperty(drawing.document, "flags.elevatedvision.elevation");
+  if ( typeof drawingE === "undefined" ) return true;
+
+  const drawingZ = CONFIG.GeometryLib.utils.gridUnitsToPixels(drawingE);
+  if ( typeof prevElev === "undefined" ) return currElev.almostEqual(drawingZ);
+  return drawingZ.between(prevElev, currElev);
 }
 
 /**
@@ -635,8 +794,6 @@ function griddedTerrainMovePenalty(token, currGridCoords, prevGridCoords, currEl
   }
 }
 
-// ----- NOTE: Helper methods ----- //
-
 /**
  * Calculate terrain penalty between two points.
  * Multiply this by distance to get the move distance.
@@ -652,6 +809,10 @@ function terrainMovePenalty(a, b, token) {
   if ( !terrainAPI || !token ) return 1;
   return terrainAPI.Terrain.percentMovementForTokenAlongPath(token, a, b) || 1;
 }
+
+
+// ----- NOTE: Helper methods ----- //
+
 
 /**
  * From a given origin, move horizontally the total 2d distance between A and B.
@@ -772,7 +933,7 @@ function * iterateHexGridMoves(origin, destination) {
           movementChange,
           gridCoords: next2d
         };
-        movementChange = {  NONE: 0, H: 0, V: 0, D: 0, E: 0 };
+        movementChange = { NONE: 0, H: 0, V: 0, D: 0, E: 0 };
       }
     }
     prevElevation = nextElevation;
@@ -810,7 +971,7 @@ function * iterateNonHexGridMoves(origin, destination) {
     gridCoords: prev2d
   };
 
-  movementChange = {  NONE: 0, H: 0, V: 0, D: 0, E: 0 }; // Copy; don't keep same object.
+  movementChange = { NONE: 0, H: 0, V: 0, D: 0, E: 0 }; // Copy; don't keep same object.
 
   // Use the elevation iteration to tell us when to move to the next 2d step.
   // Horizontal or diagonal elevation moves indicate next step.

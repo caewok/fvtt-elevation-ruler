@@ -1,0 +1,13 @@
+<fieldset>
+  <legend>{{ localize "elevationruler.name" }}</legend>
+
+    <div class="form-group">
+      <label for="elevationruler.movementPenalty">{{ localize "elevationruler.drawingconfig.movementPenalty.name" }}</label>
+      <div class="form-fields">
+        {{rangePicker name="flags.elevationruler.movementPenalty" value=object.flags.elevationruler.movementPenalty step=0.1 min=0.1 max=10}}
+      </div>
+      <p class="hint">{{ localize "elevationruler.drawingconfig.movementPenalty.hint" }}</p>
+    </div>
+
+  </legend>
+</fieldset>
