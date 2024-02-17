@@ -5,6 +5,7 @@ ClockwiseSweepPolygon,
 CONFIG,
 CONST,
 foundry,
+game,
 PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -15,6 +16,7 @@ import { Draw } from "../geometry/Draw.js";
 import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./algorithms.js";
 import { SCENE_GRAPH } from "./WallTracer.js";
 import { cdt2dConstrainedGraph, cdt2dToBorderTriangles } from "../delaunator/cdt2d_access_functions.js";
+import { Settings } from "../settings.js";
 
 /* Testing
 
@@ -214,6 +216,9 @@ export class Pathfinder {
   /** @type {object{BreadthFirstPathSearch}} */
   algorithm = {};
 
+  /** @type {function|undefined} */
+  #fogIsExploredFn;
+
   /**
    * Find the path between startPoint and endPoint using the chosen algorithm.
    * @param {Point} startPoint      Start point for the graph
@@ -224,11 +229,15 @@ export class Pathfinder {
     // Set token for token edge blocking.
     BorderEdge.moveToken = this.token;
 
+    // Set fog exploration testing if that setting is enabled.
+    if ( game.user.isGM || !Settings.get(Settings.KEYS.PATHFINDING.LIMIT_TOKEN_LOS) ) this.#fogIsExploredFn = undefined;
+    else this.#fogIsExploredFn = fogIsExploredFn();
+
     // Initialize the algorithm if not already.
     if ( !this.algorithm[type] ) {
       const alg = this.algorithm[type] = new this.constructor.ALGORITHMS[type]();
       const costMethod = this.constructor.COST_METHOD[type];
-      alg.getNeighbors = this[costMethod];
+      alg.getNeighbors = this[costMethod].bind(this);
       alg.heuristic = this._heuristic;
     }
 
@@ -307,12 +316,14 @@ export class Pathfinder {
       return [newNode];
 
     }
-    return pathNode.entryTriangle.getValidDestinations(pathNode.priorTriangle, this.spacer);
+
+    const destinations = pathNode.entryTriangle.getValidDestinations(pathNode.priorTriangle, this.spacer);
+    return this.#filterDestinationsbyTokenLOS(destinations);
   }
 
   /**
    * Get destinations with cost calculated for a given path node.
-    * @param {PathNode} pathObject
+   * @param {PathNode} pathObject
    * @returns {PathNode[]} Array of destination nodes
    */
   _identifyDestinationsWithCost(pathNode, goal) {
@@ -325,8 +336,27 @@ export class Pathfinder {
       newNode.fromPoint = pathNode.entryPoint;
       return [newNode];
     }
-    return pathNode.entryTriangle.getValidDestinationsWithCost(
+
+    const destinations = pathNode.entryTriangle.getValidDestinationsWithCost(
       pathNode.priorTriangle, this.spacer, pathNode.entryPoint);
+    return this.#filterDestinationsbyTokenLOS(destinations);
+  }
+
+  /**
+   * If not GM and GM has set the limit on pathfinding to token LOS, then filter destinations accordingly.
+   * @param {PathNode[]} destinations     Array of destination nodes
+   * @returns {PathNode[]} Array of destination nodes, possibly filtered.
+   */
+  #filterDestinationsbyTokenLOS(destinations) {
+    if ( game.user.isGM
+        || !Settings.get(Settings.KEYS.PATHFINDING.LIMIT_TOKEN_LOS) ) return destinations;
+
+    // Each entrypoint must be within the LOS polygon.
+    const los = this.token.vision?.los;
+    const previewLOS = this.token._preview?.vision?.los;
+    if ( !los ) return [];
+    return destinations.filter(d => los.contains(d.entryPoint.x, d.entryPoint.y)
+      || (previewLOS && previewLOS.contains(d.entryPoint.x, d.entryPoint.y)));
   }
 
   /**
@@ -593,4 +623,21 @@ function cleanNonGridPath(pathPoints) {
   }
   newPath.push(pathPoints.at(-1));
   return newPath;
+}
+
+/**
+ * Function factory to provide a means to test if a given canvas location is explored or unexplored.
+ * Dependent on the scene having a fog exploration for that user.
+ * Because fog will change over time, this should be called each time a new path is requested.
+ * @returns {function} Function that checks whether a canvas position is explored
+ *   - @param {number} x
+ *   - @param {number} y
+ *   - @returns {boolean}  True if explored, false if unexplored. If no fog, always true.
+ */
+export function fogIsExploredFn() {
+  const tex = canvas.fog.exploration?.getTexture()
+  if ( !tex ) return () => true;
+
+  const cache = CONFIG.GeometryLib.PixelCache.fromTexture(tex);
+  return (x, y) => cache.pixelAtCanvas(x, y) > 128;
 }
