@@ -54,11 +54,11 @@ Pathfinder.drawTriangles();
 
 endPoint = _token.center
 
-token = _token
+
 startPoint = _token.center;
 
 pf = new Pathfinder(token);
-
+pf = token.elevationruler.pathfinder
 
 path = pf.runPath(startPoint, endPoint, "breadth")
 pathPoints = Pathfinder.getPathPoints(path);
@@ -230,8 +230,8 @@ export class Pathfinder {
     BorderEdge.moveToken = this.token;
 
     // Set fog exploration testing if that setting is enabled.
-    if ( game.user.isGM || !Settings.get(Settings.KEYS.PATHFINDING.LIMIT_TOKEN_LOS) ) this.#fogIsExploredFn = undefined;
-    else this.#fogIsExploredFn = fogIsExploredFn();
+    if ( !game.user.isGM
+      && Settings.get(Settings.KEYS.PATHFINDING.LIMIT_TOKEN_LOS) ) this.#fogIsExploredFn = fogIsExploredFn();
 
     // Initialize the algorithm if not already.
     if ( !this.algorithm[type] ) {
@@ -246,7 +246,9 @@ export class Pathfinder {
 
     // Run the algorithm.
     const { start, end } = this._initializeStartEndNodes(startPoint, endPoint);
-    return this.algorithm[type].run(start, end);
+    const out = this.algorithm[type].run(start, end);
+    this.#fogIsExploredFn = undefined;
+    return out;
   }
 
 
@@ -314,11 +316,10 @@ export class Pathfinder {
       const newNode = {...goal};
       newNode.priorTriangle = pathNode.priorTriangle;
       return [newNode];
-
     }
 
     const destinations = pathNode.entryTriangle.getValidDestinations(pathNode.priorTriangle, this.spacer);
-    return this.#filterDestinationsbyTokenLOS(destinations);
+    return this.#filterDestinationsbyExploration(destinations);
   }
 
   /**
@@ -339,7 +340,7 @@ export class Pathfinder {
 
     const destinations = pathNode.entryTriangle.getValidDestinationsWithCost(
       pathNode.priorTriangle, this.spacer, pathNode.entryPoint);
-    return this.#filterDestinationsbyTokenLOS(destinations);
+    return this.#filterDestinationsbyExploration(destinations);
   }
 
   /**
@@ -347,16 +348,12 @@ export class Pathfinder {
    * @param {PathNode[]} destinations     Array of destination nodes
    * @returns {PathNode[]} Array of destination nodes, possibly filtered.
    */
-  #filterDestinationsbyTokenLOS(destinations) {
-    if ( game.user.isGM
-        || !Settings.get(Settings.KEYS.PATHFINDING.LIMIT_TOKEN_LOS) ) return destinations;
+  #filterDestinationsbyExploration(destinations) {
+    const fn = this.#fogIsExploredFn;
+    if ( !fn ) return destinations;
 
-    // Each entrypoint must be within the LOS polygon.
-    const los = this.token.vision?.los;
-    const previewLOS = this.token._preview?.vision?.los;
-    if ( !los ) return [];
-    return destinations.filter(d => los.contains(d.entryPoint.x, d.entryPoint.y)
-      || (previewLOS && previewLOS.contains(d.entryPoint.x, d.entryPoint.y)));
+    // Each entrypoint must be an explored point.
+    return destinations.filter(d => fn(d.entryPoint.x, d.entryPoint.y));
   }
 
   /**
@@ -635,9 +632,11 @@ function cleanNonGridPath(pathPoints) {
  *   - @returns {boolean}  True if explored, false if unexplored. If no fog, always true.
  */
 export function fogIsExploredFn() {
-  const tex = canvas.fog.exploration?.getTexture()
-  if ( !tex ) return () => true;
+  // log("Checking for new fog texture");
+  const tex = canvas.fog.exploration?.getTexture();
+  if ( !tex || !tex.valid ) return undefined;
 
-  const cache = CONFIG.GeometryLib.PixelCache.fromTexture(tex);
+  const { width, height } = canvas.effects.visibility.textureConfiguration;
+  const cache = CONFIG.GeometryLib.PixelCache.fromTexture(tex, { width, height });
   return (x, y) => cache.pixelAtCanvas(x, y) > 128;
 }
