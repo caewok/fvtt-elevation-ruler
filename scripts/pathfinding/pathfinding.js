@@ -181,6 +181,9 @@ export class Pathfinder {
   /** @type {Token} token */
   token;
 
+  /** @type {number} */
+  startElevation = 0;
+
   /**
    * Optional token to associate with this path.
    * Used for path spacing near obstacles.
@@ -245,6 +248,7 @@ export class Pathfinder {
     if ( this.constructor.dirty ) this.constructor.initialize();
 
     // Run the algorithm.
+    this.startElevation = startPoint.z || 0;
     const { start, end } = this._initializeStartEndNodes(startPoint, endPoint);
     const out = this.algorithm[type].run(start, end);
     this.#fogIsExploredFn = undefined;
@@ -318,7 +322,7 @@ export class Pathfinder {
       return [newNode];
     }
 
-    const destinations = pathNode.entryTriangle.getValidDestinations(pathNode.priorTriangle, this.spacer);
+    const destinations = pathNode.entryTriangle.getValidDestinations(pathNode.priorTriangle, this.startElevation, this.spacer);
     return this.#filterDestinationsbyExploration(destinations);
   }
 
@@ -339,7 +343,7 @@ export class Pathfinder {
     }
 
     const destinations = pathNode.entryTriangle.getValidDestinationsWithCost(
-      pathNode.priorTriangle, this.spacer, pathNode.entryPoint);
+      pathNode.priorTriangle, this.startElevation, this.spacer, pathNode.entryPoint);
     return this.#filterDestinationsbyExploration(destinations);
   }
 
