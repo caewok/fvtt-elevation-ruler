@@ -51,6 +51,9 @@
     "elevationruler.settings.pathfinding_tokens_block_hostile": "Hostile only",
     "elevationruler.settings.pathfinding_tokens_block_all": "All",
 
+    "elevationruler.settings.pathfinding_limit_token_los.name": "Limit Pathfinding to Explored Areas",
+    "elevationruler.settings.pathfinding_limit_token_los.hint": "When pathfinding, limit the range of the pathfinding to explored areas unless the user is the GM",
+
     "elevationruler.settings.grid-terrain-algorithm.name": "Terrain Grid Measurement",
     "elevationruler.settings.grid-terrain-algorithm.hint": "When on a grid, how to account for movement penalties or bonuses from terrain and tokens? Center: apply if the terrain/token overlaps the grid center; Percent Area: apply if the terrain/token covers at least this much of the grid square/hex; Euclidean: prorate based on percent of line segment within the terrain/token between this grid square/hex and the previous.",
     "elevationruler.settings.grid-terrain-choice-center-point": "Center Point",

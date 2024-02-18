@@ -332,21 +332,22 @@ export class WallTracerEdge extends GraphEdge {
    * @param {Token} [moveToken]     Optional token doing the move if token edges should be checked.
    * @returns {boolean}
    */
-  edgeBlocks(origin, moveToken, tokenBlockType) {
+  edgeBlocks(origin, moveToken, tokenBlockType, elevation = 0) {
     return this.objects.some(obj =>
-      (obj instanceof Wall) ? this.constructor.wallBlocks(obj, origin)
-        : (obj instanceof Token) ? this.constructor.tokenEdgeBlocks(obj, moveToken, tokenBlockType)
+      (obj instanceof Wall) ? this.constructor.wallBlocks(obj, origin, elevation)
+        : (obj instanceof Token) ? this.constructor.tokenEdgeBlocks(obj, moveToken, tokenBlockType, elevation)
           : false);
   }
 
   /**
    * Does this edge wall block from an origin somewhere?
    * Tested "live" and not cached so door or wall orientation changes need not be tracked.
-   * @param {Wall} wall       Wall to test
-   * @param {Point} origin    Measure wall blocking from perspective of this origin point.
+   * @param {Wall} wall         Wall to test
+   * @param {Point} origin      Measure wall blocking from perspective of this origin point.
+   * @param {number} [elevation=0]  Elevation of the point or origin to test.
    * @returns {boolean}
    */
-  static wallBlocks(wall, origin) {
+  static wallBlocks(wall, origin, elevation = 0) {
     if ( !wall.document.move || wall.isOpen ) return false;
 
     // Ignore one-directional walls which are facing away from the center
@@ -361,6 +362,9 @@ export class WallTracerEdge extends GraphEdge {
     if ( wall.document.dir
       && side === wall.document.dir ) return false;
 
+    // Test for wall height.
+    if ( !elevation.between(wall.bottomZ, wall.topZ) ) return false;
+
     return true;
   }
 
@@ -369,10 +373,13 @@ export class WallTracerEdge extends GraphEdge {
    * @param {Token} token             Token whose edges will be tested
    * @param {Token} moveToken         Token doing the move
    * @param {string} tokenBlockType   What test to use for comparing token dispositions for blocking
+   * @param {number} [elevation=0]  Elevation of the point or origin to test.
    * @returns {boolean}
    */
-  static tokenEdgeBlocks(token, moveToken, tokenBlockType) {
+  static tokenEdgeBlocks(token, moveToken, tokenBlockType, elevation = 0) {
     if ( !moveToken || moveToken === token ) return false;
+
+    if ( !elevation.between(token.topZ, token.bottomZ) ) return false;
 
     tokenBlockType ??= Settings._tokenBlockType();
     const D = CONST.TOKEN_DISPOSITIONS;
@@ -613,7 +620,7 @@ export class WallTracer extends Graph {
         .forEach(obj => {
           edge.objects.delete(obj);
           this._removeEdgeFromObjectSet(id, edge);
-      });
+        });
       // Works but not clear why edges sometimes exist but are not in the edge set.
       // Removing the test for if the edge is in the edges set results in occasional warnings.
       if ( !edge.objects.size && this.edges.has(edge.key) ) this.deleteEdge(edge);

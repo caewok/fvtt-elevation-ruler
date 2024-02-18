@@ -88,20 +88,22 @@ export class BorderEdge {
    * Blocked walls are invalid.
    * Typically returns 2 corner destinations plus the median destination.
    * If the edge is less than 2 * spacer, no destinations are valid.
-   * @param {Point} center              Test if wall blocks from perspective of this origin point.
-   * @param {number} [spacer]           How much away from the corner to set the corner destinations.
+   * @param {Point} center              Test if wall blocks from perspective of this origin point
+   * @param {number} elevation          Assumed elevation of the move, for testing blocking walls, tokens
+   * @param {number} [spacer]           How much away from the corner to set the corner destinations
    *   If the edge is less than 2 * spacer, it will be deemed invalid.
    *   Corner destinations are skipped if not more than spacer away from median.
    * @returns {PIXI.Point[]}
    */
-  getValidDestinations(origin, spacer) {
+  getValidDestinations(origin, elevation, spacer) {
+    elevation ??= 0;
     spacer ??= canvas.grid.size * 0.5;
     const length = this.length;
     const destinations = [];
 
     // No destination if edge is smaller than 2x spacer unless it is a door.
     // Cheat a little on the spacing so tokens exactly the right size will fit.
-    if ( this.edgeBlocks(origin)
+    if ( this.edgeBlocks(origin, elevation)
       || (!this.isOpenDoor && (length < (spacer * 1.9))) ) return destinations;
     destinations.push(this.median);
 
@@ -135,11 +137,11 @@ export class BorderEdge {
    * @param {Point} origin    Measure wall blocking from perspective of this origin point.
    * @returns {boolean}
    */
-  edgeBlocks(origin) {
+  edgeBlocks(origin, elevation = 0) {
     const { moveToken, tokenBlockType } = this.constructor;
     return this.objects.some(obj => {
-      if ( obj instanceof Wall ) return WallTracerEdge.wallBlocks(obj, origin);
-      if ( obj instanceof Token ) return WallTracerEdge.tokenEdgeBlocks(obj, moveToken, tokenBlockType);
+      if ( obj instanceof Wall ) return WallTracerEdge.wallBlocks(obj, origin, elevation);
+      if ( obj instanceof Token ) return WallTracerEdge.tokenEdgeBlocks(obj, moveToken, tokenBlockType, elevation);
       return false;
     });
   }
@@ -301,6 +303,7 @@ export class BorderTriangle {
    * Corner destination skipped if median --> corner < spacer
    *
    * @param {BorderTriangle|null} priorTriangle       Triangle that preceded this one along the path
+   * @param {number} elevation                        Assumed elevation of the move, for testing edge walls, tokens.
    * @param {number} spacer                           How far from the corner to set the corner destinations
    * @returns {PathNode} Each element has properties describing the destination, conforming to pathfinding
    *   - {number} key
@@ -308,14 +311,14 @@ export class BorderTriangle {
    *   - {BorderTriangle} entryTriangle
    *   - {BorderTriangle} priorTriangle
    */
-  getValidDestinations(priorTriangle, spacer) {
+  getValidDestinations(priorTriangle, elevation, spacer) {
     spacer ??= canvas.grid.size * 0.5;
     const destinations = [];
     const center = this.center;
     for ( const edge of Object.values(this.edges) ) {
       const entryTriangle = edge.otherTriangle(this); // Neighbor
       if ( !entryTriangle || (priorTriangle && priorTriangle === entryTriangle) ) continue;
-      const pts = edge.getValidDestinations(center, spacer);
+      const pts = edge.getValidDestinations(center, elevation, spacer);
       pts.forEach(entryPoint => {
         destinations.push({
           entryPoint,
@@ -331,11 +334,12 @@ export class BorderTriangle {
   /**
    * Retrieve destinations with cost calculation added.
    * @param {BorderTriangle|null} priorTriangle     Triangle that preceded this one along the path
+   * @param {number} elevation                        Assumed elevation of the move, for testing edge walls, tokens.
    * @param {number} spacer                         How far from the corner to set the corner destinations
    * @param {Point} fromPoint                       Point to measure from, for cost
    */
-  getValidDestinationsWithCost(priorTriangle, spacer, fromPoint) {
-    const destinations = this.getValidDestinations(priorTriangle, spacer);
+  getValidDestinationsWithCost(priorTriangle, elevation, spacer, fromPoint) {
+    const destinations = this.getValidDestinations(priorTriangle, elevation, spacer);
     destinations.forEach(d => {
       d.cost = this._calculateMovementCost(fromPoint, d.entryPoint);
       d.fromPoint = fromPoint;
