@@ -1,3 +1,10 @@
+# 0.8.7
+
+## New Features
+GM can now set whether pathfinding should be limited for users to areas within the fog of war. FYI, testing fog of war in Foundry for canvas positions is a performance hit.
+
+
+
 # 0.8.6
 Fix for pathfinding slipping through small cracks between walls. Unless the wall is a door, the path should be limited to half the token min(width, height).
 
