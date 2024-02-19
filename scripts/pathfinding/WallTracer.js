@@ -658,13 +658,6 @@ export class WallTracer extends Graph {
       const collisions = edge.findEdgeCollisions(edgeA, edgeB);
       if ( !collisions.length ) continue;
       collisions.forEach(c => c.edge = edge);
-
-      // If two collisions, there is overlap.
-      // Identify the overlapping objects.
-      if ( collisions.length === 2 ) {
-        collisions[0].overlap = true;
-        collisions[1].overlap = true;
-      }
       edgeCollisions.push(...collisions);
     }
     return groupBy(edgeCollisions, this.constructor._keyGetter);
@@ -887,17 +880,18 @@ function segmentOverlap(a, b, c, d) {
 
 
   // Overlap: c|d --- aIx|bIx --- aIx|bIx --- c|d
+  const overlap = true;
   if ( aIx && bIx ) return [
-    { t0: 0, t1: aIx.t0, pt: PIXI.Point.fromObject(aIx) },
-    { t0: 1, t1: bIx.t0, pt: PIXI.Point.fromObject(bIx) }
+    { t0: 0, t1: aIx.t0, pt: PIXI.Point.fromObject(aIx), overlap },
+    { t0: 1, t1: bIx.t0, pt: PIXI.Point.fromObject(bIx), overlap }
   ];
 
   // Overlap: a|b --- cIx|dIx --- cIx|dIx --- a|b
   const cIx = ix2.t0.between(0, 1) ? ix2 : null;
   const dIx = ix3.t0.between(0, 1) ? ix3 : null;
   if ( cIx && dIx ) return [
-    { t0: cIx.t0, t1: 0, pt: PIXI.Point.fromObject(cIx) },
-    { t0: dIx.t0, t1: 1, pt: PIXI.Point.fromObject(dIx) }
+    { t0: cIx.t0, t1: 0, pt: PIXI.Point.fromObject(cIx), overlap },
+    { t0: dIx.t0, t1: 1, pt: PIXI.Point.fromObject(dIx), overlap }
   ];
 
   // Overlap: a|b --- cIx|dIx --- aIx|bIx --- c|d
@@ -905,8 +899,8 @@ function segmentOverlap(a, b, c, d) {
   const cdIx = cIx ?? dIx;
   if ( abIx && cdIx ) {
     return [
-      { t0: cdIx.t0, t1: cIx ? 0 : 1, pt: PIXI.Point.fromObject(cdIx) },
-      { t0: aIx ? 0 : 1, t1: abIx.t0, pt: PIXI.Point.fromObject(abIx) }
+      { t0: cdIx.t0, t1: cIx ? 0 : 1, pt: PIXI.Point.fromObject(cdIx), overlap },
+      { t0: aIx ? 0 : 1, t1: abIx.t0, pt: PIXI.Point.fromObject(abIx), overlap }
     ];
   }
 
