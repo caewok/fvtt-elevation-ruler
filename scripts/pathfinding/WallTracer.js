@@ -514,8 +514,19 @@ export class WallTracer extends Graph {
     if ( !collisions.size ) {
       const edge = WallTracerEdge.fromObjects(edgeA, edgeB, [object]);
       this.addEdge(edge);
+      return;
     }
+    this.#processCollisions(collisions, edgeA, edgeB, object);
+  }
 
+  /**
+   * Process collisions and split edges at collision points.
+   * @param {SegmentIntersection[]} collisions
+   * @param {PIXI.Point} edgeA                  First edge endpoint
+   * @param {PIXI.Point} edgeB                  Other edge endpoint
+   * @param {Wall|Token} object
+   */
+  #processCollisions(collisions, edgeA, edgeB, object) {
     // Sort the keys so we can progress from A --> B along the edge.
     const tArr = [...collisions.keys()];
     tArr.sort((a, b) => a - b);
@@ -525,7 +536,7 @@ export class WallTracer extends Graph {
     // - update the collision links for the colliding edge and this new edge
     if ( !collisions.has(1) ) tArr.push(1);
     let priorT = 0;
-    const overlaps = new Set();
+    const overlapFn = this.#processOverlapCollisionFn(object);
     for ( const t of tArr ) {
       // Check each collision point.
       // For endpoint collisions, nothing will be added.
@@ -538,21 +549,10 @@ export class WallTracer extends Graph {
       for ( const cObj of cObjs ) {
         const splitEdges = cObj.edge.splitAtT(cObj.t1); // If the split is at the endpoint, will be null.
         if ( cObj.overlap ) {
-          if ( overlaps.has(cObj.edge) ) { // Ending an overlap.
-            overlaps.delete(cObj.edge);
-            if ( splitEdges ) splitEdges[0].objects.add(object); // Share the edge with this object.
-            else {
-              cObj.edge.objects.add(object);
-
-              // Make sure the object's edges include this cObj.edge.
-              this._addEdgeToObjectSet(object.id, cObj.edge);
-            }
-            addEdge = false; // Only want one edge here: the existing.
-          } else {  // Starting a new overlap.
-            overlaps.add(cObj.edge);
-            if ( splitEdges ) splitEdges[1].objects.add(object); // Share the edge with this object.
-          }
+          const overlapRes = overlapFn(cObj.edge, splitEdges);
+          addEdge &&= overlapRes;
         }
+
         if ( splitEdges ) {
           // Remove the existing edge and add the new edges.
           // With overlaps, it is possible the edge was already removed.
@@ -570,6 +570,40 @@ export class WallTracer extends Graph {
       // Cycle to next.
       priorT = t;
     }
+  }
+
+  /**
+   * Process a collision that has an overlapping edge.
+   * @param {Wall|Token} object                   Object that the edge represents
+   * @returns {function}
+   *   - @param {WallTracerEdge} overlappingEdge      The overlapping edge to process
+   *   - @param {WallTracerEdge[2]|null} splitEdges     Two edges split at the current t position
+   *   - @returns {boolean} True if an edge should be added.
+   */
+  #processOverlapCollisionFn(object) {
+    const currOverlappingEdges = new Set();
+    return (overlappingEdge, splitEdges) => {
+      // Order the splits along t0 to get the correct overlap.
+      if ( splitEdges && splitEdges[0].t0 > splitEdges[1].t0 ) splitEdges.reverse();
+
+      // Overlap is ending.
+      if ( currOverlappingEdges.has(overlappingEdge) ) {
+        currOverlappingEdges.delete(overlappingEdge);
+        if ( splitEdges ) splitEdges[0].objects.add(object);
+        else {
+          overlappingEdge.objects.add(object);
+
+          // Make sure the object's edges include this cObj.edge.
+          this._addEdgeToObjectSet(object.id, overlappingEdge);
+        }
+        return false; // Only want one edge here: the existing.
+      }
+
+      // Start a new overlap.
+      currOverlappingEdges.add(overlappingEdge);
+      if ( splitEdges ) splitEdges[1].objects.add(object); // Share the edge with this object.
+      return true;
+    };
   }
 
   /**
@@ -779,9 +813,10 @@ wt.tokenEdges.forEach(s => s.forEach(e => e.draw({color: Draw.COLORS.orange})))
 /**
  * Locate collisions between two segments. Uses almostEqual to get near collisions.
  * 1. Shared endpoints.
- * 2. Endpoint of one segment within the other segment.
+ * 2. Endpoint of one segment within the other segment. Ignored.
  * 3. Two segments intersect.
  * 4. Collinear segments overlap: return start and end of the intersections.
+ * To add back in endpoint intersection, if `segmentCollisions` is [], then call  `endpointIntersection`.
  * @param {PIXI.Point} a        Endpoint on a|b segment
  * @param {PIXI.Point} b        Endpoint on a|b segment
  * @param {PIXI.Point} c        Endpoint on c|d segment
@@ -793,9 +828,10 @@ function segmentCollisions(a, b, c, d) {
   const overlaps = segmentOverlap(a, b, c, d); // Returns null or SegmentIntersection[2]
   if ( overlaps && !overlaps[0].pt.almostEqual(overlaps[1].pt) ) return overlaps;
 
-  // If endpoints are shared, return the shared point.
+  // If endpoints are shared, return empty array.
   // Otherwise, return the segment intersection or empty array.
-  return endpointIntersection(a, b, c, d) ?? segmentIntersection(a, b, c, d) ?? [];
+  if ( endpointIntersection(a, b, c, d) ) return [];
+  return segmentIntersection(a, b, c, d) ?? [];
 }
 
 /**
