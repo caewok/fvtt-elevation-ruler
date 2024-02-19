@@ -291,12 +291,7 @@ export class WallTracerEdge extends GraphEdge {
   findEdgeCollisions(A, B) {
     const C = this.A.point;
     const D = this.B.point;
-    const collisions = endpointIntersection(A, B, C, D)
-      ?? segmentIntersection(A, B, C, D)
-      ?? segmentOverlap(A, B, C, D);
-    if ( !collisions ) return [];
-    if ( !(collisions instanceof Array) ) return [collisions];
-    return collisions;
+    return segmentCollisions(A, B, C, D) ?? [];
   }
 
   /**
@@ -787,37 +782,42 @@ wt.tokenEdges.forEach(s => s.forEach(e => e.draw({color: Draw.COLORS.orange})))
  */
 
 /**
- * Determine if two segments intersect at an endpoint and return t0, t1 based on that intersection.
+ * Locate collisions between two segments. Uses almostEqual to get near collisions.
+ * 1. Shared endpoints.
+ * 2. Endpoint of one segment within the other segment.
+ * 3. Two segments intersect.
+ * 4. Collinear segments overlap: return start and end of the intersections.
  * @param {PIXI.Point} a        Endpoint on a|b segment
  * @param {PIXI.Point} b        Endpoint on a|b segment
  * @param {PIXI.Point} c        Endpoint on c|d segment
  * @param {PIXI.Point} d        Endpoint on c|d segment
- * @returns {SegmentIntersection|null}
+ * @returns {SegmentIntersection[]|null}
+ */
+function segmentCollisions(a, b, c, d) {
+  // Check for true overlap. If shared endpoints, will be handled later.
+  const overlaps = segmentOverlap(a, b, c, d); // Returns null or SegmentIntersection[2]
+  if ( overlaps && !overlaps[0].pt.almostEqual(overlaps[1].pt) ) return overlaps;
+
+  // If endpoints are shared, return the shared point.
+  // Otherwise, return the segment intersection or empty array.
+  return endpointIntersection(a, b, c, d) ?? segmentIntersection(a, b, c, d) ?? [];
+}
+
+/**
+ * Determine if two segments intersect at an endpoint and return t0, t1 based on that intersection.
+ * Does not consider segment collinearity, and only picks the first shared endpoint.
+ * (If segments are collinear, possible they are the same and share both endpoints.)
+ * @param {PIXI.Point} a        Endpoint on a|b segment
+ * @param {PIXI.Point} b        Endpoint on a|b segment
+ * @param {PIXI.Point} c        Endpoint on c|d segment
+ * @param {PIXI.Point} d        Endpoint on c|d segment
+ * @returns {SegmentIntersection[1]|null}
  */
 function endpointIntersection(a, b, c, d) {
-  // Avoid overlaps
-  // Distinguish a---b|c---d from a---c---b|d. Latter is an overlap.
-  // Okay:
-  // a---b|c---d
-  // b---a|c---d
-  // b---a|d---c
-  // a---b|d---c
-  // Overlap:
-  // a---c---b|d
-  // a---d---b|c
-  // b---c---a|d
-  // b---d---a|c
-  const orient2d = foundry.utils.orient2dFast;
-  if ( orient2d(a, b, c).almostEqual(0) && orient2d(a, b, d).almostEqual(0) ) {
-    const dSquared = PIXI.Point.distanceSquaredBetween;
-    const dAB = dSquared(a, b);
-    if ( dAB > dSquared(a, c) || dAB > dSquared(a, d) ) return null;
-  }
-
-  if ( a.key === c.key || c.almostEqual(a) ) return { t0: 0, t1: 0, pt: a };
-  if ( a.key === d.key || d.almostEqual(a) ) return { t0: 0, t1: 1, pt: a };
-  if ( b.key === c.key || c.almostEqual(b) ) return { t0: 1, t1: 0, pt: b };
-  if ( b.key === d.key || d.almostEqual(b) ) return { t0: 1, t1: 1, pt: b };
+  if ( a.key === c.key || c.almostEqual(a) ) return [{ t0: 0, t1: 0, pt: a }];
+  if ( a.key === d.key || d.almostEqual(a) ) return [{ t0: 0, t1: 1, pt: a }];
+  if ( b.key === c.key || c.almostEqual(b) ) return [{ t0: 1, t1: 0, pt: b }];
+  if ( b.key === d.key || d.almostEqual(b) ) return [{ t0: 1, t1: 1, pt: b }];
   return null;
 }
 
@@ -830,18 +830,18 @@ function endpointIntersection(a, b, c, d) {
  * @param {PIXI.Point} b        Endpoint on a|b segment
  * @param {PIXI.Point} c        Endpoint on c|d segment
  * @param {PIXI.Point} d        Endpoint on c|d segment
- * @returns {SegmentIntersection|null}
+ * @returns {SegmentIntersection[1]|null}
  */
 function segmentIntersection(a, b, c, d) {
   if ( !foundry.utils.lineSegmentIntersects(a, b, c, d) ) return null;
   const ix = CONFIG.GeometryLib.utils.lineLineIntersection(a, b, c, d, { t1: true });
   ix.pt = PIXI.Point.fromObject(ix);
-  return ix;
+  return [ix];
 }
 
 /**
  * Determine if two segments overlap and return the two points at which the segments
- * begin their overlap.
+ * begin their overlap. If overlap is an endpoint, may return that endpoint twice.
  * @param {PIXI.Point} a        Endpoint on a|b segment
  * @param {PIXI.Point} b        Endpoint on a|b segment
  * @param {PIXI.Point} c        Endpoint on c|d segment
@@ -850,6 +850,18 @@ function segmentIntersection(a, b, c, d) {
  *  The 2 intersections will be sorted so that [0] --> [1] is the overlap.
  */
 function segmentOverlap(a, b, c, d) {
+  // Distinguish a---b|c---d from a---c---b|d. Latter is an overlap.
+  // Okay:
+  // a---b|c---d
+  // b---a|c---d
+  // b---a|d---c
+  // a---b|d---c
+  // Overlap:
+  // a---c---b|d
+  // a---d---b|c
+  // b---c---a|d
+  // b---d---a|c
+
   // First, ensure the segments are overlapping.
   const orient2d = foundry.utils.orient2dFast;
   if ( !orient2d(a, b, c).almostEqual(0) || !orient2d(a, b, d).almostEqual(0) ) return null;
