@@ -549,6 +549,7 @@ export class WallTracer extends Graph {
       for ( const cObj of cObjs ) {
         const splitEdges = cObj.edge.splitAtT(cObj.t1); // If the split is at the endpoint, will be null.
         if ( cObj.overlap ) {
+          if ( splitEdges && cObj.t0 ) splitEdges.reverse();
           const overlapRes = overlapFn(cObj.edge, splitEdges);
           addEdge &&= overlapRes;
         }
@@ -583,13 +584,13 @@ export class WallTracer extends Graph {
   #processOverlapCollisionFn(object) {
     const currOverlappingEdges = new Set();
     return (overlappingEdge, splitEdges) => {
-      // Order the splits along t0 to get the correct overlap.
-      if ( splitEdges && splitEdges[0].t0 > splitEdges[1].t0 ) splitEdges.reverse();
-
       // Overlap is ending.
       if ( currOverlappingEdges.has(overlappingEdge) ) {
         currOverlappingEdges.delete(overlappingEdge);
-        if ( splitEdges ) splitEdges[0].objects.add(object);
+        if ( splitEdges ) {
+          splitEdges[0].objects.add(object);
+          splitEdges[1].objects.delete(object);
+        }
         else {
           overlappingEdge.objects.add(object);
 
