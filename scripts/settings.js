@@ -26,7 +26,8 @@ const SETTINGS = {
       NO: "pathfinding_tokens_block_no",
       HOSTILE: "pathfinding_tokens_block_hostile",
       ALL: "pathfinding_tokens_block_all"
-    }
+    },
+    LIMIT_TOKEN_LOS: "pathfinding_limit_token_los"
   },
 
   USE_LEVELS_LABEL: "levels-use-floor-label",
@@ -112,6 +113,8 @@ export class Settings extends ModuleSettingsAbstract {
       requiresReload: false
     });
 
+    // ----- NOTE: Pathfinding ----- //
+
     register(KEYS.CONTROLS.PATHFINDING, {
       scope: "user",
       config: false,
@@ -134,6 +137,16 @@ export class Settings extends ModuleSettingsAbstract {
         [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL}`)
       },
       onChange: value => this.toggleTokenBlocksPathfinding(value)
+    });
+
+    register(KEYS.PATHFINDING.LIMIT_TOKEN_LOS, {
+      name: localize(`${KEYS.PATHFINDING.LIMIT_TOKEN_LOS}.name`),
+      hint: localize(`${KEYS.PATHFINDING.LIMIT_TOKEN_LOS}.hint`),
+      scope: "world",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
     });
 
     // ----- NOTE: Token ruler ----- //

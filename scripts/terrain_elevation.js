@@ -91,9 +91,9 @@ export function terrainElevationAtLocation(location, { startingElevation, moveme
 
   // If certain modules are active, use them to calculate elevation.
   let elevation = 0;
-  if ( MODULES_ACTIVE.ELEVATED_VISION ) elevation = EVElevationAtPoint(location, movementToken, startingElevation);
-  else if ( MODULES_ACTIVE.LEVELS ) elevation = LevelsElevationAtPoint(location, { startingElevation });
-  if ( !isFinite(elevation) ) return elevation;
+  if ( MODULES_ACTIVE.ELEVATED_VISION ) elevation = EVElevationAtPoint(location, startingElevation, movementToken, );
+  else if ( MODULES_ACTIVE.LEVELS ) elevation = LevelsElevationAtPoint(location, startingElevation);
+  if ( isFinite(elevation) ) return elevation;
 
   // Default is the scene elevation.
   return 0;
@@ -152,20 +152,21 @@ function preferTokenElevation() {
 // ----- NOTE: ELEVATED VISION ELEVATION ----- //
 /**
  * Measure the terrain elevation at a given point using Elevated Vision.
- * @param {Point} {x,y}    Point to measure, in {x, y} format
+ * @param {Point} {x,y}         Point to measure, in {x, y} format
+ * @param {number} elevation    Elevation from which to measure, in grid units.
  * @returns {Number|undefined} Point elevation or undefined if elevated vision layer is inactive
  */
-function EVElevationAtPoint(location, measuringToken, startingElevation = 0) {
-  const EVCalc = measuringToken
-    ? new canvas.elevation.TokenElevationCalculator(measuringToken)
-    : new canvas.elevation.CoordinateElevationCalculator(location);
-
-  // Location may or may not be correct, depending on above.
-  // Use positive infinity for elevation so that all tiles can be found
-  // MAX_SAFE_INTEGER needed b/c a finite elevation is required.
-  EVCalc.location = location;
-  EVCalc.elevation = isFinite(startingElevation) ? startingElevation : Number.MAX_SAFE_INTEGER;
-  if ( !measuringToken ) {
+function EVElevationAtPoint(location, elevation, measuringToken) {
+  let EVCalc;
+  if ( measuringToken) {
+    elevation ??= measuringToken.elevationE;
+    EVCalc = new canvas.elevation.TokenElevationCalculator(measuringToken,
+      { location, elevation, overrideTokenPosition: true });
+  } else {
+    elevation = isFinite(elevation) ? elevation : Number.MAX_SAFE_INTEGER;
+    const location3d = Point3d.fromObject(location);
+    location3d.z = CONFIG.GeometryLib.utils.gridUnitsToPixels(elevation ?? 0);
+    EVCalc = new canvas.elevation.CoordinateElevationCalculator(location3d);
     EVCalc.options.tileStep = Number.POSITIVE_INFINITY;
     EVCalc.options.terrainStep = Number.POSITIVE_INFINITY;
   }
@@ -189,7 +190,7 @@ function EVElevationAtPoint(location, measuringToken, startingElevation = 0) {
  * @param {PIXI.Point} p    Point to measure, in {x, y} format.
  * @return {Number|undefined} Levels elevation or undefined if levels is inactive or no levels found.
  */
-export function LevelsElevationAtPoint(p, { startingElevation = 0 } = {}) {
+export function LevelsElevationAtPoint(p, startingElevation = 0) {
   let tiles = [...levelsTilesAtPoint(p)];
   if ( !tiles.length ) return undefined;
 
