@@ -494,7 +494,12 @@ export class WallTracer extends Graph {
    */
   _removeEdgeFromObjectSet(id, edge) {
     const edgeSet = this.objectEdges.get(id);
-    if ( edgeSet ) edgeSet.delete(edge);
+    //if ( edgeSet ) edgeSet.delete(edge);
+    if ( !edgeSet ) {
+      console.debug("_removeEdgeFromObjectSet|edgeSet undefined");
+      return;
+    }
+    edgeSet.delete(edge);
   }
 
   /**
@@ -658,6 +663,13 @@ export class WallTracer extends Graph {
       if ( !edge.objects.size && this.edges.has(edge.key) ) this.deleteEdge(edge);
     }
     this.objectEdges.delete(id);
+
+    // For each remaining object in the object set, remove it temporarily and re-add it.
+    // This will remove unnecessary vertices and recombine edges.
+    const remainingObjects = edgesArr.reduce((acc, curr) => acc = acc.union(curr.objects), new Set());
+    if ( !remainingObjects.size ) return;
+    remainingObjects.forEach(obj => obj instanceof Wall ? this.removeWall(obj) : this.removeToken(obj));
+    remainingObjects.forEach(obj => obj instanceof Wall ? this.addWall(obj) : this.addToken(obj));
   }
 
   /**
