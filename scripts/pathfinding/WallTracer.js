@@ -454,6 +454,8 @@ export class WallTracer extends Graph {
    * @inherited
    */
   addEdge(edge) {
+    if ( this.edges.has(edge.key) ) return this.edges.get(edge.key);
+
     edge = super.addEdge(edge);
     this.edgesQuadtree.insert({ r: edge.bounds, t: edge });
 
@@ -593,8 +595,8 @@ export class WallTracer extends Graph {
     if ( this.edges.has(wallId) ) return;
 
     // Construct a new wall edge set.
-    this.wallIds.add(wallId);
     this.addObjectEdge(PIXI.Point.fromObject(wall.A), PIXI.Point.fromObject(wall.B), wall);
+    this.wallIds.add(wallId);
   }
 
   /**
