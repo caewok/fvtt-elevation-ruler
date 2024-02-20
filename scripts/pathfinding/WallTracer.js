@@ -1,8 +1,6 @@
 /* globals
 CanvasQuadtree,
-CONFIG,
 CONST,
-foundry,
 PIXI,
 Token,
 Wall
@@ -17,6 +15,7 @@ import { groupBy, segmentBounds } from "../util.js";
 import { Draw } from "../geometry/Draw.js";
 import { Graph, GraphVertex, GraphEdge } from "../geometry/Graph.js";
 import { Settings } from "../settings.js";
+import { doSegmentsOverlap, IX_TYPES, segmentCollision } from "../geometry/util.js";
 
 /* WallTracerVertex
 
@@ -737,62 +736,6 @@ export class WallTracer extends Graph {
   }
 }
 
-/**
- * Do two segments overlap?
- * Overlap means they intersect or they are collinear and overlap
- * @param {PIXI.Point} a   Endpoint of segment A|B
- * @param {PIXI.Point} b   Endpoint of segment A|B
- * @param {PIXI.Point} c   Endpoint of segment C|D
- * @param {PIXI.Point} d   Endpoint of segment C|D
- * @returns {boolean}
- */
-function doSegmentsOverlap(a, b, c, d) {
-  if ( foundry.utils.lineSegmentIntersects(a, b, c, d) ) return true;
-
-  // If collinear, B is within A|B or D is within A|B
-  const pts = findOverlappingPoints(a, b, c, d);
-  return pts.length;
-}
-
-/**
- * Find the points of overlap between two segments A|B and C|D.
- * @param {PIXI.Point} a   Endpoint of segment A|B
- * @param {PIXI.Point} b   Endpoint of segment A|B
- * @param {PIXI.Point} c   Endpoint of segment C|D
- * @param {PIXI.Point} d   Endpoint of segment C|D
- * @returns {PIXI.Point[]} Array with 0, 1, or 2 points.
- *   The points returned will be a, b, c, and/or d, whichever are contained by the others.
- *   No points are returned if A|B and C|D are not collinear, or if they do not overlap.
- *   A single point is returned if a single endpoint is shared.
- */
-function findOverlappingPoints(a, b, c, d) {
-  if ( !foundry.utils.orient2dFast(a, b, c).almostEqual(0)
-    || !foundry.utils.orient2dFast(a, b, d).almostEqual(0) ) return [];
-
-  // B is within A|B or D is within A|B
-  const abx = Math.minMax(a.x, b.x);
-  const aby = Math.minMax(a.y, b.y);
-  const cdx = Math.minMax(c.x, d.x);
-  const cdy = Math.minMax(c.y, d.y);
-
-  const p0 = new PIXI.Point(
-    Math.max(abx.min, cdx.min),
-    Math.max(aby.min, cdy.min)
-  );
-
-  const p1 = new PIXI.Point(
-    Math.min(abx.max, cdx.max),
-    Math.min(aby.max, cdy.max)
-  );
-
-  const xEqual = p0.x.almostEqual(p1.x);
-  const yEqual = p1.y.almostEqual(p1.y);
-  if ( xEqual && yEqual ) return [p0];
-  if ( xEqual ^ yEqual
-  || (p0.x < p1.x && p0.y < p1.y)) return [p0, p1];
-
-  return [];
-}
 
 // Must declare this variable after defining WallTracer.
 export const SCENE_GRAPH = new WallTracer();
@@ -824,134 +767,6 @@ wt.tokenEdges.forEach(s => s.forEach(e => e.draw({color: Draw.COLORS.orange})))
 */
 
 // NOTE: Helper functions
-
-const IX_TYPES = {
-  NONE: 0,
-  NORMAL: 1,
-  ENDPOINT: 2,
-  OVERLAP: 3
-};
-
-/**
- * @typedef {object} SegmentIntersection
- * Represents intersection between two segments, a|b and c|d
- * @property {PIXI.Point} pt          Point of intersection
- * @property {number} t0              Intersection location on the a|b segment
- * @property {number} t1              Intersection location on the c|d segment
- * @property {IX_TYPES} ixType        Type of intersection
- * @property {number} [endT0]         If overlap, this is the end intersection on a|b
- * @property {number} [endT1]         If overlap, this is the end intersection on c|d
- * @property {PIXI.Point} [endPoint]  If overlap, the ending intersection
- */
-
-/**
- * Locate collisions between two segments. Uses almostEqual to get near collisions.
- * 1. Shared endpoints.
- * 2. Endpoint of one segment within the other segment.
- * 3. Two segments intersect.
- * 4. Collinear segments overlap: return start and end of the intersections.
- * @param {PIXI.Point} a        Endpoint on a|b segment
- * @param {PIXI.Point} b        Endpoint on a|b segment
- * @param {PIXI.Point} c        Endpoint on c|d segment
- * @param {PIXI.Point} d        Endpoint on c|d segment
- * @returns {SegmentIntersection|null}
- */
-function segmentCollision(a, b, c, d) {
-  // Endpoint intersections can occur as part of a segment overlap. So test overlap first.
-  // Overlap will be fast if the segments are not collinear.
-  return segmentOverlap(a, b, c, d)
-    ?? endpointIntersection(a, b, c, d)
-    ?? segmentIntersection(a, b, c, d);
-}
-
-/**
- * Determine if two segments intersect at an endpoint and return t0, t1 based on that intersection.
- * Does not consider segment collinearity, and only picks the first shared endpoint.
- * (If segments are collinear, possible they are the same and share both endpoints.)
- * @param {PIXI.Point} a        Endpoint on a|b segment
- * @param {PIXI.Point} b        Endpoint on a|b segment
- * @param {PIXI.Point} c        Endpoint on c|d segment
- * @param {PIXI.Point} d        Endpoint on c|d segment
- * @returns {SegmentIntersection|null}
- */
-function endpointIntersection(a, b, c, d) {
-  const type = IX_TYPES.ENDPOINT;
-  if ( a.key === c.key || c.almostEqual(a) ) return { t0: 0, t1: 0, pt: a, type };
-  if ( a.key === d.key || d.almostEqual(a) ) return { t0: 0, t1: 1, pt: a, type };
-  if ( b.key === c.key || c.almostEqual(b) ) return { t0: 1, t1: 0, pt: b, type };
-  if ( b.key === d.key || d.almostEqual(b) ) return { t0: 1, t1: 1, pt: b, type };
-  return null;
-}
-
-/**
- * Determine if two segments intersect and return t0, t1 based on that intersection.
- * Generally will detect endpoint intersections but no special handling.
- * To ensure near-endpoint-intersections are captured, use endpointIntersection.
- * Will not detect overlap. See segmentOverlap
- * @param {PIXI.Point} a        Endpoint on a|b segment
- * @param {PIXI.Point} b        Endpoint on a|b segment
- * @param {PIXI.Point} c        Endpoint on c|d segment
- * @param {PIXI.Point} d        Endpoint on c|d segment
- * @returns {SegmentIntersection|null}
- */
-function segmentIntersection(a, b, c, d) {
-  if ( !foundry.utils.lineSegmentIntersects(a, b, c, d) ) return null;
-  const ix = CONFIG.GeometryLib.utils.lineLineIntersection(a, b, c, d, { t1: true });
-  ix.pt = PIXI.Point.fromObject(ix);
-  ix.type = IX_TYPES.NORMAL;
-  return ix;
-}
-
-/**
- * Determine if two collinear segments overlap and return the two points at which the segments
- * begin/end their overlap. If you just need the points, use findOverlappingPoints.
- * @param {PIXI.Point} a        Endpoint on a|b segment
- * @param {PIXI.Point} b        Endpoint on a|b segment
- * @param {PIXI.Point} c        Endpoint on c|d segment
- * @param {PIXI.Point} d        Endpoint on c|d segment
- * @returns {SegmentIntersection|null}
- *  Either an ENDPOINT or an OVERLAP intersection.
- */
-function segmentOverlap(a, b, c, d) {
-  const pts = findOverlappingPoints(a, b, c, d);
-  if ( !pts.length ) return null;
-
-  // Calculate t value for a single point, which must be an endpoint.
-  if ( pts.length === 1 ) {
-    const pt = pts[0];
-    const res = { pt, type: IX_TYPES.ENDPOINT };
-    res.t0 = pt.almostEqual(a) ? 0 : 1;
-    res.t1 = pt.almostEqual(c) ? 0 : 1;
-    return res;
-  }
-
-  // Calculate t value for overlapping points.
-  const res = { type: IX_TYPES.OVERLAP };
-  const distAB = PIXI.Point.distanceBetween(a, b);
-  const distCD = PIXI.Point.distanceBetween(c, d);
-  const tA0 = PIXI.Point.distanceBetween(a, pts[0]) / distAB;
-  const tA1 = PIXI.Point.distanceBetween(a, pts[1]) / distAB;
-  const tC0 = PIXI.Point.distanceBetween(c, pts[0]) / distCD;
-  const tC1 = PIXI.Point.distanceBetween(c, pts[1]) / distCD;
-
-  if ( tA0 <= tA1 ) {
-    res.t0 = tA0;
-    res.endT0 = tA1;
-    res.t1 = tC0;
-    res.endT1 = tC1;
-    res.pt = pts[0];
-    res.endPt = pts[1];
-  } else {
-    res.t0 = tA1;
-    res.endT0 = tA0;
-    res.t1 = tC1;
-    res.endT1 = tC0;
-    res.pt = pts[1];
-    res.endPt = pts[0];
-  }
-
-  return res;
-}
 
 /**
  * Prorate a t value based on some preexisting split.
