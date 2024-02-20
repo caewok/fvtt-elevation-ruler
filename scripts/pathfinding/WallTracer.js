@@ -710,7 +710,7 @@ export class WallTracer extends Graph {
   findEdgeCollisions(edgeA, edgeB) {
     const edgeCollisions = [];
     const bounds = segmentBounds(edgeA, edgeB);
-    const collisionTest = (o, _rect) => segmentsOverlap(edgeA, edgeB, o.t.A, o.t.B);
+    const collisionTest = (o, _rect) => doSegmentsOverlap(edgeA, edgeB, o.t.A, o.t.B);
     const collidingEdges = this.edgesQuadtree.getObjects(bounds, { collisionTest });
     const ENDPOINT = IX_TYPES.ENDPOINT;
     for ( const edge of collidingEdges ) {
@@ -746,7 +746,7 @@ export class WallTracer extends Graph {
  * @param {PIXI.Point} d   Endpoint of segment C|D
  * @returns {boolean}
  */
-function segmentsOverlap(a, b, c, d) {
+function doSegmentsOverlap(a, b, c, d) {
   if ( foundry.utils.lineSegmentIntersects(a, b, c, d) ) return true;
 
   // If collinear, B is within A|B or D is within A|B
