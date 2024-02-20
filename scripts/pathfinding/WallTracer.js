@@ -553,12 +553,20 @@ export class WallTracer extends Graph {
     const OVERLAP = IX_TYPES.OVERLAP;
 
     const numT = tArr.length;
+    let addEdge = true;
     for ( let i = 0; i < numT; i += 1 ) {
       // Note: it is possible for more than one collision to occur at a given t location.
       // (multiple T-endpoint collisions)
       const t = tArr[i];
       const cObjs = collisions.get(t) ?? [];
-      let addEdge = true;
+
+      // Build edge for portion of wall between priorT and t, skipping when t === 0.
+      // Exception: If this portion overlaps another edge, use that edge instead.
+      if ( t && addEdge ) {
+        const edge = WallTracerEdge.fromObjects(edgeA, edgeB, [object], priorT, t);
+        this.addEdge(edge);
+      }
+      addEdge = true;
 
       // Prioritize overlaps.
       // Only one overlap should start at a given t.
@@ -589,32 +597,24 @@ export class WallTracer extends Graph {
         }
 
         // Jump to new t position in the array.
-        i = tArr.findIndex(t => t >= overlapC.endT0);
-        priorT = t;
-        continue;
-      }
+        const idx = tArr.findIndex(t => t >= overlapC.endT0);
+        if ( ~idx ) i = idx - 1; // Will be increased by the for loop. Avoid getting into infinite loop.
+        addEdge = false; // Use the overlap instead.
 
-      // For normal intersections, split the other edge. If the other edge forms a T-intersection,
-      // it will not get split (splits at t1 = 0 or t1 = 1).
-      for ( const cObj of cObjs ) {
-        const splitEdges = cObj.edge.splitAtT(cObj.t1); // If the split is at the endpoint, will be null.
-        if ( splitEdges ) {
-          // Remove the existing edge and add the new edges.
-          // With overlaps, it is possible the edge was already removed.
-          // if ( this.edges.has(cObj.edge.key) ) this.deleteEdge(cObj.edge);
-          this.deleteEdge(cObj.edge);
-          splitEdges.forEach(e => this.addEdge(e));
+      } else {
+        // For normal intersections, split the other edge. If the other edge forms a T-intersection,
+        // it will not get split (splits at t1 = 0 or t1 = 1).
+        for ( const cObj of cObjs ) {
+          const splitEdges = cObj.edge.splitAtT(cObj.t1); // If the split is at the endpoint, will be null.
+          if ( splitEdges ) {
+            // Remove the existing edge and add the new edges.
+            // With overlaps, it is possible the edge was already removed.
+            // if ( this.edges.has(cObj.edge.key) ) this.deleteEdge(cObj.edge);
+            this.deleteEdge(cObj.edge);
+            splitEdges.forEach(e => this.addEdge(e));
+          }
         }
       }
-
-      // At each t value after 0, we must construct a new edge.
-      // Exception: If this portion overlaps another edge, use that edge instead.
-      // Build edge for portion of wall between priorT and t, skipping when t === 0
-      if ( addEdge && t ) {
-        const edge = WallTracerEdge.fromObjects(edgeA, edgeB, [object], priorT, t);
-        this.addEdge(edge);
-      }
-
       // Cycle to next.
       priorT = t;
     }
@@ -974,27 +974,6 @@ function segmentOverlap(a, b, c, d) {
 
   // No overlap.
   return null;
-}
-
-
-/**
- * Find all array objects that match a condition, remove them from the array, and return them.
- * Like Array.findSplice, but handles multiples.
- * Modifies the array in place
- * @param {array} arr       Array to search
- * @param {function} filterFn   Function used for the filter test
- * @returns {array}
- */
-function filterSplice(arr, filterFn) {
-  const indices = [];
-  const filteredElems = arr.filter((elem, idx, arr) => {
-    if ( !filterFn(elem, idx, arr) ) return false;
-    indices.push(idx);
-    return true;
-  });
-  indices.sort((a, b) => b - a); // So we can splice without changing other indices.
-  indices.forEach(idx => arr.splice(idx, 1));
-  return filteredElems;
 }
 
 /**
