@@ -283,15 +283,15 @@ export class WallTracerEdge extends GraphEdge {
    * Find the collision, if any, between this edge and another object's edge.
    * @param {PIXI.Point} A              First edge endpoint for the object
    * @param {PIXI.Point} B              Second edge endpoint for the object
-   * @returns {SegmentIntersection[]}
+   * @returns {SegmentIntersection|null}
    *  Also rounds the t0 and t1 collision percentages to WallTracerEdge.PLACES.
    *  t0 is the collision point for the A, B object edge.
    *  t1 is the collision point for this edge.
    */
-  findEdgeCollisions(A, B) {
+  findEdgeCollision(A, B) {
     const C = this.A.point;
     const D = this.B.point;
-    return segmentCollisions(A, B, C, D) ?? [];
+    return segmentCollision(A, B, C, D);
   }
 
   /**
@@ -494,9 +494,9 @@ export class WallTracer extends Graph {
    */
   _removeEdgeFromObjectSet(id, edge) {
     const edgeSet = this.objectEdges.get(id);
-    //if ( edgeSet ) edgeSet.delete(edge);
+    // Debug: if ( edgeSet ) edgeSet.delete(edge);
     if ( !edgeSet ) {
-      console.debug("_removeEdgeFromObjectSet|edgeSet undefined");
+      console.warn("_removeEdgeFromObjectSet|edgeSet undefined");
       return;
     }
     edgeSet.delete(edge);
@@ -538,37 +538,79 @@ export class WallTracer extends Graph {
 
     // For each collision, ordered along the wall from A --> B
     // - construct a new edge for this wall portion
+    // - split the colliding edge if not at that edge's endpoint
     // - update the collision links for the colliding edge and this new edge
+
+    // Overlapping edges:
+    // If overlap found, can ignore other collisions in-between.
+    // Split this edge at the start/end of the overlap.
+    // Split the overlapping edge at the start and end of the overlap.
+    // Add this object to the overlapping edge's objects.
+    // By definition, should only be a single overlap at a time.
+    // Possible for there to be collisions in between, b/c collisions checked by edgeA --> edgeB. Ignore.
     if ( !collisions.has(1) ) tArr.push(1);
     let priorT = 0;
-    const overlapFn = this.#processOverlapCollisionFn(object);
-    for ( const t of tArr ) {
-      // Check each collision point.
-      // For endpoint collisions, nothing will be added.
-      // For normal intersections, split the other edge.
-      // If overlapping, split the other edge if not at endpoint.
-      // One or more edges may be split at this collision point.
-      // Track when we start or end overlapping on an edge.
+    const OVERLAP = IX_TYPES.OVERLAP;
+
+    const numT = tArr.length;
+    for ( let i = 0; i < numT; i += 1 ) {
+      // Note: it is possible for more than one collision to occur at a given t location.
+      // (multiple T-endpoint collisions)
+      const t = tArr[i];
       const cObjs = collisions.get(t) ?? [];
-      let addEdge = Boolean(t); // Don't add an edge for 0 --> 0.
-      for ( const cObj of cObjs ) {
-        const splitEdges = cObj.edge.splitAtT(cObj.t1); // If the split is at the endpoint, will be null.
-        if ( cObj.overlap ) {
-          if ( splitEdges && cObj.t0 ) splitEdges.reverse();
-          const overlapRes = overlapFn(cObj.edge, splitEdges);
-          addEdge &&= overlapRes;
+      let addEdge = true;
+
+      // Prioritize overlaps.
+      // Only one overlap should start at a given t.
+      const overlapC = cObjs.findSplice(obj => obj.type === OVERLAP);
+      if ( overlapC ) {
+        // Beginning overlap.
+        let overlappingEdge = overlapC.edge;
+        let splitEdges = overlappingEdge.splitAtT(overlapC.t1);
+        if ( splitEdges ) {
+          this.deleteEdge(overlappingEdge);
+          const overlapIdx = overlapC.t1 > overlapC.endT1 ? 0 : 1;
+          overlappingEdge = splitEdges[overlapIdx];
+          splitEdges.forEach(e => this.addEdge(e));
         }
 
+        // Add this object to the overlapping portion.
+        overlappingEdge.objects.add(object);
+        this._addEdgeToObjectSet(object.id, overlappingEdge);
+
+        // Ending overlap.
+        const splitT = prorateTSplit(overlapC.t1, overlapC.endT1);
+        splitEdges = overlappingEdge.splitAtT(splitT);
+        if ( splitEdges ) {
+          this.deleteEdge(overlappingEdge);
+          const overlapIdx = overlapC.t1 > overlapC.endT1 ? 0 : 1;
+          splitEdges[overlapIdx].objects.delete(object); // Remove object from non-overlapping portion.
+          splitEdges.forEach(e => this.addEdge(e));
+        }
+
+        // Jump to new t position in the array.
+        i = tArr.findIndex(t => t >= overlapC.endT0);
+        priorT = t;
+        continue;
+      }
+
+      // For normal intersections, split the other edge. If the other edge forms a T-intersection,
+      // it will not get split (splits at t1 = 0 or t1 = 1).
+      for ( const cObj of cObjs ) {
+        const splitEdges = cObj.edge.splitAtT(cObj.t1); // If the split is at the endpoint, will be null.
         if ( splitEdges ) {
           // Remove the existing edge and add the new edges.
           // With overlaps, it is possible the edge was already removed.
-          if ( this.edges.has(cObj.edge.key) ) this.deleteEdge(cObj.edge);
+          // if ( this.edges.has(cObj.edge.key) ) this.deleteEdge(cObj.edge);
+          this.deleteEdge(cObj.edge);
           splitEdges.forEach(e => this.addEdge(e));
         }
       }
 
+      // At each t value after 0, we must construct a new edge.
+      // Exception: If this portion overlaps another edge, use that edge instead.
       // Build edge for portion of wall between priorT and t, skipping when t === 0
-      if ( addEdge ) {
+      if ( addEdge && t ) {
         const edge = WallTracerEdge.fromObjects(edgeA, edgeB, [object], priorT, t);
         this.addEdge(edge);
       }
@@ -576,40 +618,6 @@ export class WallTracer extends Graph {
       // Cycle to next.
       priorT = t;
     }
-  }
-
-  /**
-   * Process a collision that has an overlapping edge.
-   * @param {Wall|Token} object                   Object that the edge represents
-   * @returns {function}
-   *   - @param {WallTracerEdge} overlappingEdge      The overlapping edge to process
-   *   - @param {WallTracerEdge[2]|null} splitEdges     Two edges split at the current t position
-   *   - @returns {boolean} True if an edge should be added.
-   */
-  #processOverlapCollisionFn(object) {
-    const currOverlappingEdges = new Set();
-    return (overlappingEdge, splitEdges) => {
-      // Overlap is ending.
-      if ( currOverlappingEdges.has(overlappingEdge) ) {
-        currOverlappingEdges.delete(overlappingEdge);
-        if ( splitEdges ) {
-          splitEdges[0].objects.add(object);
-          splitEdges[1].objects.delete(object);
-        }
-        else {
-          overlappingEdge.objects.add(object);
-
-          // Make sure the object's edges include this cObj.edge.
-          this._addEdgeToObjectSet(object.id, overlappingEdge);
-        }
-        return false; // Only want one edge here: the existing.
-      }
-
-      // Start a new overlap.
-      currOverlappingEdges.add(overlappingEdge);
-      if ( splitEdges ) splitEdges[1].objects.add(object); // Share the edge with this object.
-      return true;
-    };
   }
 
   /**
@@ -694,20 +702,22 @@ export class WallTracer extends Graph {
 
   /**
    * Locate collision points for any edges that collide with this edge.
+   * Skips edges that simply share a single endpoint.
    * @param {PIXI.Point} edgeA                      Edge endpoint
    * @param {PIXI.Point} edgeB                      Other edge endpoint
-   * @returns {Map<number, EdgeTracerCollision[]>}  Map of locations of the collisions
+   * @returns {Map<number, EdgeTracerCollision[]>}  Map of locations of the collisions along A|B
    */
   findEdgeCollisions(edgeA, edgeB) {
     const edgeCollisions = [];
     const bounds = segmentBounds(edgeA, edgeB);
     const collisionTest = (o, _rect) => segmentsOverlap(edgeA, edgeB, o.t.A, o.t.B);
     const collidingEdges = this.edgesQuadtree.getObjects(bounds, { collisionTest });
+    const ENDPOINT = IX_TYPES.ENDPOINT;
     for ( const edge of collidingEdges ) {
-      const collisions = edge.findEdgeCollisions(edgeA, edgeB);
-      if ( !collisions.length ) continue;
-      collisions.forEach(c => c.edge = edge);
-      edgeCollisions.push(...collisions);
+      const collision = edge.findEdgeCollision(edgeA, edgeB);
+      if ( !collision || collision.type === ENDPOINT ) continue;
+      collision.edge = edge;
+      edgeCollisions.push(collision);
     }
     return groupBy(edgeCollisions, this.constructor._keyGetter);
   }
@@ -815,36 +825,46 @@ wt.tokenEdges.forEach(s => s.forEach(e => e.draw({color: Draw.COLORS.orange})))
 
 // NOTE: Helper functions
 
+const IX_TYPES = {
+  NONE: 0,
+  NORMAL: 1,
+  ENDPOINT: 2,
+  OVERLAP: 3
+};
+
 /**
  * @typedef {object} SegmentIntersection
  * Represents intersection between two segments, a|b and c|d
- * @property {PIXI.Point} pt        Point of intersection
- * @property {number} t0            Intersection location on the a --> b segment
- * @property {number} t1            Intersection location on the c --> d segment
+ * @property {PIXI.Point} pt          Point of intersection
+ * @property {number} t0              Intersection location on the a|b segment
+ * @property {number} t1              Intersection location on the c|d segment
+ * @property {IX_TYPES} ixType        Type of intersection
+ * @property {number} [endT0]         If overlap, this is the end intersection on a|b
+ * @property {number} [endT1]         If overlap, this is the end intersection on c|d
+ * @property {PIXI.Point} [endPoint]  If overlap, the ending intersection
  */
 
 /**
  * Locate collisions between two segments. Uses almostEqual to get near collisions.
  * 1. Shared endpoints.
- * 2. Endpoint of one segment within the other segment. Ignored.
+ * 2. Endpoint of one segment within the other segment.
  * 3. Two segments intersect.
  * 4. Collinear segments overlap: return start and end of the intersections.
- * To add back in endpoint intersection, if `segmentCollisions` is [], then call  `endpointIntersection`.
  * @param {PIXI.Point} a        Endpoint on a|b segment
  * @param {PIXI.Point} b        Endpoint on a|b segment
  * @param {PIXI.Point} c        Endpoint on c|d segment
  * @param {PIXI.Point} d        Endpoint on c|d segment
- * @returns {SegmentIntersection[]|null}
+ * @returns {SegmentIntersection|null}
  */
-function segmentCollisions(a, b, c, d) {
-  // Check for true overlap. If shared endpoints, will be handled later.
-  const overlaps = segmentOverlap(a, b, c, d); // Returns null or SegmentIntersection[2]
-  if ( overlaps && !overlaps[0].pt.almostEqual(overlaps[1].pt) ) return overlaps;
+function segmentCollision(a, b, c, d) {
+  // Endpoint intersections can occur as part of a segment overlap. So test overlap first.
+  // Overlap will be fast if the segments are not collinear.
+  const overlap = segmentOverlap(a, b, c, d);
 
-  // If endpoints are shared, return empty array.
-  // Otherwise, return the segment intersection or empty array.
-  if ( endpointIntersection(a, b, c, d) ) return [];
-  return segmentIntersection(a, b, c, d) ?? [];
+  // If the overlap is a single point, it is likely an endpoint intersection.
+  if ( overlap && !overlap.pt.almostEqual(overlap.endPt) ) return overlap;
+  return endpointIntersection(a, b, c, d)
+    ?? segmentIntersection(a, b, c, d);
 }
 
 /**
@@ -855,13 +875,14 @@ function segmentCollisions(a, b, c, d) {
  * @param {PIXI.Point} b        Endpoint on a|b segment
  * @param {PIXI.Point} c        Endpoint on c|d segment
  * @param {PIXI.Point} d        Endpoint on c|d segment
- * @returns {SegmentIntersection[1]|null}
+ * @returns {SegmentIntersection|null}
  */
 function endpointIntersection(a, b, c, d) {
-  if ( a.key === c.key || c.almostEqual(a) ) return [{ t0: 0, t1: 0, pt: a }];
-  if ( a.key === d.key || d.almostEqual(a) ) return [{ t0: 0, t1: 1, pt: a }];
-  if ( b.key === c.key || c.almostEqual(b) ) return [{ t0: 1, t1: 0, pt: b }];
-  if ( b.key === d.key || d.almostEqual(b) ) return [{ t0: 1, t1: 1, pt: b }];
+  const type = IX_TYPES.ENDPOINT;
+  if ( a.key === c.key || c.almostEqual(a) ) return { t0: 0, t1: 0, pt: a, type };
+  if ( a.key === d.key || d.almostEqual(a) ) return { t0: 0, t1: 1, pt: a, type };
+  if ( b.key === c.key || c.almostEqual(b) ) return { t0: 1, t1: 0, pt: b, type };
+  if ( b.key === d.key || d.almostEqual(b) ) return { t0: 1, t1: 1, pt: b, type };
   return null;
 }
 
@@ -874,23 +895,24 @@ function endpointIntersection(a, b, c, d) {
  * @param {PIXI.Point} b        Endpoint on a|b segment
  * @param {PIXI.Point} c        Endpoint on c|d segment
  * @param {PIXI.Point} d        Endpoint on c|d segment
- * @returns {SegmentIntersection[1]|null}
+ * @returns {SegmentIntersection|null}
  */
 function segmentIntersection(a, b, c, d) {
   if ( !foundry.utils.lineSegmentIntersects(a, b, c, d) ) return null;
   const ix = CONFIG.GeometryLib.utils.lineLineIntersection(a, b, c, d, { t1: true });
   ix.pt = PIXI.Point.fromObject(ix);
-  return [ix];
+  ix.type = IX_TYPES.NORMAL;
+  return ix;
 }
 
 /**
  * Determine if two segments overlap and return the two points at which the segments
- * begin their overlap. If overlap is an endpoint, may return that endpoint twice.
+ * begin their overlap.
  * @param {PIXI.Point} a        Endpoint on a|b segment
  * @param {PIXI.Point} b        Endpoint on a|b segment
  * @param {PIXI.Point} c        Endpoint on c|d segment
  * @param {PIXI.Point} d        Endpoint on c|d segment
- * @returns {SegmentIntersection[2]|null}
+ * @returns {SegmentIntersection|null}
  *  The 2 intersections will be sorted so that [0] --> [1] is the overlap.
  */
 function segmentOverlap(a, b, c, d) {
@@ -931,30 +953,66 @@ function segmentOverlap(a, b, c, d) {
 
 
   // Overlap: c|d --- aIx|bIx --- aIx|bIx --- c|d
-  const overlap = true;
-  if ( aIx && bIx ) return [
-    { t0: 0, t1: aIx.t0, pt: PIXI.Point.fromObject(aIx), overlap },
-    { t0: 1, t1: bIx.t0, pt: PIXI.Point.fromObject(bIx), overlap }
-  ];
+  const type = IX_TYPES.OVERLAP;
+  if ( aIx && bIx ) return {
+    t0: 0, t1: aIx.t0, pt: PIXI.Point.fromObject(aIx), type,
+    endT0: 1, endT1: bIx.t0, endPt: PIXI.Point.fromObject(bIx) };
 
   // Overlap: a|b --- cIx|dIx --- cIx|dIx --- a|b
   const cIx = ix2.t0.between(0, 1) ? ix2 : null;
   const dIx = ix3.t0.between(0, 1) ? ix3 : null;
-  if ( cIx && dIx ) return [
-    { t0: cIx.t0, t1: 0, pt: PIXI.Point.fromObject(cIx), overlap },
-    { t0: dIx.t0, t1: 1, pt: PIXI.Point.fromObject(dIx), overlap }
-  ];
+  if ( cIx && dIx ) return {
+    t0: cIx.t0, t1: 0, pt: PIXI.Point.fromObject(cIx), type,
+    endT0: dIx.t0, endT1: 1, endPt: PIXI.Point.fromObject(dIx) };
 
   // Overlap: a|b --- cIx|dIx --- aIx|bIx --- c|d
   const abIx = aIx ?? bIx;
   const cdIx = cIx ?? dIx;
-  if ( abIx && cdIx ) {
-    return [
-      { t0: cdIx.t0, t1: cIx ? 0 : 1, pt: PIXI.Point.fromObject(cdIx), overlap },
-      { t0: aIx ? 0 : 1, t1: abIx.t0, pt: PIXI.Point.fromObject(abIx), overlap }
-    ];
-  }
+  if ( abIx && cdIx ) return {
+    t0: cdIx.t0, t1: cIx ? 0 : 1, pt: PIXI.Point.fromObject(cdIx), type,
+    endT0: aIx ? 0 : 1, endT1: abIx.t0, endPt: PIXI.Point.fromObject(abIx) };
 
   // No overlap.
   return null;
+}
+
+
+/**
+ * Find all array objects that match a condition, remove them from the array, and return them.
+ * Like Array.findSplice, but handles multiples.
+ * Modifies the array in place
+ * @param {array} arr       Array to search
+ * @param {function} filterFn   Function used for the filter test
+ * @returns {array}
+ */
+function filterSplice(arr, filterFn) {
+  const indices = [];
+  const filteredElems = arr.filter((elem, idx, arr) => {
+    if ( !filterFn(elem, idx, arr) ) return false;
+    indices.push(idx);
+    return true;
+  });
+  indices.sort((a, b) => b - a); // So we can splice without changing other indices.
+  indices.forEach(idx => arr.splice(idx, 1));
+  return filteredElems;
+}
+
+/**
+ * Prorate a t value based on some preexisting split.
+ * Example: Split a segment length 10 at .2 and .8.
+ *  - Split at .2: Segments length 2 and length 8.
+ *  - Split second segment: (.8 - .2) / .8 = .75. Split length 8 segment at .7 to get length 6.
+ *  - Segments 2, 6, 2
+ * If the first split is higher, must reverse the numbers.
+ */
+function prorateTSplit(firstT, secondT) {
+  if ( secondT.almostEqual(0) ) return 0;
+  if ( firstT.almostEqual(0) ) return secondT;
+  if ( firstT.almostEqual(1) ) return secondT;
+  if ( secondT.almostEqual(1) ) return 1;
+
+  const flip = secondT < firstT;
+  if ( flip ) [firstT, secondT] = [secondT, firstT];
+  const newT = (secondT - firstT) / secondT;
+  return flip ? 1 - newT : newT;
 }
