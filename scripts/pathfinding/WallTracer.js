@@ -13,7 +13,7 @@ Wall
 
 // WallTracer3
 
-import { groupBy, segmentBounds, perpendicularPoints } from "../util.js";
+import { groupBy, segmentBounds } from "../util.js";
 import { Draw } from "../geometry/Draw.js";
 import { Graph, GraphVertex, GraphEdge } from "../geometry/Graph.js";
 import { Settings } from "../settings.js";
@@ -859,11 +859,8 @@ const IX_TYPES = {
 function segmentCollision(a, b, c, d) {
   // Endpoint intersections can occur as part of a segment overlap. So test overlap first.
   // Overlap will be fast if the segments are not collinear.
-  const overlap = segmentOverlap(a, b, c, d);
-
-  // If the overlap is a single point, it is likely an endpoint intersection.
-  if ( overlap && !overlap.pt.almostEqual(overlap.endPt) ) return overlap;
-  return endpointIntersection(a, b, c, d)
+  return segmentOverlap(a, b, c, d)
+    ?? endpointIntersection(a, b, c, d)
     ?? segmentIntersection(a, b, c, d);
 }
 
@@ -906,74 +903,54 @@ function segmentIntersection(a, b, c, d) {
 }
 
 /**
- * Determine if two segments overlap and return the two points at which the segments
- * begin their overlap.
+ * Determine if two collinear segments overlap and return the two points at which the segments
+ * begin/end their overlap. If you just need the points, use findOverlappingPoints.
  * @param {PIXI.Point} a        Endpoint on a|b segment
  * @param {PIXI.Point} b        Endpoint on a|b segment
  * @param {PIXI.Point} c        Endpoint on c|d segment
  * @param {PIXI.Point} d        Endpoint on c|d segment
  * @returns {SegmentIntersection|null}
- *  The 2 intersections will be sorted so that [0] --> [1] is the overlap.
+ *  Either an ENDPOINT or an OVERLAP intersection.
  */
 function segmentOverlap(a, b, c, d) {
-  // Distinguish a---b|c---d from a---c---b|d. Latter is an overlap.
-  // Okay:
-  // a---b|c---d
-  // b---a|c---d
-  // b---a|d---c
-  // a---b|d---c
-  // Overlap:
-  // a---c---b|d
-  // a---d---b|c
-  // b---c---a|d
-  // b---d---a|c
+  const pts = findOverlappingPoints(a, b, c, d);
+  if ( !pts.length ) return null;
 
-  // First, ensure the segments are overlapping.
-  const orient2d = foundry.utils.orient2dFast;
-  if ( !orient2d(a, b, c).almostEqual(0) || !orient2d(a, b, d).almostEqual(0) ) return null;
+  // Calculate t value for a single point, which must be an endpoint.
+  if ( pts.length === 1 ) {
+    const pt = pts[0];
+    const res = { pt, type: IX_TYPES.ENDPOINT };
+    res.t0 = pt.almostEqual(a) ? 0 : 1;
+    res.t1 = pt.almostEqual(c) ? 0 : 1;
+    return res;
+  }
 
-  // To detect overlap, construct small perpendicular lines to the endpoints.
-  const aP = perpendicularPoints(a, b); // Line perpendicular to a|b that intersects a
-  const bP = perpendicularPoints(b, a);
-  const cP = perpendicularPoints(c, d);
-  const dP = perpendicularPoints(d, c);
+  // Calculate t value for overlapping points.
+  const res = { type: IX_TYPES.OVERLAP };
+  const distAB = PIXI.Point.distanceBetween(a, b);
+  const distCD = PIXI.Point.distanceBetween(c, d);
+  const tA0 = PIXI.Point.distanceBetween(a, pts[0]) / distAB;
+  const tA1 = PIXI.Point.distanceBetween(a, pts[1]) / distAB;
+  const tC0 = PIXI.Point.distanceBetween(c, pts[0]) / distCD;
+  const tC1 = PIXI.Point.distanceBetween(c, pts[1]) / distCD;
 
-  // Intersect each segment with the perpendicular lines.
-  const lli = CONFIG.GeometryLib.utils.lineLineIntersection;
-  const ix0 = lli(c, d, aP[0], aP[1]);
-  const ix1 = lli(c, d, bP[0], bP[1]);
-  const ix2 = lli(a, b, cP[0], cP[1]);
-  const ix3 = lli(a, b, dP[0], dP[1]);
+  if ( tA0 <= tA1 ) {
+    res.t0 = tA0;
+    res.endT0 = tA1;
+    res.t1 = tC0;
+    res.endT1 = tC1;
+    res.pt = pts[0];
+    res.endPt = pts[1];
+  } else {
+    res.t0 = tA1;
+    res.endT0 = tA0;
+    res.t1 = tC1;
+    res.endT1 = tC0;
+    res.pt = pts[1];
+    res.endPt = pts[0];
+  }
 
-  // Shouldn't happen unless a,b,c, or d are not distinct points.
-  if ( !(ix0 && ix1 && ix2 && ix3) ) return null;
-
-  const aIx = ix0.t0.between(0, 1) ? ix0 : null;
-  const bIx = ix1.t0.between(0, 1) ? ix1 : null;
-
-
-  // Overlap: c|d --- aIx|bIx --- aIx|bIx --- c|d
-  const type = IX_TYPES.OVERLAP;
-  if ( aIx && bIx ) return {
-    t0: 0, t1: aIx.t0, pt: PIXI.Point.fromObject(aIx), type,
-    endT0: 1, endT1: bIx.t0, endPt: PIXI.Point.fromObject(bIx) };
-
-  // Overlap: a|b --- cIx|dIx --- cIx|dIx --- a|b
-  const cIx = ix2.t0.between(0, 1) ? ix2 : null;
-  const dIx = ix3.t0.between(0, 1) ? ix3 : null;
-  if ( cIx && dIx ) return {
-    t0: cIx.t0, t1: 0, pt: PIXI.Point.fromObject(cIx), type,
-    endT0: dIx.t0, endT1: 1, endPt: PIXI.Point.fromObject(dIx) };
-
-  // Overlap: a|b --- cIx|dIx --- aIx|bIx --- c|d
-  const abIx = aIx ?? bIx;
-  const cdIx = cIx ?? dIx;
-  if ( abIx && cdIx ) return {
-    t0: cdIx.t0, t1: cIx ? 0 : 1, pt: PIXI.Point.fromObject(cdIx), type,
-    endT0: aIx ? 0 : 1, endT1: abIx.t0, endPt: PIXI.Point.fromObject(abIx) };
-
-  // No overlap.
-  return null;
+  return res;
 }
 
 /**
