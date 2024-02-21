@@ -36,7 +36,7 @@ export function gridShape(p) {
  * @returns {null|PIXI.Rectangle|PIXI.Polygon}
  */
 export function gridShapeFromGridCoords(gridCoords) {
-  if ( canvas.grid.isHex ) return hexGridShapeFromGridCoords(gridCoords);
+  if ( canvas.grid.isHexagonal ) return hexGridShapeFromGridCoords(gridCoords);
   return squareGridShapeFromGridCoords(gridCoords)
 }
 
