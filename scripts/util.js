@@ -224,3 +224,23 @@ export async function injectConfiguration(app, html, data, template, findString)
   form.append(myHTML);
   app.setPosition(app.position);
 }
+
+/**
+ * Find all array objects that match a condition, remove them from the array, and return them.
+ * Like Array.findSplice, but handles multiples.
+ * Modifies the array in place
+ * @param {array} arr       Array to search
+ * @param {function} filterFn   Function used for the filter test
+ * @returns {array}
+ */
+export function filterSplice(arr, filterFn) {
+  const indices = [];
+  const filteredElems = arr.filter((elem, idx, arr) => {
+    if ( !filterFn(elem, idx, arr) ) return false;
+    indices.push(idx);
+    return true;
+  });
+  indices.sort((a, b) => b - a); // So we can splice without changing other indices.
+  indices.forEach(idx => arr.splice(idx, 1));
+  return filteredElems;
+}
