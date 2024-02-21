@@ -775,16 +775,11 @@ wt.tokenEdges.forEach(s => s.forEach(e => e.draw({color: Draw.COLORS.orange})))
  *  - Split at .2: Segments length 2 and length 8.
  *  - Split second segment: (.8 - .2) / .8 = .75. Split length 8 segment at .7 to get length 6.
  *  - Segments 2, 6, 2
- * If the first split is higher, must reverse the numbers.
+ * Handles when the segment is split moving from 1 --> 0, indicated by secondT < firstT.
  */
 function prorateTSplit(firstT, secondT) {
-  if ( secondT.almostEqual(0) ) return 0;
-  if ( firstT.almostEqual(0) ) return secondT;
-  if ( firstT.almostEqual(1) ) return secondT;
-  if ( secondT.almostEqual(1) ) return 1;
-
-  const flip = secondT < firstT;
-  if ( flip ) [firstT, secondT] = [secondT, firstT];
-  const newT = (secondT - firstT) / secondT;
-  return flip ? 1 - newT : newT;
+  if ( secondT.almostEqual(0) ) return 1;
+  if ( firstT.almostEqual(secondT) ) return 0;
+  if ( secondT < firstT ) return secondT / firstT;
+  return (secondT - firstT) / (1 - firstT);
 }
