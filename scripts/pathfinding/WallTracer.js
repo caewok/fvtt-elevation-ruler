@@ -552,7 +552,6 @@ export class WallTracer extends Graph {
     const OVERLAP = IX_TYPES.OVERLAP;
 
     const numT = tArr.length;
-    let addEdge = true;
     for ( let i = 0; i < numT; i += 1 ) {
       // Note: it is possible for more than one collision to occur at a given t location.
       // (multiple T-endpoint collisions)
@@ -561,11 +560,10 @@ export class WallTracer extends Graph {
 
       // Build edge for portion of wall between priorT and t, skipping when t === 0.
       // Exception: If this portion overlaps another edge, use that edge instead.
-      if ( t && addEdge ) {
+      if ( t > priorT ) {
         const edge = WallTracerEdge.fromObjects(edgeA, edgeB, [object], priorT, t);
         this.addEdge(edge);
       }
-      addEdge = true;
 
       // Prioritize overlaps.
       // Only one overlap should start at a given t.
@@ -598,22 +596,23 @@ export class WallTracer extends Graph {
         // Jump to new t position in the array.
         const idx = tArr.findIndex(t => t >= overlapC.endT0);
         if ( ~idx ) i = idx - 1; // Will be increased by the for loop. Avoid getting into infinite loop.
-        addEdge = false; // Use the overlap instead.
+        priorT = overlapC.endT0;
+        continue;
 
-      } else {
-        // For normal intersections, split the other edge. If the other edge forms a T-intersection,
-        // it will not get split (splits at t1 = 0 or t1 = 1).
-        for ( const cObj of cObjs ) {
-          const splitEdges = cObj.edge.splitAtT(cObj.t1); // If the split is at the endpoint, will be null.
-          if ( splitEdges ) {
-            // Remove the existing edge and add the new edges.
-            // With overlaps, it is possible the edge was already removed.
-            // if ( this.edges.has(cObj.edge.key) ) this.deleteEdge(cObj.edge);
-            this.deleteEdge(cObj.edge);
-            splitEdges.forEach(e => this.addEdge(e));
-          }
+      }
+      // For normal intersections, split the other edge. If the other edge forms a T-intersection,
+      // it will not get split (splits at t1 = 0 or t1 = 1).
+      for ( const cObj of cObjs ) {
+        const splitEdges = cObj.edge.splitAtT(cObj.t1); // If the split is at the endpoint, will be null.
+        if ( splitEdges ) {
+          // Remove the existing edge and add the new edges.
+          // With overlaps, it is possible the edge was already removed.
+          // if ( this.edges.has(cObj.edge.key) ) this.deleteEdge(cObj.edge);
+          this.deleteEdge(cObj.edge);
+          splitEdges.forEach(e => this.addEdge(e));
         }
       }
+
       // Cycle to next.
       priorT = t;
     }
