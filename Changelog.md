@@ -1,3 +1,8 @@
+# 0.8.8
+Improvements to updating the scene graph. Avoid leaving unneeded vertices and split edges when a token or wall is removed. Fixes to handling overlapping edges to correctly reflect what objects make up the edge.
+
+Update lib geometry to v0.2.18.
+
 # 0.8.7
 
 ## New Features
