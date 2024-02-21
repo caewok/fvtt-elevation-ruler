@@ -266,7 +266,7 @@ export class WallTracerEdge extends GraphEdge {
    * @returns {PIXI.Point} The point along the wall line. Ratio 0: endpoint A; 1: endpoint B.
    */
   static pointAtEdgeRatio(edgeA, edgeB, edgeT) {
-    edgeT = Math.roundDecimals(edgeT, WallTracerEdge.PLACES);
+    edgeT = CONFIG.GeometryLib.utils.roundDecimals(edgeT, WallTracerEdge.PLACES);
     if ( edgeT.almostEqual(0) ) return edgeA;
     if ( edgeT.almostEqual(1) ) return edgeB;
     return edgeA.projectToward(edgeB, edgeT);
@@ -411,7 +411,7 @@ export class WallTracer extends Graph {
    * @param {WallTracerCollision} c   Collision to group
    * @returns {number} The t0 property, rounded.
    */
-  static _keyGetter(c) { return Math.roundDecimals(c.t0, WallTracer.PLACES); }
+  static _keyGetter(c) { return CONFIG.GeometryLib.utils.roundDecimals(c.t0, WallTracer.PLACES); }
 
   /**
    * Map of a set of edges, keyed to the placeable's id.
