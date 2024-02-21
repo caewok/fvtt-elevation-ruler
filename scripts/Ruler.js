@@ -3,7 +3,6 @@ canvas,
 CONST,
 duplicate,
 game,
-getProperty,
 PIXI,
 Ruler,
 ui
@@ -334,7 +333,7 @@ function _computeTokenSpeed(gridSpaces) {
   if ( !token ) return;
 
   const speedAttribute = SPEED.ATTRIBUTES[token.movementType] ?? SPEED.ATTRIBUTES.WALK;
-  const tokenSpeed = Number(getProperty(token, speedAttribute));
+  const tokenSpeed = Number(foundry.utils.getProperty(token, speedAttribute));
   if ( !tokenSpeed ) return;
 
   // Other constants

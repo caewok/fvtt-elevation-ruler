@@ -2,7 +2,7 @@
 canvas,
 CONFIG,
 CONST,
-getProperty,
+foundry,
 PIXI
 */
 "use strict";
@@ -95,7 +95,7 @@ function diagonalDistanceMultiplier() {
   const distance = canvas.dimensions.distance;
   const diagonalRule = DIAGONAL_RULES[canvas.grid.diagonalRule] ?? DIAGONAL_RULES["555"];
   let diagonalDist = distance;
-  if ( !canvas.grid.isHex
+  if ( !canvas.grid.isHexagonal
     && diagonalRule === DIAGONAL_RULES.EUCL ) diagonalDist = Math.hypot(distance, distance);
   return diagonalDist;
 }
@@ -691,7 +691,7 @@ function shapeForDrawing(drawing) {
  */
 function hasActiveDrawingTerrain(drawing, currElev, prevElev) {
   if ( !drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) ) return false;
-  const drawingE = getProperty(drawing.document, "flags.elevatedvision.elevation");
+  const drawingE = foundry.utils.getProperty(drawing.document, "flags.elevatedvision.elevation");
   if ( typeof drawingE === "undefined" ) return true;
 
   const drawingZ = CONFIG.GeometryLib.utils.gridUnitsToPixels(drawingE);
