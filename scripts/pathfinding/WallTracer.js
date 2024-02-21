@@ -650,7 +650,7 @@ export class WallTracer extends Graph {
    * @param {string} id             Id of the edge object to remove
    * @param {Map<string, Set<TokenTracerEdge>>} Map of edges to remove from
    */
-  removeObject(id) {
+  removeObject(id, _recurse = true) {
     const edges = this.objectEdges.get(id);
     if ( !edges || !edges.size ) return;
 
@@ -672,30 +672,32 @@ export class WallTracer extends Graph {
 
     // For each remaining object in the object set, remove it temporarily and re-add it.
     // This will remove unnecessary vertices and recombine edges.
-    const remainingObjects = edgesArr.reduce((acc, curr) => acc = acc.union(curr.objects), new Set());
-    if ( !remainingObjects.size ) return;
-    remainingObjects.forEach(obj => obj instanceof Wall ? this.removeWall(obj) : this.removeToken(obj));
-    remainingObjects.forEach(obj => obj instanceof Wall ? this.addWall(obj) : this.addToken(obj));
+    if ( _recurse ) {
+      const remainingObjects = edgesArr.reduce((acc, curr) => acc = acc.union(curr.objects), new Set());
+      if ( !remainingObjects.size ) return;
+      remainingObjects.forEach(obj => obj instanceof Wall ? this.removeWall(obj.id, false) : this.removeToken(obj.id, false));
+      remainingObjects.forEach(obj => obj instanceof Wall ? this.addWall(obj) : this.addToken(obj));
+    }
   }
 
   /**
    * Remove all associated edges with this wall.
    * @param {string|Wall} wallId    Id of the wall to remove, or the wall itself.
    */
-  removeWall(wallId) {
+  removeWall(wallId, _recurse = true) {
     if ( wallId instanceof Wall ) wallId = wallId.id;
     this.wallIds.delete(wallId);
-    return this.removeObject(wallId);
+    return this.removeObject(wallId, _recurse);
   }
 
   /**
    * Remove all associated edges with this token.
    * @param {string|Token} tokenId    Id of the token to remove, or the token itself.
    */
-  removeToken(tokenId) {
+  removeToken(tokenId, _recurse = true) {
     if ( tokenId instanceof Token ) tokenId = tokenId.id;
     this.tokenIds.delete(tokenId);
-    return this.removeObject(tokenId);
+    return this.removeObject(tokenId, _recurse);
   }
 
   /**
