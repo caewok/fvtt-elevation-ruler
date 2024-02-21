@@ -87,7 +87,6 @@ UX goals:
  */
 function clear(wrapper) {
   // User increments/decrements to the elevation for the current destination
-  this.destination._userElevationIncrements = 0;
   this._movementToken = undefined;
   return wrapper();
 }
