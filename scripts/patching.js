@@ -9,7 +9,6 @@ import { PATCHES as PATCHES_Ruler } from "./Ruler.js";
 import { PATCHES as PATCHES_Token } from "./Token.js";
 import { PATCHES as PATCHES_GridLayer } from "./GridLayer.js";
 import { PATCHES as PATCHES_ClientKeybindings } from "./ClientKeybindings.js";
-import { PATCHES as PATCHES_BaseGrid } from "./BaseGrid.js";
 import { PATCHES as PATCHES_HexagonalGrid } from "./HexagonalGrid.js";
 import { PATCHES as PATCHES_TokenPF } from "./pathfinding/Token.js";
 import { PATCHES as PATCHES_DrawingConfig } from "./DrawingConfig.js";
@@ -26,7 +25,6 @@ import { PATCHES as PATCHES_ClientSettings } from "./ModuleSettingsAbstract.js";
 
 const mergeObject = foundry.utils.mergeObject;
 const PATCHES = {
-  BaseGrid: PATCHES_BaseGrid,
   ClientKeybindings: PATCHES_ClientKeybindings,
   ClientSettings: PATCHES_ClientSettings,
   DrawingConfig: PATCHES_DrawingConfig,
