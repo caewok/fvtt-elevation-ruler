@@ -1,7 +1,7 @@
 /* globals
 canvas,
 CONST,
-duplicate,
+foundry,
 game,
 PIXI,
 Ruler,
@@ -168,11 +168,15 @@ function _addWaypoint(wrapper, point) {
   if ( this._unsnap ) this.waypoints.at(-1).copyFrom(point);
   else if ( this.waypoints.length === 1 ) {
     // Move the waypoint to find unsnapped token.
-    const oldWaypoint = duplicate(this.waypoints[0]);
-    this.waypoints[0].copyFrom(point);
+    const oldWaypoint = foundry.utils.duplicate(this.waypoints[0]);
+    this.waypoints[0].x = point.x;
+    this.waypoints[0].y = point.y;
     const token = this._getMovementToken();
     if ( token && !tokenIsSnapped(token) ) this._unsnappedOrigin = true;
-    else this.waypoints[0].copyFrom(oldWaypoint);
+    else {
+      this.waypoints[0].x = oldWaypoint.x;
+      this.waypoints[0].y = oldWaypoint.y;
+    }
   }
 
   // Elevate the waypoint.
