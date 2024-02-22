@@ -391,20 +391,27 @@ function griddedMoveDistance(a, b, token, { useAllElevation = true, stopTarget }
 function adjustGridMoveForElevation(gridMove) {
   let totalE = gridMove.E;
   let totalD = gridMove.D;
+  // Move one elevation step per diagonal.
   while ( totalE > 0 && totalD > 0 ) {
     totalE -= 1;
     totalD -= 1;
   }
 
-  while ( totalE > 0 && gridMove.H > 0 ) {
-    totalE -= 1;
-    gridMove.H -= 1;
-    gridMove.D += 1;
-  }
-  while ( totalE > 0 && gridMove.V > 0 ) {
-    totalE -= 1;
-    gridMove.V -= 1;
-    gridMove.D += 1;
+  const diagRule = canvas.grid.grid.diagonals
+  if ( diagRule !== CONST.GRID_DIAGONALS.ILLEGAL ) {
+    // Move one elevation step per horizontal, changing horizontal to diagonal.
+    while ( totalE > 0 && gridMove.H > 0 ) {
+      totalE -= 1;
+      gridMove.H -= 1;
+      gridMove.D += 1;
+    }
+
+    // Move one elevation step per vertical, changing vertical to diagonal.
+    while ( totalE > 0 && gridMove.V > 0 ) {
+      totalE -= 1;
+      gridMove.V -= 1;
+      gridMove.D += 1;
+    }
   }
 
   // All other elevation moves, if any, can be vertical.
@@ -429,17 +436,6 @@ export function sumGridMoves(a, b) {
     Object.keys(totalChangeCount).forEach(key => totalChangeCount[key] += movementChange[key]);
   }
   return totalChangeCount;
-}
-
-/**
- * Helper to determine the grid shape from grid coordiantes
- * @param {Array[2]} gridCoords     Grid coordinates, [row, col]
- * @returns {PIXI.Rectangle|PIXI.Polygon}
- */
-export function gridShapeFromGridCoordinates(gridCoords) {
-  const gridShapeFn = canvas.grid.type === CONST.GRID_TYPES.SQUARE ? squareGridShape : hexGridShape;
-  const [x, y] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[0], gridCoords[1]);
-  return gridShapeFn({x, y});
 }
 
 /**
@@ -812,8 +808,8 @@ function isHexRow() {
  * @returns {CHANGE}
  */
 function gridChangeType(prevGridCoord, nextGridCoord) {
-  const xChange = prevGridCoord[1] !== nextGridCoord[1]; // Column is x
-  const yChange = prevGridCoord[0] !== nextGridCoord[0]; // Row is y
+  const xChange = (prevGridCoord.j !== prevGridCoord.j) || (prevGridCoord.x !== nextGridCoord.x);
+  const yChange = (prevGridCoord.i !== prevGridCoord.i) || (prevGridCoord.y !== prevGridCoord.y);
   return CHANGE[((xChange * 2) + yChange)];
 }
 
