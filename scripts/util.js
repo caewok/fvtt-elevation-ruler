@@ -18,83 +18,35 @@ export function log(...args) {
 
 /**
  * Helper to get the grid shape for given grid type.
- * @param {x: number, y: number} p    Location to use.
+ * @param {GridCoordinates} coords    Grid (i,j) offset or x,y coordinates
  * @returns {null|PIXI.Rectangle|PIXI.Polygon}
  */
-export function gridShape(p) {
+export function gridShape(coords) {
   const { GRIDLESS, SQUARE } = CONST.GRID_TYPES;
   switch ( canvas.grid.type ) {
     case GRIDLESS: return null;
-    case SQUARE: return squareGridShape(p);
-    default: return hexGridShape(p);
+    case SQUARE: return squareGridShape(coords);
+    default: return hexGridShape(coords);
   }
 }
 
 /**
- * Helper to get the grid shape from grid coordinates.
- * @param {number[2]} gridCoords
- * @returns {null|PIXI.Rectangle|PIXI.Polygon}
- */
-export function gridShapeFromGridCoords(gridCoords) {
-  if ( canvas.grid.isHexagonal ) return hexGridShapeFromGridCoords(gridCoords);
-  return squareGridShapeFromGridCoords(gridCoords)
-}
-
-/**
- * From ElevatedVision ElevationLayer.js
- * Return the rectangle corresponding to the grid square at this point.
- * @param {x: number, y: number} p    Location within the square.
+ * Return a rectangle for a given grid square.
+ * @param {GridCoordinates} coords      Grid (i,j) offset or x,y coordinates
  * @returns {PIXI.Rectangle}
  */
-function squareGridShapeFromTopLeft(tlx, tly) {
-  const { w, h } = canvas.grid;
+function squareGridShape(coords) {
+  const { x, y } = canvas.grid.grid.getTopLeftPoint(coords);
   return new PIXI.Rectangle(tlx, tly, w, h);
 }
 
-function squareGridShapeFromGridCoords(gridCoords) {
-  const [tlx, tly] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[0], gridCoords[1]);
-  return squareGridShapeFromTopLeft(tlx, tly)
-}
-
-export function squareGridShape(p) {
-  const [tlx, tly] = canvas.grid.grid.getTopLeft(p.x, p.y);
-  return squareGridShapeFromTopLeft(tlx, tly);
-}
-
 /**
- * From ElevatedVision ElevationLayer.js
- * Return the polygon corresponding to the grid hex at this point.
- * @param {x: number, y: number} p    Location within the square.
- * @returns {PIXI.Rectangle}
+ * Return a polygon for a given grid hex.
+ * @param {GridCoordinates} coords      Grid (i,j) offset or x,y coordinates
+ * @returns {PIXI.Polygon}
  */
-function hexGridShapeFromTopLeft(tlx, tly, { width = 1, height = 1 } = {}) {
-  if ( width !== height ) return null; // Canvas.grid.grid.getBorderPolygon will return null if width !== height.
-  const points = canvas.grid.grid.getBorderPolygon(width, height, 0); // TO-DO: Should a border be included to improve calc?
-  const pointsTranslated = [];
-  const ln = points.length;
-  for ( let i = 0; i < ln; i += 2) pointsTranslated.push(points[i] + tlx, points[i+1] + tly);
-  return new PIXI.Polygon(pointsTranslated);
-}
-
-function hexGridShapeFromGridCoords(gridCoords, opts) {
-  const [tlx, tly] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[0], gridCoords[1]);
-  return hexGridShapeFromTopLeft(tlx, tly, opts);
-}
-
-export function hexGridShape(p, opts) {
-  const [tlx, tly] = canvas.grid.grid.getTopLeft(p.x, p.y);
-  return hexGridShapeFromTopLeft(tlx, tly, opts);
-}
-
-/**
- * Find the grid center given grid coordinates.
- * @param {number[]} gridCoords
- * @returns {PIXI.Point}
- */
-export function gridCenterFromGridCoords(gridCoords) {
-  const [tlx, tly] = canvas.grid.grid.getPixelsFromGridPosition(gridCoords[0], gridCoords[1]);
-  const [cx, cy] = canvas.grid.grid.getCenter(tlx, tly);
-  return new PIXI.Point(cx, cy);
+export function hexGridShape(coords) {
+  return new PIXI.Polygon(...canvas.grid.grid.getVertices(coords));
 }
 
 /**
