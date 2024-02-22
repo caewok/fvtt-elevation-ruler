@@ -31,14 +31,6 @@ Hooks.once("ready", function() {
   if ( MODULES_ACTIVE.TERRAIN_MAPPER ) MODULES_ACTIVE.API.TERRAIN_MAPPER = game.modules.get("terrainmapper").api;
 });
 
-export const DIAGONAL_RULES = {
-  EUCL: 0,
-  555: 1,
-  5105: 2,
-  MANHATTAN: 3
-};
-
-
 export const MOVEMENT_TYPES = {
   AUTO: -1,
   BURROW: 0,

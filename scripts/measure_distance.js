@@ -7,14 +7,13 @@ PIXI
 */
 "use strict";
 
-import { DIAGONAL_RULES, MODULES_ACTIVE, SPEED, MODULE_ID, FLAGS } from "./const.js";
+import { MODULES_ACTIVE, SPEED, MODULE_ID, FLAGS } from "./const.js";
 import {
   iterateGridUnderLine,
   squareGridShape,
   hexGridShape,
   segmentBounds,
-  gridShapeFromGridCoords,
-  gridCenterFromGridCoords } from "./util.js";
+  gridShapeFromGridCoords } from "./util.js";
 import { Settings } from "./settings.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { CenteredRectangle } from "./geometry/CenteredPolygon/CenteredRectangle.js";
@@ -68,23 +67,36 @@ export function measureDistance(a, b, { gridless = false } = {}) {
  * Additional distance for diagonal moves.
  * @returns {function}
  *  - @param {number} nDiag
- *  - @returns {number} Diagonal distance, accounting for the diagonal 5105 rule.
+ *  - @returns {number} Diagonal distance. Accounts for alternating rules.
  */
 function diagonalDistanceAdder() {
   const distance = canvas.dimensions.distance;
-  const diagonalDist = diagonalDistanceMultiplier();
-  const diagonalRule = DIAGONAL_RULES[canvas.grid.diagonalRule] ?? DIAGONAL_RULES["555"];
+  const diagonalMult = diagonalDistanceMultiplier();
+  const diagonalDistance = distance * diagonalMult;
+  const diagonalRule = canvas.grid.grid.diagonals;
   switch ( diagonalRule ) {
-    case DIAGONAL_RULES["5105"]: {
+    case ALTERNATING_1: {
       let totalDiag = 0;
       return nDiag => {
-        const nEven = ~~(nDiag * 0.5) + (totalDiag % 2);
+        const pastOdd = totalDiag % 2;
+        const nEven = ~~(nDiag * 0.5) + pastOdd;
         totalDiag += nDiag;
         return (nDiag + nEven) * diagonalDist;
       };
     }
-    case DIAGONAL_RULES.MANHATTAN: return nDiag => (nDiag + nDiag) * distance;
-    default: return nDiag => nDiag * diagonalDist;
+
+    case ALTERNATING_2: {
+      let totalDiag = 0;
+      return nDiag => {
+        // Adjust if the past total puts us on an even square
+        const pastOdd = totalDiag % 2;
+        const nOdd = Math.ceil(nDiag * 0.5) - pastOdd;
+        totalDiag += nDiag;
+        return (nDiag + nEven) * diagonalDist;
+      };
+
+    }
+    default: return nDiag => nDiag * diagonalDistance;
   }
 }
 
@@ -92,12 +104,15 @@ function diagonalDistanceAdder() {
  * Determine the diagonal distance multiplier.
  */
 function diagonalDistanceMultiplier() {
-  const distance = canvas.dimensions.distance;
-  const diagonalRule = DIAGONAL_RULES[canvas.grid.diagonalRule] ?? DIAGONAL_RULES["555"];
-  let diagonalDist = distance;
-  if ( !canvas.grid.isHexagonal
-    && diagonalRule === DIAGONAL_RULES.EUCL ) diagonalDist = Math.hypot(distance, distance);
-  return diagonalDist;
+  if ( canvas.grid.isHexagonal || canvas.grid.isGridless ) return Math.SQRT2;
+  const D = CONST.GRID_DIAGONALS;
+  switch ( canvas.grid.grid.diagonals ) {
+    case D.EXACT: return Math.SQRT2;
+    case D.APPROXIMATE: return 1.5;
+    case D.RECTILINEAR: return 2;
+    case D.ILLEGAL: return 2;  // Move horizontal + vertical for every diagonal
+    default: return 1;
+  }
 }
 
 /**
@@ -616,7 +631,7 @@ function griddedMovePenalty(currGridCoords, prevGridCoords, { currElev = 0, prev
   switch ( alg ) {
     case GT.CHOICES.CENTER: {
       const gridShape = gridShapeFromGridCoords(currGridCoords);
-      currCenter = gridCenterFromGridCoords(currGridCoords);
+      currCenter = canvas.grid.grid.getCenterPoint(currGridCoords);
       collisionTest = o => objectBoundsFn(o.t).contains(currCenter.x, currCenter.y);
       bounds = gridShape.getBounds();
       break;
@@ -632,11 +647,11 @@ function griddedMovePenalty(currGridCoords, prevGridCoords, { currElev = 0, prev
     }
 
     case GT.CHOICES.EUCLIDEAN: {
-      currCenter = gridCenterFromGridCoords(currGridCoords);
+      currCenter = canvas.grid.grid.getCenterPoint(currGridCoords);
       currCenter = Point3d.fromObject(currCenter);
       currCenter.z = currElev;
 
-      prevCenter = gridCenterFromGridCoords(prevGridCoords);
+      prevCenter = canvas.grid.grid.getCenterPoint(prevGridCoords);
       prevCenter = Point3d.fromObject(prevCenter);
       prevCenter.z = prevElev;
 
@@ -716,7 +731,7 @@ function griddedTerrainMovePenalty(token, currGridCoords, prevGridCoords, currEl
   const alg = Settings.get(GT.ALGORITHM);
   switch ( alg ) {
     case GT.CHOICES.CENTER: {
-      const currCenter = Point3d.fromObject(gridCenterFromGridCoords(currGridCoords));
+      const currCenter = Point3d.fromObject(canvas.grid.grid.getCenterPoint(currGridCoords));
       currCenter.z = currElev;
       return Terrain.percentMovementChangeForTokenAtPoint(token, currCenter, speedAttribute);
     }
@@ -729,8 +744,8 @@ function griddedTerrainMovePenalty(token, currGridCoords, prevGridCoords, currEl
     }
 
     case GT.CHOICES.EUCLIDEAN: {
-      const currCenter = Point3d.fromObject(gridCenterFromGridCoords(currGridCoords));
-      const prevCenter = Point3d.fromObject(gridCenterFromGridCoords(prevGridCoords));
+      const currCenter = Point3d.fromObject(canvas.grid.grid.getCenterPoint(currGridCoords));
+      const prevCenter = Point3d.fromObject(canvas.grid.grid.getCenterPoint(prevGridCoords));
       currCenter.z = currElev;
       prevCenter.z = prevElev;
       return Terrain.percentMovementForTokenAlongPath(token, prevCenter, currCenter, speedAttribute);
