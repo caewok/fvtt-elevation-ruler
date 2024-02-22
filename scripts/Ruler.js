@@ -36,12 +36,12 @@ import {
 
 import {
   tokenIsSnapped,
+  gridShape,
   log } from "./util.js";
 
 import {
   measureDistance,
-  measureMoveDistance,
-  gridShapeFromGridCoordinates
+  measureMoveDistance
 } from "./measure_distance.js";
 
 /**
@@ -481,7 +481,7 @@ function splitSegment(segment, splitMoveDistance, token, gridless) {
  *   endpoint contained within the shape.
  */
 function segmentGridHalfIntersection(gridCoords, a, b) {
-  const gridShape = gridShapeFromGridCoordinates(gridCoords);
+  const gridShape = gridShape(gridCoords);
   const ixs = gridShape.segmentIntersections(a, b);
   if ( !ixs || ixs.length === 0 ) return null;
   if ( ixs.length === 1 ) return gridShape.contains(a.x, a.y) ? a : b;
