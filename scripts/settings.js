@@ -175,6 +175,7 @@ export class Settings extends ModuleSettingsAbstract {
       hint: localize(`${KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE}.hint`),
       scope: "world",
       config: true,
+      default: 0,
       type: Number
     });
 
