@@ -146,7 +146,8 @@ function constructPathfindingSegments(segments, segmentMap) {
   if ( !segmentMap.size ) return segments;
   const newSegments = [];
   for ( const segment of segments ) {
-    const { A, B } = segment.ray;
+    const A = Point3d.fromObject(segment.ray.A);
+    const B = Point3d.fromObject(segment.ray.B);
     const pathPoints = segmentMap.get(A.to2d().key);
     if ( !pathPoints ) {
       newSegments.push(segment);
