@@ -10,10 +10,8 @@ PIXI
 import { MODULES_ACTIVE, SPEED, MODULE_ID, FLAGS } from "./const.js";
 import {
   iterateGridUnderLine,
-  squareGridShape,
-  hexGridShape,
   segmentBounds,
-  gridShapeFromGridCoords } from "./util.js";
+  gridShape } from "./util.js";
 import { Settings } from "./settings.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { CenteredRectangle } from "./geometry/CenteredPolygon/CenteredRectangle.js";
@@ -72,10 +70,11 @@ export function measureDistance(a, b, { gridless = false } = {}) {
 function diagonalDistanceAdder() {
   const distance = canvas.dimensions.distance;
   const diagonalMult = diagonalDistanceMultiplier();
-  const diagonalDistance = distance * diagonalMult;
+  const diagonalDist = distance * diagonalMult;
   const diagonalRule = canvas.grid.grid.diagonals;
+  const D = CONST.GRID_DIAGONALS;
   switch ( diagonalRule ) {
-    case ALTERNATING_1: {
+    case D.ALTERNATING_1: {
       let totalDiag = 0;
       return nDiag => {
         const pastOdd = totalDiag % 2;
@@ -85,18 +84,18 @@ function diagonalDistanceAdder() {
       };
     }
 
-    case ALTERNATING_2: {
+    case D.ALTERNATING_2: {
       let totalDiag = 0;
       return nDiag => {
         // Adjust if the past total puts us on an even square
         const pastOdd = totalDiag % 2;
         const nOdd = Math.ceil(nDiag * 0.5) - pastOdd;
         totalDiag += nDiag;
-        return (nDiag + nEven) * diagonalDist;
+        return (nDiag + nOdd) * diagonalDist;
       };
 
     }
-    default: return nDiag => nDiag * diagonalDistance;
+    default: return nDiag => nDiag * diagonalDist;
   }
 }
 
@@ -397,8 +396,7 @@ function adjustGridMoveForElevation(gridMove) {
     totalD -= 1;
   }
 
-  const diagRule = canvas.grid.grid.diagonals
-  if ( diagRule !== CONST.GRID_DIAGONALS.ILLEGAL ) {
+  if ( canvas.grid.grid.diagonals !== CONST.GRID_DIAGONALS.ILLEGAL ) {
     // Move one elevation step per horizontal, changing horizontal to diagonal.
     while ( totalE > 0 && gridMove.H > 0 ) {
       totalE -= 1;
@@ -604,7 +602,7 @@ function griddedMovePenalty(currGridCoords, prevGridCoords, { currElev = 0, prev
   let mult;
   let objectBoundsFn;
   let filterFn;
-  let quadtree
+  let quadtree;
   if ( token ) {
     mult = Settings.get(Settings.KEYS.TOKEN_RULER.TOKEN_MULTIPLIER);
     objectBoundsFn = t => t.constrainedTokenBorder;
@@ -626,19 +624,19 @@ function griddedMovePenalty(currGridCoords, prevGridCoords, { currElev = 0, prev
   let prevCenter;
   switch ( alg ) {
     case GT.CHOICES.CENTER: {
-      const gridShape = gridShapeFromGridCoords(currGridCoords);
+      const shape = gridShape(currGridCoords);
       currCenter = canvas.grid.grid.getCenterPoint(currGridCoords);
       collisionTest = o => objectBoundsFn(o.t).contains(currCenter.x, currCenter.y);
-      bounds = gridShape.getBounds();
+      bounds = shape.getBounds();
       break;
     }
 
     case GT.CHOICES.PERCENT: {
-      const gridShape = gridShapeFromGridCoords(currGridCoords);
+      const shape = gridShape(currGridCoords);
       const percentThreshold = Settings.get(GT.AREA_THRESHOLD);
-      const totalArea = gridShape.area;
-      collisionTest = o => percentOverlap(objectBoundsFn(o.t), gridShape, totalArea) >= percentThreshold;
-      bounds = gridShape.getBounds();
+      const totalArea = shape.area;
+      collisionTest = o => percentOverlap(objectBoundsFn(o.t), shape, totalArea) >= percentThreshold;
+      bounds = shape.getBounds();
       break;
     }
 
@@ -733,9 +731,9 @@ function griddedTerrainMovePenalty(token, currGridCoords, prevGridCoords, currEl
     }
 
     case GT.CHOICES.PERCENT: {
-      const gridShape = gridShapeFromGridCoords(currGridCoords);
+      const shape = gridShape(currGridCoords);
       const percentThreshold = Settings.get(GT.AREA_THRESHOLD);
-      return Terrain.percentMovementChangeForTokenWithinShape(token, gridShape,
+      return Terrain.percentMovementChangeForTokenWithinShape(token, shape,
         percentThreshold, speedAttribute, currElev);
     }
 
@@ -808,8 +806,8 @@ function isHexRow() {
  * @returns {CHANGE}
  */
 function gridChangeType(prevGridCoord, nextGridCoord) {
-  const xChange = (prevGridCoord.j !== prevGridCoord.j) || (prevGridCoord.x !== nextGridCoord.x);
-  const yChange = (prevGridCoord.i !== prevGridCoord.i) || (prevGridCoord.y !== prevGridCoord.y);
+  const xChange = (prevGridCoord.j !== nextGridCoord.j) || (prevGridCoord.x !== nextGridCoord.x);
+  const yChange = (prevGridCoord.i !== nextGridCoord.i) || (prevGridCoord.y !== nextGridCoord.y);
   return CHANGE[((xChange * 2) + yChange)];
 }
 
@@ -993,7 +991,7 @@ rulerPts.forEach(pt => Draw.point(pt, { color: Draw.COLORS.green }))
 
 rulerShapes = [];
 for ( let i = 0; i < gridCoords.length; i += 1 ) {
-  rulerShapes.push(gridShapeFromGridCoords([gridCoords[i][0], gridCoords[i][1]]))
+  rulerShapes.push(gridShape([gridCoords[i][0], gridCoords[i][1]]))
 }
 rulerShapes.forEach(shape => Draw.shape(shape, { color: Draw.COLORS.green }))
 

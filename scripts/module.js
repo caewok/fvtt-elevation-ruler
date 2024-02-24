@@ -11,7 +11,7 @@ ui
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS } from "./const.js";
-import { iterateGridUnderLine, gridShapeFromGridCoords } from "./util.js";
+import { iterateGridUnderLine, gridShape } from "./util.js";
 import { registerGeometry } from "./geometry/registration.js";
 import { registerElevationConfig } from "./geometry/elevation_configs.js";
 
@@ -50,7 +50,7 @@ Hooks.once("init", function() {
     iterateGridProjectedElevation,
     iterateGridMoves,
     sumGridMoves,
-    gridShapeFromGridCoords,
+    gridShape,
     PATCHER,
     MOVEMENT_TYPES,
 
