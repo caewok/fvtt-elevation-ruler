@@ -278,16 +278,18 @@ function _computeDistance(gridSpaces) {
   let waypointMoveDistance = 0;
   let waypointStartingElevation = 0;
   for ( const segment of this.segments ) {
-    if ( waypointKeys.has(segment.ray.A.to2d().key) ) {
+    const A = Point3d.fromObject(segment.ray.A);
+    const B = Point3d.fromObject(segment.ray.B);
+    if ( waypointKeys.has(A.to2d().key) ) {
       waypointDistance = 0;
       waypointMoveDistance = 0;
-      waypointStartingElevation = segment.ray.A.z;
+      waypointStartingElevation = A.z;
     }
     waypointDistance += segment.distance;
     waypointMoveDistance += segment.moveDistance;
     segment.waypointDistance = waypointDistance;
     segment.waypointMoveDistance = waypointMoveDistance;
-    segment.waypointElevationIncrement = segment.ray.B.z - waypointStartingElevation;
+    segment.waypointElevationIncrement = B.z - waypointStartingElevation;
   }
 }
 

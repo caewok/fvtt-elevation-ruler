@@ -12,6 +12,7 @@ PIXI
 import { SPEED, MODULE_ID, MODULES_ACTIVE } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
+import { Point3d } from "./geometry/3d/Point3d.js";
 import { perpendicularPoints, log, segmentBounds } from "./util.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
 import { BorderEdge } from "./pathfinding/BorderTriangle.js";
@@ -56,8 +57,10 @@ export function _getMeasurementSegments(wrapped) {
   const pathPoints = Settings.get(Settings.KEYS.CONTROLS.PATHFINDING)
     ? calculatePathPointsForSegment(lastSegment, token)
     : [];
-  if ( pathPoints.length > 2 ) segmentMap.set(lastSegment.ray.A.to2d().key, pathPoints);
-  else segmentMap.delete(lastSegment.ray.A.to2d().key);
+
+  const lastA = PIXI.Point.fromObject(lastSegment.ray.A); // Want 2d version.
+  if ( pathPoints.length > 2 ) segmentMap.set(lastA.key, pathPoints);
+  else segmentMap.delete(lastA.key);
 
   // For each segment, replace with path sub-segment if pathfinding was used for that segment.
   const t2 = performance.now();
@@ -73,7 +76,8 @@ export function _getMeasurementSegments(wrapped) {
  * @returns {PIXI.Point[]}
  */
 function calculatePathPointsForSegment(segment, token) {
-  const { A, B } = segment.ray;
+  const A = Point3d.fromObject(segment.ray.A);
+  const B = Point3d.fromObject(segment.ray.B);
 
   // If no collision present, no pathfinding required.
   const tC = performance.now();
