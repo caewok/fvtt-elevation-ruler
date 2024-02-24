@@ -87,9 +87,9 @@ export function * iterateGridUnderLine(origin, destination, { reverse = false } 
  * @returns {boolean}
  */
 export function tokenIsSnapped(token) {
-  const { x, y } = token.document;
-  const [snappedX, snappedY] = canvas.grid.grid.getTopLeft(x, y);
-  return snappedX.almostEqual(x) && snappedY.almostEqual(y);
+  const tokenLoc = PIXI.Point.fromObject(token.document);
+  const snappedPt = canvas.grid.grid.getTopLeftPoint(tokenLoc);
+  return tokenLoc.almostEqual(snappedPt);
 }
 
 /**
