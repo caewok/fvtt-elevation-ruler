@@ -683,9 +683,9 @@ function calculateDrawingsMovePenalty(drawings) {
  */
 function shapeForDrawing(drawing) {
   switch ( drawing.type ) {
-    case CONST.DRAWING_TYPES.RECTANGLE: return CenteredRectangle.fromDrawing(drawing);
-    case CONST.DRAWING_TYPES.POLYGON: return CenteredPolygon.fromDrawing(drawing);
-    case CONST.DRAWING_TYPES.ELLIPSE: return Ellipse.fromDrawing(drawing);
+    case Drawing.SHAPE_TYPES.RECTANGLE: return CenteredRectangle.fromDrawing(drawing);
+    case Drawing.SHAPE_TYPES.POLYGON: return CenteredPolygon.fromDrawing(drawing);
+    case Drawing.SHAPE_TYPES.ELLIPSE: return Ellipse.fromDrawing(drawing);
     default: return drawing.bounds;
   }
 }
