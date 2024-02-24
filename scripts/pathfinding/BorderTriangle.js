@@ -356,7 +356,8 @@ export class BorderTriangle {
   _calculateMovementCost(fromPoint, toPoint) {
     // TODO: Handle 3d distance. Probably Ray3d with measureDistance or measureDistances.
     // TODO: Handle terrain distance.
-    return CONFIG.GeometryLib.utils.gridUnitsToPixels(canvas.grid.measureDistance(fromPoint, toPoint));
+    const pathRes = canvas.grid.measurePath([fromPoint, toPoint]);
+    return CONFIG.GeometryLib.utils.gridUnitsToPixels(pathRes.distance);
   }
 
   /**

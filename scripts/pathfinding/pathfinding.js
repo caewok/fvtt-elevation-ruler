@@ -264,7 +264,8 @@ export class Pathfinder {
    */
   // TODO: Handle 3d points?
   _heuristic(goal, current) {
-    return CONFIG.GeometryLib.utils.gridUnitsToPixels(canvas.grid.measureDistance(goal.entryPoint, current.entryPoint));
+    const pathRes = canvas.grid.measurePath([goal.entryPoint, current.entryPoint]);
+    return CONFIG.GeometryLib.utils.gridUnitsToPixels(pathRes.distance);
   }
 
   /**
