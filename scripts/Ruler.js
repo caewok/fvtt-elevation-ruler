@@ -244,9 +244,8 @@ function _canMove(wrapper, token) {
  * Use measurement that counts segments within a grid square properly.
  * Add moveDistance property to each segment; track the total.
  * If token not present or Terrain Mapper not active, this will be the same as segment distance.
- * @param {boolean} gridSpaces    Base distance on the number of grid spaces moved?
  */
-function _computeDistance(gridSpaces) {
+function _computeDistance() {
   // If not this ruler's user, use the segments already calculated and passed via socket.
   if ( this.user !== game.user ) return;
 
@@ -254,8 +253,8 @@ function _computeDistance(gridSpaces) {
   if ( this.segments.some(s => !s) ) console.error("Segment is undefined.");
 
   // Determine the distance of each segment.
-  _computeSegmentDistances.call(this, gridSpaces);
-  if ( Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING) ) _computeTokenSpeed.call(this, gridSpaces);
+  _computeSegmentDistances.call(this);
+  if ( Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING) ) _computeTokenSpeed.call(this);
 
   switch ( this.segments.length ) {
     case 1: break;
@@ -296,9 +295,9 @@ function _computeDistance(gridSpaces) {
 /**
  * Calculate the distance of each segment.
  */
-function _computeSegmentDistances(gridSpaces) {
+function _computeSegmentDistances() {
   const token = this._getMovementToken();
-  const gridless = !gridSpaces || canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
+  const gridless = canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
   const measureMoveDistance = this.constructor.measureMoveDistance;
 
   // Loop over each segment in turn, adding the physical distance and the move distance.
@@ -332,7 +331,7 @@ function _computeSegmentDistances(gridSpaces) {
   this.totalMoveDistance = totalMoveDistance;
 }
 
-function _computeTokenSpeed(gridSpaces) {
+function _computeTokenSpeed() {
   // Requires a movement token and a defined token speed.
   const token = this._getMovementToken();
   if ( !token ) return;
@@ -342,7 +341,7 @@ function _computeTokenSpeed(gridSpaces) {
   if ( !tokenSpeed ) return;
 
   // Other constants
-  const gridless = !gridSpaces || canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
+  const gridless = canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
   const walkDistance = tokenSpeed;
   const dashDistance = tokenSpeed * SPEED.MULTIPLIER;
 
