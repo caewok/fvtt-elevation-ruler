@@ -106,6 +106,7 @@ function diagonalDistanceMultiplier() {
   if ( canvas.grid.isHexagonal || canvas.grid.isGridless ) return Math.SQRT2;
   const D = CONST.GRID_DIAGONALS;
   switch ( canvas.grid.grid.diagonals ) {
+    case D.EQUIDISTANT: return 1;
     case D.EXACT: return Math.SQRT2;
     case D.APPROXIMATE: return 1.5;
     case D.RECTILINEAR: return 2;
