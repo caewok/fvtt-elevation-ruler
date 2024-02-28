@@ -587,8 +587,8 @@ function cleanGridPathSlow(pathPoints) {
 }
 
 function getGridCenterPoint(pt) {
-  const pt = canvas.grid.grid.getCenterPoint(pt.x, pt.y);
-  return new PIXI.Point(pt.x, pt.y);
+  const centerPt = canvas.grid.grid.getCenterPoint(pt.x, pt.y);
+  return new PIXI.Point(centerPt.x, centerPt.y);
 }
 
 /**
