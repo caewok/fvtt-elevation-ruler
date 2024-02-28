@@ -37,7 +37,8 @@ export function gridShape(coords) {
  */
 function squareGridShape(coords) {
   const { x, y } = canvas.grid.grid.getTopLeftPoint(coords);
-  return new PIXI.Rectangle(tlx, tly, w, h);
+  const { sizeX, sizeY } = canvas.grid;
+  return new PIXI.Rectangle(x, y, sizeX, sizeY);
 }
 
 /**
