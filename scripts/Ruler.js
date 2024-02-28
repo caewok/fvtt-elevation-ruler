@@ -482,10 +482,10 @@ function splitSegment(segment, splitMoveDistance, token, gridless) {
  *   endpoint contained within the shape.
  */
 function segmentGridHalfIntersection(gridCoords, a, b) {
-  const gridShape = gridShape(gridCoords);
-  const ixs = gridShape.segmentIntersections(a, b);
+  const shape = gridShape(gridCoords);
+  const ixs = shape.segmentIntersections(a, b);
   if ( !ixs || ixs.length === 0 ) return null;
-  if ( ixs.length === 1 ) return gridShape.contains(a.x, a.y) ? a : b;
+  if ( ixs.length === 1 ) return shape.contains(a.x, a.y) ? a : b;
   return PIXI.Point.midPoint(ixs[0], ixs[1]);
 }
 
