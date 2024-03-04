@@ -3,6 +3,7 @@ canvas,
 PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
+"use strict";
 
 import { Draw } from "../geometry/Draw.js";
 import { PriorityQueueArray } from "./PriorityQueueArray.js";

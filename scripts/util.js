@@ -1,12 +1,14 @@
 /* globals
 canvas,
+CONFIG,
 CONST,
-game,
-PIXI
+PIXI,
+renderTemplate
 */
 "use strict";
 
 import { MODULE_ID } from "./const.js";
+import { Point3d } from "./geometry/3d/Point3d.js";
 
 export function log(...args) {
   try {
@@ -66,20 +68,82 @@ export function perpendicularPoints(A, B, distance = 1) {
   ];
 }
 
-/*
- * Generator to iterate grid points under a line.
- * See Ruler.prototype._highlightMeasurementSegment
- * @param {x: Number, y: Number} origin       Origination point
- * @param {x: Number, y: Number} destination  Destination point
- * @param {object} [opts]                     Options affecting the result
- * @param {boolean} [opts.reverse]            Return the points from destination --> origin.
- * @return Iterator, which in turn
- *   returns {GridCoordinates} Array for each grid point under the line.
+/**
+ * Row, column, elevation coordinates of a grid space. Follows from GridOffset
+ * The vertical assumes the grid cubes are stacked upon one another.
+ * @typedef {object} GridOffset3d
+ * @property {number} i     The row coordinate
+ * @property {number} j     The column coordinate
+ * @property {number} k     The elevation, where 0 is at the scene elevation, negative is below the scene.
+ *   k * canvas.scene.dimensions.distance === elevation in grid units.
  */
-export function * iterateGridUnderLine(origin, destination, { reverse = false } = {}) {
-  const waypoints = reverse ? [destination, origin] : [origin, destination];
-  const pts = canvas.grid.grid.getDirectPath(waypoints);
-  for ( const pt of pts ) yield pt;
+
+
+/**
+ * An offset of a grid space or a point with pixel coordinates.
+ * @typedef {GridOffset3d|Point3d} GridCoordinates3d
+ */
+
+/**
+ * Get the center point for a given GridCoordinates3d
+ * @param {GridCoordinates3d} coords    The coordinates
+ * @returns {Point3d} The center point
+ */
+export function getCenterPoint3d(coords) {
+  const center = Point3d.fromObject(canvas.grid.getCenterPoint(coords));
+  center.z = canvasElevationFromCoordinates(coords);
+  return center;
+}
+
+/**
+ * Get a point from grid coordinates.
+ * @param {GridCoordinates3d} coords
+ * @returns {Point3d}
+ *   - If i,j,k present, returns the center point
+ *   - Otherwise returns the point at x,y,z
+ */
+export function pointFromGridCoordinates(coords) {
+  const z  = canvasElevationFromCoordinates(coords);
+  if ( Object.hasOwn(coords, "i") ) {
+    const pt = canvas.grid.getCenterPoint(coords);
+    return new Point3d(pt.x, pt.y, z);
+  }
+  const pt = Point3d.fromObject(coords);
+  pt.z = z;
+  return pt;
+}
+
+/**
+ * Calculate the canvas elevation for a given set of coordinates.
+ * @param {GridCoordinates3d} coords    The coordinates
+ * @returns {number} Elevation in canvas pixel units.
+ */
+export function canvasElevationFromCoordinates(coords) {
+  return CONFIG.GeometryLib.utils.gridUnitsToPixels(gridElevationFromCoordinates(coords));
+}
+
+/**
+ * Calculate the grid elevation for a given set of coordinates.
+ * @param {GridCoordinates3d} coords    The coordinates
+ * @returns {number} Elevation in grid units.
+ */
+export function gridElevationFromCoordinates(coords) {
+  const k = coords.k;
+  if ( typeof k === "undefined" ) return CONFIG.GeometryLib.utils.pixelsToGridUnits(coords.z) || 0;
+  return k * canvas.scene.dimensions.distance;
+}
+
+/**
+ * Calculate the unit elevation for a given set of coordinates.
+ * @param {GridCoordinates3d} coords    The coordinates
+ * @returns {number} Elevation in number of grid steps.
+ */
+export function unitElevationFromCoordinates(coords) {
+  const k = coords.k;
+  if ( typeof k !== "undefined" ) return k;
+  const z = coords.z;
+  if ( typeof z === "undefined" ) return 0;
+  return Math.round(CONFIG.GeometryLib.utils.pixelsToGridUnits(z) / canvas.scene.dimensions.distance);
 }
 
 /**
