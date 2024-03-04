@@ -37,7 +37,9 @@ import {
 import {
   tokenIsSnapped,
   gridShape,
-  log } from "./util.js";
+  log,
+  pointFromGridCoordinates,
+  canvasElevationFromCoordinates } from "./util.js";
 
 import {
   measureDistance,
@@ -443,14 +445,13 @@ function splitSegment(segment, splitMoveDistance, token, gridless) {
   const res = Ruler.measureMoveDistance(A, B, token,
     { gridless, useAllElevation: false, stopTarget: splitMoveDistance });
 
-  let breakPoint;
-  if ( gridless ) breakPoint = res.endPoint; // We can get the exact split point.
-  else {
+  let breakPoint = pointFromGridCoordinates(res.endGridCoords); // We can get the exact split point.
+  if ( !gridless ) {
     // We can get the end grid.
     // Use halfway between the intersection points for this grid shape.
-    breakPoint = Point3d.fromObject(segmentGridHalfIntersection(res.endGridCoords, A, B) ?? A);
+    breakPoint = Point3d.fromObject(segmentGridHalfIntersection(breakPoint, A, B) ?? A);
     if ( breakPoint === A ) breakPoint.z = A.z;
-    else breakPoint.z = res.endElevationZ;
+    else breakPoint.z = canvasElevationFromCoordinates(res.endGridCoords);
   }
 
   if ( breakPoint.almostEqual(B) ) return [segment];
