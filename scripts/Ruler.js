@@ -342,15 +342,28 @@ function _computeTokenSpeed(gridSpaces) {
   const walkDistance = tokenSpeed;
   const dashDistance = tokenSpeed * SPEED.MULTIPLIER;
 
-  // For each segment, determine the type of movement: walk, dash, max.
-  // If a segment has 2+ types, split the segment; recalculating distances.
+  // Variables changed in the loop
   let totalDistance = 0;
   let totalMoveDistance = 0;
+  let totalCombatMoveDistance = 0;
+  let prevCombatMoveDistance = 0;
   let dashing = false;
   let atMaximum = false;
   let nSegments = this.segments.length;
-  const maxIter = nSegments * 3;  // Debugging
+
+  // Add in already moved combat distance.
+  if ( game.combat?.started && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) {
+    prevCombatMoveDistance = totalCombatMoveDistance = token.lastMoveDistance;
+    dashing = totalCombatMoveDistance >= walkDistance || totalCombatMoveDistance.almostEqual(walkDistance, .01);
+    atMaximum = totalCombatMoveDistance >= dashDistance || totalCombatMoveDistance.almostEqual(dashDistance, .01);
+  }
+
+  // Debugging, to avoid infinite loops.
+  const maxIter = nSegments * 3;
   let iter = 0;
+
+  // For each segment, determine the type of movement: walk, dash, max.
+  // If a segment has 2+ types, split the segment; recalculating distances.
   for ( let i = 0; i < nSegments; i += 1 ) {
     let segment = this.segments[i];
 
@@ -365,9 +378,9 @@ function _computeTokenSpeed(gridSpaces) {
 
     // Check if segment must be split.
     // Do dash first so the split can later be checked for maximum.
-    const newMoveDistance = totalMoveDistance + segment.moveDistance;
-    const targetDistance = (!dashing && newMoveDistance > walkDistance) ? walkDistance
-      : (!atMaximum && newMoveDistance > dashDistance) ? dashDistance
+    const newMoveDistance = totalCombatMoveDistance + segment.moveDistance;
+    const targetDistance = (!dashing && newMoveDistance > walkDistance) ? (walkDistance - prevCombatMoveDistance)
+      : (!atMaximum && newMoveDistance > dashDistance) ? (dashDistance - prevCombatMoveDistance)
         : undefined;
     if ( targetDistance ) {
       // Force dash and maximum, to avoid loops on error in measurement.
@@ -387,13 +400,14 @@ function _computeTokenSpeed(gridSpaces) {
 
     totalDistance += segment.distance;
     totalMoveDistance += segment.moveDistance;
+    totalCombatMoveDistance += segment.moveDistance;
 
     // Mark segment speed and flag when past the dash and maximum points.
-    if ( totalMoveDistance > dashDistance && !totalMoveDistance.almostEqual(dashDistance, .01) ) {
+    if ( totalCombatMoveDistance > dashDistance && !totalCombatMoveDistance.almostEqual(dashDistance, .01) ) {
       segment.speed = SPEED.TYPES.MAXIMUM;
       dashing ||= true;
       atMaximum ||= true;
-    } else if ( totalMoveDistance > walkDistance && !totalMoveDistance.almostEqual(walkDistance, .01) ) {
+    } else if ( totalCombatMoveDistance > walkDistance && !totalCombatMoveDistance.almostEqual(walkDistance, .01) ) {
       segment.speed = SPEED.TYPES.DASH;
       dashing ||= true;
     } else segment.speed = SPEED.TYPES.WALK;
