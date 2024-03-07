@@ -42,7 +42,8 @@ const SETTINGS = {
     ENABLED: "enable-token-ruler",
     ROUND_TO_MULTIPLE: "round-to-multiple",
     SPEED_HIGHLIGHTING: "token-ruler-highlighting",
-    TOKEN_MULTIPLIER: "token-terrain-multiplier"
+    TOKEN_MULTIPLIER: "token-terrain-multiplier",
+    COMBAT_HISTORY: "token-ruler-combat-history"
   },
 
   GRID_TERRAIN: {
@@ -54,7 +55,6 @@ const SETTINGS = {
     },
     AREA_THRESHOLD: "grid-terrain-area-threshold"
   }
-
 };
 
 const KEYBINDINGS = {
@@ -163,6 +163,16 @@ export class Settings extends ModuleSettingsAbstract {
     register(KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING, {
       name: localize(`${KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING}.name`),
       hint: localize(`${KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING}.hint`),
+      scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.TOKEN_RULER.COMBAT_HISTORY, {
+      name: localize(`${KEYS.TOKEN_RULER.COMBAT_HISTORY}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.COMBAT_HISTORY}.hint`),
       scope: "user",
       config: true,
       default: false,
