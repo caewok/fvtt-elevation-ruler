@@ -354,8 +354,8 @@ function _computeTokenSpeed(gridSpaces) {
   // Add in already moved combat distance.
   if ( game.combat?.started && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) {
     prevCombatMoveDistance = totalCombatMoveDistance = token.lastMoveDistance;
-    dashing = totalCombatMoveDistance > walkDistance && !totalCombatMoveDistance.almostEqual(walkDistance, .01);
-    atMaximum = totalCombatMoveDistance > dashDistance && !totalCombatMoveDistance.almostEqual(dashDistance, .01);
+    dashing = totalCombatMoveDistance >= walkDistance || totalCombatMoveDistance.almostEqual(walkDistance, .01);
+    atMaximum = totalCombatMoveDistance >= dashDistance || totalCombatMoveDistance.almostEqual(dashDistance, .01);
   }
 
   // Debugging, to avoid infinite loops.
