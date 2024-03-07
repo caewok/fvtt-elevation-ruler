@@ -46,20 +46,11 @@ export const MOVEMENT_TYPES = {
   FLY: 2
 };
 
-// Store the flipped key/values.
-Object.entries(MOVEMENT_TYPES).forEach(([key, value]) => MOVEMENT_TYPES[value] = key);
-
 export const MOVEMENT_BUTTONS = {
   [MOVEMENT_TYPES.AUTO]: "road-lock",
   [MOVEMENT_TYPES.BURROW]: "person-digging",
   [MOVEMENT_TYPES.WALK]: "person-walking-with-cane",
   [MOVEMENT_TYPES.FLY]: "dove"
-};
-
-export const SPEED_ATTRIBUTES = {
-  [MOVEMENT_TYPES.BURROW]: "",
-  [MOVEMENT_TYPES.WALK]: "",
-  [MOVEMENT_TYPES.FLY]: ""
 };
 
 /**

@@ -244,3 +244,10 @@ export function filterSplice(arr, filterFn) {
   indices.forEach(idx => arr.splice(idx, 1));
   return filteredElems;
 }
+
+/**
+ * Get the key for a given object value. Presumes unique values, otherwise returns first.
+ */
+export function keyForValue(object, value) {
+  return Object.keys(object).find(key => object[key] === value);
+}

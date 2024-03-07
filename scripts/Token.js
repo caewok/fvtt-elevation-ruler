@@ -77,12 +77,16 @@ async function _onDragLeftDrop(wrapped, event) {
  * Token.prototype.lastMoveDistance
  * Return the last move distance. If combat is active, return the last move since this token
  * started its turn.
- * @param {boolean} [sinceCombatTurn=true]     Should the combat turn zero out the movement distance.
  * @returns {number}
  */
 function lastMoveDistance() {
-  if ( game.combat?.active && this._lastCombatRoundMove < game.combat.round ) return 0;
-  return this._lastMoveDistance ?? 0;
+  if ( game.combat?.started ) {
+    if ( !this._combatMoveData ) return 0;
+    const combatData = this._combatMoveData.get(game.combat.id);
+    if ( !combatData || combatData.lastRound < game.combat.round ) return 0;
+    return combatData.lastMoveDistance;
+  }
+  return this._lastMoveDistance || 0;
 }
 
 /**
@@ -97,10 +101,20 @@ function updateToken(document, changes, _options, _userId) {
   if ( token.isPreview
     || !(Object.hasOwn(changes, "x")|| Object.hasOwn(changes, "y") || Object.hasOwn(changes, "elevation")) ) return;
 
-  if ( game.combat?.active ) token._lastCombatRoundMove = game.combat.round;
   const ruler = canvas.controls.ruler;
   if ( ruler.active && ruler._getMovementToken() === token ) token._lastMoveDistance = ruler.totalMoveDistance;
   else token._lastMoveDistance = Ruler.measureMoveDistance(token.position, token.document, token).moveDistance;
+  if ( game.combat?.started ) {
+    // Store the combat move distance and the last round for which the combat move occurred.
+    // Map to each unique combat.
+    const combatId = game.combat.id;
+    token._combatMoveData ??= new Map();
+    if ( !token._combatMoveData.has(combatId) ) token._combatMoveData.set(combatId, { lastMoveDistance: 0, lastRound: -1 });
+    const combatData = token._combatMoveData.get(combatId);
+    if ( combatData.lastRound < game.combat.round ) combatData.lastMoveDistance = token._lastMoveDistance;
+    else combatData.lastMoveDistance += token._lastMoveDistance
+    combatData.lastRound = game.combat.round;
+  }
 }
 
 /**

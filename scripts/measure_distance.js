@@ -709,7 +709,7 @@ function hasActiveDrawingTerrain(drawing, currElev, prevElev) {
  * @returns {number} Percent move penalty to apply. Returns 1 if no penalty.
  */
 function griddedTerrainMovePenalty(token, currGridCoords, prevGridCoords, currElev = 0, prevElev = 0) {
-  if ( !MODULES_ACTIVE.TERRAIN_MAPPER ) return 1;
+  if ( !MODULES_ACTIVE.TERRAIN_MAPPER || !token ) return 1;
   const Terrain = MODULES_ACTIVE.API.TERRAIN_MAPPER.Terrain;
   const speedAttribute = SPEED.ATTRIBUTES[token.movementType] ?? SPEED.ATTRIBUTES.WALK;
   const GT = Settings.KEYS.GRID_TERRAIN;
