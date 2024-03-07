@@ -1,5 +1,6 @@
 # 0.8.9
 Fix errors thrown when using the ruler without a movement token with either Terrain Mapper or Elevated Vision modules active. Closes issue #51.
+Display speed colors to other users who have the speed color setting enabled. Closes issue #53.
 Add CONFIG options to set additional movement types to the token hud. Closes issue #50.
 ```js
 // Example: Add a swim movement to the api.
