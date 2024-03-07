@@ -2,3 +2,5 @@
 sync_to_module.sh
 test_sync_to_module.sh
 sync_module.sh
+
+*.sh
