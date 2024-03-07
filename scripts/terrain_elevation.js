@@ -43,6 +43,7 @@ Used by ruler to get elevation at waypoints and at the end of the ruler.
 
 import { MODULES_ACTIVE } from "./const.js";
 import { Settings } from "./settings.js";
+import { Point3d } from "./geometry/3d/Point3d.js";
 
 /**
  * Calculate the elevation for a given waypoint.
