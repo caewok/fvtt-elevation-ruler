@@ -1,4 +1,8 @@
 # 0.8.9
+### New features
+Track combat moves on a per-combat basis. Add settings toggle to have movement speed highlighting reflect sum of moves for that combat round.
+
+### Bug fixes
 Fix errors thrown when using the ruler without a movement token with either Terrain Mapper or Elevated Vision modules active. Closes issue #51.
 Display speed colors to other users who have the speed color setting enabled. Closes issue #53.
 Add CONFIG options to set additional movement types to the token hud. Closes issue #50.
@@ -8,7 +12,6 @@ CONFIG.elevationruler.MOVEMENT_TYPES.SWIM = 3; // Increment by 1 from the highes
 CONFIG.elevationruler.MOVEMENT_BUTTONS[CONFIG.elevationruler.MOVEMENT_TYPES.SWIM] = "person-swimming"; // From Font Awesome
 CONFIG.elevationruler.SPEED.ATTRIBUTES.SWIM = "actor.system.attributes.movement.swim"; // dnd5e
 ```
-
 
 # 0.8.8
 Improvements to updating the scene graph. Avoid leaving unneeded vertices and split edges when a token or wall is removed. Fixes to handling overlapping edges to correctly reflect what objects make up the edge.
