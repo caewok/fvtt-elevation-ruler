@@ -80,9 +80,12 @@ async function _onDragLeftDrop(wrapped, event) {
  * @param {boolean} [sinceCombatTurn=true]     Should the combat turn zero out the movement distance.
  * @returns {number}
  */
-function lastMoveDistance() {
-  if ( game.combat?.active && this._lastCombatRoundMove < game.combat.round ) return 0;
-  return this._lastMoveDistance ?? 0;
+function lastMoveDistance(sinceCombatTurn=true) {
+  if ( game.combat?.active && sinceCombatTurn ) {
+    if ( this._lastCombatRoundMove < game.combat.round ) return 0;
+    return this._lastCombatRoundMoveDistance || 0;
+  }
+  return this._lastMoveDistance || 0;
 }
 
 /**
@@ -97,10 +100,15 @@ function updateToken(document, changes, _options, _userId) {
   if ( token.isPreview
     || !(Object.hasOwn(changes, "x")|| Object.hasOwn(changes, "y") || Object.hasOwn(changes, "elevation")) ) return;
 
-  if ( game.combat?.active ) token._lastCombatRoundMove = game.combat.round;
   const ruler = canvas.controls.ruler;
   if ( ruler.active && ruler._getMovementToken() === token ) token._lastMoveDistance = ruler.totalMoveDistance;
   else token._lastMoveDistance = Ruler.measureMoveDistance(token.position, token.document, token).moveDistance;
+  if ( game.combat?.active ) {
+    token._lastCombatRoundMoveDistance ||= 0;
+    if ( this._lastCombatRoundMove < game.combat.round ) token._lastCombatRoundMoveDistance = token._lastMoveDistance;
+    else token._lastCombatRoundMoveDistance += token._lastMoveDistance
+    token._lastCombatRoundMove = game.combat.round;
+  }
 }
 
 /**
