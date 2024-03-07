@@ -41,8 +41,17 @@ Hooks.once("init", function() {
     // Font awesome identifiers for the Token HUD speed selection.
     MOVEMENT_BUTTONS,
 
+    // Types of movement.
+    MOVEMENT_TYPES,
+
     debug: false
   };
+
+  /* To add a movement to the api:
+  CONFIG.elevationruler.MOVEMENT_TYPES.SWIM = 3; // Increment by 1 from the highest-valued movement type
+  CONFIG.elevationruler.MOVEMENT_BUTTONS[CONFIG.elevationruler.MOVEMENT_TYPES.SWIM] = "person-swimming"; // From Font Awesome
+  CONFIG.elevationruler.SPEED.ATTRIBUTES.SWIM = "actor.system.attributes.movement.swim"; // dnd5e
+  */
 
 
   game.modules.get(MODULE_ID).api = {
@@ -51,7 +60,6 @@ Hooks.once("init", function() {
     sumGridMoves,
     gridShape,
     PATCHER,
-    MOVEMENT_TYPES,
 
     // Pathfinding
     pathfinding: {

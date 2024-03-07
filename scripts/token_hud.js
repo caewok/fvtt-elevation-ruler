@@ -31,6 +31,7 @@ SOFTWARE.
 
 import { MODULE_ID, FLAGS, MOVEMENT_TYPES, MOVEMENT_BUTTONS, MODULES_ACTIVE } from "./const.js";
 import { LevelsElevationAtPoint } from "./terrain_elevation.js";
+import { keyForValue } from "./util.js";
 
 export const PATCHES = {};
 PATCHES.MOVEMENT_SELECTION = {};
@@ -56,7 +57,7 @@ PATCHES.MOVEMENT_SELECTION.HOOKS = { renderTokenHUD };
 function movementType() {
   let selectedMovement = this.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_SELECTION);
   if ( selectedMovement === MOVEMENT_TYPES.AUTO ) return determineMovementType(this);
-  return MOVEMENT_TYPES[selectedMovement];
+  return keyForValue(MOVEMENT_TYPES, selectedMovement);
 }
 
 PATCHES.MOVEMENT_SELECTION.GETTERS = { movementType };
@@ -74,7 +75,7 @@ function determineMovementType(token) {
     groundElevation = LevelsElevationAtPoint(token.center, { startingElevation: token.elevationE }) ?? 0;
   } else groundElevation = 0;
 
-  return MOVEMENT_TYPES[Math.sign(token.elevationE - groundElevation) + 1];
+  return keyForValue(MOVEMENT_TYPES, Math.sign(token.elevationE - groundElevation) + 1);
 }
 
 /**
@@ -97,7 +98,7 @@ function addMovementSelectionButton(tokenDocument, html) {
  */
 async function onMovementTypeButtonClick(tokenDocument, html) {
   const currentType = tokenDocument.getFlag(MODULE_ID, FLAGS.MOVEMENT_SELECTION); // May be undefined.
-  const nextTypeName = MOVEMENT_TYPES[currentType + 1] ?? "AUTO";
+  const nextTypeName = keyForValue(MOVEMENT_TYPES, currentType + 1) ?? "AUTO";
   await tokenDocument.setFlag(MODULE_ID, FLAGS.MOVEMENT_SELECTION, MOVEMENT_TYPES[nextTypeName]);
   html.find("#switch-movement-type").remove();
   addMovementSelectionButton(tokenDocument, html);
