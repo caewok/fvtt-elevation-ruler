@@ -15,7 +15,7 @@ import { Point3d } from "./geometry/3d/Point3d.js";
 
 // Class that handles physical distance measurement between two points.
 
-export class MeasurePhysicalDistance {
+export class PhysicalDistance {
   /**
    * Measure physical distance between two points, accounting for grid rules.
    * @param {GridCoordinates3d} a                     Starting point for the segment

@@ -2,13 +2,16 @@
 canvas,
 CONFIG,
 CONST,
-Drawing,
-foundry
+game,
+isNewerVersion,
+PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
 // Helper functions to handle GridCoordinates and v11 alternatives.
+
+import { Point3d } from "./geometry/3d/Point3d.js";
 
 // ----- NOTE: Conversion functions to handle v11 and v12 ----- //
 
@@ -32,7 +35,7 @@ export function getTopLeftPoint(coords) {
  * @returns {Point}
  */
 export function getCenterPoint(coords) {
-  if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getCenterPoint(coords)
+  if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getCenterPoint(coords);
   if ( Object.hasOwn(coords, "i") ) {
     const arr = canvas.grid.grid.getPixelsFromGridPosition(coords.i, coords.j);
     return canvas.grid.grid.getCenter(arr[0], arr[1]);
@@ -63,8 +66,8 @@ export function gridShape(coords) {
  */
 export function squareGridShape(coords) {
   const { x, y } = getTopLeftPoint(coords);
-  const sizeX = canvas.grid.sizeX || canvas.grid.size; // v12 || v11
-  const sizeY = canvas.grid.sizeY || canvas.grid.size; // v12 || v11
+  const sizeX = canvas.grid.sizeX || canvas.grid.size; // V12 || v11
+  const sizeY = canvas.grid.sizeY || canvas.grid.size; // V12 || v11
   return new PIXI.Rectangle(x, y, sizeX, sizeY);
 }
 
@@ -76,7 +79,7 @@ export function squareGridShape(coords) {
 export function hexGridShape(coords) {
   if ( isNewerVersion(game.version, 12) ) return new PIXI.Polygon(...canvas.grid.grid.getVertices(coords));
   const { x, y } = getTopLeftPoint(coords);
-  const points = canvas.grid.grid.getBorderPolygon(1, 1, 0); // width = 1, height = 1
+  const points = canvas.grid.grid.getBorderPolygon(1, 1, 0); // Width = 1, height = 1
   const pointsTranslated = [];
   const ln = points.length;
   for ( let i = 0; i < ln; i += 2) pointsTranslated.push(points[i] + x, points[i+1] + y);
@@ -123,7 +126,7 @@ export function getCenterPoint3d(coords) {
 export function pointFromGridCoordinates(coords) {
   const z = canvasElevationFromCoordinates(coords);
   const pt = Object.hasOwn(coords, "i") ? getCenterPoint(coords) : coords;
-  return new Point3d(coords.x, coords.y, z);
+  return new Point3d(pt.x, pt.y, z);
 }
 
 /**

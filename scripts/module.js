@@ -11,7 +11,7 @@ ui
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS } from "./const.js";
-import { gridShape } from "./util.js";
+import { gridShape } from "./grid_coordinates.js";
 import { registerGeometry } from "./geometry/registration.js";
 import { registerElevationConfig } from "./geometry/elevation_configs.js";
 
@@ -29,7 +29,7 @@ import {
 import {
   MovePenalty,
   MovePenaltyGridless,
-  MovePenaltyGridded
+  MovePenaltyGridded,
 
   // For debugging
   TokenMovePenaltyGridless,
@@ -90,13 +90,13 @@ Hooks.once("init", function() {
     measure: {
       MeasurePhysicalDistance,
       MeasurePhysicalDistanceGridless,
-      MeasurePhysicalDistanceGridded
+      MeasurePhysicalDistanceGridded,
       MeasureMoveDistance,
       MeasureMoveDistanceGridless,
       MeasureMoveDistanceGridded,
       MovePenalty,
       MovePenaltyGridless,
-      MovePenaltyGridded
+      MovePenaltyGridded,
 
       // For debugging
       TokenMovePenaltyGridless,

@@ -1,14 +1,11 @@
 /* globals
-canvas,
 CONFIG,
-CONST,
 PIXI,
 renderTemplate
 */
 "use strict";
 
 import { MODULE_ID } from "./const.js";
-import { Point3d } from "./geometry/3d/Point3d.js";
 import { getTopLeftPoint } from "./grid_coordinates.js";
 
 export function log(...args) {

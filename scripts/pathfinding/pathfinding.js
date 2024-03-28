@@ -12,7 +12,7 @@ PIXI
 
 import { BorderTriangle, BorderEdge } from "./BorderTriangle.js";
 import { boundsForPoint, log } from "../util.js";
-import { getCenterPoint } from "./grid_coordinates.js";
+import { getCenterPoint } from "../grid_coordinates.js";
 import { Draw } from "../geometry/Draw.js";
 import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./algorithms.js";
 import { SCENE_GRAPH } from "./WallTracer.js";

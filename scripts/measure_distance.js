@@ -11,13 +11,13 @@ Ruler
 "use strict";
 
 import { MODULES_ACTIVE, SPEED, MODULE_ID, FLAGS } from "./const.js";
+import { segmentBounds } from "./util.js";
 import {
-  segmentBounds,
   gridShape,
   getCenterPoint3d,
   canvasElevationFromCoordinates,
   unitElevationFromCoordinates,
-  pointFromGridCoordinates } from "./util.js";
+  pointFromGridCoordinates } from "./grid_coordinates.js";
 import { Settings } from "./settings.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { CenteredRectangle } from "./geometry/CenteredPolygon/CenteredRectangle.js";

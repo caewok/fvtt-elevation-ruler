@@ -36,10 +36,9 @@ import {
 
 import {
   tokenIsSnapped,
-  gridShape,
-  log,
-  pointFromGridCoordinates,
-  canvasElevationFromCoordinates } from "./util.js";
+  log } from "./util.js";
+
+import { gridShape, pointFromGridCoordinates, canvasElevationFromCoordinates } from "./grid_coordinates.js";
 
 import {
   measureDistance,
@@ -94,11 +93,11 @@ function clear(wrapper) {
 }
 
 /**
- * Wrap Ruler.prototype._getMeasurementData
+ * Wrap Ruler.prototype.toJSON
  * Store the current userElevationIncrements for the destination.
  * Store segment information, possibly including pathfinding.
  */
-function _getMeasurementData(wrapper) {
+function toJSON(wrapper) {
   // If debugging, log will not display on user's console
   // console.log("constructing ruler json!")
   const obj = wrapper();
@@ -580,7 +579,7 @@ function _getMovementToken(wrapped) {
 
 PATCHES.BASIC.WRAPS = {
   clear,
-  _getMeasurementData,
+  toJSON,
   update,
   _addWaypoint,
   _removeWaypoint,

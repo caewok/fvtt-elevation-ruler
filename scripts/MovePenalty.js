@@ -316,12 +316,16 @@ export class MovePenaltyGridded extends MovePenalty {
 }
 
 export class TokenMovePenaltyGridded extends MovePenaltyGridded {
-  /** @type {object} */
-  static #CLASSES = {
-    [CENTER]: TokenMovePenaltyCenterGrid,
-    [PERCENT]: TokenMovePenaltyPercentGrid,
-    [EUCLIDEAN]: TokenMovePenaltyEuclideanGrid
-  };
+  /** @type {Map<String, class>} */
+  static #penaltySubclasses = new Map();
+
+  /**
+   * Track subclasses used for different grid penalty measurements.
+   */
+  static _registerPenaltySubclass(type, theClass) { this.#penaltySubclasses.set(type, theClass); }
+
+  /** @type {class} */
+  static get #penaltySubclass() { return this.#penaltySubclasses.get(this.griddedAlgorithm); }
 
   /**
    * Returns a penalty function for gridded moves.
@@ -334,7 +338,7 @@ export class TokenMovePenaltyGridded extends MovePenaltyGridded {
 
   static movePenaltyFn() {
     if ( this.mult === 1 ) return () => 1;
-    return this.#CLASSES[this.griddedAlgorithm].moveMultiplier;
+    return this.#penaltySubclass.moveMultiplier;
   }
 
   /**
@@ -345,7 +349,7 @@ export class TokenMovePenaltyGridded extends MovePenaltyGridded {
    * @returns {number} Percent penalty
    */
   static moveMultiplier(currGridCoords, prevGridCoords, token) {
-    return this.#CLASSES[this.griddedAlgorithm].moveMultiplier(currGridCoords, prevGridCoords, token);
+    return this.#penaltySubclasses.moveMultiplier(currGridCoords, prevGridCoords, token);
   }
 
   /**
@@ -425,12 +429,16 @@ export class TokenMovePenaltyEuclideanGrid extends TokenMovePenaltyGridded {
 }
 
 export class DrawingMovePenaltyGridded extends MovePenaltyGridded {
-  /** @type {object} */
-  static #CLASSES = {
-    [CENTER]: DrawingMovePenaltyCenterGrid,
-    [PERCENT]: DrawingMovePenaltyPercentGrid,
-    [EUCLIDEAN]: DrawingMovePenaltyEuclideanGrid
-  };
+  /** @type {Map<String, class>} */
+  static #penaltySubclasses = new Map();
+
+  /**
+   * Track subclasses used for different grid penalty measurements.
+   */
+  static _registerPenaltySubclass(type, theClass) { this.#penaltySubclasses.set(type, theClass); }
+
+  /** @type {class} */
+  static get #penaltySubclass() { return this.#penaltySubclasses.get(this.griddedAlgorithm); }
 
   /**
    * Returns a penalty function for gridded moves.
@@ -440,7 +448,7 @@ export class DrawingMovePenaltyGridded extends MovePenaltyGridded {
    *   - @param {Token} [token]                 Token doing the move. Required for token moves.
    *   - @returns {number} Percent penalty to apply for the move.
    */
-  static movePenaltyFn() { return this.#CLASSES[this.griddedAlgorithm].moveMultiplier; }
+  static movePenaltyFn() { return this.#penaltySubclass.moveMultiplier; }
 
   /**
    * Move multiplier accounting for drawings on the grid.
@@ -449,9 +457,8 @@ export class DrawingMovePenaltyGridded extends MovePenaltyGridded {
    * @returns {number} Percent penalty
    */
   static moveMultiplier(currGridCoords, prevGridCoords) {
-    return this.#CLASSES[this.griddedAlgorithm].moveMultiplier(currGridCoords, prevGridCoords);
+    return this.#penaltySubclass.moveMultiplier(currGridCoords, prevGridCoords);
   }
-
 
   /**
    * Filter placeable tokens by either a center test or a percent overlap test.
@@ -532,12 +539,16 @@ export class DrawingMovePenaltyEuclideanGrid extends DrawingMovePenaltyGridded {
 }
 
 export class TerrainMovePenaltyGridded extends MovePenaltyGridded {
-  /** @type {object} */
-  static #CLASSES = {
-    [CENTER]: TerrainMovePenaltyCenterGrid,
-    [PERCENT]: TerrainMovePenaltyPercentGrid,
-    [EUCLIDEAN]: TerrainMovePenaltyEuclideanGrid
-  };
+  /** @type {Map<String, class>} */
+  static #penaltySubclasses = new Map();
+
+  /**
+   * Track subclasses used for different grid penalty measurements.
+   */
+  static _registerPenaltySubclass(type, theClass) { this.#penaltySubclasses.set(type, theClass); }
+
+  /** @type {class} */
+  static get #penaltySubclass() { return this.#penaltySubclasses.get(this.griddedAlgorithm); }
 
   /**
    * Determine the speed attribute for a given token.
@@ -555,7 +566,7 @@ export class TerrainMovePenaltyGridded extends MovePenaltyGridded {
    *   - @returns {number} Percent penalty to apply for the move.
    */
 
-  static movePenaltyFn() { return this.#CLASSES[this.griddedAlgorithm].moveMultiplier; }
+  static movePenaltyFn() { return this.#penaltySubclass.moveMultiplier; }
 
   /**
    * Move multiplier accounting for tokens on the grid.
@@ -565,7 +576,7 @@ export class TerrainMovePenaltyGridded extends MovePenaltyGridded {
    * @returns {number} Percent penalty
    */
   static moveMultiplier(currGridCoords, prevGridCoords, token) {
-    return this.#CLASSES[this.griddedAlgorithm].moveMultiplier(currGridCoords, prevGridCoords, token);
+    return this.#penaltySubclass.moveMultiplier(currGridCoords, prevGridCoords, token);
   }
 
 }
@@ -751,3 +762,17 @@ function rayShapesIntersectionPenalty(a, b, shapes, shapePenaltyFn) {
   const totalDistance = Point3d.distanceBetween(a, b);
   return (distOutside + penaltyDistInside) / totalDistance;
 }
+
+
+// Register subclasses used for different grid penalty measurements.
+TokenMovePenaltyGridded._registerPenaltySubclass(CENTER, TokenMovePenaltyCenterGrid);
+TokenMovePenaltyGridded._registerPenaltySubclass(PERCENT, TokenMovePenaltyPercentGrid);
+TokenMovePenaltyGridded._registerPenaltySubclass(EUCLIDEAN, TokenMovePenaltyEuclideanGrid);
+
+DrawingMovePenaltyGridded._registerPenaltySubclass(CENTER, DrawingMovePenaltyCenterGrid);
+DrawingMovePenaltyGridded._registerPenaltySubclass(PERCENT, DrawingMovePenaltyPercentGrid);
+DrawingMovePenaltyGridded._registerPenaltySubclass(EUCLIDEAN, DrawingMovePenaltyEuclideanGrid);
+
+TerrainMovePenaltyGridded._registerPenaltySubclass(CENTER, TerrainMovePenaltyCenterGrid);
+TerrainMovePenaltyGridded._registerPenaltySubclass(PERCENT, TerrainMovePenaltyPercentGrid);
+TerrainMovePenaltyGridded._registerPenaltySubclass(EUCLIDEAN, TerrainMovePenaltyEuclideanGrid);
