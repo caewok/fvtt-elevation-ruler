@@ -2,7 +2,6 @@
 canvas,
 CONFIG,
 CONST,
-isHexRow,
 PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -354,11 +353,19 @@ export class MeasurePhysicalDistanceGridded extends MeasurePhysicalDistance {
   static gridUnder2dLine(origin, destination) {
     return canvas.grid.getDirectPath([origin, destination]);
   }
-
-
 }
 
 // Store the flipped key/values. And lock the keys.
 const CHANGE = MeasurePhysicalDistanceGridded.CHANGE;
 Object.entries(CHANGE).forEach(([key, value]) => CHANGE[value] = key);
 Object.freeze(CHANGE);
+
+// ----- NOTE: Helper functions ----- //
+
+/**
+ * @returns {boolean} True if the grid is a row hex.
+ */
+function isHexRow() {
+  return canvas.grid.type === CONST.GRID_TYPES.HEXODDR
+    || canvas.grid.type === CONST.GRID_TYPES.HEXEVENR;
+}

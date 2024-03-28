@@ -15,6 +15,31 @@ import { gridShape } from "./util.js";
 import { registerGeometry } from "./geometry/registration.js";
 import { registerElevationConfig } from "./geometry/elevation_configs.js";
 
+// Measure classes
+import {
+  MeasurePhysicalDistance,
+  MeasurePhysicalDistanceGridless,
+  MeasurePhysicalDistanceGridded } from "./MeasurePhysicalDistance.js";
+
+import {
+  MeasureMoveDistance,
+  MeasureMoveDistanceGridless,
+  MeasureMoveDistanceGridded } from "./MeasureMoveDistance.js";
+
+import {
+  MovePenalty,
+  MovePenaltyGridless,
+  MovePenaltyGridded
+
+  // For debugging
+  TokenMovePenaltyGridless,
+  TerrainMovePenaltyGridless,
+  DrawingMovePenaltyGridless,
+
+  TokenMovePenaltyGridded,
+  DrawingMovePenaltyGridded,
+  TerrainMovePenaltyGridded } from "./MovePenalty.js";
+
 // Pathfinding
 import { BorderTriangle, BorderEdge } from "./pathfinding/BorderTriangle.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
@@ -60,6 +85,28 @@ Hooks.once("init", function() {
     sumGridMoves,
     gridShape,
     PATCHER,
+
+    // Measure classes
+    measure: {
+      MeasurePhysicalDistance,
+      MeasurePhysicalDistanceGridless,
+      MeasurePhysicalDistanceGridded
+      MeasureMoveDistance,
+      MeasureMoveDistanceGridless,
+      MeasureMoveDistanceGridded,
+      MovePenalty,
+      MovePenaltyGridless,
+      MovePenaltyGridded
+
+      // For debugging
+      TokenMovePenaltyGridless,
+      TerrainMovePenaltyGridless,
+      DrawingMovePenaltyGridless,
+
+      TokenMovePenaltyGridded,
+      DrawingMovePenaltyGridded,
+      TerrainMovePenaltyGridded
+    },
 
     // Pathfinding
     pathfinding: {
