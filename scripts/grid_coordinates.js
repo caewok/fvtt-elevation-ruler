@@ -10,19 +10,37 @@ foundry
 
 // Helper functions to handle GridCoordinates and v11 alternatives.
 
+// ----- NOTE: Conversion functions to handle v11 and v12 ----- //
+
 /**
  * Get the top left point on the grid for a given set of coordinates.
  * @param {GridCoordinates} coords    Grid (i,j) offset or x,y coordinates
  * @returns {Point}
  */
-function getTopLeftPoint(coords) {
+export function getTopLeftPoint(coords) {
   if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getTopLeftPoint(coords);
   if ( Object.hasOwn(coords, "i") ) {
-    return canvas.grid.grid.getPixelsFromGridPosition(coords.i, coords.j);
+    const arr = canvas.grid.grid.getPixelsFromGridPosition(coords.i, coords.j);
+    return { x: arr[0], y: arr[1] };
   }
   return canvas.grid.grid.getTopLeft(coords.x, coords.y);
 }
 
+/**
+ * Get the center point on the grid for a given set of coordinates.
+ * @param {GridCoordinates} coords    Grid (i,j) offset or x,y coordinates
+ * @returns {Point}
+ */
+export function getCenterPoint(coords) {
+  if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getCenterPoint(coords)
+  if ( Object.hasOwn(coords, "i") ) {
+    const arr = canvas.grid.grid.getPixelsFromGridPosition(coords.i, coords.j);
+    return canvas.grid.grid.getCenter(arr[0], arr[1]);
+  }
+  return canvas.grid.grid.getCenter(coords.x, coords.y);
+}
+
+// ----- NOTE: Grid shape ----- //
 
 /**
  * Helper to get the grid shape for given grid type.
@@ -44,8 +62,9 @@ export function gridShape(coords) {
  * @returns {PIXI.Rectangle}
  */
 export function squareGridShape(coords) {
-  const { x, y } = canvas.grid.grid.getTopLeftPoint(coords);
-  const { sizeX, sizeY } = canvas.grid;
+  const { x, y } = getTopLeftPoint(coords);
+  const sizeX = canvas.grid.sizeX || canvas.grid.size; // v12 || v11
+  const sizeY = canvas.grid.sizeY || canvas.grid.size; // v12 || v11
   return new PIXI.Rectangle(x, y, sizeX, sizeY);
 }
 
@@ -55,9 +74,16 @@ export function squareGridShape(coords) {
  * @returns {PIXI.Polygon}
  */
 export function hexGridShape(coords) {
-  return new PIXI.Polygon(...canvas.grid.grid.getVertices(coords));
+  if ( isNewerVersion(game.version, 12) ) return new PIXI.Polygon(...canvas.grid.grid.getVertices(coords));
+  const { x, y } = getTopLeftPoint(coords);
+  const points = canvas.grid.grid.getBorderPolygon(1, 1, 0); // width = 1, height = 1
+  const pointsTranslated = [];
+  const ln = points.length;
+  for ( let i = 0; i < ln; i += 2) pointsTranslated.push(points[i] + x, points[i+1] + y);
+  return new PIXI.Polygon(pointsTranslated);
 }
 
+// ----- NOTE: GridCoordinates3d ----- //
 
 /**
  * Row, column, elevation coordinates of a grid space. Follows from GridOffset
@@ -82,7 +108,7 @@ export function hexGridShape(coords) {
  * @returns {Point3d} The center point
  */
 export function getCenterPoint3d(coords) {
-  const center = Point3d.fromObject(canvas.grid.getCenterPoint(coords));
+  const center = Point3d.fromObject(getCenterPoint(coords));
   center.z = canvasElevationFromCoordinates(coords);
   return center;
 }
@@ -95,14 +121,9 @@ export function getCenterPoint3d(coords) {
  *   - Otherwise returns the point at x,y,z
  */
 export function pointFromGridCoordinates(coords) {
-  const z  = canvasElevationFromCoordinates(coords);
-  if ( Object.hasOwn(coords, "i") ) {
-    const pt = canvas.grid.getCenterPoint(coords);
-    return new Point3d(pt.x, pt.y, z);
-  }
-  const pt = Point3d.fromObject(coords);
-  pt.z = z;
-  return pt;
+  const z = canvasElevationFromCoordinates(coords);
+  const pt = Object.hasOwn(coords, "i") ? getCenterPoint(coords) : coords;
+  return new Point3d(coords.x, coords.y, z);
 }
 
 /**

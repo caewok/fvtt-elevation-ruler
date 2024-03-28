@@ -12,6 +12,7 @@ PIXI
 
 import { BorderTriangle, BorderEdge } from "./BorderTriangle.js";
 import { boundsForPoint, log } from "../util.js";
+import { getCenterPoint } from "./grid_coordinates.js";
 import { Draw } from "../geometry/Draw.js";
 import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./algorithms.js";
 import { SCENE_GRAPH } from "./WallTracer.js";
@@ -586,10 +587,7 @@ function cleanGridPathSlow(pathPoints) {
   return filteredPath;
 }
 
-function getGridCenterPoint(pt) {
-  const centerPt = canvas.grid.grid.getCenterPoint(pt);
-  return PIXI.Point.fromObject(centerPt);
-}
+function getGridCenterPoint(pt) { return PIXI.Point.fromObject(getCenterPoint(pt)); }
 
 /**
  * For given point not on a grid:
