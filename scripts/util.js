@@ -238,3 +238,17 @@ export function filterSplice(arr, filterFn) {
 export function keyForValue(object, value) {
   return Object.keys(object).find(key => object[key] === value);
 }
+
+/**
+ * Calculate the percent area overlap of one shape on another.
+ * @param {PIXI.Rectangle|PIXI.Polygon} overlapShape
+ * @param {PIXI.Rectangle|PIXI.Polygon} areaShape
+ * @returns {number} Value between 0 and 1.
+ */
+export function percentOverlap(overlapShape, areaShape, totalArea) {
+  if ( !overlapShape.overlaps(areaShape) ) return 0;
+  const intersection = overlapShape.intersectPolygon(areaShape.toPolygon());
+  const ixArea = intersection.area;
+  totalArea ??= areaShape.area;
+  return ixArea / totalArea;
+}
