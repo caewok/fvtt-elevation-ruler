@@ -8,11 +8,11 @@ CONST
 
 // Class to measure distance between two points, accounting for token movement through terrain.
 
-import { MeasurePhysicalDistanceGridless, MeasurePhysicalDistanceGridded } from "./MeasurePhysicalDistance.js";
+import { PhysicalDistanceGridless, PhysicalDistanceGridded } from "./PhysicalDistance.js";
 import { MovePenaltyGridless, MovePenaltyGridded } from "./MovePenalty.js";
 import { unitElevationFromCoordinates } from "./grid_coordinates.js";
 
-export class MeasureMoveDistance {
+export class MoveDistance {
   /**
    * Measure distance between two points, accounting for movement penalties and grid rules.
    * @param {GridCoordinates3d} a                     Starting point for the segment
@@ -38,12 +38,12 @@ export class MeasureMoveDistance {
    */
   static #applyChildClass(method, gridless = false, ...args) {
     gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
-    const cl = gridless ? MeasureMoveDistanceGridless : MeasureMoveDistanceGridded;
+    const cl = gridless ? MoveDistanceGridless : MoveDistanceGridded;
     return cl[method](...args);
   }
 }
 
-export class MeasureMoveDistanceGridless extends MeasureMoveDistance {
+export class MoveDistanceGridless extends MoveDistance {
   /**
    * Measure distance between two points, accounting for movement penalties.
    * @param {GridCoordinates3d} a                     Starting point for the segment
@@ -71,7 +71,7 @@ export class MeasureMoveDistanceGridless extends MeasureMoveDistance {
 
     // Determine penalty proportion of the a|b segment.
     const penalty = penaltyFn(a, b, token);
-    const d = CONFIG.GeometryLib.utils.pixelsToGridUnits(MeasurePhysicalDistanceGridless(a, b));
+    const d = CONFIG.GeometryLib.utils.pixelsToGridUnits(PhysicalDistanceGridless(a, b));
     return {
       distance: d,
       moveDistance: d * penalty,
@@ -121,7 +121,7 @@ export class MeasureMoveDistanceGridless extends MeasureMoveDistance {
 
 }
 
-export class MeasureMoveDistanceGridded extends MeasureMoveDistance {
+export class MoveDistanceGridded extends MoveDistance {
   /**
    * Measure distance between two points on a grid, accounting for movement penalties and grid rules.
    * @param {GridCoordinates3d} a                     Starting point for the segment
@@ -138,7 +138,7 @@ export class MeasureMoveDistanceGridded extends MeasureMoveDistance {
    *  Euclidean on a grid also uses grid squares, but measures using actual diagonal from center to center.
    */
   static measure(a, b, token, { useAllElevation = true, stopTarget, penaltyFn } = {}) {
-    const iter = MeasurePhysicalDistanceGridded.gridUnder3dLine(a, b).values();
+    const iter = PhysicalDistanceGridded.gridUnder3dLine(a, b).values();
     let prevGridCoords = iter.next().value;
 
     // Should never happen, as passing the same point as a,b returns a single square.
@@ -154,7 +154,7 @@ export class MeasureMoveDistanceGridded extends MeasureMoveDistance {
 
     let currGridCoords;
     for ( currGridCoords of iter ) {
-      const d = MeasurePhysicalDistanceGridded.measure(prevGridCoords, currGridCoords);
+      const d = PhysicalDistanceGridded.measure(prevGridCoords, currGridCoords);
       const penalty = penaltyFn(currGridCoords, prevGridCoords, token);
       const dMove = d * penalty;
 

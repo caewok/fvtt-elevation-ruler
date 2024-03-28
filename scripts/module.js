@@ -17,14 +17,14 @@ import { registerElevationConfig } from "./geometry/elevation_configs.js";
 
 // Measure classes
 import {
-  MeasurePhysicalDistance,
-  MeasurePhysicalDistanceGridless,
-  MeasurePhysicalDistanceGridded } from "./MeasurePhysicalDistance.js";
+  PhysicalDistance,
+  PhysicalDistanceGridless,
+  PhysicalDistanceGridded } from "./PhysicalDistance.js";
 
 import {
-  MeasureMoveDistance,
-  MeasureMoveDistanceGridless,
-  MeasureMoveDistanceGridded } from "./MeasureMoveDistance.js";
+  MoveDistance,
+  MoveDistanceGridless,
+  MoveDistanceGridded } from "./MoveDistance.js";
 
 import {
   MovePenalty,
@@ -88,12 +88,12 @@ Hooks.once("init", function() {
 
     // Measure classes
     measure: {
-      MeasurePhysicalDistance,
-      MeasurePhysicalDistanceGridless,
-      MeasurePhysicalDistanceGridded,
-      MeasureMoveDistance,
-      MeasureMoveDistanceGridless,
-      MeasureMoveDistanceGridded,
+      PhysicalDistance,
+      PhysicalDistanceGridless,
+      PhysicalDistanceGridded,
+      MoveDistance,
+      MoveDistanceGridless,
+      MoveDistanceGridded,
       MovePenalty,
       MovePenaltyGridless,
       MovePenaltyGridded,

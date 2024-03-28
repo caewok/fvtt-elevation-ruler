@@ -62,12 +62,12 @@ export class PhysicalDistance {
    */
   static #applyChildClass(method, gridless = false, ...args) {
     gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
-    const cl = gridless ? MeasurePhysicalDistanceGridless : MeasurePhysicalDistanceGridded;
+    const cl = gridless ? PhysicalDistanceGridless : PhysicalDistanceGridded;
     return cl[method](...args);
   }
 }
 
-export class MeasurePhysicalDistanceGridless extends MeasurePhysicalDistance {
+export class PhysicalDistanceGridless extends PhysicalDistance {
   /**
    * Measure physical distance between two points, accounting for grid rules.
    * @param {GridCoordinates3d} a                     Starting point for the segment
@@ -110,7 +110,7 @@ export class MeasurePhysicalDistanceGridless extends MeasurePhysicalDistance {
   }
 }
 
-export class MeasurePhysicalDistanceGridded extends MeasurePhysicalDistance {
+export class PhysicalDistanceGridded extends PhysicalDistance {
   /** @type {enum} */
   static CHANGE = {
     NONE: 0,
@@ -356,7 +356,7 @@ export class MeasurePhysicalDistanceGridded extends MeasurePhysicalDistance {
 }
 
 // Store the flipped key/values. And lock the keys.
-const CHANGE = MeasurePhysicalDistanceGridded.CHANGE;
+const CHANGE = PhysicalDistanceGridded.CHANGE;
 Object.entries(CHANGE).forEach(([key, value]) => CHANGE[value] = key);
 Object.freeze(CHANGE);
 
