@@ -10,14 +10,16 @@ Ruler
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { MODULES_ACTIVE, SPEED, MODULE_ID, FLAGS } from "./const.js";
+import { MODULES_ACTIVE, SPEED, MODULE_ID, FLAGS, GRID_DIAGONALS } from "./const.js";
 import { segmentBounds } from "./util.js";
 import {
   gridShape,
   getCenterPoint3d,
   canvasElevationFromCoordinates,
   unitElevationFromCoordinates,
-  pointFromGridCoordinates } from "./grid_coordinates.js";
+  pointFromGridCoordinates,
+  getDirectPath,
+  diagonalRule } from "./grid_coordinates.js";
 import { Settings } from "./settings.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { CenteredRectangle } from "./geometry/CenteredPolygon/CenteredRectangle.js";
@@ -77,9 +79,8 @@ function diagonalDistanceAdder() {
   const distance = canvas.dimensions.distance;
   const diagonalMult = diagonalDistanceMultiplier();
   const diagonalDist = distance * diagonalMult;
-  const diagonalRule = canvas.grid.grid.diagonals;
-  const D = CONST.GRID_DIAGONALS;
-  switch ( diagonalRule ) {
+  const D = GRID_DIAGONALS;
+  switch ( diagonalRule() ) {
     case D.ALTERNATING_1: {
       let totalDiag = 0;
       return nDiag => {
@@ -110,8 +111,8 @@ function diagonalDistanceAdder() {
  */
 function diagonalDistanceMultiplier() {
   if ( canvas.grid.isHexagonal || canvas.grid.isGridless ) return Math.SQRT2;
-  const D = CONST.GRID_DIAGONALS;
-  switch ( canvas.grid.grid.diagonals ) {
+  const D = GRID_DIAGONALS;
+  switch ( diagonalRule() ) {
     case D.EQUIDISTANT: return 1;
     case D.EXACT: return Math.SQRT2;
     case D.APPROXIMATE: return 1.5;
@@ -930,7 +931,7 @@ function terrainMovePenalty(a, b, token) {
  * @returns {GridCoordinates[]} Array containing each grid point under the line.
  *   For gridless, returns the GridCoordinates of the origin and destination.
  */
-export function gridUnder2dLine(origin, destination) { return canvas.grid.getDirectPath([origin, destination]); }
+export function gridUnder2dLine(origin, destination) { return getDirectPath([origin, destination]); }
 
 /*
  * Get the grid coordinates for a 3d segment projected to 2d.

@@ -25,8 +25,8 @@ export class MoveDistance {
    *  Instead of mathematical shortcuts from center, actual grid squares are counted.
    *  Euclidean on a grid also uses grid squares, but measures using actual diagonal from center to center.
    */
-  static measure(a, b, token, { gridless = false, ...opts } = {}) {
-    return this.#applyChildClass("measureMoveDistance", gridless, a, b, token, opts);
+  static measure(a, b, { gridless = false, ...opts } = {}) {
+    return this.#applyChildClass("measure", gridless, a, b, opts);
   }
 
   /**
@@ -48,8 +48,8 @@ export class MoveDistanceGridless extends MoveDistance {
    * Measure distance between two points, accounting for movement penalties.
    * @param {GridCoordinates3d} a                     Starting point for the segment
    * @param {GridCoordinates3d} b                     Ending point for the segment
-   * @param {Token} token                             Token doing the move, for calculating move penalty
    * @param {object} [opts]                           Options that affect the measurement
+   * @param {Token} [opts.token]                      Token doing the move, for calculating move penalty
    * @param {boolean} [opts.useAllElevation]          When false, stop once 2d destination is reached
    *                                                  regardless of elevation
    * @param {number} [opts.stopTarget]                Stop the move once this amount of distance is covered
@@ -59,19 +59,19 @@ export class MoveDistanceGridless extends MoveDistance {
    *  Instead of mathematical shortcuts from center, actual grid squares are counted.
    *  Euclidean on a grid also uses grid squares, but measures using actual diagonal from center to center.
    */
-  static measure(a, b, token, { useAllElevation = true, stopTarget, penaltyFn } = {}) {
+  static measure(a, b, { token, useAllElevation = true, stopTarget, penaltyFn } = {}) {
     penaltyFn ??= MovePenaltyGridless.movePenaltyFn();
 
     // Recursively calls measure without a stop target to find a breakpoint.
     if ( stopTarget ) {
       const fullZ = b.z;
-      b = this.#findGridlessBreakpoint(a, b, token, stopTarget, { penaltyFn });
+      b = this.#findGridlessBreakpoint(a, b, stopTarget, { token, penaltyFn });
       if ( useAllElevation ) b.z = fullZ;
     }
 
     // Determine penalty proportion of the a|b segment.
     const penalty = penaltyFn(a, b, token);
-    const d = CONFIG.GeometryLib.utils.pixelsToGridUnits(PhysicalDistanceGridless(a, b));
+    const d = CONFIG.GeometryLib.utils.pixelsToGridUnits(PhysicalDistanceGridless.measure(a, b));
     return {
       distance: d,
       moveDistance: d * penalty,
@@ -88,11 +88,11 @@ export class MoveDistanceGridless extends MoveDistance {
    * @param {number} splitMoveDistance          Distance, in grid units, of the desired first subsegment move distance
    * @returns {Point3d}
    */
-  #findGridlessBreakpoint(a, b, token, splitMoveDistance, opts = {}) {
+  #findGridlessBreakpoint(a, b, splitMoveDistance, opts = {}) {
     // Binary search to find a reasonably close t value for the split move distance.
     // Because the move distance can vary depending on terrain.
     const MAX_ITER = 20;
-    const { moveDistance: fullMoveDistance } = this.measure(a, b, token, opts);
+    const { moveDistance: fullMoveDistance } = this.measure(a, b, opts);
 
     let t = splitMoveDistance / fullMoveDistance;
     if ( t <= 0 ) return a;
@@ -103,7 +103,7 @@ export class MoveDistanceGridless extends MoveDistance {
     let testSplitPoint;
     for ( let i = 0; i < MAX_ITER; i += 1 ) {
       testSplitPoint = a.projectToward(b, t);
-      const { moveDistance } = this.measure(a, testSplitPoint, token, opts);
+      const { moveDistance } = this.measure(a, testSplitPoint, opts);
 
       // Adjust t by half the distance to the max/min t value.
       // Need not be all that exact but must be over the target distance.
@@ -126,8 +126,8 @@ export class MoveDistanceGridded extends MoveDistance {
    * Measure distance between two points on a grid, accounting for movement penalties and grid rules.
    * @param {GridCoordinates3d} a                     Starting point for the segment
    * @param {GridCoordinates3d} b                     Ending point for the segment
-   * @param {Token} token                             Token doing the move, for calculating move penalty
    * @param {object} [opts]                           Options that affect the measurement
+   * @param {Token} [opts.token]                      Token doing the move, for calculating move penalty
    * @param {boolean} [opts.useAllElevation]          When false, stop once 2d destination is reached
    *                                                  regardless of elevation
    * @param {number} [opts.stopTarget]                Stop the move once this amount of distance is covered
@@ -137,7 +137,7 @@ export class MoveDistanceGridded extends MoveDistance {
    *  Instead of mathematical shortcuts from center, actual grid squares are counted.
    *  Euclidean on a grid also uses grid squares, but measures using actual diagonal from center to center.
    */
-  static measure(a, b, token, { useAllElevation = true, stopTarget, penaltyFn } = {}) {
+  static measure(a, b, { token, useAllElevation = true, stopTarget, penaltyFn } = {}) {
     const iter = PhysicalDistanceGridded.gridUnder3dLine(a, b).values();
     let prevGridCoords = iter.next().value;
 
@@ -149,13 +149,14 @@ export class MoveDistanceGridded extends MoveDistance {
 
     // Step over each grid shape in turn. Change the distance by penalty amount.
     penaltyFn ??= MovePenaltyGridded.movePenaltyFn();
+    const tokenMultiplier = MovePenalty.tokenMultiplier;
     let dTotal = 0;
     let dMoveTotal = 0;
 
     let currGridCoords;
     for ( currGridCoords of iter ) {
       const d = PhysicalDistanceGridded.measure(prevGridCoords, currGridCoords);
-      const penalty = penaltyFn(currGridCoords, prevGridCoords, token);
+      const penalty = penaltyFn(currGridCoords, prevGridCoords, { token, tokenMultiplier });
       const dMove = d * penalty;
 
       // Early stop if the stop target is met.
@@ -170,7 +171,7 @@ export class MoveDistanceGridded extends MoveDistance {
     if ( useAllElevation && currGridCoords ) {
       const endGridCoords = { ...currGridCoords };
       endGridCoords.k = unitElevationFromCoordinates(b);
-      const res = this.measure(currGridCoords, endGridCoords, { penaltyFn, useAllElevation: false });
+      const res = this.measure(currGridCoords, endGridCoords, { token, penaltyFn, useAllElevation: false });
       dTotal += res.distance;
       dMoveTotal += res.moveDistance;
       currGridCoords = endGridCoords;

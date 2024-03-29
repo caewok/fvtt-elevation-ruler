@@ -7,10 +7,13 @@ PIXI
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
+import { GRID_DIAGONALS } from "./const.js";
 import {
   pointFromGridCoordinates,
   unitElevationFromCoordinates,
-  getCenterPoint3d } from "./grid_coordinates.js";
+  getCenterPoint3d,
+  getDirectPath,
+  diagonalRule } from "./grid_coordinates.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 
 // Class that handles physical distance measurement between two points.
@@ -105,9 +108,7 @@ export class PhysicalDistanceGridless extends PhysicalDistance {
    * @returns {GridCoordinates[]} Array containing each grid point under the line.
    *   For gridless, returns the GridCoordinates of the origin and destination.
    */
-  static gridUnder2dLine(origin, destination) {
-    return canvas.grid.getDirectPath([origin, destination]);
-  }
+  static gridUnder2dLine = getDirectPath;
 }
 
 export class PhysicalDistanceGridded extends PhysicalDistance {
@@ -152,9 +153,8 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
     const distance = canvas.dimensions.distance;
     const diagonalMult = this.#diagonalDistanceMultiplier();
     const diagonalDist = distance * diagonalMult;
-    const diagonalRule = canvas.grid.grid.diagonals;
-    const D = CONST.GRID_DIAGONALS;
-    switch ( diagonalRule ) {
+    const D = GRID_DIAGONALS;
+    switch ( diagonalRule() ) {
       case D.ALTERNATING_1: {
         let totalDiag = 0;
         return nDiag => {
@@ -186,8 +186,8 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
    */
   static #diagonalDistanceMultiplier() {
     if ( canvas.grid.isHexagonal || canvas.grid.isGridless ) return Math.SQRT2;
-    const D = CONST.GRID_DIAGONALS;
-    switch ( canvas.grid.grid.diagonals ) {
+    const D = GRID_DIAGONALS;
+    switch ( diagonalRule() ) {
       case D.EQUIDISTANT: return 1;
       case D.EXACT: return Math.SQRT2;
       case D.APPROXIMATE: return 1.5;
@@ -268,7 +268,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
     // If vertical projection, increment elevation only.
     // If diagonal or horizontal, increment both elevation and grid step.
     // Flip horizontal/vertical for hex rows.
-    const diagAllowed = canvas.grid.grid.diagonals !== CONST.GRID_DIAGONALS.ILLEGAL;
+    const diagAllowed = canvas.grid.grid.diagonals !== GRID_DIAGONALS.ILLEGAL;
     const [elevOnlyMove, canvasOnlyMove] = isHexRow() ? ["H", "V"] : ["V", "H"];
     let prevProjPt = projPtsIter.next().value;
     let prevPt = pts2dIter.next().value;
@@ -350,9 +350,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
    * @returns {GridCoordinates[]} Array containing each grid point under the line.
    *   For gridless, returns the GridCoordinates of the origin and destination.
    */
-  static gridUnder2dLine(origin, destination) {
-    return canvas.grid.getDirectPath([origin, destination]);
-  }
+  static gridUnder2dLine = getDirectPath;
 }
 
 // Store the flipped key/values. And lock the keys.

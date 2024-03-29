@@ -29,7 +29,8 @@ import {
 import {
   getCenterPoint3d,
   canvasElevationFromCoordinates,
-  gridShape } from "./grid_coordinates.js";
+  gridShape,
+  pointFromGridCoordinates } from "./grid_coordinates.js";
 
 const { CENTER, PERCENT, EUCLIDEAN } = Settings.KEYS.GRID_TERRAIN.CHOICES;
 
@@ -84,12 +85,15 @@ export class MovePenalty {
 
   /**
    * Move multiplier for the path a --> b.
-   * Meant to be overridden by subclasses.
    * @param {Point3d} a                     Starting point for the segment
    * @param {Point3d} b                     Ending point for the segment
+   * @param {boolean} gridless    Should this be a gridless measurement?
+   * @param {...} opts            Additional arguments passed to method
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(_a, _b) { return 1; }
+  static moveMultiplier(a, b, { gridless = false, ...opts } = {}) {
+    return this.#applyChildClass("moveMultiplier", gridless, a, b, opts);
+  }
 
 
   /** Helper to calculate a shape for a given drawing.
@@ -114,57 +118,60 @@ MovePenalty.rayShapesIntersectionPenalty = rayShapesIntersectionPenalty;
 
 export class MovePenaltyGridless extends MovePenalty {
   /**
-   * Returns a penalty function for gridless moves.
+   * Construct a penalty function for gridless moves.
    * @returns {function}
    *   - @param {GridCoordinates3d} a
    *   - @param {GridCoordinates3d} b
-   *   - @param {Token} [token]                 Token doing the move. Required for token moves.
+   *   - @param {object} [opts]                   Additional options to affect the measurement
+   *   - @param {Token} [opts.token]              Token doing the move
+   *   - @param {number} [opts.tokenMultiplier]   Multiplier for tokens
    *   - @returns {number} Percent penalty to apply for the move.
    */
   static movePenaltyFn() {
-    const mult = this.tokenMultiplier;
-    const terrainAPI = this.terrainAPI;
-
-    if ( mult !== 1 && terrainAPI ) { // Terrain, token, drawing.
-      return multiplicativeCompose(
-        DrawingMovePenaltyGridless.moveMultiplier,
-        TerrainMovePenaltyGridless.moveMultiplier,
-        TokenMovePenaltyGridless.moveMultiplier
-      );
-    }
-
-    if ( mult !== 1 ) { // No terrain.
-      return multiplicativeCompose(
-        DrawingMovePenaltyGridless.moveMultiplier,
-        TokenMovePenaltyGridless.moveMultiplier
-      );
-    }
-
-    if ( terrainAPI ) {// No token.
-      return multiplicativeCompose(
-        DrawingMovePenaltyGridless.moveMultiplier,
-        TerrainMovePenaltyGridless.moveMultiplier
-      );
-    }
-
-    // Drawing only.
-    return (a, b, _token) => DrawingMovePenaltyGridless.moveMultiplier(a, b);
+    const fns = [
+      DrawingMovePenaltyGridless.movePenaltyFn(),
+      TokenMovePenaltyGridless.movePenaltyFn()
+    ];
+    if ( this.terrainAPI ) fns.push(TerrainMovePenaltyGridless.movePenaltyFn());
+    return multiplicativeCompose(...fns);
   }
+
+  /**
+   * Move multiplier for the path a --> b.
+   * @param {Point3d} a                     Starting point for the segment
+   * @param {Point3d} b                     Ending point for the segment
+   * @param {object} opts                   Additional arguments passed to method
+   * @returns {number} Percent penalty
+   */
+  static moveMultiplier(a, b, opts) { return this.movePenaltyFn()(a, b, opts); }
 }
 
 export class TokenMovePenaltyGridless extends MovePenaltyGridless {
   /**
+   * Construct a penalty function.
+   * @returns {function}
+   *   - @param {GridCoordinates3d} a
+   *   - @param {GridCoordinates3d} b
+   *   - @param {object} [opts]                      Options affecting the calculation
+   *   - @param {Token} [opts.token]                 Token doing the move
+   *   - @param {number} [opts.tokenMultiplier]      Penalty multiplier for encountered tokens
+   *   - @returns {number} Percent penalty to apply for the move.
+   */
+  static movePenaltyFn() { return this.moveMultiplier.bind(this); }
+
+  /**
    * Move multiplier accounting for tokens encountered along the path a --> b.
    * Multiplier based on the percentage of the segment that overlaps 1+ tokens.
-   * @param {Point3d} a                       Starting point for the segment
-   * @param {Point3d} b                       Ending point for the segment
-   * @param {Token} [token]                   Token to exclude from search (the moving token)
-   * @param {number} [mult]                   Multiplier for tokens
+   * @param {GridCoordinates3d} a                       Starting point for the segment
+   * @param {GridCoordinates3d} b                       Ending point for the segment
+   * @param {object} [opts]                   Options affecting the calculation
+   * @param {Token} [opts.token]              Token to exclude from search (usually the moving token)
+   * @param {number} [opts.tokenMultiplier]   Penalty multiplier for encountered tokens
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(a, b, token, mult) {
-    mult ??= this.tokenMultiplier;
-    if ( mult === 1 ) return 1;
+  static moveMultiplier(a, b, { token, tokenMultiplier } = {}) {
+    tokenMultiplier ??= this.tokenMultiplier;
+    if ( tokenMultiplier === 1 ) return 1;
 
     // Find tokens along the ray whose constrained borders intersect the ray.
     const collisionTest = o => o.t.constrainedTokenBorder.lineSegmentIntersects(a, b, { inside: true });
@@ -173,7 +180,7 @@ export class TokenMovePenaltyGridless extends MovePenaltyGridless {
     if ( !tokens.size ) return 1;
 
     // Determine the percentage of the ray that intersects the constrained token shapes.
-    const penaltyFn = () => mult;
+    const penaltyFn = () => tokenMultiplier;
     return this.rayShapesIntersectionPenalty(a, b, tokens.map(t => t.constrainedTokenBorder), penaltyFn);
   }
 }
@@ -181,21 +188,48 @@ export class TokenMovePenaltyGridless extends MovePenaltyGridless {
 export class TerrainMovePenaltyGridless extends MovePenaltyGridless {
 
   /**
+   * Construct a penalty function.
+   * @returns {function}
+   *   - @param {GridCoordinates3d} a
+   *   - @param {GridCoordinates3d} b
+   *   - @param {object} [opts]                   Additional options to affect the measurement
+   *   - @param {Token} [opts.token]              Token doing the move
+   *   - @param {number} [opts.tokenMultiplier]   Multiplier for tokens
+   *   - @returns {number} Percent penalty to apply for the move.
+   */
+  static movePenaltyFn() {
+    if ( this.terrainAPI ) return this.moveMultiplier.bind(this);
+    return () => 1;
+  }
+
+  /**
    * Move multiplier accounting for tokens encountered along the path a --> b.
    * Multiplier based on the percentage of the segment that overlaps 1+ tokens.
    * @param {Point3d} a                       Starting point for the segment
    * @param {Point3d} b                       Ending point for the segment
-   * @param {Token} [token]                   Token to exclude from search (the moving token)
+   * @param {object} [opts]                   Options affecting the calculation
+   * @param {Token} [opts.token]              Token whose move will be penalized; required
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(a, b, token) {
-    const terrainAPI = this.terrainAPI;
+  static moveMultiplier(a, b, { token }) {
     if ( !terrainAPI || !token ) return 1;
     return terrainAPI.Terrain.percentMovementForTokenAlongPath(token, a, b) || 1;
   }
 }
 
 export class DrawingMovePenaltyGridless extends MovePenaltyGridless {
+  /**
+   * Construct a penalty function.
+   * @returns {function}
+   *   - @param {GridCoordinates3d} a
+   *   - @param {GridCoordinates3d} b
+   *   - @param {object} [opts]                   Additional options to affect the measurement
+   *   - @param {Token} [opts.token]              Token doing the move
+   *   - @param {number} [opts.tokenMultiplier]   Multiplier for tokens
+   *   - @returns {number} Percent penalty to apply for the move.
+   */
+  static movePenaltyFn() { return this.moveMultiplier.bind(this); }
+
   /**
    * Move multiplier accounting for drawings encountered along the path a --> b.
    * Multiplier based on the percentage of the segment that overlaps 1+ drawings.
@@ -253,12 +287,23 @@ export class MovePenaltyGridded extends MovePenalty {
    *   - @returns {number} Percent penalty to apply for the move.
    */
   static movePenaltyFn() {
-    return multiplicativeCompose(
-      TokenMovePenaltyGridded.movePenaltyFn(),
+    const fns = [
       DrawingMovePenaltyGridded.movePenaltyFn(),
-      TerrainMovePenaltyGridded.movePenaltyFn()
-    );
+      TokenMovePenaltyGridded.movePenaltyFn()
+    ];
+    if ( this.terrainAPI ) fns.push(TerrainMovePenaltyGridded.movePenaltyFn());
+    return multiplicativeCompose(...fns);
   }
+
+  /**
+   * Move multiplier for the path a --> b.
+   * @param {Point3d} a                     Starting point for the segment
+   * @param {Point3d} b                     Ending point for the segment
+   * @param {object} opts                   Additional arguments passed to method
+   * @returns {number} Percent penalty
+   */
+  static moveMultiplier(a, b, ...opts) { return this.movePenaltyFn()(a, b, opts); }
+
 
   /**
    * Retrieve objects that have an overlap with the grid center.
@@ -311,8 +356,6 @@ export class MovePenaltyGridded extends MovePenalty {
       && filterFn(o.t, currZ, prevZ);
     return quadtree.getObjects(bounds, { collisionTest });
   }
-
-
 }
 
 export class TokenMovePenaltyGridded extends MovePenaltyGridded {
@@ -333,23 +376,21 @@ export class TokenMovePenaltyGridded extends MovePenaltyGridded {
    *   - @param {GridCoordinates3d} a
    *   - @param {GridCoordinates3d} b
    *   - @param {Token} [token]                 Token doing the move. Required for token moves.
+   *   - @param {number} [tokenMultiplier]      Penalty multiplier for encountered tokens
    *   - @returns {number} Percent penalty to apply for the move.
    */
 
-  static movePenaltyFn() {
-    if ( this.mult === 1 ) return () => 1;
-    return this.#penaltySubclass.moveMultiplier;
-  }
+  static movePenaltyFn() { return this.#penaltySubclass.moveMultiplier.bind(this); }
 
   /**
    * Move multiplier accounting for tokens on the grid.
    * @param {GridCoordinates3d} currGridCoords        The current grid location
    * @param {GridCoordinates3d} prevGridCoords        The previous step along the grid
-   * @param {Token} [token]                   Token to exclude from search (the moving token)
+   * @param {object} [opts]                           Options affecting the calculation
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(currGridCoords, prevGridCoords, token) {
-    return this.#penaltySubclasses.moveMultiplier(currGridCoords, prevGridCoords, token);
+  static moveMultiplier(currGridCoords, prevGridCoords, opts) {
+    return this.#penaltySubclasses.moveMultiplier(currGridCoords, prevGridCoords, opts);
   }
 
   /**
@@ -379,34 +420,36 @@ export class TokenMovePenaltyCenterGrid extends TokenMovePenaltyGridded {
    * Move multiplier accounting for tokens that overlap the center of the grid.
    * @param {GridCoordinates3d} currGridCoords        The current grid location
    * @param {GridCoordinates3d} prevGridCoords        The previous step along the grid
-   * @param {Token} [token]                   Token to exclude from search (the moving token)
-   * @param {number} [mult]                   Multiplier for tokens
+   * @param {object} [opts]                           Options affecting the calculation
+   * @param {Token} [opts.token]                      Token to exclude from search (the moving token)
+   * @param {number} [opts.tokenMultiplier]           Penalty multiplier for encountered tokens
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(currGridCoords, prevGridCoords, token, mult) {
-    mult ??= this.tokenMultiplier;
-    if ( mult === 1 ) return 1;
+  static moveMultiplier(currGridCoords, prevGridCoords, { token, tokenMultiplier } = {}) {
+    tokenMultiplier ??= this.tokenMultiplier;
+    if ( tokenMultiplier === 1 ) return 1;
     const tokens = this._filterTokens(currGridCoords, prevGridCoords, Settings.KEYS.GRID_TERRAIN.CHOICES.CENTER);
     tokens.delete(token);
-    return tokens.size ? mult : 1;
+    return tokens.size ? tokenMultiplier : 1;
   }
 }
 
 export class TokenMovePenaltyPercentGrid extends TokenMovePenaltyGridded {
   /**
-   * Move multiplier accounting for tokens that overlap a percentage of the grid.
+   * Move tokenMultiplieriplier accounting for tokens that overlap a percentage of the grid.
    * @param {GridCoordinates3d} currGridCoords        The current grid location
    * @param {GridCoordinates3d} prevGridCoords        The previous step along the grid
-   * @param {Token} [token]                   Token to exclude from search (the moving token)
-   * @param {number} [mult]                   Multiplier for tokens
+   * @param {object} [opts]                           Options affecting the calculation
+   * @param {Token} [opts.token]                      Token to exclude from search (the moving token)
+   * @param {number} [opts.tokenMultiplier]           Penalty multiplier for encountered tokens
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(currGridCoords, prevGridCoords, token, mult) {
-    mult ??= this.tokenMultiplier;
-    if ( mult === 1 ) return 1;
+  static moveMultiplier(currGridCoords, prevGridCoords, { token, tokenMultiplier } = {}) {
+    tokenMultiplier ??= this.tokenMultiplier;
+    if ( tokenMultiplier === 1 ) return 1;
     const tokens = this._filterTokens(currGridCoords, prevGridCoords, Settings.KEYS.GRID_TERRAIN.CHOICES.PERCENT);
     tokens.delete(token);
-    return tokens.size ? mult : 1;
+    return tokens.size ? tokenMultiplier : 1;
   }
 }
 
@@ -415,16 +458,17 @@ export class TokenMovePenaltyEuclideanGrid extends TokenMovePenaltyGridded {
    * Move multiplier accounting for tokens splitting the euclidean distance between the two locations.
    * @param {GridCoordinates3d} currGridCoords        The current grid location
    * @param {GridCoordinates3d} prevGridCoords        The previous step along the grid
-   * @param {Token} [token]                   Token to exclude from search (the moving token)
-   * @param {number} [mult]                   Multiplier for tokens
+   * @param {object} [opts]                           Options affecting the calculation
+   * @param {Token} [opts.token]                      Token to exclude from search (the moving token)
+   * @param {number} [opts.tokenMultiplier]           Penalty multiplier for encountered tokens
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(currGridCoords, prevGridCoords, token, mult) {
-    mult ??= this.tokenMultiplier;
-    if ( mult === 1 ) return 1;
+  static moveMultiplier(currGridCoords, prevGridCoords, { token, tokenMultiplier } = {}) {
+    tokenMultiplier ??= this.tokenMultiplier;
+    if ( tokenMultiplier === 1 ) return 1;
     const currCenter = getCenterPoint3d(prevGridCoords);
     const prevCenter = getCenterPoint3d(currGridCoords);
-    return TokenMovePenaltyGridless.moveMultiplier(prevCenter, currCenter, token, mult);
+    return TokenMovePenaltyGridless.moveMultiplier(prevCenter, currCenter, token, tokenMultiplier);
   }
 }
 
@@ -448,7 +492,7 @@ export class DrawingMovePenaltyGridded extends MovePenaltyGridded {
    *   - @param {Token} [token]                 Token doing the move. Required for token moves.
    *   - @returns {number} Percent penalty to apply for the move.
    */
-  static movePenaltyFn() { return this.#penaltySubclass.moveMultiplier; }
+  static movePenaltyFn() { return this.#penaltySubclass.moveMultiplier.bind(this); }
 
   /**
    * Move multiplier accounting for drawings on the grid.
@@ -562,21 +606,21 @@ export class TerrainMovePenaltyGridded extends MovePenaltyGridded {
    * @returns {function}
    *   - @param {GridCoordinates3d} a
    *   - @param {GridCoordinates3d} b
-   *   - @param {Token} [token]                 Token doing the move. Required for token moves.
+   *   - @param {object} [opts]                      Options affecting the calculation
    *   - @returns {number} Percent penalty to apply for the move.
    */
 
-  static movePenaltyFn() { return this.#penaltySubclass.moveMultiplier; }
+  static movePenaltyFn() { return this.#penaltySubclass.moveMultiplier.bind(this); }
 
   /**
    * Move multiplier accounting for tokens on the grid.
    * @param {GridCoordinates3d} currGridCoords        The current grid location
    * @param {GridCoordinates3d} prevGridCoords        The previous step along the grid
-   * @param {Token} token                             Token affected by the terrain
+   * @param {object} [opts]                           Options affecting the calculation
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(currGridCoords, prevGridCoords, token) {
-    return this.#penaltySubclass.moveMultiplier(currGridCoords, prevGridCoords, token);
+  static moveMultiplier(currGridCoords, prevGridCoords, opts) {
+    return this.#penaltySubclass.moveMultiplier(currGridCoords, prevGridCoords, opts);
   }
 
 }
@@ -586,10 +630,11 @@ export class TerrainMovePenaltyCenterGrid extends TerrainMovePenaltyGridded {
    * Move multiplier accounting for terrains that overlap the center of the grid.
    * @param {GridCoordinates3d} currGridCoords        The current grid location
    * @param {GridCoordinates3d} prevGridCoords        The previous step along the grid
-   * @param {Token} token                             Token affected by the terrain
+   * @param {object} [opts]                           Options affecting the calculation
+   * @param {Token} [opts.token]                      Token affected by the terrain
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(currGridCoords, prevGridCoords, token) {
+  static moveMultiplier(currGridCoords, prevGridCoords, { token } = {}) {
     const currCenter = getCenterPoint3d(currGridCoords);
     this.terrain.percentMovementChangeForTokenAtPoint(token, currCenter, this.getSpeedAttribute(token));
   }
@@ -600,10 +645,11 @@ export class TerrainMovePenaltyPercentGrid extends TerrainMovePenaltyGridded {
    * Move multiplier accounting for terrains that overlap the center of the grid.
    * @param {GridCoordinates3d} currGridCoords        The current grid location
    * @param {GridCoordinates3d} prevGridCoords        The previous step along the grid
-   * @param {Token} token                             Token affected by the terrain
+   * @param {object} [opts]                           Options affecting the calculation
+   * @param {Token} [opts.token]                      Token affected by the terrain
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(currGridCoords, prevGridCoords, token) {
+  static moveMultiplier(currGridCoords, prevGridCoords, { token } = {}) {
     const currElev = canvasElevationFromCoordinates(currGridCoords);
     const shape = gridShape(currGridCoords);
     this.terrain.percentMovementChangeForTokenWithinShape(
@@ -620,10 +666,11 @@ export class TerrainMovePenaltyEuclideanGrid extends TerrainMovePenaltyGridded {
    * Move multiplier accounting for terrains that overlap the center of the grid.
    * @param {GridCoordinates3d} currGridCoords        The current grid location
    * @param {GridCoordinates3d} prevGridCoords        The previous step along the grid
-   * @param {Token} token                             Token affected by the terrain
+   * @param {object} [opts]                           Options affecting the calculation
+   * @param {Token} [opts.token]                      Token affected by the terrain
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(currGridCoords, prevGridCoords, token) {
+  static moveMultiplier(currGridCoords, prevGridCoords, { token } = {}) {
     const currCenter = getCenterPoint3d(currGridCoords);
     this.terrain.percentMovementChangeForTokenAtPoint(token, currCenter, this.getSpeedAttribute(token));
   }
@@ -646,8 +693,8 @@ const multiplicativeCompose = (...functions) => {
 
 /**
  * Determine the percentage of the ray that intersects a set of shapes.
- * @param {PIXI.Point} a                    Origin point of ray
- * @param {PIXI.Point} b                    Destination point of ray
+ * @param {GridCoordinates} a                    Origin point of ray
+ * @param {GridCoordinates} b                    Destination point of ray
  * @param {Set<PIXI.Polygon
            |PIXI.Rectangle
            |PIXI.Circle>} shapes            Any shape that has a contains(x,y) method
@@ -656,6 +703,9 @@ const multiplicativeCompose = (...functions) => {
  */
 function rayShapesIntersectionPenalty(a, b, shapes, shapePenaltyFn) {
   if ( !shapes.size ) return 1;
+
+  a = pointFromGridCoordinates(a);
+  b = pointFromGridCoordinates(b);
 
   const tValues = [];
   const deltaMag = b.to2d().subtract(a).magnitude();

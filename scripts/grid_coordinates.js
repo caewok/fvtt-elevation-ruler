@@ -12,8 +12,24 @@ PIXI
 // Helper functions to handle GridCoordinates and v11 alternatives.
 
 import { Point3d } from "./geometry/3d/Point3d.js";
+import { iterateGridUnderLine } from "./util.js";
+import { GRID_DIAGONALS } from "./const.js";
 
 // ----- NOTE: Conversion functions to handle v11 and v12 ----- //
+
+/**
+ * Get the grid (i,j) coordinates for a given point.
+ * @param {GridCoordinates} coords    Grid (i,j) offset or x,y coordinates
+ * @returns {i, j}
+ */
+function getGridPosition(coords) {
+  if ( Object.hasOwn(coords, "i") ) return coords;
+  return arrayToCoordsIJ(canvas.grid.grid.getGridPositionFromPixels(coords.x, coords.y));
+}
+
+function arrayToCoordsXY(arr) { return { x: arr[0], y: arr[1] }; }
+
+function arrayToCoordsIJ(arr) { return { i: arr[0], j: arr[1] }; }
 
 /**
  * Get the top left point on the grid for a given set of coordinates.
@@ -22,11 +38,11 @@ import { Point3d } from "./geometry/3d/Point3d.js";
  */
 export function getTopLeftPoint(coords) {
   if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getTopLeftPoint(coords);
-  if ( Object.hasOwn(coords, "i") ) {
-    const arr = canvas.grid.grid.getPixelsFromGridPosition(coords.i, coords.j);
-    return { x: arr[0], y: arr[1] };
-  }
-  return canvas.grid.grid.getTopLeft(coords.x, coords.y);
+
+  const arr = Object.hasOwn(coords, "i")
+    ? canvas.grid.grid.getPixelsFromGridPosition(coords.i, coords.j)
+    : canvas.grid.grid.getTopLeft(coords.x, coords.y);
+  return arrayToCoordsXY(arr);
 }
 
 /**
@@ -36,12 +52,47 @@ export function getTopLeftPoint(coords) {
  */
 export function getCenterPoint(coords) {
   if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getCenterPoint(coords);
-  if ( Object.hasOwn(coords, "i") ) {
-    const arr = canvas.grid.grid.getPixelsFromGridPosition(coords.i, coords.j);
-    return canvas.grid.grid.getCenter(arr[0], arr[1]);
-  }
-  return canvas.grid.grid.getCenter(coords.x, coords.y);
+
+  const arr = Object.hasOwn(coords, "i")
+    ? canvas.grid.grid.getPixelsFromGridPosition(coords.i, coords.j)
+    : canvas.grid.grid.getCenter(coords.x, coords.y);
+  return arrayToCoordsXY(arr);
 }
+
+/**
+ * Get the grid coordinates between two points. Uses Bresenham's algorithm.
+ * @param {GridCoordinates} startCoords    Grid (i,j) offset or x,y coordinates
+ * @param {GridCoordinates} endCoords    Grid (i,j) offset or x,y coordinates
+ * @returns {GridCoordinates[]} An array of [i,j] coordinates
+ */
+export function getDirectPath(startCoords, endCoords) {
+  if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getDirectPath([startCoords, endCoords]);
+
+  // Closest parallel to v12 getDirectPath is probably iterateGridUnderLine.
+  startCoords = Object.hasOwn(startCoords, "i") ? getCenterPoint(startCoords) : startCoords;
+  endCoords = Object.hasOwn(endCoords, "i") ? getCenterPoint(endCoords) : endCoords;
+  const offsets = [...iterateGridUnderLine(startCoords, endCoords)];
+  return offsets.map(o => arrayToCoordsIJ(o));
+}
+
+// ----- NOTE: Grid diagonals ----- //
+
+/**
+ * Retrieve the current diagonal rule.
+ * @returns {GRID_DIAGONALS}
+ */
+export function diagonalRule() {
+  if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.diagonals;
+
+  switch ( canvas.grid.diagonalRule ) {
+    case "555": return GRID_DIAGONALS.EQUIDISTANT;
+    case "5105": return GRID_DIAGONALS.ALTERNATING_1;
+    case "EUCL": return GRID_DIAGONALS.EXACT;
+    case "MANHATTAN": return GRID_DIAGONALS.RECTILINEAR;
+    default: return GRID_DIAGONALS.APPROXIMATE;
+  }
+}
+
 
 // ----- NOTE: Grid shape ----- //
 
@@ -104,6 +155,16 @@ export function hexGridShape(coords) {
  * @typedef {GridOffset3d|Point3d} GridCoordinates3d
  */
 
+/**
+ * Get the grid (i,j, k) coordinates for a given point.
+ * @param {GridCoordinates3d} coords    Grid (i,j,k) offset or x,y,z coordinates
+ * @returns {i, j}
+ */
+function getGridPosition3d(coords) {
+  const out = getGridPosition(coords);
+  out.k = unitElevationFromCoordinates(coords);
+  return out;
+}
 
 /**
  * Get the center point for a given GridCoordinates3d
@@ -125,8 +186,8 @@ export function getCenterPoint3d(coords) {
  */
 export function pointFromGridCoordinates(coords) {
   const z = canvasElevationFromCoordinates(coords);
-  const pt = Object.hasOwn(coords, "i") ? getCenterPoint(coords) : coords;
-  return new Point3d(pt.x, pt.y, z);
+  coords = Object.hasOwn(coords, "i") ? getCenterPoint(coords) : coords;
+  return new Point3d(coords.x, coords.y, z);
 }
 
 /**
