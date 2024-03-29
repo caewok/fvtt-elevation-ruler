@@ -32,7 +32,13 @@ import {
   gridShape,
   pointFromGridCoordinates } from "./grid_coordinates.js";
 
-const { CENTER, PERCENT, EUCLIDEAN } = Settings.KEYS.GRID_TERRAIN.CHOICES;
+// Cannot do this b/c some circular definition is causing Settings to be undefined.
+// const { CENTER, PERCENT, EUCLIDEAN } = Settings.KEYS.GRID_TERRAIN.CHOICES;
+
+// Taken directly from Settings.js
+const CENTER = "grid-terrain-choice-center-point";
+const PERCENT = "grid-terrain-choice-percent-area";
+const EUCLIDEAN = "grid-terrain-choice-euclidean";
 
 export class MovePenalty {
   /** @type {number} */
@@ -428,7 +434,7 @@ export class TokenMovePenaltyCenterGrid extends TokenMovePenaltyGridded {
   static moveMultiplier(currGridCoords, prevGridCoords, { token, tokenMultiplier } = {}) {
     tokenMultiplier ??= this.tokenMultiplier;
     if ( tokenMultiplier === 1 ) return 1;
-    const tokens = this._filterTokens(currGridCoords, prevGridCoords, Settings.KEYS.GRID_TERRAIN.CHOICES.CENTER);
+    const tokens = this._filterTokens(currGridCoords, prevGridCoords, CENTER);
     tokens.delete(token);
     return tokens.size ? tokenMultiplier : 1;
   }
@@ -447,7 +453,7 @@ export class TokenMovePenaltyPercentGrid extends TokenMovePenaltyGridded {
   static moveMultiplier(currGridCoords, prevGridCoords, { token, tokenMultiplier } = {}) {
     tokenMultiplier ??= this.tokenMultiplier;
     if ( tokenMultiplier === 1 ) return 1;
-    const tokens = this._filterTokens(currGridCoords, prevGridCoords, Settings.KEYS.GRID_TERRAIN.CHOICES.PERCENT);
+    const tokens = this._filterTokens(currGridCoords, prevGridCoords, PERCENT);
     tokens.delete(token);
     return tokens.size ? tokenMultiplier : 1;
   }
@@ -512,7 +518,7 @@ export class DrawingMovePenaltyGridded extends MovePenaltyGridded {
    * @returns {Set<Token>}
    */
   static _filter(currGridCoords, prevGridCoords, type) {
-    const method = type === Settings.KEYS.GRID_TERRAIN.CHOICES.PERCENT
+    const method = type === PERCENT
       ? "_getMoveObjectsPercentGrid" : "_getMoveObjectsCenterGrid";
     return this[method](
       currGridCoords,
@@ -543,7 +549,7 @@ export class DrawingMovePenaltyCenterGrid extends DrawingMovePenaltyGridded {
    * @returns {number} Percent penalty
    */
   static moveMultiplier(currGridCoords, prevGridCoords) {
-    const drawings = this._filter(currGridCoords, prevGridCoords, Settings.KEYS.GRID_TERRAIN.CHOICES.CENTER);
+    const drawings = this._filter(currGridCoords, prevGridCoords, CENTER);
     return this._calculateDrawingsMovePenalty(drawings);
   }
 
