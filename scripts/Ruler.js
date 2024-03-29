@@ -38,12 +38,11 @@ import {
   tokenIsSnapped,
   log } from "./util.js";
 
-import { gridShape, pointFromGridCoordinates, canvasElevationFromCoordinates } from "./grid_coordinates.js";
+import { PhysicalDistance } from "./PhysicalDistance.js";
 
-import {
-  measureDistance,
-  measureMoveDistance
-} from "./measure_distance.js";
+import { MoveDistance } from "./MoveDistance.js";
+
+import { gridShape, pointFromGridCoordinates, canvasElevationFromCoordinates } from "./grid_coordinates.js";
 
 /**
  * Modified Ruler
@@ -656,10 +655,10 @@ PATCHES.BASIC.GETTERS = {
 };
 
 PATCHES.BASIC.STATIC_METHODS = {
-  measureDistance,
-  measureMoveDistance,
   elevationAtWaypoint,
-  terrainElevationAtLocation
+  terrainElevationAtLocation,
+  measureDistance: PhysicalDistance.measure,
+  measureMoveDistance: MoveDistance.measure
 };
 
 
