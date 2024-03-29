@@ -9,7 +9,7 @@ CONST
 // Class to measure distance between two points, accounting for token movement through terrain.
 
 import { PhysicalDistanceGridless, PhysicalDistanceGridded } from "./PhysicalDistance.js";
-import { MovePenaltyGridless, MovePenaltyGridded } from "./MovePenalty.js";
+import { MovePenalty, MovePenaltyGridless, MovePenaltyGridded } from "./MovePenalty.js";
 import { unitElevationFromCoordinates } from "./grid_coordinates.js";
 
 export class MoveDistance {
