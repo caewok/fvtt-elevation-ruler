@@ -820,14 +820,14 @@ function rayShapesIntersectionPenalty(a, b, shapes, shapePenaltyFn) {
 }
 
 // Register subclasses used for different grid penalty measurements.
-TokenMovePenaltyGridded._registerPenaltySubclass(Settings.KEYS.GRID_TERRAIN.CHOICES.CENTER, TokenMovePenaltyCenterGrid);
-TokenMovePenaltyGridded._registerPenaltySubclass(Settings.KEYS.GRID_TERRAIN.CHOICES.PERCENT, TokenMovePenaltyPercentGrid);
-TokenMovePenaltyGridded._registerPenaltySubclass(Settings.KEYS.GRID_TERRAIN.CHOICES.EUCLIDEAN, TokenMovePenaltyEuclideanGrid);
+TokenMovePenaltyGridded._registerPenaltySubclass(CENTER, TokenMovePenaltyCenterGrid);
+TokenMovePenaltyGridded._registerPenaltySubclass(PERCENT, TokenMovePenaltyPercentGrid);
+TokenMovePenaltyGridded._registerPenaltySubclass(EUCLIDEAN, TokenMovePenaltyEuclideanGrid);
 
-DrawingMovePenaltyGridded._registerPenaltySubclass(Settings.KEYS.GRID_TERRAIN.CHOICES.CENTER, DrawingMovePenaltyCenterGrid);
-DrawingMovePenaltyGridded._registerPenaltySubclass(Settings.KEYS.GRID_TERRAIN.CHOICES.PERCENT, DrawingMovePenaltyPercentGrid);
-DrawingMovePenaltyGridded._registerPenaltySubclass(Settings.KEYS.GRID_TERRAIN.CHOICES.EUCLIDEAN, DrawingMovePenaltyEuclideanGrid);
+DrawingMovePenaltyGridded._registerPenaltySubclass(CENTER, DrawingMovePenaltyCenterGrid);
+DrawingMovePenaltyGridded._registerPenaltySubclass(PERCENT, DrawingMovePenaltyPercentGrid);
+DrawingMovePenaltyGridded._registerPenaltySubclass(EUCLIDEAN, DrawingMovePenaltyEuclideanGrid);
 
-TerrainMovePenaltyGridded._registerPenaltySubclass(Settings.KEYS.GRID_TERRAIN.CHOICES.CENTER, TerrainMovePenaltyCenterGrid);
-TerrainMovePenaltyGridded._registerPenaltySubclass(Settings.KEYS.GRID_TERRAIN.CHOICES.PERCENT, TerrainMovePenaltyPercentGrid);
-TerrainMovePenaltyGridded._registerPenaltySubclass(Settings.KEYS.GRID_TERRAIN.CHOICES.EUCLIDEAN, TerrainMovePenaltyEuclideanGrid);
+TerrainMovePenaltyGridded._registerPenaltySubclass(CENTER, TerrainMovePenaltyCenterGrid);
+TerrainMovePenaltyGridded._registerPenaltySubclass(PERCENT, TerrainMovePenaltyPercentGrid);
+TerrainMovePenaltyGridded._registerPenaltySubclass(EUCLIDEAN, TerrainMovePenaltyEuclideanGrid);
