@@ -165,7 +165,7 @@ export class MoveDistanceGridded extends MoveDistance {
       const dMove = d * penalty;
 
       // Early stop if the stop target is met.
-      if ( stopTarget && (dMoveTotal + dMove) > stopTarget ) break;
+      if ( stopTarget && (dMoveTotal + dMove) >= stopTarget ) break;
 
       // Cycle to next.
       dTotal += d;
