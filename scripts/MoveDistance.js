@@ -1,6 +1,5 @@
 /* globals
 canvas,
-CONFIG,
 CONST
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -10,7 +9,7 @@ CONST
 
 import { PhysicalDistanceGridless, PhysicalDistanceGridded } from "./PhysicalDistance.js";
 import { MovePenalty, MovePenaltyGridless, MovePenaltyGridded } from "./MovePenalty.js";
-import { unitElevationFromCoordinates } from "./grid_coordinates.js";
+import { unitElevationFromCoordinates, pointFromGridCoordinates } from "./grid_coordinates.js";
 
 export class MoveDistance {
   /**

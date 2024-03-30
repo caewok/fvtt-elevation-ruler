@@ -30,7 +30,8 @@ export class PhysicalDistance {
    *  Euclidean on a grid also uses grid squares, but measures using actual diagonal from center to center.
    */
   static measure(a, b, { gridless = false } = {}) {
-    return this.#applyChildClass("measure", gridless, a, b);
+    const cl = this._getChildClass(gridless);
+    return cl.measure(a, b);
   }
 
   /**
@@ -42,7 +43,8 @@ export class PhysicalDistance {
    *   For gridless, returns the GridCoordinates of the origin and destination.
    */
   static gridUnder3dLine(origin, destination, { gridless = false } = {}) {
-    return this.#applyChildClass("gridUnder3dLine", gridless, origin, destination);
+    const cl = this._getChildClass(gridless);
+    return cl.gridUnder3dLine(origin, destination);
   }
 
   /**
@@ -53,19 +55,8 @@ export class PhysicalDistance {
    *   For gridless, returns the GridCoordinates of the origin and destination.
    */
   static gridUnder2dLine(origin, destination, { gridless = false } = {}) {
-    return this.#applyChildClass("gridUnder2dLine", gridless, origin, destination);
-  }
-
-  /**
-   * Helper method to choose between gridless and gridded subclasses.
-   * @param {string} method       Method to use
-   * @param {boolean} gridless    Should this be a gridless measurement?
-   * @param {...} args            Additional arguments passed to method
-   * @returns {*} Result of the applied method.
-   */
-  static #applyChildClass(method, gridless = false, ...args) {
-    const cl = this._getChildClass(gridless)
-    return cl[method](...args);
+    const cl = this._getChildClass(gridless);
+    return cl.gridUnder2dLine(origin, destination);
   }
 
   static _getChildClass(gridless) {

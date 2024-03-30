@@ -1,9 +1,8 @@
 /* globals
 canvas,
-CONFIG,
 CONST,
 Drawing,
-foundry
+Token
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
@@ -82,15 +81,18 @@ export class MovePenalty {
 
   /**
    * For a given point between a and b, locate colliding objects of the given type.
+   * Returns all objects that intersect a --> b according to object bounds.
    * @param {GridCoordinates3d} a       Starting point
    * @param {GridCoordinates3d} b       Ending point
-   * @param {function} collisionTest    Test used in quadtree to eliminate false positives
    * @param {Quadtree} quadtree         Quadtree to use for the search
    * @returns {Set<PlaceableObject>} Objects from the given quadtree, or the null set
    */
-  static _placeablesAlongSegment(a, b, collisionTest, quadtree) {
-    const bounds = segmentBounds(a, b);
-    return quadtree.getObjects(bounds, { collisionTest });
+  static _placeablesAlongSegment(a, b, quadtree) {
+    a = pointFromGridCoordinates(a);
+    b = pointFromGridCoordinates(b);
+    const abBounds = segmentBounds(a, b);
+    const collisionTest = o => this._placeableBounds(o.t).lineSegmentIntersects(a, b, { inside: true });
+    return quadtree.getObjects(abBounds, { collisionTest });
   }
 
   /**
@@ -119,22 +121,60 @@ export class MovePenalty {
   }
 
   /**
-   * Helper to test if a drawing has a terrain that is active for this elevation.
+   * Penalty for a specific drawing.
    * @param {Drawing} drawing       Placeable drawing to test
-   * @param {number} currElev       Elevation to test
-   * @param {number} [prevElev]     If defined, drawing must be between prevElev and currElev.
-   *   If not defined, drawing must be at currElev
-   * @returns {boolean}
+   * @returns {number}
    */
-  static _hasActiveDrawingTerrain(drawing, currElev, prevElev) {
-    if ( !drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) ) return false;
-    const drawingE = foundry.utils.getProperty(drawing.document, "flags.elevatedvision.elevation");
-    if ( typeof drawingE === "undefined" ) return true;
-
-    const drawingZ = CONFIG.GeometryLib.utils.gridUnitsToPixels(drawingE);
-    if ( typeof prevElev === "undefined" ) return currElev.almostEqual(drawingZ);
-    return drawingZ.between(prevElev, currElev);
+  static drawingPenalty(drawing) {
+    return drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) || 1;
   }
+
+  /**
+   * Construct a function that determines if a placeable should qualify as intersecting the segment a, b.
+   * Can assume the placeable border does intersect a|b.
+   * @param {Point3d} a
+   * @param {Point3d} b
+   * @returns {function}
+   *   - @param {Token} t
+   *   - @returns {boolean}
+   */
+  _placeableFilterFn(a, b) {
+    const verticalTest = this._placeableVerticalTestFn(a, b);
+    const qualifyTest = this._placeableQualificationTestFn(a, b);
+    return o => verticalTest(o) && qualifyTest(o);
+  }
+
+  /**
+   * Construct a function that tests if a given placeable falls within the vertical range
+   * of the segment. Assumes the placeable border does intersect a|b.
+   * @param {Point3d} a
+   * @param {Point3d} b
+   * @returns {function}
+   *   - @param {PlaceableObject} o
+   *   - @returns {boolean}
+   */
+  _placeableVerticalTestFn(a, b) { return o => o.elevationZ.between(a.z, b.z); }
+
+  /**
+   * Construct a function that tests if a given placeable qualifies as potentially penalizing
+   * movement along the segment. Assumes the placeable border does intersect a|b.
+   * @param {Point3d} a
+   * @param {Point3d} b
+   * @returns {function}
+   *   - @param {PlaceableObject} o
+   *   - @returns {boolean}
+   */
+  _placeableQualificationTestFn(_a, _b) { return _o => true; }
+
+  /**
+   * Get the bounds for placeable of the type to be tested.
+   * @param {PlaceableObject} obj
+   * @returns {PIXI.Rectangle|PIXI.Polygon|PIXI.Circle|PIXI.Ellipse}
+   */
+  _placeableBounds(obj) {
+    if ( obj instanceof Token ) return obj.constrainedTokenBorder;
+    if ( obj instanceof Drawing ) return this._shapeForDrawing(obj);
+    return obj.bounds(); }
 }
 
 // Add in additional method to calculate penalties along ray that intersects shape(s).
@@ -200,9 +240,12 @@ export class TokenMovePenaltyGridless extends MovePenaltyGridless {
     tokenMultiplier ??= this.tokenMultiplier;
     if ( tokenMultiplier === 1 ) return 1;
 
+    a = pointFromGridCoordinates(a);
+    b = pointFromGridCoordinates(b);
+
     // Find tokens along the ray whose constrained borders intersect the ray.
-    const collisionTest = o => o.t.constrainedTokenBorder.lineSegmentIntersects(a, b, { inside: true });
-    const tokens = this._placeablesAlongSegment(a, b, collisionTest, canvas.tokens.quadtree);
+    const tokens = this._placeablesAlongSegment(a, b, canvas.tokens.quadtree)
+      .filter(this._placeableFilterFn(a, b));
     tokens.delete(token);
     if ( !tokens.size ) return 1;
 
@@ -210,6 +253,52 @@ export class TokenMovePenaltyGridless extends MovePenaltyGridless {
     const penaltyFn = () => tokenMultiplier;
     return this.rayShapesIntersectionPenalty(a, b, tokens.map(t => t.constrainedTokenBorder), penaltyFn);
   }
+}
+
+export class DrawingMovePenaltyGridless extends MovePenaltyGridless {
+
+  /**
+   * Construct a penalty function.
+   * @returns {function}
+   *   - @param {GridCoordinates3d} a
+   *   - @param {GridCoordinates3d} b
+   *   - @param {object} [opts]                   Additional options to affect the measurement
+   *   - @param {Token} [opts.token]              Token doing the move
+   *   - @param {number} [opts.tokenMultiplier]   Multiplier for tokens
+   *   - @returns {number} Percent penalty to apply for the move.
+   */
+  static movePenaltyFn() { return this.moveMultiplier.bind(this); }
+
+  /**
+   * Move multiplier accounting for drawings encountered along the path a --> b.
+   * Multiplier based on the percentage of the segment that overlaps 1+ drawings.
+   * @param {GridCoordinates3d} a                       Starting point for the segment
+   * @param {GridCoordinates3d} b                       Ending point for the segment
+   * @returns {number} Percent penalty
+   */
+  static moveMultiplier(a, b) {
+    a = pointFromGridCoordinates(a);
+    b = pointFromGridCoordinates(b);
+
+    // Find drawings along the ray whose borders intersect the ray.
+    const drawings = this._placeablesAlongSegment(a, b, canvas.drawings.quadtree)
+      .filter(this._placeableFilterFn(a, b));
+    if ( !drawings.size ) return 1;
+
+    // Determine the percentage of the ray that intersects the constrained token shapes.
+    return this.rayShapesIntersectionPenalty(a, b, drawings.map(d => this._shapeForDrawing(d)), this.drawingPenalty);
+  }
+
+  /**
+   * Construct a function that tests if a given placeable qualifies as potentially penalizing
+   * movement along the segment. Assumes the placeable border does intersect a|b.
+   * @param {Point3d} a
+   * @param {Point3d} b
+   * @returns {function}
+   *   - @param {PlaceableObject} o
+   *   - @returns {boolean}
+   */
+  _placeableQualificationTestFn(_a, _b) { return d => this.drawingPenalty(d) !== 1; }
 }
 
 export class TerrainMovePenaltyGridless extends MovePenaltyGridless {
@@ -241,40 +330,6 @@ export class TerrainMovePenaltyGridless extends MovePenaltyGridless {
   static moveMultiplier(a, b, { token }) {
     if ( !this.terrainAPI || !token ) return 1;
     return this.terrainAPI.Terrain.percentMovementForTokenAlongPath(token, a, b) || 1;
-  }
-}
-
-export class DrawingMovePenaltyGridless extends MovePenaltyGridless {
-  /**
-   * Construct a penalty function.
-   * @returns {function}
-   *   - @param {GridCoordinates3d} a
-   *   - @param {GridCoordinates3d} b
-   *   - @param {object} [opts]                   Additional options to affect the measurement
-   *   - @param {Token} [opts.token]              Token doing the move
-   *   - @param {number} [opts.tokenMultiplier]   Multiplier for tokens
-   *   - @returns {number} Percent penalty to apply for the move.
-   */
-  static movePenaltyFn() { return this.moveMultiplier.bind(this); }
-
-  /**
-   * Move multiplier accounting for drawings encountered along the path a --> b.
-   * Multiplier based on the percentage of the segment that overlaps 1+ drawings.
-   * @param {Point3d} a                       Starting point for the segment
-   * @param {Point3d} b                       Ending point for the segment
-   * @returns {number} Percent penalty
-   */
-  static moveMultiplier(a, b) {
-    // Find drawings along the ray whose borders intersect the ray.
-    const collisionTest = o => o.t.bounds.lineSegmentIntersects(a, b, { inside: true });
-    const drawings = this._placeablesAlongSegment(a, b, collisionTest, canvas.drawings.quadtree)
-      .filter(d => this._hasActiveDrawingTerrain(d, b.z ?? 0, a.z ?? 0));
-    if ( !drawings.size ) return 1;
-
-    // Determine the percentage of the ray that intersects the constrained token shapes.
-    const penaltyFn = d => d.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) || 1;
-    return this.rayShapesIntersectionPenalty(a, b, drawings.map(d => this._shapeForDrawing(d)), penaltyFn);
-
   }
 }
 
@@ -313,57 +368,30 @@ export class MovePenaltyGridded extends MovePenalty {
    */
   static moveMultiplier(a, b, ...opts) { return this.movePenaltyFn()(a, b, opts); }
 
-
   /**
-   * Retrieve objects that have an overlap with the grid center.
+   * Test if the object overlaps with the grid center.
+   * @param {PlaceableObject} obj                 Object to test
    * @param {GridCoordinates3d} currGridCoords    The current grid location
-   * @param {GridCoordinates3d} prevGridCoords    The previous step along the grid
-   * @param {Quadtree} quadtree                   Quadtree for the placeable type
-   * @param {function} objectBoundsFn             Function that describes bounds for the placeable
-   *   - @param {PlaceableObject} object
-   *   - @returns {PIXI.Polygon|PIXI.Rectangle|PIXI.Circle} Shape of the object's bounds
-   * @param {function} filterFn                   Function that eliminates objects not within elevation
-   *   - @param {PlaceableObject} object
-   *   - @param {number} currZ              Current elevation
-   *   - @param {number} prevZ              Elevation at previous step
-   *   - @returns {boolean} True if object should be kept
-   * @returns {Set<PlaceableObject>}
+   * @returns {boolean}
    */
-  static _getMoveObjectsCenterGrid(currGridCoords, prevGridCoords, quadtree, objectBoundsFn, filterFn) {
-    const shape = gridShape(currGridCoords);
-    const bounds = shape.getBounds();
+  static _placeableCenterOverlap(obj, currGridCoords) {
     const currCenter = getCenterPoint3d(currGridCoords);
-    const prevZ = canvasElevationFromCoordinates(prevGridCoords);
-    const collisionTest = o => this._shapeForDrawing(o.t).contains(currCenter.x, currCenter.y)
-      && filterFn(o.t, currCenter.z, prevZ);
-    return quadtree.getObjects(bounds, { collisionTest });
+    return this._placeableBounds(obj).contains(currCenter.x, currCenter.y);
   }
 
   /**
-   * Retrieve objects that have a percent overlap with the grid bounds.
-   * @param {GridCoordinates3d} currGridCoords    The current grid location
-   * @param {GridCoordinates3d} prevGridCoords    The previous step along the grid
-   * @param {Quadtree} quadtree                   Quadtree for the placeable type
-   * @param {function} objectBoundsFn             Function that describes bounds for the placeable
-   *   - @param {PlaceableObject} object
-   *   - @returns {PIXI.Polygon|PIXI.Rectangle|PIXI.Circle} Shape of the object's bounds
-   * @param {function} filterFn                   Function that eliminates objects not within elevation
-   *   - @param {PlaceableObject} object
-   *   - @param {number} currZ              Current elevation
-   *   - @param {number} prevZ              Elevation at previous step
-   *   - @returns {boolean} True if object should be kept
-   * @returns {Set<PlaceableObject>}
+   * Test if the object has a percentage overlap with the current grid space, by area.
+   * @param {PlaceableObject} obj                     Object to test
+   * @param {GridCoordinates3d} currGridCoords        The current grid location
+   * @param {PIXI.Polygon|PIXI.Rectangle} [shape]     Grid shape
+   * @param {number} [percentThreshold]               Threshold test
+   * @returns {boolean}
    */
-  static _getMoveObjectsPercentGrid(currGridCoords, prevGridCoords, quadtree, objectBoundsFn, filterFn) {
-    const currZ = canvasElevationFromCoordinates(currGridCoords);
-    const prevZ = canvasElevationFromCoordinates(prevGridCoords);
-    const shape = gridShape(currGridCoords);
-    const bounds = shape.getBounds();
-    const percentThreshold = this.percentThreshold;
+  static _placeablePercentAreaOverlap(obj, currGridCoords, shape, percentThreshold) {
+    percentThreshold ??= this.percentThreshold;
+    shape ??= gridShape(currGridCoords);
     const totalArea = shape.area;
-    const collisionTest = o => percentOverlap(objectBoundsFn(o.t), shape, totalArea) >= percentThreshold
-      && filterFn(o.t, currZ, prevZ);
-    return quadtree.getObjects(bounds, { collisionTest });
+    return percentOverlap(this._placeableBounds(obj), shape, totalArea) >= percentThreshold;
   }
 }
 
@@ -403,25 +431,33 @@ export class TokenMovePenaltyGridded extends MovePenaltyGridded {
   }
 
   /**
-   * Filter placeable tokens by either a center test or a percent overlap test.
+   * Move multiplier accounting for tokens that overlap some portion of the grid
    * @param {GridCoordinates3d} currGridCoords        The current grid location
    * @param {GridCoordinates3d} prevGridCoords        The previous step along the grid
-   * @param {Settings.KEYS.GRID_TERRAIN.CHOICES} type Type of test: center or percentage
-   * @returns {Set<Token>}
+   * @param {object} [opts]                           Options affecting the calculation
+   * @param {Token} [opts.token]                      Token to exclude from search (the moving token)
+   * @param {number} [opts.tokenMultiplier]           Penalty multiplier for encountered tokens
+   * @returns {number} Percent penalty
    */
-  static _filterTokens(currGridCoords, prevGridCoords, type) {
-    const method = type === Settings.KEYS.GRID_TERRAIN.CHOICES.PERCENT
-      ? "_getMoveObjectsPercentGrid" : "_getMoveObjectsCenterGrid";
-    const objectBoundsFn = t => t.constrainedTokenBorder;
-    const filterFn = (t, currZ, _prevZ) => currZ.between(t.bottomZ && t.topZ);
-    return this[method](
-      currGridCoords,
-      prevGridCoords,
-      canvas.tokens.quadtree,
-      objectBoundsFn,
-      filterFn);
-  }
+  static _moveMultiplier(currGridCoords, prevGridCoords, { token, tokenMultiplier } = {}) {
+    tokenMultiplier ??= this.tokenMultiplier;
+    if ( tokenMultiplier === 1 ) return 1;
 
+    currGridCoords = pointFromGridCoordinates(currGridCoords);
+    prevGridCoords = pointFromGridCoordinates(prevGridCoords);
+
+    // Find tokens along the ray whose constrained borders intersect the ray.
+    const tokens = this._placeablesAlongSegment(currGridCoords, prevGridCoords); // Ensure a is currGridCoords.
+    tokens.delete(token);
+    if ( !tokens.size ) return 1;
+
+    // If any token qualifies, assess the penalty.
+    const filterFn = this._placeableFilterFn(currGridCoords, prevGridCoords);
+    for ( const token of tokens ) {
+      if ( filterFn(token) ) return tokenMultiplier;
+    }
+    return 1;
+  }
 }
 
 export class TokenMovePenaltyCenterGrid extends TokenMovePenaltyGridded {
@@ -434,18 +470,24 @@ export class TokenMovePenaltyCenterGrid extends TokenMovePenaltyGridded {
    * @param {number} [opts.tokenMultiplier]           Penalty multiplier for encountered tokens
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(currGridCoords, prevGridCoords, { token, tokenMultiplier } = {}) {
-    tokenMultiplier ??= this.tokenMultiplier;
-    if ( tokenMultiplier === 1 ) return 1;
-    const tokens = this._filterTokens(currGridCoords, prevGridCoords, CENTER);
-    tokens.delete(token);
-    return tokens.size ? tokenMultiplier : 1;
+  static moveMultiplier(currGridCoords, prevGridCoords, opts) {
+    return this._moveMultiplier(currGridCoords, prevGridCoords, opts);
   }
+
+  /**
+   * Construct a function that tests if the token border overlaps the grid center point.
+   * @param {Point3d} a     The grid center point to test
+   * @param {Point3d} b     Unused (represents previous grid center point).
+   * @returns {function}
+   *   - @param {PlaceableObject} o
+   *   - @returns {boolean}
+   */
+  _placeableQualificationTestFn(a, _b) { return t => this._placeableCenterOverlap(t, a); }
 }
 
 export class TokenMovePenaltyPercentGrid extends TokenMovePenaltyGridded {
   /**
-   * Move tokenMultiplieriplier accounting for tokens that overlap a percentage of the grid.
+   * Move multiplier accounting for tokens that overlap the center of the grid.
    * @param {GridCoordinates3d} currGridCoords        The current grid location
    * @param {GridCoordinates3d} prevGridCoords        The previous step along the grid
    * @param {object} [opts]                           Options affecting the calculation
@@ -453,12 +495,22 @@ export class TokenMovePenaltyPercentGrid extends TokenMovePenaltyGridded {
    * @param {number} [opts.tokenMultiplier]           Penalty multiplier for encountered tokens
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(currGridCoords, prevGridCoords, { token, tokenMultiplier } = {}) {
-    tokenMultiplier ??= this.tokenMultiplier;
-    if ( tokenMultiplier === 1 ) return 1;
-    const tokens = this._filterTokens(currGridCoords, prevGridCoords, PERCENT);
-    tokens.delete(token);
-    return tokens.size ? tokenMultiplier : 1;
+  static moveMultiplier(currGridCoords, prevGridCoords, opts) {
+    return this._moveMultiplier(currGridCoords, prevGridCoords, opts);
+  }
+
+  /**
+   * Construct a function that tests if the token border overlaps the grid shape.
+   * @param {Point3d} a     The grid center point to test
+   * @param {Point3d} b     Unused (represents previous grid center point).
+   * @returns {function}
+   *   - @param {PlaceableObject} o
+   *   - @returns {boolean}
+   */
+  _placeableQualificationTestFn(a, _b) {
+    const percentThreshold = this.percentThreshold; // Precalculate for speed.
+    const shape = gridShape(a); // Precalculate for speed.
+    return t => this._placeablePercentAreaOverlap(t, a, shape, percentThreshold);
   }
 }
 
@@ -514,34 +566,27 @@ export class DrawingMovePenaltyGridded extends MovePenaltyGridded {
   }
 
   /**
-   * Filter placeable tokens by either a center test or a percent overlap test.
-   * @param {GridCoordinates3d} currGridCoords        The current grid location
-   * @param {GridCoordinates3d} prevGridCoords        The previous step along the grid
-   * @param {Settings.KEYS.GRID_TERRAIN.CHOICES} type Type of test: center or percentage
-   * @returns {Set<Token>}
-   */
-  static _filter(currGridCoords, prevGridCoords, type) {
-    const method = type === PERCENT
-      ? "_getMoveObjectsPercentGrid" : "_getMoveObjectsCenterGrid";
-    return this[method](
-      currGridCoords,
-      prevGridCoords,
-      canvas.drawings.quadtree,
-      this._shapeForDrawing,
-      this._hasActiveDrawingTerrain);
-  }
-
-  /**
    * Helper to calculate the percentage penalty for a set of drawings.
    * @param {Set<Drawing>} drawings
    * @returns {number}
    */
   static _calculateDrawingsMovePenalty(drawings) {
     return drawings.reduce((acc, curr) => {
-      const penalty = curr.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) || 1;
+      const penalty = this.drawingPenalty(curr);
       return acc * penalty;
     }, 1);
   }
+
+  /**
+   * Construct a function that tests if a given placeable qualifies as potentially penalizing
+   * movement along the segment. Assumes the placeable border does intersect a|b.
+   * @param {Point3d} a
+   * @param {Point3d} b
+   * @returns {function}
+   *   - @param {PlaceableObject} o
+   *   - @returns {boolean}
+   */
+  _placeableQualificationTestFn(_a, _b) { return d => this.drawingPenalty(d) !== 1; }
 }
 
 export class DrawingMovePenaltyCenterGrid extends DrawingMovePenaltyGridded {
@@ -552,10 +597,26 @@ export class DrawingMovePenaltyCenterGrid extends DrawingMovePenaltyGridded {
    * @returns {number} Percent penalty
    */
   static moveMultiplier(currGridCoords, prevGridCoords) {
-    const drawings = this._filter(currGridCoords, prevGridCoords, CENTER);
+    currGridCoords = pointFromGridCoordinates(currGridCoords);
+    prevGridCoords = pointFromGridCoordinates(prevGridCoords);
+
+    const drawings = this._placeablesAlongSegment(currGridCoords, prevGridCoords, canvas.drawings.quadtree)
+      .filter(this._placeableFilterFn(currGridCoords, prevGridCoords));
     return this._calculateDrawingsMovePenalty(drawings);
   }
 
+  /**
+   * Construct a function that tests if the drawing border overlaps the grid center.
+   * @param {Point3d} a     The grid center point to test
+   * @param {Point3d} b     Unused (represents previous grid center point).
+   * @returns {function}
+   *   - @param {PlaceableObject} o
+   *   - @returns {boolean}
+   */
+  _placeableQualificationTestFn(a, b) {
+    const parentTest = super._placeableQualificationTestFn(a, b);
+    return d => parentTest(d) && this._placeableCenterOverlap(d, a);
+  }
 }
 
 export class DrawingMovePenaltyPercentGrid extends DrawingMovePenaltyGridded {
@@ -566,15 +627,28 @@ export class DrawingMovePenaltyPercentGrid extends DrawingMovePenaltyGridded {
    * @returns {number} Percent penalty
    */
   static moveMultiplier(currGridCoords, prevGridCoords) {
-    const drawings = this._getMoveObjectsPercentGrid(
-      currGridCoords,
-      prevGridCoords,
-      canvas.drawings.quadtree,
-      this._shapeForDrawing,
-      this._hasActiveDrawingTerrain);
+    currGridCoords = pointFromGridCoordinates(currGridCoords);
+    prevGridCoords = pointFromGridCoordinates(prevGridCoords);
+
+    const drawings = this._placeablesAlongSegment(currGridCoords, prevGridCoords, canvas.drawings.quadtree)
+      .filter(this._placeableFilterFn(currGridCoords, prevGridCoords));
     return this._calculateDrawingsMovePenalty(drawings);
   }
 
+  /**
+   * Construct a function that tests if the token border overlaps the grid shape.
+   * @param {Point3d} a     The grid center point to test
+   * @param {Point3d} b     Unused (represents previous grid center point).
+   * @returns {function}
+   *   - @param {PlaceableObject} o
+   *   - @returns {boolean}
+   */
+  _placeableQualificationTestFn(a, b) {
+    const percentThreshold = this.percentThreshold; // Precalculate for speed.
+    const shape = gridShape(a); // Precalculate for speed.
+    const parentTest = super._placeableQualificationTestFn(a, b);
+    return d => parentTest(d) && this._placeablePercentAreaOverlap(d, a, shape, percentThreshold);
+  }
 }
 
 export class DrawingMovePenaltyEuclideanGrid extends DrawingMovePenaltyGridded {
@@ -702,8 +776,8 @@ const multiplicativeCompose = (...functions) => {
 
 /**
  * Determine the percentage of the ray that intersects a set of shapes.
- * @param {GridCoordinates} a                    Origin point of ray
- * @param {GridCoordinates} b                    Destination point of ray
+ * @param {Point3d} a                    Origin point of ray
+ * @param {Point3d} b                    Destination point of ray
  * @param {Set<PIXI.Polygon
            |PIXI.Rectangle
            |PIXI.Circle>} shapes            Any shape that has a contains(x,y) method
@@ -712,9 +786,6 @@ const multiplicativeCompose = (...functions) => {
  */
 function rayShapesIntersectionPenalty(a, b, shapes, shapePenaltyFn) {
   if ( !shapes.size ) return 1;
-
-  a = pointFromGridCoordinates(a);
-  b = pointFromGridCoordinates(b);
 
   const tValues = [];
   const deltaMag = b.to2d().subtract(a).magnitude();
@@ -822,7 +893,7 @@ function rayShapesIntersectionPenalty(a, b, shapes, shapePenaltyFn) {
   return (distOutside + penaltyDistInside) / totalDistance;
 }
 
-// Register subclasses used for different grid penalty measurements.
+// NOTE: Register subclasses used for different grid penalty measurements.
 TokenMovePenaltyGridded._registerPenaltySubclass(CENTER, TokenMovePenaltyCenterGrid);
 TokenMovePenaltyGridded._registerPenaltySubclass(PERCENT, TokenMovePenaltyPercentGrid);
 TokenMovePenaltyGridded._registerPenaltySubclass(EUCLIDEAN, TokenMovePenaltyEuclideanGrid);
@@ -834,3 +905,4 @@ DrawingMovePenaltyGridded._registerPenaltySubclass(EUCLIDEAN, DrawingMovePenalty
 TerrainMovePenaltyGridded._registerPenaltySubclass(CENTER, TerrainMovePenaltyCenterGrid);
 TerrainMovePenaltyGridded._registerPenaltySubclass(PERCENT, TerrainMovePenaltyPercentGrid);
 TerrainMovePenaltyGridded._registerPenaltySubclass(EUCLIDEAN, TerrainMovePenaltyEuclideanGrid);
+

@@ -195,7 +195,7 @@ export function pointFromGridCoordinates(coords) {
  * @returns {number} Elevation in canvas pixel units.
  */
 export function canvasElevationFromCoordinates(coords) {
-  return CONFIG.GeometryLib.utils.gridUnitsToPixels(gridElevationFromCoordinates(coords));
+  return CONFIG.GeometryLib.utils.gridUnitsToPixels(gridElevationFromCoordinates(coords)) || 0;
 }
 
 /**
