@@ -297,8 +297,7 @@ function _computeDistance() {
  */
 function _computeSegmentDistances() {
   const token = this._getMovementToken();
-  const gridless = canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
-  const measureMoveDistance = this.constructor.measureMoveDistance;
+  const moveCl = MoveDistance._getChildClass(); // Get grid or gridless class.
 
   // Loop over each segment in turn, adding the physical distance and the move distance.
   let totalDistance = 0;
@@ -308,23 +307,14 @@ function _computeSegmentDistances() {
     this.segments.at(-1).last = true;
   }
   for ( const segment of this.segments ) {
-    const { distance, moveDistance } = measureMoveDistance(
+    const { distance, moveDistance } = moveCl.measure(
       segment.ray.A,
       segment.ray.B,
-      token,
-      { gridless, useAllElevation: segment.last });
+      { token, useAllElevation: segment.last });
     segment.distance = distance;
     segment.moveDistance = moveDistance;
     totalDistance += segment.distance;
     totalMoveDistance += segment.moveDistance;
-  }
-
-  if ( totalMoveDistance > 40 ) {
-    log({ totalMoveDistance });
-  }
-
-  if ( totalMoveDistance > 60 ) {
-    log({ totalMoveDistance });
   }
 
   this.totalDistance = totalDistance;
@@ -392,8 +382,9 @@ function _computeTokenSpeed() {
 
       // Split the segment, storing the latter portion in the queue for next iteration.
       const splitDistance = targetDistance - totalMoveDistance;
-      const segments = splitSegment(segment, splitDistance, token, gridless);
-      if ( segments.length === 2 ) {
+      const breakPoint = locateSegmentBreakpoint(segment, splitDistance, token, gridless);
+      if ( breakPoint ) {
+        const segments = splitSegmentAt(segment, breakPoint);
         this.segments.splice(i, 1, segments[0]); // Delete the old segment, replace.
         this.segments.splice(i + 1, 0, segments[1]); // Add the split.
         nSegments += 1;
@@ -438,24 +429,24 @@ function _computeTokenSpeed() {
 */
 
 /**
- * Cut a ruler segment at a specific point such that the first subsegment
+ * Determine the specific point at which to cut a ruler segment such that the first subsegment
  * measures a specific incremental move distance.
  * @param {RulerMeasurementSegment} segment       Segment, with ray property, to split
  * @param {number} incrementalMoveDistance        Distance, in grid units, of the desired first subsegment move distance
  * @param {Token} token                           Token to use when measuring move distance
- * @returns {RulerMeasurementSegment[]}
- *   If the incrementalMoveDistance is less than 0, returns [].
- *   If the incrementalMoveDistance is greater than segment move distance, returns [segment]
- *   Otherwise returns [RulerMeasurementSegment, RulerMeasurementSegment]
+ * @returns {Point3d|null}
+ *   If the incrementalMoveDistance is less than 0, returns null.
+ *   If the incrementalMoveDistance is greater than segment move distance, returns null
+ *   Otherwise returns the point at which to break the segment.
  */
-function splitSegment(segment, splitMoveDistance, token, gridless) {
-  if ( splitMoveDistance <= 0 ) return [];
-  if ( !segment.moveDistance || splitMoveDistance > segment.moveDistance ) return [segment];
+function locateSegmentBreakpoint(segment, splitMoveDistance, token, gridless) {
+  if ( splitMoveDistance <= 0 ) return null;
+  if ( !segment.moveDistance || splitMoveDistance > segment.moveDistance ) return null;
 
   // Attempt to move the split distance and determine the split location.
   const { A, B } = segment.ray;
-  const res = Ruler.measureMoveDistance(A, B, token,
-    { gridless, useAllElevation: false, stopTarget: splitMoveDistance });
+  const res = Ruler.measureMoveDistance(A, B,
+    { token, gridless, useAllElevation: false, stopTarget: splitMoveDistance });
 
   let breakPoint = pointFromGridCoordinates(res.endGridCoords); // We can get the exact split point.
   if ( !gridless ) {
@@ -466,8 +457,23 @@ function splitSegment(segment, splitMoveDistance, token, gridless) {
     else breakPoint.z = canvasElevationFromCoordinates(res.endGridCoords);
   }
 
-  if ( breakPoint.almostEqual(B) ) return [segment];
-  if ( breakPoint.almostEqual(A) ) return [];
+  if ( breakPoint.almostEqual(B) || breakPoint.almostEqual(A) ) return null;
+  return breakPoint;
+}
+
+/**
+ * Cut a ruler segment at a specified point.
+ * @param {RulerMeasurementSegment} segment       Segment, with ray property, to split
+ * @param {number} incrementalMoveDistance        Distance, in grid units, of the desired first subsegment move distance
+ * @param {Token} token                           Token to use when measuring move distance
+ * @returns {RulerMeasurementSegment[]}
+ *   If the incrementalMoveDistance is less than 0, returns [].
+ *   If the incrementalMoveDistance is greater than segment move distance, returns [segment]
+ *   Otherwise returns [RulerMeasurementSegment, RulerMeasurementSegment]
+ */
+function splitSegmentAt(segment, breakPoint) {
+  if ( breakPoint.almostEqual(segment.B) ) return [segment];
+  if ( breakPoint.almostEqual(segment.A) ) return [];
 
   // Split the segment into two at the break point.
   const s0 = {...segment};
@@ -484,6 +490,9 @@ function splitSegment(segment, splitMoveDistance, token, gridless) {
   if ( segment.last ) { s0.last = false; }
   return [s0, s1];
 }
+
+
+
 
 /**
  * For a given segment, locate its intersection at a grid shape.
@@ -657,8 +666,8 @@ PATCHES.BASIC.GETTERS = {
 PATCHES.BASIC.STATIC_METHODS = {
   elevationAtWaypoint,
   terrainElevationAtLocation,
-  measureDistance: PhysicalDistance.measure,
-  measureMoveDistance: MoveDistance.measure
+  measureDistance: PhysicalDistance.measure.bind(PhysicalDistance),
+  measureMoveDistance: MoveDistance.measure.bind(MoveDistance)
 };
 
 

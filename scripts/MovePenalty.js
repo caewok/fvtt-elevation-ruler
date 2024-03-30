@@ -71,9 +71,13 @@ export class MovePenalty {
    * @returns {*} Result of the applied method.
    */
   static #applyChildClass(method, gridless = false, ...args) {
-    gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
-    const cl = gridless ? MovePenaltyGridless : MovePenaltyGridded;
+    const cl = this._getChildClass(gridless);
     return cl[method](...args);
+  }
+
+  static _getChildClass(gridless) {
+    gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
+    return gridless ? MovePenaltyGridless : MovePenaltyGridded;
   }
 
   /**
@@ -101,7 +105,6 @@ export class MovePenalty {
     return this.#applyChildClass("moveMultiplier", gridless, a, b, opts);
   }
 
-
   /** Helper to calculate a shape for a given drawing.
    * @param {Drawing} drawing
    * @returns {CenteredPolygon|CenteredRectangle|PIXI.Circle}
@@ -113,6 +116,24 @@ export class MovePenalty {
       case Drawing.SHAPE_TYPES.ELLIPSE: return Ellipse.fromDrawing(drawing);
       default: return drawing.bounds;
     }
+  }
+
+  /**
+   * Helper to test if a drawing has a terrain that is active for this elevation.
+   * @param {Drawing} drawing       Placeable drawing to test
+   * @param {number} currElev       Elevation to test
+   * @param {number} [prevElev]     If defined, drawing must be between prevElev and currElev.
+   *   If not defined, drawing must be at currElev
+   * @returns {boolean}
+   */
+  static _hasActiveDrawingTerrain(drawing, currElev, prevElev) {
+    if ( !drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) ) return false;
+    const drawingE = foundry.utils.getProperty(drawing.document, "flags.elevatedvision.elevation");
+    if ( typeof drawingE === "undefined" ) return true;
+
+    const drawingZ = CONFIG.GeometryLib.utils.gridUnitsToPixels(drawingE);
+    if ( typeof prevElev === "undefined" ) return currElev.almostEqual(drawingZ);
+    return drawingZ.between(prevElev, currElev);
   }
 }
 
@@ -254,24 +275,6 @@ export class DrawingMovePenaltyGridless extends MovePenaltyGridless {
     const penaltyFn = d => d.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) || 1;
     return this.rayShapesIntersectionPenalty(a, b, drawings.map(d => this._shapeForDrawing(d)), penaltyFn);
 
-  }
-
-  /**
-   * Helper to test if a drawing has a terrain that is active for this elevation.
-   * @param {Drawing} drawing       Placeable drawing to test
-   * @param {number} currElev       Elevation to test
-   * @param {number} [prevElev]     If defined, drawing must be between prevElev and currElev.
-   *   If not defined, drawing must be at currElev
-   * @returns {boolean}
-   */
-  static _hasActiveDrawingTerrain(drawing, currElev, prevElev) {
-    if ( !drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) ) return false;
-    const drawingE = foundry.utils.getProperty(drawing.document, "flags.elevatedvision.elevation");
-    if ( typeof drawingE === "undefined" ) return true;
-
-    const drawingZ = CONFIG.GeometryLib.utils.gridUnitsToPixels(drawingE);
-    if ( typeof prevElev === "undefined" ) return currElev.almostEqual(drawingZ);
-    return drawingZ.between(prevElev, currElev);
   }
 }
 

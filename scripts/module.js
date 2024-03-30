@@ -15,6 +15,9 @@ import { gridShape } from "./grid_coordinates.js";
 import { registerGeometry } from "./geometry/registration.js";
 import { registerElevationConfig } from "./geometry/elevation_configs.js";
 
+// Grid coordinates
+import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d } from "./grid_coordinates.js";
+
 // Measure classes
 import {
   PhysicalDistance,
@@ -80,6 +83,12 @@ Hooks.once("init", function() {
   game.modules.get(MODULE_ID).api = {
     gridShape,
     PATCHER,
+
+    coordinates: {
+      pointFromGridCoordinates,
+      getCenterPoint3d,
+      getGridPosition3d
+    },
 
     // Measure classes
     measure: {

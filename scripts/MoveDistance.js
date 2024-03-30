@@ -37,9 +37,13 @@ export class MoveDistance {
    * @returns {*} Result of the applied method.
    */
   static #applyChildClass(method, gridless = false, ...args) {
-    gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
-    const cl = gridless ? MoveDistanceGridless : MoveDistanceGridded;
+    const cl = this._getChildClass(gridless);
     return cl[method](...args);
+  }
+
+  static _getChildClass(gridless) {
+    gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
+    return gridless ? MoveDistanceGridless : MoveDistanceGridded;
   }
 }
 
@@ -65,13 +69,15 @@ export class MoveDistanceGridless extends MoveDistance {
     // Recursively calls measure without a stop target to find a breakpoint.
     if ( stopTarget ) {
       const fullZ = b.z;
+      a = pointFromGridCoordinates(a);
+      b = pointFromGridCoordinates(b);
       b = this.#findGridlessBreakpoint(a, b, stopTarget, { token, penaltyFn });
       if ( useAllElevation ) b.z = fullZ;
     }
 
     // Determine penalty proportion of the a|b segment.
-    const penalty = penaltyFn(a, b, token);
-    const d = CONFIG.GeometryLib.utils.pixelsToGridUnits(PhysicalDistanceGridless.measure(a, b));
+    const penalty = penaltyFn(a, b, { token });
+    const d = PhysicalDistanceGridless.measure(a, b);
     return {
       distance: d,
       moveDistance: d * penalty,
@@ -88,7 +94,7 @@ export class MoveDistanceGridless extends MoveDistance {
    * @param {number} splitMoveDistance          Distance, in grid units, of the desired first subsegment move distance
    * @returns {Point3d}
    */
-  #findGridlessBreakpoint(a, b, splitMoveDistance, opts = {}) {
+  static #findGridlessBreakpoint(a, b, splitMoveDistance, opts = {}) {
     // Binary search to find a reasonably close t value for the split move distance.
     // Because the move distance can vary depending on terrain.
     const MAX_ITER = 20;

@@ -53,9 +53,8 @@ export function getTopLeftPoint(coords) {
 export function getCenterPoint(coords) {
   if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getCenterPoint(coords);
 
-  const arr = Object.hasOwn(coords, "i")
-    ? canvas.grid.grid.getPixelsFromGridPosition(coords.i, coords.j)
-    : canvas.grid.grid.getCenter(coords.x, coords.y);
+  if ( Object.hasOwn(coords, "i") ) coords = getTopLeftPoint(coords);
+  const arr = canvas.grid.grid.getCenter(coords.x, coords.y);
   return arrayToCoordsXY(arr);
 }
 
@@ -160,7 +159,7 @@ export function hexGridShape(coords) {
  * @param {GridCoordinates3d} coords    Grid (i,j,k) offset or x,y,z coordinates
  * @returns {i, j}
  */
-function getGridPosition3d(coords) {
+export function getGridPosition3d(coords) {
   const out = getGridPosition(coords);
   out.k = unitElevationFromCoordinates(coords);
   return out;

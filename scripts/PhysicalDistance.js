@@ -64,9 +64,13 @@ export class PhysicalDistance {
    * @returns {*} Result of the applied method.
    */
   static #applyChildClass(method, gridless = false, ...args) {
-    gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
-    const cl = gridless ? PhysicalDistanceGridless : PhysicalDistanceGridded;
+    const cl = this._getChildClass(gridless)
     return cl[method](...args);
+  }
+
+  static _getChildClass(gridless) {
+    gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
+    return gridless ? PhysicalDistanceGridless : PhysicalDistanceGridded;
   }
 }
 
