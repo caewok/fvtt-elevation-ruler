@@ -25,21 +25,15 @@ export class MoveDistance {
    *  Euclidean on a grid also uses grid squares, but measures using actual diagonal from center to center.
    */
   static measure(a, b, { gridless = false, ...opts } = {}) {
-    return this.#applyChildClass("measure", gridless, a, b, opts);
+    const cl = this._getChildClass(gridless);
+    return cl.measure(a, b, opts);
   }
 
   /**
-   * Helper method to choose between gridless and gridded subclasses.
-   * @param {string} method       Method to use
-   * @param {boolean} gridless    Should this be a gridless measurement?
-   * @param {...} args            Additional arguments passed to method
-   * @returns {*} Result of the applied method.
+   * Get the relevant child class depending on whether gridded or gridless is desired.
+   * @param {boolean} [gridless]    Should a gridless penalty be used?
+   * @returns {class}
    */
-  static #applyChildClass(method, gridless = false, ...args) {
-    const cl = this._getChildClass(gridless);
-    return cl[method](...args);
-  }
-
   static _getChildClass(gridless) {
     gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
     return gridless ? MoveDistanceGridless : MoveDistanceGridded;
@@ -165,7 +159,7 @@ export class MoveDistanceGridded extends MoveDistance {
       const dMove = d * penalty;
 
       // Early stop if the stop target is met.
-      if ( stopTarget && (dMoveTotal + dMove) >= stopTarget ) break;
+      if ( stopTarget && (dMoveTotal + dMove) > stopTarget ) break;
 
       // Cycle to next.
       dTotal += d;
@@ -174,18 +168,19 @@ export class MoveDistanceGridded extends MoveDistance {
     }
 
     if ( useAllElevation && currGridCoords ) {
-      const endGridCoords = { ...currGridCoords };
+      // Measure only the vertical distance between the projected endpoint and the desired endpoint.
+      const endGridCoords = { ...prevGridCoords };
       endGridCoords.k = unitElevationFromCoordinates(b);
-      const res = this.measure(currGridCoords, endGridCoords, { token, penaltyFn, useAllElevation: false });
+      const res = this.measure(prevGridCoords, endGridCoords, { token, penaltyFn, useAllElevation: false });
       dTotal += res.distance;
       dMoveTotal += res.moveDistance;
-      currGridCoords = endGridCoords;
+      prevGridCoords = endGridCoords;
     }
 
     return {
       distance: dTotal,
       moveDistance: dMoveTotal,
-      endGridCoords: currGridCoords
+      endGridCoords: prevGridCoords
     };
   }
 }

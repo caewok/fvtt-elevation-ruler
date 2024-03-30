@@ -479,6 +479,17 @@ function splitSegmentAt(segment, breakpoint, token, gridless) {
   // Measure the distance to the breakpoint
   const res = Ruler.measureMoveDistance(A, breakpoint, { token, gridless, useAllElevation: false });
 
+  // For debugging, measure the other segment.
+  if ( CONFIG[MODULE_ID].debug ){
+    const resB = Ruler.measureMoveDistance(breakpoint, B, { token, gridless, useAllElevation: false });
+    if ( !segment.distance.almostEqual(resA.distance + resB.distance) ) {
+      console.warn("Physical distance of split segments does not match.", { segment, breakpoint, token });
+    }
+    if ( !segment.moveDistance.almostEqual(resA.moveDistance + resB.moveDistance) ) {
+      console.warn("Move distance of split segments does not match.", { segment, breakpoint, token });
+    }
+  }
+
   // Split the segment into two at the break point.
   const s0 = {...segment};
   s0.ray = new Ray3d(A, breakpoint);

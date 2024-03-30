@@ -59,6 +59,11 @@ export class PhysicalDistance {
     return cl.gridUnder2dLine(origin, destination);
   }
 
+  /**
+   * Get the relevant child class depending on whether gridded or gridless is desired.
+   * @param {boolean} [gridless]    Should a gridless penalty be used?
+   * @returns {class}
+   */
   static _getChildClass(gridless) {
     gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
     return gridless ? PhysicalDistanceGridless : PhysicalDistanceGridded;

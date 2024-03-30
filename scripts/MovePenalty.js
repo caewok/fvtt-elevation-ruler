@@ -59,21 +59,15 @@ export class MovePenalty {
    *   - @returns {number} Percent penalty to apply for the move.
    */
   static movePenaltyFn({ gridless = false } = {}) {
-    return this.#applyChildClass("movePenaltyFn", gridless);
+    const cl = this._getChildClass(gridless);
+    return cl.movePenaltyFn();
   }
 
   /**
-   * Helper method to choose between gridless and gridded subclasses.
-   * @param {string} method       Method to use
-   * @param {boolean} gridless    Should this be a gridless measurement?
-   * @param {...} args            Additional arguments passed to method
-   * @returns {*} Result of the applied method.
+   * Get the relevant child class depending on whether gridded or gridless is desired.
+   * @param {boolean} [gridless]    Should a gridless penalty be used?
+   * @returns {class}
    */
-  static #applyChildClass(method, gridless = false, ...args) {
-    const cl = this._getChildClass(gridless);
-    return cl[method](...args);
-  }
-
   static _getChildClass(gridless) {
     gridless ||= canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
     return gridless ? MovePenaltyGridless : MovePenaltyGridded;
@@ -104,7 +98,8 @@ export class MovePenalty {
    * @returns {number} Percent penalty
    */
   static moveMultiplier(a, b, { gridless = false, ...opts } = {}) {
-    return this.#applyChildClass("moveMultiplier", gridless, a, b, opts);
+    const cl = this._getChildClass(gridless);
+    return cl.moveMultiplier(a, b, opts);
   }
 
   /** Helper to calculate a shape for a given drawing.
@@ -366,7 +361,7 @@ export class MovePenaltyGridded extends MovePenalty {
    * @param {object} opts                   Additional arguments passed to method
    * @returns {number} Percent penalty
    */
-  static moveMultiplier(a, b, ...opts) { return this.movePenaltyFn()(a, b, opts); }
+  static moveMultiplier(a, b, opts) { return this.movePenaltyFn()(a, b, opts); }
 
   /**
    * Test if the object overlaps with the grid center.
@@ -417,7 +412,7 @@ export class TokenMovePenaltyGridded extends MovePenaltyGridded {
    *   - @returns {number} Percent penalty to apply for the move.
    */
 
-  static movePenaltyFn() { return this.#penaltySubclass.moveMultiplier.bind(this); }
+  static movePenaltyFn() { return this.#penaltySubclass.moveMultiplier.bind(this.#penaltySubclass); }
 
   /**
    * Move multiplier accounting for tokens on the grid.
@@ -454,9 +449,7 @@ export class TokenMovePenaltyGridded extends MovePenaltyGridded {
 
     // If any token qualifies, assess the penalty.
     const filterFn = this._placeableFilterFn(currGridCoords, prevGridCoords);
-    for ( const token of tokens ) {
-      if ( filterFn(token) ) return tokenMultiplier;
-    }
+    if ( tokens.some(filterFn) ) return tokenMultiplier;
     return 1;
   }
 }
@@ -554,7 +547,7 @@ export class DrawingMovePenaltyGridded extends MovePenaltyGridded {
    *   - @param {Token} [token]                 Token doing the move. Required for token moves.
    *   - @returns {number} Percent penalty to apply for the move.
    */
-  static movePenaltyFn() { return this.#penaltySubclass.moveMultiplier.bind(this); }
+  static movePenaltyFn() { return this.#penaltySubclass.moveMultiplier.bind(this.#penaltySubclass); }
 
   /**
    * Move multiplier accounting for drawings on the grid.
@@ -700,7 +693,7 @@ export class TerrainMovePenaltyGridded extends MovePenaltyGridded {
    *   - @returns {number} Percent penalty to apply for the move.
    */
 
-  static movePenaltyFn() { return this.#penaltySubclass.moveMultiplier.bind(this); }
+  static movePenaltyFn() { return this.#penaltySubclass.moveMultiplier.bind(this.#penaltySubclass); }
 
   /**
    * Move multiplier accounting for tokens on the grid.
