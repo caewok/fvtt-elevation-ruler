@@ -1,5 +1,6 @@
 /* globals
 Color,
+foundry,
 game,
 Hooks
 */
@@ -72,36 +73,108 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-export const SPEED = {
-  ATTRIBUTES: { WALK: "", BURROW: "", FLY: ""},
-  MULTIPLIER: 0,
-  TYPES: {
-    WALK: 0,
-    DASH: 1,
-    MAXIMUM: -1
-  },
-  COLORS: {
-    WALK: Color.from(0x00ff00),
-    DASH: Color.from(0xffff00),
-    MAXIMUM: Color.from(0xff0000)
-  },
+/**
+ * @typedef {object} SpeedCategory
+ *
+ * Object that stores the name, multiplier, and color of a given speed category.
+ * Custom properties are permitted. The SpeedCategory is passed to SPEED.maximumCategoryDistance,
+ * which in turn can be defined to use custom properties to calculate the maximum distance for the category.
+ *
+ * @prop {Color} color          Color used with ruler highlighting
+ * @prop {string} name          Unique name of the category (relative to other SpeedCategories)
+ * @prop {number} [multiplier]  This times the token movement equals the distance for this category
+ */
 
-  // Use Font Awesome font unicode instead of basic unicode for displaying terrain symbol.
-  useFontAwesome: false, // Set to true to use Font Awesome unicode
-  terrainSymbol: "🥾"  // For Font Awesome, https://fontawesome.com/icons/bolt?f=classic&s=solid would be "\uf0e7".
+const WalkSpeedCategory = {
+  name: "Walk",
+  color: Color.from(0x00ff00),
+  multiplier: 1
 };
 
-// Add the inversions for lookup
-SPEED.COLORS[SPEED.TYPES.WALK] = SPEED.COLORS.WALK;
-SPEED.COLORS[SPEED.TYPES.DASH] = SPEED.COLORS.DASH;
-SPEED.COLORS[SPEED.TYPES.MAXIMUM] = SPEED.COLORS.MAXIMUM;
+const DashSpeedCategory = {
+  name: "Dash",
+  color: Color.from(0xffff00),
+  multiplier: 2
+};
+
+export const SPEED = {
+  /**
+   * Object of strings indicating where on the actor to locate the given attribute.
+   * @type {object<key, string>}
+   */
+  ATTRIBUTES: { WALK: "", BURROW: "", FLY: ""},
+
+  /**
+   * Array of speed categories used for speed highlighting.
+   * Array is in order, from highest priority to lowest. Only once the distance is surpassed
+   * in the first category is the next category considered.
+   * @type {SpeedCategory[]}
+   */
+  CATEGORIES: [WalkSpeedCategory, DashSpeedCategory],
+
+  /**
+   * Color to use once all SpeedCategory distances have been exceeded.
+   * @type {Color}
+   */
+  MAXIMUM_COLOR: Color.from(0xff0000),
+
+  // Use Font Awesome font unicode instead of basic unicode for displaying terrain symbol.
+
+  /**
+   * If true, use Font Awesome font unicode instead of basic unicode for displaying terrain symbol.
+   * @type {boolean}
+   */
+  useFontAwesome: false, // Set to true to use Font Awesome unicode
+
+  /**
+   * Terrain icon.
+   * If using Font Awesome, e.g, https://fontawesome.com/icons/bolt?f=classic&s=solid would be "\uf0e7".
+   * @type {string}
+   */
+  terrainSymbol: "🥾"
+};
+
+export const MaximumSpeedCategory = {
+  name: "Maximum",
+  multiplier: Number.POSITIVE_INFINITY
+};
+
+Object.defineProperty(MaximumSpeedCategory, "color", {
+  get: () => SPEED.MAXIMUM_COLOR
+});
+
+/**
+ * Given a token, get the maximum distance the token can travel for a given type.
+ * Distance measured from 0, so types overlap. E.g.
+ *   WALK (x1): Token speed 25, distance = 25.
+ *   DASH (x2): Token speed 25, distance = 50.
+ *
+ * @param {Token} token                   Token whose speed should be used
+ * @param {SpeedCategory} speedCategory   Category for which the maximum distance is desired
+ * @param {number} [tokenSpeed]           Optional token speed to avoid repeated lookups
+ * @returns {number}
+ */
+SPEED.maximumCategoryDistance = function(token, speedCategory, tokenSpeed) {
+  tokenSpeed ??= SPEED.tokenSpeed(token);
+  return speedCategory.multiplier * tokenSpeed;
+};
+
+/**
+ * Given a token, retrieve its base speed.
+ * @param {Token} token                   Token whose speed is required
+ * @returns {number} Distance, in grid units
+ */
+SPEED.tokenSpeed = function(token) {
+  const speedAttribute = SPEED.ATTRIBUTES[token.movementType] ?? SPEED.ATTRIBUTES.WALK;
+  return Number(foundry.utils.getProperty(token, speedAttribute));
+};
 
 // Avoid testing for the system id each time.
 Hooks.once("init", function() {
   SPEED.ATTRIBUTES.WALK = defaultWalkAttribute();
   SPEED.ATTRIBUTES.BURROW = defaultBurrowAttribute();
   SPEED.ATTRIBUTES.FLY = defaultFlyAttribute();
-  SPEED.MULTIPLIER = defaultDashMultiplier();
+  DashSpeedCategory.multiplier = defaultDashMultiplier();
 });
 
 export function defaultWalkAttribute() {
@@ -211,7 +284,8 @@ export function defaultDashMultiplier() {
 /**
  * From Foundry v12
  * The different rules to define and measure diagonal distance/cost in a square grid.
- * The description of each option refers to the distance/cost of moving diagonally relative to the distance/cost of a horizontal or vertical move.
+ * The description of each option refers to the distance/cost of moving diagonally relative
+ * to the distance/cost of a horizontal or vertical move.
  * @enum {number}
  */
 export const GRID_DIAGONALS = {
@@ -254,5 +328,5 @@ export const GRID_DIAGONALS = {
   /**
    * The diagonal distance is ∞. Diagonal movement is not allowed/possible.
    */
-  ILLEGAL: 6,
+  ILLEGAL: 6
 };

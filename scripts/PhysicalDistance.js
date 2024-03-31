@@ -132,54 +132,53 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
    *  Instead of mathematical shortcuts from center, actual grid squares are counted.
    *  Euclidean on a grid also uses grid squares, but measures using actual diagonal from center to center.
    */
-  static measure(a, b, { diagonalAdder } = {}) {
+  static measure(a, b, { numPrevDiagonal = 0, changeCount } = {}) {
     // Convert each grid step into a distance value.
     // Sum the horizontal and vertical moves.
-    const changeCount = this.sumGridMoves(a, b);
-    this.#convertElevationMovesToDiagonal(changeCount);
+    changeCount ??= this.sumGridMoves(a, b);
+    this._convertElevationMovesToDiagonal(changeCount);
     let d = (changeCount.V + changeCount.H) * canvas.dimensions.distance;
 
     // Add diagonal distance based on varying diagonal rules.
-    console.log({a, b})
-    diagonalAdder ??= this._diagonalDistanceAdder();
-    d += diagonalAdder(changeCount.D);
+    d += this._diagonalDistance(changeCount.D, numPrevDiagonal);
     return d;
   }
 
   /**
-   * Construct a function used to add diagonal distance under alternating rules.
-   * @returns {function}
-   *  - @param {number} nDiag
-   *  - @returns {number} Diagonal distance. Accounts for alternating rules.
+   * Calculate physical distance between two points, returning the converted count
    */
-  static _diagonalDistanceAdder() {
+  static _measure(a, b, { prevDiagonals = 0 } = {}) {
+    const changeCount = this.sumGridMoves(a, b);
+    this._convertElevationMovesToDiagonal(changeCount)
+
+  }
+
+  /**
+   * Add diagonal distance; handle alternating diagonal rules.
+   * @param {number} numDiagonal          Number of diagonal moves
+   * @param {number} [numPrevDiagonal=0]  Number of previous diagonal moves; used for alternating
+   * @returns {number} The additional distance for diagonal moves.
+   */
+  static _diagonalDistance(numDiagonal, numPrevDiagonal = 0) {
+    if ( !numDiagonal ) return 0;
     const distance = canvas.dimensions.distance;
     const diagonalMult = this.#diagonalDistanceMultiplier();
     const diagonalDist = distance * diagonalMult;
     const D = GRID_DIAGONALS;
     switch ( diagonalRule() ) {
       case D.ALTERNATING_1: {
-        let totalDiag = 0;
-        return nDiag => {
-          const pastOdd = totalDiag % 2;
-          const nEven = ~~(nDiag * 0.5) + pastOdd;
-          totalDiag += nDiag;
-          return (nDiag + nEven) * diagonalDist;
-        };
+        const pastOdd = numPrevDiagonal % 2;
+        const nEven = ~~(numDiagonal * 0.5) + pastOdd;
+        return (numDiagonal + nEven) * diagonalDist;
       }
 
       case D.ALTERNATING_2: {
-        let totalDiag = 0;
-        return nDiag => {
-          // Adjust if the past total puts us on an even square
-          const pastOdd = totalDiag % 2;
-          const nOdd = Math.ceil(nDiag * 0.5) - pastOdd;
-          totalDiag += nDiag;
-          return (nDiag + nOdd) * diagonalDist;
-        };
-
+        const pastOdd = numPrevDiagonal % 2;
+        const nOdd = Math.ceil(numDiagonal * 0.5) - pastOdd;
+        return (numDiagonal + nOdd) * diagonalDist;
       }
-      default: return nDiag => nDiag * diagonalDist;
+
+      default: numDiagonal * diagonalDist;
     }
   }
 
@@ -242,7 +241,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
    * @returns {object} The modified change count, with elevation eliminated. For convenience.
    *    The change Count object is modified in place.
    */
-  static #convertElevationMovesToDiagonal(changeCount) {
+  static _convertElevationMovesToDiagonal(changeCount) {
     while ( changeCount.E && changeCount.H ) {
       changeCount.H -=1;
       changeCount.D += 1;

@@ -15,7 +15,7 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
-import { SPEED, MODULE_ID } from "./const.js";
+import { SPEED, MODULE_ID, MaximumSpeedCategory } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
@@ -298,25 +298,23 @@ function _computeDistance() {
 
 /**
  * Calculate the distance of each segment.
+ * Segments are considered a group, so that alternating diagonals gives the same result
+ * with or without the segment breaks.
  */
 function _computeSegmentDistances() {
   const token = this._getMovementToken();
-  const moveCl = MoveDistance._getChildClass(); // Get grid or gridless class.
 
   // Loop over each segment in turn, adding the physical distance and the move distance.
   let totalDistance = 0;
   let totalMoveDistance = 0;
+  let numPrevDiagonal = 0;
+
   if ( this.segments.length ) {
     this.segments[0].first = true;
     this.segments.at(-1).last = true;
   }
   for ( const segment of this.segments ) {
-    const { distance, moveDistance } = moveCl.measure(
-      segment.ray.A,
-      segment.ray.B,
-      { token, useAllElevation: segment.last });
-    segment.distance = distance;
-    segment.moveDistance = moveDistance;
+    numPrevDiagonal = _measureSegment(segment, token, numPrevDiagonal);
     totalDistance += segment.distance;
     totalMoveDistance += segment.moveDistance;
   }
@@ -325,112 +323,110 @@ function _computeSegmentDistances() {
   this.totalMoveDistance = totalMoveDistance;
 }
 
+/**
+ * Measure a given segment, updating its distance labels accordingly.
+ * Segment modified in place.
+ * @param {RulerSegment} segment          Segment to measure
+ * @param {Token} [token]                 Token to use for the measurement
+ * @param {number} [numPrevDiagonal=0]    Number of previous diagonals for the segment
+ * @returns {number} numPrevDiagonal
+ */
+function _measureSegment(segment, token, numPrevDiagonal = 0) {
+  segment.numPrevDiagonal = numPrevDiagonal;
+  const res = MoveDistance.measure(
+    segment.ray.A,
+    segment.ray.B,
+    { token, useAllElevation: segment.last, numPrevDiagonal });
+  segment.distance = res.distance;
+  segment.moveDistance = res.moveDistance;
+  segment.numDiagonal = res.numDiagonal;
+  return res.numPrevDiagonal;
+}
+
+// TODO:
+// Need to recalculate segment distances and segment numPrevDiagonal, because
+// each split will potentially screw up numPrevDiagonal.
+// May not even need to store numPrevDiagonal in segments.
+// Also need to handle array of speed points.
+//   Need CONFIG function that takes a token and gives array of speeds with colors.
+
+/**
+ * Incrementally add together all segments. Split segment(s) at SpeedCategory maximum distances.
+ * Mark each segment with the distance, move distance, and SpeedCategory name.
+ * Does not assume segments have measurements, and modifies existing measurements.
+ * Segments modified in place.
+ */
 function _computeTokenSpeed() {
   // Requires a movement token and a defined token speed.
   const token = this._getMovementToken();
   if ( !token ) return;
 
-  const speedAttribute = SPEED.ATTRIBUTES[token.movementType] ?? SPEED.ATTRIBUTES.WALK;
-  const tokenSpeed = Number(foundry.utils.getProperty(token, speedAttribute));
+  // Precalculate the token speed.
+  const tokenSpeed = SPEED.tokenSpeed(token);
   if ( !tokenSpeed ) return;
 
   // Other constants
   const gridless = canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
-  const walkDistance = tokenSpeed;
-  const dashDistance = tokenSpeed * SPEED.MULTIPLIER;
 
   // Variables changed in the loop
   let totalDistance = 0;
   let totalMoveDistance = 0;
   let totalCombatMoveDistance = 0;
-  let prevCombatMoveDistance = 0;
-  let dashing = false;
-  let atMaximum = false;
-  let nSegments = this.segments.length;
+  let numPrevDiagonal = 0;
+  let s = 0;
+  let segment;
 
   // Add in already moved combat distance.
-  if ( game.combat?.started && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) {
-    prevCombatMoveDistance = totalCombatMoveDistance = token.lastMoveDistance;
-    dashing = totalCombatMoveDistance >= walkDistance || totalCombatMoveDistance.almostEqual(walkDistance, .01);
-    atMaximum = totalCombatMoveDistance >= dashDistance || totalCombatMoveDistance.almostEqual(dashDistance, .01);
-  }
+  if ( game.combat?.started
+    && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) totalCombatMoveDistance = token.lastMoveDistance;
 
-  // Debugging, to avoid infinite loops.
-  const maxIter = nSegments * 3;
-  let iter = 0;
+  // Progress through each speed attribute in turn.
+  const categoryIter = [...SPEED.CATEGORIES, MaximumSpeedCategory].values();
+  const maxDistFn = (token, speedCategory, tokenSpeed) => {
+    if ( speedCategory.name === "Maximum" ) return Number.POSITIVE_INFINITY;
+    return SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
+  };
 
-  // For each segment, determine the type of movement: walk, dash, max.
-  // If a segment has 2+ types, split the segment; recalculating distances.
-  for ( let i = 0; i < nSegments; i += 1 ) {
-    let segment = this.segments[i];
+  let speedCategory = categoryIter.next().value;
+  let maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
 
-    iter += 1; // Debugging
-    if ( iter > maxIter ) break; // Debugging
+  while ( (segment = this.segments[s]) ) {
+    segment.speed = speedCategory;
+    let newPrevDiagonal = _measureSegment(segment, token, numPrevDiagonal);
 
-    // A previous segment was at the maximum speed, so all subsequent segments are at maximum.
-    if ( atMaximum ) {
-      segment.speed = SPEED.TYPES.MAXIMUM;
-      continue;
-    }
+    // If we have exceeded maxDistance, determine if a split is required.
+    const newDistance = totalCombatMoveDistance + segment.moveDistance;
 
-    // Check if segment must be split.
-    // Do dash first so the split can later be checked for maximum.
-    const newMoveDistance = totalCombatMoveDistance + segment.moveDistance;
-    const targetDistance = (!dashing && newMoveDistance > walkDistance) ? (walkDistance - prevCombatMoveDistance)
-      : (!atMaximum && newMoveDistance > dashDistance) ? (dashDistance - prevCombatMoveDistance)
-        : undefined;
-    if ( targetDistance ) {
-      // Force dash and maximum, to avoid loops on error in measurement.
-      atMaximum ||= dashing;
-      dashing = true;
-
-      // Split the segment, storing the latter portion in the queue for next iteration.
-      const splitDistance = targetDistance - totalMoveDistance;
-      const breakpoint = locateSegmentBreakpoint(segment, splitDistance, token, gridless);
-      if ( breakpoint ) {
-        const segments = splitSegmentAt(segment, breakpoint, token, gridless);
-        this.segments.splice(i, 1, segments[0]); // Delete the old segment, replace.
-        this.segments.splice(i + 1, 0, segments[1]); // Add the split.
-        nSegments += 1;
-        segment = segments[0];
+    if ( newDistance > maxDistance || newDistance.almostEqual(maxDistance ) ) {
+      if ( newDistance > maxDistance ) {
+        // Split the segment, inserting the latter portion in the queue for future iteration.
+        const splitDistance = maxDistance - totalCombatMoveDistance;
+        const breakpoint = locateSegmentBreakpoint(segment, splitDistance, token, gridless);
+        if ( breakpoint ) {
+          const segments = _splitSegmentAt(segment, breakpoint);
+          this.segments.splice(s, 1, segments[0]); // Delete the old segment, replace.
+          this.segments.splice(s + 1, 0, segments[1]); // Add the split.
+          segment = segments[0];
+          newPrevDiagonal = _measureSegment(segment, token, numPrevDiagonal);
+        }
       }
+
+      // Increment to the next speed category.
+      speedCategory = categoryIter.next().value;
+      maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
     }
 
+    // Increment totals.
+    s += 1;
     totalDistance += segment.distance;
     totalMoveDistance += segment.moveDistance;
     totalCombatMoveDistance += segment.moveDistance;
-
-    // Mark segment speed and flag when past the dash and maximum points.
-    if ( totalCombatMoveDistance > dashDistance && !totalCombatMoveDistance.almostEqual(dashDistance, .01) ) {
-      segment.speed = SPEED.TYPES.MAXIMUM;
-      dashing ||= true;
-      atMaximum ||= true;
-    } else if ( totalCombatMoveDistance > walkDistance && !totalCombatMoveDistance.almostEqual(walkDistance, .01) ) {
-      segment.speed = SPEED.TYPES.DASH;
-      dashing ||= true;
-    } else segment.speed = SPEED.TYPES.WALK;
+    numPrevDiagonal = newPrevDiagonal;
   }
 
-  // Recalculated distances, just in case the splitting is off.
   this.totalDistance = totalDistance;
   this.totalMoveDistance = totalMoveDistance;
 }
-
-/* Debugging
-  arr = [1,2,3,4,5,6];
-  nArr = arr.length;
-  iter = 0;
-  for ( let i = 0; i < nArr; i += 1 ) {
-    iter += 1
-    if ( iter > 10 ) break;
-    const a = arr[i];
-    if ( a === 3 ) {
-      arr.splice(i + 1, 0, 3.5);
-      nArr += 1;
-    }
-    console.debug(`${i}, ${a}`);
-  }
-*/
 
 /**
  * Determine the specific point at which to cut a ruler segment such that the first subsegment
@@ -466,47 +462,29 @@ function locateSegmentBreakpoint(segment, splitMoveDistance, token, gridless) {
 }
 
 /**
- * Cut a ruler segment at a specified point.
+ * Cut a ruler segment at a specified point. Does not remeasure the resulting segments.
+ * Assumes without testing that the breakpoint lies on the segment between A and B.
  * @param {RulerMeasurementSegment} segment       Segment, with ray property, to split
- * @param {number} incrementalMoveDistance        Distance, in grid units, of the desired first subsegment move distance
- * @param {Token} token                           Token to use when measuring move distance
- * @returns {RulerMeasurementSegment[]}
- *   If the incrementalMoveDistance is less than 0, returns [].
- *   If the incrementalMoveDistance is greater than segment move distance, returns [segment]
- *   Otherwise returns [RulerMeasurementSegment, RulerMeasurementSegment]
+ * @param {Point3d} breakpoint                    Point to use when splitting the segments
+ * @returns [RulerMeasurementSegment, RulerMeasurementSegment]
  */
-function splitSegmentAt(segment, breakpoint, token, gridless) {
+function _splitSegmentAt(segment, breakpoint) {
   const { A, B } = segment.ray;
-  if ( breakpoint.almostEqual(B) ) return [segment];
-  if ( breakpoint.almostEqual(A) ) return [];
-
-  // Measure the distance to the breakpoint
-  const resA = Ruler.measureMoveDistance(A, breakpoint, { token, gridless, useAllElevation: false });
-
-  // It is possible for the segments to not add up to the original (for move distance),
-  // depending on the precise path taken.
-  const resB = Ruler.measureMoveDistance(breakpoint, B, { token, gridless, useAllElevation: false });
-
-  // For debugging, measure the other segment.
-  if ( CONFIG[MODULE_ID].debug ) {
-    if ( !segment.distance.almostEqual(resA.distance + resB.distance) ) {
-      console.warn("Physical distance of split segments does not match.", { segment, breakpoint, token });
-    }
-    if ( !segment.moveDistance.almostEqual(resA.moveDistance + resB.moveDistance) ) {
-      console.warn("Move distance of split segments does not match.", { segment, breakpoint, token });
-    }
-  }
 
   // Split the segment into two at the break point.
   const s0 = {...segment};
   s0.ray = new Ray3d(A, breakpoint);
-  s0.distance = resA.distance;
-  s0.moveDistance = resA.moveDistance;
+  s0.distance = null;
+  s0.moveDistance = null;
+  s0.numDiagonal = null;
 
   const s1 = {...segment};
   s1.ray = new Ray3d(breakpoint, B);
-  s1.distance = resB.distance;
-  s1.moveDistance = resB.moveDistance;
+  s1.distance = null;
+  s1.moveDistance = null;
+  s1.numPrevDiagonal = null;
+  s1.numDiagonal = null;
+  s1.speed = null;
 
   if ( segment.first ) { s1.first = false; }
   if ( segment.last ) { s0.last = false; }
