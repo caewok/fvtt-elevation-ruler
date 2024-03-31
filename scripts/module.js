@@ -11,9 +11,37 @@ ui
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS } from "./const.js";
-import { gridShape } from "./util.js";
+import { gridShape } from "./grid_coordinates.js";
 import { registerGeometry } from "./geometry/registration.js";
 import { registerElevationConfig } from "./geometry/elevation_configs.js";
+
+// Grid coordinates
+import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d } from "./grid_coordinates.js";
+
+// Measure classes
+import {
+  PhysicalDistance,
+  PhysicalDistanceGridless,
+  PhysicalDistanceGridded } from "./PhysicalDistance.js";
+
+import {
+  MoveDistance,
+  MoveDistanceGridless,
+  MoveDistanceGridded } from "./MoveDistance.js";
+
+import {
+  MovePenalty,
+  MovePenaltyGridless,
+  MovePenaltyGridded,
+
+  // For debugging
+  TokenMovePenaltyGridless,
+  TerrainMovePenaltyGridless,
+  DrawingMovePenaltyGridless,
+
+  TokenMovePenaltyGridded,
+  DrawingMovePenaltyGridded,
+  TerrainMovePenaltyGridded } from "./MovePenalty.js";
 
 // Pathfinding
 import { BorderTriangle, BorderEdge } from "./pathfinding/BorderTriangle.js";
@@ -25,8 +53,6 @@ import { benchPathfinding } from "./pathfinding/benchmark.js";
 
 // Wall updates for pathfinding
 import { SCENE_GRAPH, WallTracer, WallTracerEdge, WallTracerVertex } from "./pathfinding/WallTracer.js";
-
-import { gridUnder3dLine, gridUnder2dLine, sumGridMoves } from "./measure_distance.js";
 
 Hooks.once("init", function() {
   // Cannot access localization until init.
@@ -55,11 +81,36 @@ Hooks.once("init", function() {
 
 
   game.modules.get(MODULE_ID).api = {
-    gridUnder3dLine,
-    gridUnder2dLine,
-    sumGridMoves,
     gridShape,
     PATCHER,
+
+    coordinates: {
+      pointFromGridCoordinates,
+      getCenterPoint3d,
+      getGridPosition3d
+    },
+
+    // Measure classes
+    measure: {
+      PhysicalDistance,
+      PhysicalDistanceGridless,
+      PhysicalDistanceGridded,
+      MoveDistance,
+      MoveDistanceGridless,
+      MoveDistanceGridded,
+      MovePenalty,
+      MovePenaltyGridless,
+      MovePenaltyGridded,
+
+      // For debugging
+      TokenMovePenaltyGridless,
+      TerrainMovePenaltyGridless,
+      DrawingMovePenaltyGridless,
+
+      TokenMovePenaltyGridded,
+      DrawingMovePenaltyGridded,
+      TerrainMovePenaltyGridded
+    },
 
     // Pathfinding
     pathfinding: {

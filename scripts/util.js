@@ -1,14 +1,12 @@
 /* globals
-canvas,
 CONFIG,
-CONST,
 PIXI,
 renderTemplate
 */
 "use strict";
 
 import { MODULE_ID } from "./const.js";
-import { Point3d } from "./geometry/3d/Point3d.js";
+import { getTopLeftPoint } from "./grid_coordinates.js";
 
 export function log(...args) {
   try {
@@ -16,40 +14,6 @@ export function log(...args) {
   } catch(e) {
     // Empty
   }
-}
-
-/**
- * Helper to get the grid shape for given grid type.
- * @param {GridCoordinates} coords    Grid (i,j) offset or x,y coordinates
- * @returns {null|PIXI.Rectangle|PIXI.Polygon}
- */
-export function gridShape(coords) {
-  const { GRIDLESS, SQUARE } = CONST.GRID_TYPES;
-  switch ( canvas.grid.type ) {
-    case GRIDLESS: return null;
-    case SQUARE: return squareGridShape(coords);
-    default: return hexGridShape(coords);
-  }
-}
-
-/**
- * Return a rectangle for a given grid square.
- * @param {GridCoordinates} coords      Grid (i,j) offset or x,y coordinates
- * @returns {PIXI.Rectangle}
- */
-function squareGridShape(coords) {
-  const { x, y } = canvas.grid.grid.getTopLeftPoint(coords);
-  const { sizeX, sizeY } = canvas.grid;
-  return new PIXI.Rectangle(x, y, sizeX, sizeY);
-}
-
-/**
- * Return a polygon for a given grid hex.
- * @param {GridCoordinates} coords      Grid (i,j) offset or x,y coordinates
- * @returns {PIXI.Polygon}
- */
-export function hexGridShape(coords) {
-  return new PIXI.Polygon(...canvas.grid.grid.getVertices(coords));
 }
 
 /**
@@ -69,91 +33,13 @@ export function perpendicularPoints(A, B, distance = 1) {
 }
 
 /**
- * Row, column, elevation coordinates of a grid space. Follows from GridOffset
- * The vertical assumes the grid cubes are stacked upon one another.
- * @typedef {object} GridOffset3d
- * @property {number} i     The row coordinate
- * @property {number} j     The column coordinate
- * @property {number} k     The elevation, where 0 is at the scene elevation, negative is below the scene.
- *   k * canvas.scene.dimensions.distance === elevation in grid units.
- */
-
-
-/**
- * An offset of a grid space or a point with pixel coordinates.
- * @typedef {GridOffset3d|Point3d} GridCoordinates3d
- */
-
-/**
- * Get the center point for a given GridCoordinates3d
- * @param {GridCoordinates3d} coords    The coordinates
- * @returns {Point3d} The center point
- */
-export function getCenterPoint3d(coords) {
-  const center = Point3d.fromObject(canvas.grid.getCenterPoint(coords));
-  center.z = canvasElevationFromCoordinates(coords);
-  return center;
-}
-
-/**
- * Get a point from grid coordinates.
- * @param {GridCoordinates3d} coords
- * @returns {Point3d}
- *   - If i,j,k present, returns the center point
- *   - Otherwise returns the point at x,y,z
- */
-export function pointFromGridCoordinates(coords) {
-  const z  = canvasElevationFromCoordinates(coords);
-  if ( Object.hasOwn(coords, "i") ) {
-    const pt = canvas.grid.getCenterPoint(coords);
-    return new Point3d(pt.x, pt.y, z);
-  }
-  const pt = Point3d.fromObject(coords);
-  pt.z = z;
-  return pt;
-}
-
-/**
- * Calculate the canvas elevation for a given set of coordinates.
- * @param {GridCoordinates3d} coords    The coordinates
- * @returns {number} Elevation in canvas pixel units.
- */
-export function canvasElevationFromCoordinates(coords) {
-  return CONFIG.GeometryLib.utils.gridUnitsToPixels(gridElevationFromCoordinates(coords));
-}
-
-/**
- * Calculate the grid elevation for a given set of coordinates.
- * @param {GridCoordinates3d} coords    The coordinates
- * @returns {number} Elevation in grid units.
- */
-export function gridElevationFromCoordinates(coords) {
-  const k = coords.k;
-  if ( typeof k === "undefined" ) return CONFIG.GeometryLib.utils.pixelsToGridUnits(coords.z) || 0;
-  return k * canvas.scene.dimensions.distance;
-}
-
-/**
- * Calculate the unit elevation for a given set of coordinates.
- * @param {GridCoordinates3d} coords    The coordinates
- * @returns {number} Elevation in number of grid steps.
- */
-export function unitElevationFromCoordinates(coords) {
-  const k = coords.k;
-  if ( typeof k !== "undefined" ) return k;
-  const z = coords.z;
-  if ( typeof z === "undefined" ) return 0;
-  return Math.round(CONFIG.GeometryLib.utils.pixelsToGridUnits(z) / canvas.scene.dimensions.distance);
-}
-
-/**
  * Determine if a token is currently snapped to the grid.
  * @param {Token} token
  * @returns {boolean}
  */
 export function tokenIsSnapped(token) {
   const tokenLoc = PIXI.Point.fromObject(token.document);
-  const snappedPt = canvas.grid.grid.getTopLeftPoint(tokenLoc);
+  const snappedPt = getTopLeftPoint(tokenLoc);
   return tokenLoc.almostEqual(snappedPt);
 }
 
@@ -195,7 +81,7 @@ export function groupBy(list, keyGetter) {
  * @returns {PIXI.Rectangle}
  */
 export function segmentBounds(a, b) {
-  if ( !b || a.equals(b) ) return new PIXI.Rectangle(a.x - 1, a.y - 1, 3, 3);
+  if ( !b || (a.x === b.x && a.y === b.y) ) return new PIXI.Rectangle(a.x - 1, a.y - 1, 3, 3);
   const xMinMax = Math.minMax(a.x, b.x);
   const yMinMax = Math.minMax(a.y, b.y);
   return new PIXI.Rectangle(xMinMax.min, yMinMax.min, xMinMax.max - xMinMax.min, yMinMax.max - yMinMax.min);
@@ -237,4 +123,66 @@ export function filterSplice(arr, filterFn) {
  */
 export function keyForValue(object, value) {
   return Object.keys(object).find(key => object[key] === value);
+}
+
+/**
+ * Calculate the percent area overlap of one shape on another.
+ * @param {PIXI.Rectangle|PIXI.Polygon} overlapShape
+ * @param {PIXI.Rectangle|PIXI.Polygon} areaShape
+ * @returns {number} Value between 0 and 1.
+ */
+export function percentOverlap(overlapShape, areaShape, totalArea) {
+  if ( !overlapShape.overlaps(areaShape) ) return 0;
+  const intersection = overlapShape.intersectPolygon(areaShape.toPolygon());
+  const ixArea = intersection.area;
+  totalArea ??= areaShape.area;
+  return ixArea / totalArea;
+}
+
+/*
+ * Generator to iterate grid points under a line.
+ * See Ruler.prototype._highlightMeasurementSegment
+ * @param {x: Number, y: Number} origin       Origination point
+ * @param {x: Number, y: Number} destination  Destination point
+ * @param {object} [opts]                     Options affecting the result
+ * @param {boolean} [opts.reverse]            Return the points from destination --> origin.
+ * @return Iterator, which in turn
+ *   returns [row, col] Array for each grid point under the line.
+ */
+export function * iterateGridUnderLine(origin, destination, { reverse = false } = {}) {
+  if ( !(origin instanceof PIXI.Point) ) origin = PIXI.Point.fromObject(origin);
+  if ( !(destination instanceof PIXI.Point) ) destination = PIXI.Point.fromObject(destination);
+  if ( reverse ) [origin, destination] = [destination, origin];
+
+  const distance = PIXI.Point.distanceBetween(origin, destination); // We want 2d here.
+  const spacer = canvas.scene.grid.type === CONST.GRID_TYPES.SQUARE ? 1.41 : 1;
+  const nMax = Math.max(Math.floor(distance / (spacer * Math.min(canvas.grid.w, canvas.grid.h))), 1);
+  const tMax = Array.fromRange(nMax+1).map(t => t / nMax);
+
+  // Track prior position
+  let prior = null;
+  let tPrior = null;
+  for ( const t of tMax ) {
+    const {x, y} = origin.projectToward(destination, t);
+
+    // Get grid position
+    const [r0, c0] = prior ?? [null, null];
+    const [r1, c1] = canvas.grid.grid.getGridPositionFromPixels(x, y);
+    if ( r0 === r1 && c0 === c1 ) continue;
+
+    // Skip the first one
+    // If the positions are not neighbors, also highlight their halfway point
+    if ( prior && !canvas.grid.isNeighbor(r0, c0, r1, c1) ) {
+      const th = (t + tPrior) * 0.5;
+      const {x: xh, y: yh} = origin.projectToward(destination, th);
+      yield canvas.grid.grid.getGridPositionFromPixels(xh, yh); // [rh, ch]
+    }
+
+    // After so the halfway point is done first.
+    yield [r1, c1];
+
+    // Set for next round.
+    prior = [r1, c1];
+    tPrior = t;
+  }
 }
