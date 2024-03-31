@@ -138,6 +138,7 @@ export class MoveDistanceGridded extends MoveDistance {
    */
   static measure(a, b, { numPrevDiagonal = 0, token, useAllElevation = true, stopTarget, penaltyFn } = {}) {
     const iter = PhysicalDistanceGridded.gridUnder3dLine(a, b).values();
+    const startDiagonal = numPrevDiagonal;
     let prevGridCoords = iter.next().value;
 
     // Should never happen, as passing the same point as a,b returns a single square.
@@ -184,6 +185,7 @@ export class MoveDistanceGridded extends MoveDistance {
       distance: dTotal,
       moveDistance: dMoveTotal,
       endGridCoords: prevGridCoords,
+      numDiagonal: numPrevDiagonal - startDiagonal,
       numPrevDiagonal
     };
   }

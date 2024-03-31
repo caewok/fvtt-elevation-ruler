@@ -304,7 +304,7 @@ export function _highlightMeasurementSegment(wrapped, segment) {
     && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING);
 
   // Highlight each split in turn, changing highlight color each time.
-  if ( doSpeedHighlighting ) this.color = SPEED.COLORS[segment.speed];
+  if ( doSpeedHighlighting ) this.color = segment.speed.color;
 
   // Call Foundry version and return if not speed highlighting.
   const res = wrapped(segment);
