@@ -238,7 +238,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
    * Remaining diagonal --> horizontal.
    * @param {object} changeCount      Result of sumGridMoves
    * @returns {object} The modified change count, with elevation eliminated. For convenience.
-   *    The changeCount object is modified in place.
+   *    The change Count object is modified in place.
    */
   static #convertElevationMovesToDiagonal(changeCount) {
     while ( changeCount.E && changeCount.H ) {
