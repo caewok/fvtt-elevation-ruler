@@ -213,6 +213,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
       const currGridCoords = pts[i];
       const movementChange = this.gridChangeType3d(prevGridCoords, currGridCoords);
       Object.keys(totalChangeCount).forEach(key => totalChangeCount[key] += movementChange[key]);
+      prevGridCoords = currGridCoords;
     }
     return totalChangeCount;
   }
@@ -239,7 +240,10 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
     const zChange = (prevGridCoord.k !== nextGridCoord.k) || (prevGridCoord.z !== nextGridCoord.z);
     const res = { NONE: 0, H: 0, V: 0, D: 0, E: 0 };
     res[this.gridChangeType(prevGridCoord, nextGridCoord)] = 1;
-    if ( zChange ) res.E = 1;
+    if ( zChange ) {
+      res.E = 1;
+      res.NONE = 0;
+    }
     return res;
   }
 

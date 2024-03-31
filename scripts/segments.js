@@ -204,7 +204,13 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
     } else moveLabel = `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${newMoveDistance}${units}`;
   }
 
-  return `${origLabel}\n${elevLabel}${moveLabel}`;
+  let combatLabel = "";
+  if ( game.combat?.started && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) {
+    const pastMoveDistance = this._movementToken?.lastMoveDistance;
+    if ( pastMoveDistance ) combatLabel = `\nPrior: ${pastMoveDistance}${units}`;
+  }
+
+  return `${origLabel}\n${elevLabel}${moveLabel}${combatLabel}`;
 }
 
 /**
