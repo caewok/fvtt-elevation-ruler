@@ -1,3 +1,8 @@
+# 0.8.10
+Refactor physical and move distance measurement in anticipation of Foundry v12.
+Fix for token stopping prematurely if the mouse is released after space bar pressed when using the Ruler.
+
+
 # 0.8.9
 ### New features
 Track combat moves on a per-combat basis. Add settings toggle to have movement speed highlighting reflect sum of moves for that combat round.
