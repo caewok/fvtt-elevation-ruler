@@ -135,6 +135,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
     // Convert each grid step into a distance value.
     // Sum the horizontal and vertical moves.
     const changeCount = this.sumGridMoves(a, b);
+    this.#convertElevationMovesToDiagonal(changeCount);
     let d = (changeCount.V + changeCount.H) * canvas.dimensions.distance;
 
     // Add diagonal distance based on varying diagonal rules.
@@ -228,6 +229,36 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
     const xChange = (prevGridCoord.j !== nextGridCoord.j) || (prevGridCoord.x !== nextGridCoord.x);
     const yChange = (prevGridCoord.i !== nextGridCoord.i) || (prevGridCoord.y !== nextGridCoord.y);
     return CHANGE[((xChange * 2) + yChange)];
+  }
+
+  /**
+   * Convert elevation moves to diagonal or horizontal.
+   * Horizontal --> diagonal.
+   * Vertical --> diagonal.
+   * Remaining diagonal --> horizontal.
+   * @param {object} changeCount      Result of sumGridMoves
+   * @returns {object} The modified change count, with elevation eliminated. For convenience.
+   *    The changeCount object is modified in place.
+   */
+  static #convertElevationMovesToDiagonal(changeCount) {
+    while ( changeCount.E && changeCount.H ) {
+      changeCount.H -=1;
+      changeCount.D += 1;
+      changeCount.E -= 1;
+    }
+
+    while ( changeCount.E && changeCount.V ) {
+      changeCount.V -=1;
+      changeCount.D += 1;
+      changeCount.E -= 1;
+    }
+
+    while ( changeCount.E ) {
+      changeCount.H += 1;
+      changeCount.E -= 1;
+    }
+
+    return changeCount;
   }
 
   /**
