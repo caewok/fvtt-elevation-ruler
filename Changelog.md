@@ -1,11 +1,13 @@
-# 0.8.10
+# 0.9.0
 ### New features
 Add indicator of past combat movement in the ruler.
+Allow for unlimited number of speed categories, colors, along with custom speed functions in the CONFIG.
 
 ### Bug fixes
 Refactor physical and move distance measurement in anticipation of Foundry v12. Closes issue #59 (measurement near waypoints).
+Refactor how segments are split for purposes of speed highlighting.
+Fix for counting alternating diagonals across ruler segments/waypoints.
 Fix for token stopping prematurely if the mouse is released after space bar pressed when using the Ruler.
-
 
 # 0.8.9
 ### New features
