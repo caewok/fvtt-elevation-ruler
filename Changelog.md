@@ -1,5 +1,9 @@
 # 0.8.10
-Refactor physical and move distance measurement in anticipation of Foundry v12.
+### New features
+Add indicator of past combat movement in the ruler.
+
+### Bug fixes
+Refactor physical and move distance measurement in anticipation of Foundry v12. Closes issue #59 (measurement near waypoints).
 Fix for token stopping prematurely if the mouse is released after space bar pressed when using the Ruler.
 
 

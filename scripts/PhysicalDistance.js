@@ -125,13 +125,14 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
    * Measure physical distance between two points, accounting for grid rules.
    * @param {GridCoordinates3d} a                     Starting point for the segment
    * @param {GridCoordinates3d} b                     Ending point for the segment
-   * @param {boolean} [gridless=false]    If true, use the euclidean distance, ignoring grid.
+   * @param {object} [opts]
+   * @param {function} [opts.diagonalAdder]           Function to track alternating diagonals.
    * @returns {number} Distance in grid units.
    *  A segment wholly within a square may be 0 distance.
    *  Instead of mathematical shortcuts from center, actual grid squares are counted.
    *  Euclidean on a grid also uses grid squares, but measures using actual diagonal from center to center.
    */
-  static measure(a, b) {
+  static measure(a, b, { diagonalAdder } = {}) {
     // Convert each grid step into a distance value.
     // Sum the horizontal and vertical moves.
     const changeCount = this.sumGridMoves(a, b);
@@ -139,8 +140,9 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
     let d = (changeCount.V + changeCount.H) * canvas.dimensions.distance;
 
     // Add diagonal distance based on varying diagonal rules.
-    const diagAdder = this.#diagonalDistanceAdder();
-    d += diagAdder(changeCount.D);
+    console.log({a, b})
+    diagonalAdder ??= this._diagonalDistanceAdder();
+    d += diagonalAdder(changeCount.D);
     return d;
   }
 
@@ -150,7 +152,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
    *  - @param {number} nDiag
    *  - @returns {number} Diagonal distance. Accounts for alternating rules.
    */
-  static #diagonalDistanceAdder() {
+  static _diagonalDistanceAdder() {
     const distance = canvas.dimensions.distance;
     const diagonalMult = this.#diagonalDistanceMultiplier();
     const diagonalDist = distance * diagonalMult;
