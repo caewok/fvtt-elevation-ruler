@@ -584,6 +584,7 @@ function _onMouseMove(wrapped, event) {
  * @see {Canvas._onDragLeftDrop}
  */
 function _onMouseUp(wrapped, event) {
+  if ( this._state === Ruler.STATES.MOVING ) return;
   this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
   return wrapped(event);
 }
@@ -620,11 +621,10 @@ PATCHES.BASIC.WRAPS = {
   _onClickLeft,
   _onClickRight,
   _onMouseMove,
-  _onMouseUp,
   _canMove
 };
 
-PATCHES.BASIC.MIXES = { _animateMovement, _getMovementToken, _getMeasurementSegments };
+PATCHES.BASIC.MIXES = { _animateMovement, _getMovementToken, _getMeasurementSegments, _onMouseUp };
 
 PATCHES.BASIC.OVERRIDES = { _computeDistance, _animateSegment };
 
