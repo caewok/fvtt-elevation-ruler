@@ -135,6 +135,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
     // Convert each grid step into a distance value.
     // Sum the horizontal and vertical moves.
     const changeCount = this.sumGridMoves(a, b);
+    this.#convertElevationMovesToDiagonal(changeCount);
     let d = (changeCount.V + changeCount.H) * canvas.dimensions.distance;
 
     // Add diagonal distance based on varying diagonal rules.
@@ -213,6 +214,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
       const currGridCoords = pts[i];
       const movementChange = this.gridChangeType3d(prevGridCoords, currGridCoords);
       Object.keys(totalChangeCount).forEach(key => totalChangeCount[key] += movementChange[key]);
+      prevGridCoords = currGridCoords;
     }
     return totalChangeCount;
   }
@@ -230,6 +232,36 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
   }
 
   /**
+   * Convert elevation moves to diagonal or horizontal.
+   * Horizontal --> diagonal.
+   * Vertical --> diagonal.
+   * Remaining diagonal --> horizontal.
+   * @param {object} changeCount      Result of sumGridMoves
+   * @returns {object} The modified change count, with elevation eliminated. For convenience.
+   *    The change Count object is modified in place.
+   */
+  static #convertElevationMovesToDiagonal(changeCount) {
+    while ( changeCount.E && changeCount.H ) {
+      changeCount.H -=1;
+      changeCount.D += 1;
+      changeCount.E -= 1;
+    }
+
+    while ( changeCount.E && changeCount.V ) {
+      changeCount.V -=1;
+      changeCount.D += 1;
+      changeCount.E -= 1;
+    }
+
+    while ( changeCount.E ) {
+      changeCount.H += 1;
+      changeCount.E -= 1;
+    }
+
+    return changeCount;
+  }
+
+  /**
    * Type of change between two 3d grid coordinates.
    * @param {number[2]} prevGridCoord
    * @param {number[2]} nextGridCoord
@@ -239,7 +271,10 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
     const zChange = (prevGridCoord.k !== nextGridCoord.k) || (prevGridCoord.z !== nextGridCoord.z);
     const res = { NONE: 0, H: 0, V: 0, D: 0, E: 0 };
     res[this.gridChangeType(prevGridCoord, nextGridCoord)] = 1;
-    if ( zChange ) res.E = 1;
+    if ( zChange ) {
+      res.E = 1;
+      res.NONE = 0;
+    }
     return res;
   }
 
