@@ -136,7 +136,7 @@ export class MoveDistanceGridded extends MoveDistance {
    *  Instead of mathematical shortcuts from center, actual grid squares are counted.
    *  Euclidean on a grid also uses grid squares, but measures using actual diagonal from center to center.
    */
-  static measure(a, b, { token, useAllElevation = true, stopTarget, penaltyFn } = {}) {
+  static measure(a, b, { numPrevDiagonal = 0, token, useAllElevation = true, stopTarget, penaltyFn } = {}) {
     const iter = PhysicalDistanceGridded.gridUnder3dLine(a, b).values();
     let prevGridCoords = iter.next().value;
 
@@ -154,7 +154,9 @@ export class MoveDistanceGridded extends MoveDistance {
 
     let currGridCoords;
     for ( currGridCoords of iter ) {
-      const d = PhysicalDistanceGridded.measure(prevGridCoords, currGridCoords);
+      const changeCount = PhysicalDistanceGridded.sumGridMoves(prevGridCoords, currGridCoords);
+      PhysicalDistanceGridded._convertElevationMovesToDiagonal(changeCount);
+      const d = PhysicalDistanceGridded.measure(prevGridCoords, currGridCoords, { changeCount, numPrevDiagonal });
       const penalty = penaltyFn(currGridCoords, prevGridCoords, { token, tokenMultiplier });
       const dMove = d * penalty;
 
@@ -165,6 +167,7 @@ export class MoveDistanceGridded extends MoveDistance {
       dTotal += d;
       dMoveTotal += dMove;
       prevGridCoords = currGridCoords;
+      numPrevDiagonal += changeCount.D;
     }
 
     if ( useAllElevation && currGridCoords ) {
@@ -180,7 +183,8 @@ export class MoveDistanceGridded extends MoveDistance {
     return {
       distance: dTotal,
       moveDistance: dMoveTotal,
-      endGridCoords: prevGridCoords
+      endGridCoords: prevGridCoords,
+      numPrevDiagonal
     };
   }
 }

@@ -306,15 +306,18 @@ function _computeSegmentDistances() {
   // Loop over each segment in turn, adding the physical distance and the move distance.
   let totalDistance = 0;
   let totalMoveDistance = 0;
+  let numPrevDiagonal = 0;
+
   if ( this.segments.length ) {
     this.segments[0].first = true;
     this.segments.at(-1).last = true;
   }
   for ( const segment of this.segments ) {
-    const { distance, moveDistance } = moveCl.measure(
+    segment.numPrevDiagonal = numPrevDiagonal;
+    const { distance, moveDistance, numPrevDiagonal } = moveCl.measure(
       segment.ray.A,
       segment.ray.B,
-      { token, useAllElevation: segment.last });
+      { token, useAllElevation: segment.last, numPrevDiagonal });
     segment.distance = distance;
     segment.moveDistance = moveDistance;
     totalDistance += segment.distance;
@@ -324,6 +327,13 @@ function _computeSegmentDistances() {
   this.totalDistance = totalDistance;
   this.totalMoveDistance = totalMoveDistance;
 }
+
+// TODO:
+// Need to recalculate segment distances and segment numPrevDiagonal, because
+// each split will potentially screw up numPrevDiagonal.
+// May not even need to store numPrevDiagonal in segments.
+// Also need to handle array of speed points.
+//   Need CONFIG function that takes a token and gives array of speeds with colors.
 
 function _computeTokenSpeed() {
   // Requires a movement token and a defined token speed.
@@ -481,11 +491,11 @@ function splitSegmentAt(segment, breakpoint, token, gridless) {
   if ( breakpoint.almostEqual(A) ) return [];
 
   // Measure the distance to the breakpoint
-  const resA = Ruler.measureMoveDistance(A, breakpoint, { token, gridless, useAllElevation: false });
+  const resA = Ruler.measureMoveDistance(A, breakpoint, { numPrevDiagonal: segment.numPrevDiagonal, token, gridless, useAllElevation: false });
 
   // It is possible for the segments to not add up to the original (for move distance),
   // depending on the precise path taken.
-  const resB = Ruler.measureMoveDistance(breakpoint, B, { token, gridless, useAllElevation: false });
+  const resB = Ruler.measureMoveDistance(breakpoint, B, { numPrevDiagonal: resA.numPrevDiagonal, token, gridless, useAllElevation: false });
 
   // For debugging, measure the other segment.
   if ( CONFIG[MODULE_ID].debug ) {
@@ -507,6 +517,7 @@ function splitSegmentAt(segment, breakpoint, token, gridless) {
   s1.ray = new Ray3d(breakpoint, B);
   s1.distance = resB.distance;
   s1.moveDistance = resB.moveDistance;
+  s1.numPrevDiagonal = resA.numPrevDiagonal;
 
   if ( segment.first ) { s1.first = false; }
   if ( segment.last ) { s0.last = false; }
