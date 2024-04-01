@@ -231,6 +231,7 @@ async function _animateMovement(wrapped, token) {
   return Promise.allSettled(promises);
 }
 
+
 /**
  * Wrap Ruler.prototype._canMove
  * Allow GM full reign to move tokens.
