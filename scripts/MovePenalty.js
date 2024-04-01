@@ -73,6 +73,56 @@ export class MovePenalty {
     return gridless ? MovePenaltyGridless : MovePenaltyGridded;
   }
 
+
+  /**
+   * Find all terrain placeables along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} [token]             Movement token
+   * @returns {object}
+   *   - @prop {Set<Token>} tokens
+   *   - @prop {Set<Drawing>} drawings
+   *   - @prop {Set<Terrain>} terrains
+   */
+  static allTerrainPlaceablesAlongSegment(a, b, token, { gridless = false } = {}) {
+    const cl = this._getChildClass(gridless);
+    return cl.allTerrainPlaceablesAlongSegment(a, b, token);
+  }
+
+  /**
+   * Test if any qualifying terrain placeables block the segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @returns {boolean} True if any block
+   */
+  static anyTerrainPlaceablesAlongSegment(a, b, token, { gridless = false } = {}) {
+    const cl = this._getChildClass(gridless);
+    return cl.anyTerrainPlaceablesAlongSegment(a, b, token);
+  }
+
+  /**
+   * Find all terrain placeables along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Quadtree} quadtree         The quadtree to use for lookup
+   * @returns {Set<Drawing>}
+   */
+  static _allTerrainPlaceablesAlongSegment(a, b, quadtree) {
+    return this._placeablesAlongSegment(a, b, quadtree)
+      .filter(this._placeableFilterFn(a, b));
+  }
+
+  /**
+   * Determine if any terrain placeables are along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} token               Token to exclude (generally the moving token)
+   * @returns {Set<Token>}
+   */
+  static _anyTerrainPlaceablesAlongSegment(a, b) {
+    return this.allTerrainPlaceablesAlongSegment(a, b).size;
+  }
+
   /**
    * For a given point between a and b, locate colliding objects of the given type.
    * Returns all objects that intersect a --> b according to object bounds.
@@ -206,6 +256,37 @@ export class MovePenaltyGridless extends MovePenalty {
    * @returns {number} Percent penalty
    */
   static moveMultiplier(a, b, opts) { return this.movePenaltyFn()(a, b, opts); }
+
+  /**
+   * Find all terrain placeables along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} [token]             Movement token
+   * @returns {object}
+   *   - @prop {Set<Token>} tokens
+   *   - @prop {Set<Drawing>} drawings
+   *   - @prop {Set<Terrain>} terrains
+   */
+  static allTerrainPlaceablesAlongSegment(a, b, token) {
+    return {
+      tokens: TokenMovePenaltyGridless._allTerrainPlaceablesAlongSegment(a, b, token),
+      drawings: DrawingMovePenaltyGridless._allTerrainPlaceablesAlongSegment(a, b),
+      terrains: TerrainMovePenaltyGridless._allTerrainPlaceablesAlongSegment(a, b, token)
+    };
+  }
+
+  /**
+   * Test if any qualifying terrain placeables block the segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} [token]             Movement token
+   * @returns {boolean} True if any block
+   */
+  static anyTerrainPlaceablesAlongSegment(a, b, token) {
+    return TokenMovePenaltyGridless._anyTerrainPlaceablesAlongSegment(a, b, token)
+      || DrawingMovePenaltyGridless._anyTerrainPlaceablesAlongSegment(a, b)
+      || TerrainMovePenaltyGridless._anyTerrainPlaceablesAlongSegment(a, b, token);
+  }
 }
 
 export class TokenMovePenaltyGridless extends MovePenaltyGridless {
@@ -239,14 +320,25 @@ export class TokenMovePenaltyGridless extends MovePenaltyGridless {
     b = pointFromGridCoordinates(b);
 
     // Find tokens along the ray whose constrained borders intersect the ray.
-    const tokens = this._placeablesAlongSegment(a, b, canvas.tokens.quadtree)
-      .filter(this._placeableFilterFn(a, b));
-    tokens.delete(token);
+    const tokens = this.allTerrainPlaceablesAlongSegment(a, b, token);
     if ( !tokens.size ) return 1;
 
     // Determine the percentage of the ray that intersects the constrained token shapes.
     const penaltyFn = () => tokenMultiplier;
     return this.rayShapesIntersectionPenalty(a, b, tokens.map(t => t.constrainedTokenBorder), penaltyFn);
+  }
+
+  /**
+   * Find all terrain placeables along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} token               Token to exclude (generally the moving token)
+   * @returns {Set<Token>}
+   */
+  static _allTerrainPlaceablesAlongSegment(a, b, token) {
+    const tokens = super._allTerrainPlaceablesAlongSegment(a, b, canvas.tokens.quadtree);
+    tokens.delete(token);
+    return tokens;
   }
 }
 
@@ -276,8 +368,7 @@ export class DrawingMovePenaltyGridless extends MovePenaltyGridless {
     b = pointFromGridCoordinates(b);
 
     // Find drawings along the ray whose borders intersect the ray.
-    const drawings = this._placeablesAlongSegment(a, b, canvas.drawings.quadtree)
-      .filter(this._placeableFilterFn(a, b));
+    const drawings = this.allTerrainPlaceablesAlongSegment(a, b);
     if ( !drawings.size ) return 1;
 
     // Determine the percentage of the ray that intersects the constrained token shapes.
@@ -294,6 +385,17 @@ export class DrawingMovePenaltyGridless extends MovePenaltyGridless {
    *   - @returns {boolean}
    */
   static _placeableQualificationTestFn(_a, _b) { return d => this.drawingPenalty(d) !== 1; }
+
+  /**
+   * Find all terrain placeables along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} token               Token to exclude (generally the moving token)
+   * @returns {Set<Drawing>}
+   */
+  static _allTerrainPlaceablesAlongSegment(a, b) {
+    return super._allTerrainPlaceablesAlongSegment(a, b, canvas.drawings.quadtree);
+  }
 }
 
 export class TerrainMovePenaltyGridless extends MovePenaltyGridless {
@@ -325,6 +427,38 @@ export class TerrainMovePenaltyGridless extends MovePenaltyGridless {
   static moveMultiplier(a, b, { token }) {
     if ( !this.terrainAPI || !token ) return 1;
     return this.terrainAPI.Terrain.percentMovementForTokenAlongPath(token, a, b) || 1;
+  }
+
+  /**
+   * Find all terrain placeables along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} token               Token that encounters the terrain
+   * @returns {Set<TerrainMarkers>}
+   */
+  static _allTerrainPlaceablesAlongSegment(a, b, token) {
+    if ( !this.terrainAPI ) return new Set();
+    const ttr = new canvas.terrain.TravelTerrainRay(token, { origin: a, destination: b });
+    return new Set([
+      ...ttr._canvasTerrainMarkers().filter(m => m.terrains.size),
+      ...ttr._tilesTerrainMarkers(),
+      ...ttr._templatesTerrainMarkers()
+    ]);
+  }
+
+  /**
+   * Determine if any terrain placeables are along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} token               Token to exclude (generally the moving token)
+   * @returns {Set<Token>}
+   */
+  static _anyTerrainPlaceablesAlongSegment(a, b, token) {
+    if ( !this.terrainAPI ) return false;
+    const ttr = new canvas.terrain.TravelTerrainRay(token, { origin: a, destination: b });
+    return ttr._canvasTerrainMarkers().filter(m => m.terrains.size).length
+      || ttr._tilesTerrainMarkers().length
+      || ttr._templatesTerrainMarkers().length;
   }
 }
 
@@ -387,6 +521,37 @@ export class MovePenaltyGridded extends MovePenalty {
     shape ??= gridShape(currGridCoords);
     const totalArea = shape.area;
     return percentOverlap(this._placeableBounds(obj), shape, totalArea) >= percentThreshold;
+  }
+
+  /**
+   * Find all terrain placeables along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} [token]             Movement token
+   * @returns {object}
+   *   - @prop {Set<Token>} tokens
+   *   - @prop {Set<Drawing>} drawings
+   *   - @prop {Set<Terrain>} terrains
+   */
+  static allTerrainPlaceablesAlongSegment(a, b, token) {
+    return {
+      tokens: TokenMovePenaltyGridded.allTerrainPlaceablesAlongSegment(a, b, token),
+      drawings: DrawingMovePenaltyGridded.allTerrainPlaceablesAlongSegment(a, b),
+      terrains: TerrainMovePenaltyGridded.allTerrainPlaceablesAlongSegment(a, b, token)
+    };
+  }
+
+  /**
+   * Test if any qualifying terrain placeables block the segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} [token]             Movement token
+   * @returns {boolean} True if any block
+   */
+  static anyTerrainPlaceablesAlongSegment(a, b, token) {
+    return TokenMovePenaltyGridded._anyTerrainPlaceablesAlongSegment(a, b, token)
+      || DrawingMovePenaltyGridded._anyTerrainPlaceablesAlongSegment(a, b)
+      || TerrainMovePenaltyGridded._anyTerrainPlaceablesAlongSegment(a, b, token);
   }
 }
 
@@ -451,6 +616,41 @@ export class TokenMovePenaltyGridded extends MovePenaltyGridded {
     const filterFn = this._placeableFilterFn(currGridCoords, prevGridCoords);
     if ( tokens.some(filterFn) ) return tokenMultiplier;
     return 1;
+  }
+
+  /**
+   * Find all terrain placeables along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} token               Token to exclude (generally the moving token)
+   * @returns {Set<Token>}
+   */
+  static _allTerrainPlaceablesAlongSegment(a, b, token) {
+    const tokens = super._allTerrainPlaceablesAlongSegment(a, b, canvas.tokens.quadtree);
+    tokens.delete(token);
+    return tokens;
+  }
+
+  /**
+   * Find all terrain placeables along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} [token]             Movement token
+   * @returns {Set<Token>}
+   */
+  static allTerrainPlaceablesAlongSegment(a, b, token) {
+    return this.#penaltySubclass._allTerrainPlaceablesAlongSegment(a, b, token);
+  }
+
+  /**
+   * Test if any qualifying terrain placeables block the segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} [token]             Movement token
+   * @returns {boolean} True if any block
+   */
+  static anyTerrainPlaceablesAlongSegment(a, b, token) {
+    return this.#penaltySubclass._anyTerrainPlaceablesAlongSegment(a, b, token);
   }
 }
 
@@ -596,6 +796,37 @@ export class DrawingMovePenaltyGridded extends MovePenaltyGridded {
    *   - @returns {boolean}
    */
   static _placeableQualificationTestFn(_a, _b) { return d => this.drawingPenalty(d) !== 1; }
+
+  /**
+   * Find all terrain placeables along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} token               Token to exclude (generally the moving token)
+   * @returns {Set<Drawing>}
+   */
+  static _allTerrainPlaceablesAlongSegment(a, b) {
+    return super._allTerrainPlaceablesAlongSegment(a, b, canvas.drawings.quadtree);
+  }
+
+  /**
+   * Find all terrain placeables along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @returns {Set<Drawing>}
+   */
+  static allTerrainPlaceablesAlongSegment(a, b) {
+    return this.#penaltySubclass._allTerrainPlaceablesAlongSegment(a, b);
+  }
+
+  /**
+   * Test if any qualifying terrain placeables block the segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @returns {boolean} True if any block
+   */
+  static anyTerrainPlaceablesAlongSegment(a, b) {
+    return this.#penaltySubclass._anyTerrainPlaceablesAlongSegment(a, b);
+  }
 }
 
 export class DrawingMovePenaltyCenterGrid extends DrawingMovePenaltyGridded {
@@ -706,6 +937,59 @@ export class TerrainMovePenaltyGridded extends MovePenaltyGridded {
     return this.#penaltySubclass.moveMultiplier(currGridCoords, prevGridCoords, opts);
   }
 
+  /**
+   * Find all terrain placeables along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} token               Token that encounters the terrain
+   * @returns {Set<TerrainMarkers>}
+   */
+  static _allTerrainPlaceablesAlongSegment(a, b, token) {
+    if ( !this.terrainAPI ) return new Set();
+    const ttr = new canvas.terrain.TravelTerrainRay(token, { origin: a, destination: b });
+    return new Set([
+      ...ttr._canvasTerrainMarkers().filter(m => m.terrains.size),
+      ...ttr._tilesTerrainMarkers(),
+      ...ttr._templatesTerrainMarkers()
+    ]);
+  }
+
+  /**
+   * Determine if any terrain placeables are along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} token               Token to exclude (generally the moving token)
+   * @returns {Set<Token>}
+   */
+  static _anyTerrainPlaceablesAlongSegment(a, b, token) {
+    if ( !this.terrainAPI ) return false;
+    const ttr = new canvas.terrain.TravelTerrainRay(token, { origin: a, destination: b });
+    return ttr._canvasTerrainMarkers().filter(m => m.terrains.size).length
+      || ttr._tilesTerrainMarkers().length
+      || ttr._templatesTerrainMarkers().length;
+  }
+
+  /**
+   * Find all terrain placeables along segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} [token]             Movement token
+   * @returns {Set<Token>}
+   */
+  static allTerrainPlaceablesAlongSegment(a, b, token) {
+    return this.#penaltySubclass._allTerrainPlaceablesAlongSegment(a, b, token);
+  }
+
+  /**
+   * Test if any qualifying terrain placeables block the segment a|b.
+   * @param {GridCoordinates3d} a       Starting point
+   * @param {GridCoordinates3d} b       Ending point
+   * @param {Token} [token]             Movement token
+   * @returns {boolean} True if any block
+   */
+  static anyTerrainPlaceablesAlongSegment(a, b, token) {
+    return this.#penaltySubclass._anyTerrainPlaceablesAlongSegment(a, b, token);
+  }
 }
 
 export class TerrainMovePenaltyCenterGrid extends TerrainMovePenaltyGridded {
@@ -718,8 +1002,9 @@ export class TerrainMovePenaltyCenterGrid extends TerrainMovePenaltyGridded {
    * @returns {number} Percent penalty
    */
   static moveMultiplier(currGridCoords, prevGridCoords, { token } = {}) {
+    if ( !token ) return 1;
     const currCenter = getCenterPoint3d(currGridCoords);
-    this.terrain.percentMovementChangeForTokenAtPoint(token, currCenter, this.getSpeedAttribute(token));
+    return this.terrain.percentMovementChangeForTokenAtPoint(token, currCenter, this.getSpeedAttribute(token));
   }
 }
 
@@ -733,9 +1018,10 @@ export class TerrainMovePenaltyPercentGrid extends TerrainMovePenaltyGridded {
    * @returns {number} Percent penalty
    */
   static moveMultiplier(currGridCoords, prevGridCoords, { token } = {}) {
+    if ( !token ) return 1;
     const currElev = canvasElevationFromCoordinates(currGridCoords);
     const shape = gridShape(currGridCoords);
-    this.terrain.percentMovementChangeForTokenWithinShape(
+    return this.terrain.percentMovementChangeForTokenWithinShape(
       token,
       shape,
       this.percentThreshold,
@@ -754,8 +1040,9 @@ export class TerrainMovePenaltyEuclideanGrid extends TerrainMovePenaltyGridded {
    * @returns {number} Percent penalty
    */
   static moveMultiplier(currGridCoords, prevGridCoords, { token } = {}) {
+    if ( !token ) return 1;
     const currCenter = getCenterPoint3d(currGridCoords);
-    this.terrain.percentMovementChangeForTokenAtPoint(token, currCenter, this.getSpeedAttribute(token));
+    return this.terrain.percentMovementChangeForTokenAtPoint(token, currCenter, this.getSpeedAttribute(token));
   }
 }
 
@@ -771,6 +1058,20 @@ export class TerrainMovePenaltyEuclideanGrid extends TerrainMovePenaltyGridded {
 const multiplicativeCompose = (...functions) => {
   return (...args) => {
     return functions.reduce((acc, fn) => acc * fn(...args), 1);
+  };
+};
+
+/**
+ * Compose multiple functions, taking "OR" of each. Default return is false.
+ * @param {function} ...      Functions to apply in turn, from left to right
+ * @returns {boolean} || value, where false is the default for an empty function list.
+ * Example:
+ * fn = orCompose(x => !x, y => Boolean(y + 1))
+ * fn(1) ==> !1 || (1 + 1) => true
+ */
+const orCompose = (...functions) => {
+  return (...args) => {
+    return functions.reduce((acc, fn) => acc || fn(...args), false);
   };
 };
 

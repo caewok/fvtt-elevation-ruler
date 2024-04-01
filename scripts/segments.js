@@ -9,7 +9,7 @@ PIXI
 */
 "use strict";
 
-import { SPEED, MODULE_ID, MODULES_ACTIVE } from "./const.js";
+import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
@@ -18,6 +18,7 @@ import { Pathfinder } from "./pathfinding/pathfinding.js";
 import { BorderEdge } from "./pathfinding/BorderTriangle.js";
 import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
 import { elevationAtWaypoint } from "./terrain_elevation.js";
+import { MovePenalty } from "./MovePenalty.js";
 
 /**
  * Mixed wrap of  Ruler.prototype._getMeasurementSegments
@@ -81,11 +82,13 @@ function calculatePathPointsForSegment(segment, token) {
 
   // If no collision present, no pathfinding required.
   const tC = performance.now();
-  if ( !hasCollision(A, B, token) ) {
+  if ( !hasCollision(A, B, token)
+    && !(CONFIG[MODULE_ID].pathfindingCheckTerrains && MovePenalty.anyTerrainPlaceablesAlongSegment(A, B, token)) ) {
     const tEnd = performance.now();
     log(`Determined no collision for ${Pathfinder.triangleEdges.size} edges in ${tEnd - tC} ms.`);
     return [];
   }
+
   const tEnd = performance.now();
   log(`Found collision for ${Pathfinder.triangleEdges.size} edges in ${tEnd - tC} ms.`);
 

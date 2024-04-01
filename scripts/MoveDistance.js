@@ -10,6 +10,7 @@ CONST
 import { PhysicalDistanceGridless, PhysicalDistanceGridded } from "./PhysicalDistance.js";
 import { MovePenalty, MovePenaltyGridless, MovePenaltyGridded } from "./MovePenalty.js";
 import { unitElevationFromCoordinates, pointFromGridCoordinates } from "./grid_coordinates.js";
+import { MODULE_ID } from "./const.js";
 
 export class MoveDistance {
   /**
@@ -158,7 +159,14 @@ export class MoveDistanceGridded extends MoveDistance {
       const changeCount = PhysicalDistanceGridded.sumGridMoves(prevGridCoords, currGridCoords);
       PhysicalDistanceGridded._convertElevationMovesToDiagonal(changeCount);
       const d = PhysicalDistanceGridded.measure(prevGridCoords, currGridCoords, { changeCount, numPrevDiagonal });
-      const penalty = penaltyFn(currGridCoords, prevGridCoords, { token, tokenMultiplier });
+      let penalty = penaltyFn(currGridCoords, prevGridCoords, { token, tokenMultiplier });
+
+      if ( CONFIG[MODULE_ID].debug && penalty !== 1 ) {
+        console.debug(`Move penalty ${penalty}`, { currGridCoords, prevGridCoords });
+      }
+
+
+      if ( !Number.isFinite(penalty) ) penalty = 1;
       const dMove = d * penalty;
 
       // Early stop if the stop target is met.
