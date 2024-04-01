@@ -9,6 +9,9 @@ Wall
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
+import { MODULE_ID } from "../const.js";
+import { MoveDistance } from "../MoveDistance.js";
+import { PhysicalDistance } from "../PhysicalDistance.js";
 import { Draw } from "../geometry/Draw.js";
 import { WallTracerEdge } from "./WallTracer.js";
 
@@ -305,7 +308,7 @@ export class BorderTriangle {
    * @param {BorderTriangle|null} priorTriangle       Triangle that preceded this one along the path
    * @param {number} elevation                        Assumed elevation of the move, for testing edge walls, tokens.
    * @param {number} spacer                           How far from the corner to set the corner destinations
-   * @returns {PathNode} Each element has properties describing the destination, conforming to pathfinding
+   * @returns {PathNode[]} Each element has properties describing the destination, conforming to pathfinding
    *   - {number} key
    *   - {PIXI.Point} entryPoint
    *   - {BorderTriangle} entryTriangle
@@ -334,14 +337,16 @@ export class BorderTriangle {
   /**
    * Retrieve destinations with cost calculation added.
    * @param {BorderTriangle|null} priorTriangle     Triangle that preceded this one along the path
-   * @param {number} elevation                        Assumed elevation of the move, for testing edge walls, tokens.
+   * @param {number} elevation                      Assumed elevation of the move, for testing edge walls, tokens.
    * @param {number} spacer                         How far from the corner to set the corner destinations
    * @param {Point} fromPoint                       Point to measure from, for cost
+   * @param {Token} [token]                         Token doing the movement
+   * @returns {PathNode[]}
    */
-  getValidDestinationsWithCost(priorTriangle, elevation, spacer, fromPoint) {
+  getValidDestinationsWithCost(priorTriangle, elevation, spacer, fromPoint, token) {
     const destinations = this.getValidDestinations(priorTriangle, elevation, spacer);
     destinations.forEach(d => {
-      d.cost = this._calculateMovementCost(fromPoint, d.entryPoint);
+      d.cost = this._calculateMovementCost(fromPoint, d.entryPoint, token);
       d.fromPoint = fromPoint;
     });
     return destinations;
@@ -349,15 +354,20 @@ export class BorderTriangle {
 
   /**
    * Calculate the cost for a single path node from a given point.
-   * @param {PathNode} node
-   * @param {Point} fromPoint
+   * @param {Point} fromPoint                         Where the movement starts
+   * @param {Point} toPoint                           Where the movement ends
+   * @param {Token} [token]                           Token doing the movement
    * @returns {number} Cost value
    */
-  _calculateMovementCost(fromPoint, toPoint) {
+  _calculateMovementCost(fromPoint, toPoint, token) {
     // TODO: Handle 3d distance. Probably Ray3d with measureDistance or measureDistances.
     // TODO: Handle terrain distance.
-    const pathRes = canvas.grid.measurePath([fromPoint, toPoint]);
-    return CONFIG.GeometryLib.utils.gridUnitsToPixels(pathRes.distance);
+    if ( CONFIG[MODULE_ID].pathfindingCheckTerrains ) {
+      const pathRes = MoveDistance.measure(fromPoint, toPoint, { token });
+      return CONFIG.GeometryLib.utils.gridUnitsToPixels(pathRes.moveDistance);
+    }
+    const distance = PhysicalDistance.measure(fromPoint, toPoint);
+    return CONFIG.GeometryLib.utils.gridUnitsToPixels(distance);
   }
 
   /**

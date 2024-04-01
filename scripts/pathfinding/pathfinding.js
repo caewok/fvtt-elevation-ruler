@@ -18,6 +18,7 @@ import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarP
 import { SCENE_GRAPH } from "./WallTracer.js";
 import { cdt2dConstrainedGraph, cdt2dToBorderTriangles } from "../delaunator/cdt2d_access_functions.js";
 import { Settings } from "../settings.js";
+import { PhysicalDistanceGridless } from "../PhysicalDistance.js";
 
 /* Testing
 
@@ -263,10 +264,9 @@ export class Pathfinder {
    * @param {PathNode} goal
    * @param {PathNode} current
    */
-  // TODO: Handle 3d points?
   _heuristic(goal, current) {
-    const pathRes = canvas.grid.measurePath([goal.entryPoint, current.entryPoint]);
-    return CONFIG.GeometryLib.utils.gridUnitsToPixels(pathRes.distance);
+    const distance = PhysicalDistanceGridless.measure(goal.entryPoint, current.entryPoint);
+    return CONFIG.GeometryLib.utils.gridUnitsToPixels(distance);
   }
 
   /**
@@ -338,14 +338,14 @@ export class Pathfinder {
     if ( pathNode.entryTriangle === goal.entryTriangle ) {
       // Need a copy so we can modify cost for this goal node only.
       const newNode = {...goal};
-      newNode.cost = goal.entryTriangle._calculateMovementCost(pathNode.entryPoint, goal.entryPoint);
+      newNode.cost = goal.entryTriangle._calculateMovementCost(pathNode.entryPoint, goal.entryPoint, this.token);
       newNode.priorTriangle = pathNode.priorTriangle;
       newNode.fromPoint = pathNode.entryPoint;
       return [newNode];
     }
 
     const destinations = pathNode.entryTriangle.getValidDestinationsWithCost(
-      pathNode.priorTriangle, this.startElevation, this.spacer, pathNode.entryPoint);
+      pathNode.priorTriangle, this.startElevation, this.spacer, pathNode.entryPoint, this.token);
     return this.#filterDestinationsbyExploration(destinations);
   }
 

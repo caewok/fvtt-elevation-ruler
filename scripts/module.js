@@ -2,6 +2,7 @@
 canvas,
 game,
 CONFIG,
+CONST,
 Hooks,
 ui
 */
@@ -11,12 +12,11 @@ ui
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS } from "./const.js";
-import { gridShape } from "./grid_coordinates.js";
 import { registerGeometry } from "./geometry/registration.js";
 import { registerElevationConfig } from "./geometry/elevation_configs.js";
 
 // Grid coordinates
-import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d } from "./grid_coordinates.js";
+import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d, gridShape } from "./grid_coordinates.js";
 
 // Measure classes
 import {
@@ -70,6 +70,11 @@ Hooks.once("init", function() {
     // Types of movement.
     MOVEMENT_TYPES,
 
+    // Account for terrains/tokens in pathfinding.
+    // Can be a serious performance hit.
+    pathfindingCheckTerrains: false,
+
+    // Enable certain debug console logging and tests.
     debug: false
   };
 
