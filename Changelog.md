@@ -8,6 +8,7 @@ Refactor physical and move distance measurement in anticipation of Foundry v12. 
 Refactor how segments are split for purposes of speed highlighting.
 Fix for counting alternating diagonals across ruler segments/waypoints.
 Fix for token stopping prematurely if the mouse is released after space bar pressed when using the Ruler.
+Fix for "drunken token movement" in which a token would wander off the path when moving through several fake waypoints that were not centered on the grid.
 
 # 0.8.9
 ### New features
