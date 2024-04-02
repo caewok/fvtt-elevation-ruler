@@ -160,12 +160,6 @@ export class MoveDistanceGridded extends MoveDistance {
       PhysicalDistanceGridded._convertElevationMovesToDiagonal(changeCount);
       const d = PhysicalDistanceGridded.measure(prevGridCoords, currGridCoords, { changeCount, numPrevDiagonal });
       let penalty = penaltyFn(currGridCoords, prevGridCoords, { token, tokenMultiplier });
-
-      if ( CONFIG[MODULE_ID].debug && penalty !== 1 ) {
-        console.debug(`Move penalty ${penalty}`, { currGridCoords, prevGridCoords });
-      }
-
-
       if ( !Number.isFinite(penalty) ) penalty = 1;
       const dMove = d * penalty;
 
