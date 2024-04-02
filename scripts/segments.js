@@ -14,7 +14,7 @@ import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { perpendicularPoints, log, segmentBounds } from "./util.js";
-import { Pathfinder } from "./pathfinding/pathfinding.js";
+import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
 import { BorderEdge } from "./pathfinding/BorderTriangle.js";
 import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
 import { elevationAtWaypoint } from "./terrain_elevation.js";
@@ -116,24 +116,6 @@ function calculatePathPointsForSegment(segment, token) {
   return pathPoints;
 }
 
-/**
- * Instead of a typical `token.checkCollision` test, test for collisions against the edge graph.
- * With this approach, collisions with enemy tokens trigger pathfinding.
- * @param {PIXI.Point} A          Origin point for the move
- * @param {PIXI.Point} B          Destination point for the move
- * @param {Token} token           Token that is moving
- * @returns {boolean}
- */
-function hasCollision(A, B, token) {
-  BorderEdge.moveToken = token; // Set the token so we can test token edge blocking.
-  const lineSegmentIntersects = foundry.utils.lineSegmentIntersects;
-
-  // SCENE_GRAPH has way less edges than Pathfinder and has quadtree for the edges.
-  const edges = SCENE_GRAPH.edgesQuadtree.getObjects(segmentBounds(A, B));
-  const tokenBlockType = Settings._tokenBlockType();
-  return edges.some(edge => lineSegmentIntersects(A, B, edge.A, edge.B)
-    && edge.edgeBlocks(A, token, tokenBlockType));
-}
 
 /**
  * Check provided array of segments against stored path points.
