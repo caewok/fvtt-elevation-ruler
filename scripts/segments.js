@@ -54,8 +54,9 @@ export function _getMeasurementSegments(wrapped) {
   }
 
   // If currently pathfinding, set path for the last segment, overriding any prior path.
+  // Pathfinding when: the pathfinding icon is enabled or the temporary toggle key is held.
   const lastSegment = segments.at(-1);
-  const pathPoints = Settings.get(Settings.KEYS.CONTROLS.PATHFINDING)
+  const pathPoints = (Settings.get(Settings.KEYS.CONTROLS.PATHFINDING) ^ Settings.FORCE_TOGGLE_PATHFINDING)
     ? calculatePathPointsForSegment(lastSegment, token)
     : [];
 
