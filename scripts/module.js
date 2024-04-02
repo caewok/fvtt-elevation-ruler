@@ -77,7 +77,15 @@ Hooks.once("init", function() {
     tokenHPAttribute: defaultHPAttribute(),
 
     // ID of Token statuses to ignore when pathfinding.
-    pathfindingIgnoreStatuses: new Set("sleeping", "unconscious", "dead", "ethereal", "incapacitated", "paralyzed", "petrified", "restrained"),
+    pathfindingIgnoreStatuses: new Set([
+      "sleeping",
+      "unconscious",
+      "dead",
+      "ethereal",
+      "incapacitated",
+      "paralyzed",
+      "petrified",
+      "restrained"]),
 
     // Enable certain debug console logging and tests.
     debug: false
