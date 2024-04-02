@@ -12,6 +12,9 @@
     "elevationruler.keybindings.removeWaypointTokenRuler.name": "Remove Token Ruler Waypoint",
     "elevationruler.keybindings.removeWaypointTokenRuler.hint": "When token ruler is enabled, remove a waypoint while dragging the token.",
 
+    "elevationruler.keybindings.togglePathfinding.name": "Temporarily Toggle Pathfinding",
+    "elevationruler.keybindings.togglePathfinding.hint": "If the pathfinding button is enabled, holding this key will temporarily disable pathfinding. If the pathfinding button is not enabled, holding this key will temporarily enable pathfinding.",
+
     "elevationruler.settings.levels-use-floor-label.name": "Levels Floor Label",
     "elevationruler.settings.levels-use-floor-label.hint": "If Levels module is active, label the ruler with the current floor, if the Levels UI floors are named.",
     "elevationruler.settings.levels-labels-never": "Never",

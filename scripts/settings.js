@@ -63,7 +63,8 @@ const KEYBINDINGS = {
   TOKEN_RULER: {
     ADD_WAYPOINT: "addWaypointTokenRuler",
     REMOVE_WAYPOINT: "removeWaypointTokenRuler"
-  }
+  },
+  TOGGLE_PATHFINDING: "incrementElevation2"
 };
 
 
@@ -73,6 +74,8 @@ export class Settings extends ModuleSettingsAbstract {
 
   /** @type {object} */
   static KEYBINDINGS = KEYBINDINGS;
+
+  static FORCE_TOGGLE_PATHFINDING = false;
 
   /**
    * Register all settings
@@ -271,6 +274,25 @@ export class Settings extends ModuleSettingsAbstract {
         { key: "-" }
       ],
       onDown: context => toggleTokenRulerWaypoint(context, false),
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
+
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.TOGGLE_PATHFINDING, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOGGLE_PATHFINDING}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOGGLE_PATHFINDING}.hint`),
+      editable: [
+        { key: "KeyP" }
+      ],
+      onDown: () => {
+        this.FORCE_TOGGLE_PATHFINDING ||= true;
+        const ruler = canvas.controls.ruler;
+        if ( ruler._state === Ruler.STATES.MEASURING ) ruler.measure(ruler.destination, { force: true });
+      },
+      onUp: () => {
+        this.FORCE_TOGGLE_PATHFINDING &&= false;
+        const ruler = canvas.controls.ruler;
+        if ( ruler._state === Ruler.STATES.MEASURING ) ruler.measure(ruler.destination, { force: true });
+      },
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
   }
