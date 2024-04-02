@@ -91,6 +91,9 @@ paths = pf.algorithm.breadth.getAllPathPoints()
 paths.forEach(path => pf.algorithm.astar.drawPath(path, { color: Draw.COLORS.gray }))
 pf.drawPath(pathPoints, { color: Draw.COLORS.white })
 
+cleanedPathPoints = pf.cleanPath(pathPoints);
+pf.drawPath(cleanedPathPoints, { color: Draw.COLORS.green })
+
 // Walk through an algorithm
 
 let { start, end } = pf._initializeStartEndNodes(startPoint, endPoint)
@@ -430,21 +433,11 @@ export class Pathfinder {
 
   /**
    * Clean an array of path points.
-   * Straighten path and remove points that are very close to one another.
-   * If gridded, attempt to center the points on the grid.
-   * If not gridded, keep within the canvas grid size.
-   * Do not move a point if the path collides with a wall.
-   * Do not move a point if it would take it outside its grid square (to limit
-   * possibility that it would move the path into a terrain).
+   * Straighten path by removing unnecessary points.
    * @param {PIXI.Point[]} pathPoints
    * @returns {PIXI.Point[]}
    */
-  static cleanPath(pathPoints) {
-    return cleanGridPathRDP(pathPoints, this.token);
-
-    // if ( canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) return cleanNonGridPath(pathPoints);
-    // else return cleanGridPath(pathPoints);
-  }
+  cleanPath(pathPoints) { return cleanGridPathRDP(pathPoints, this.token); }
 }
 
 
@@ -530,14 +523,13 @@ function hasAnyCollisions(a, b, token) {
  * @returns {boolean}
  */
 export function hasCollision(a, b, token) {
-  BorderEdge.moveToken = token; // Set the token so we can test token edge blocking.
   const lineSegmentIntersects = foundry.utils.lineSegmentIntersects;
-
-  // SCENE_GRAPH has way less edges than Pathfinder and has quadtree for the edges.
-  const edges = SCENE_GRAPH.edgesQuadtree.getObjects(segmentBounds(a, b));
   const tokenBlockType = Settings._tokenBlockType();
+  // SCENE_GRAPH has way less edges than Pathfinder and has quadtree for the edges.
+  // Edges are WallTracerEdge
+  const edges = SCENE_GRAPH.edgesQuadtree.getObjects(segmentBounds(a, b));
   return edges.some(edge => lineSegmentIntersects(a, b, edge.A, edge.B)
-    && edge.edgeBlocks(a, token, tokenBlockType));
+    && edge.edgeBlocks(a, token, tokenBlockType, token.elevationZ));
 }
 
 /**

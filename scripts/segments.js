@@ -103,7 +103,7 @@ function calculatePathPointsForSegment(segment, token) {
 
   // Clean the path
   const t2 = performance.now();
-  pathPoints = Pathfinder.cleanPath(pathPoints);
+  pathPoints = pf.cleanPath(pathPoints);
   const t3 = performance.now();
   log(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t3 - t2} ms.`, pathPoints);
 
