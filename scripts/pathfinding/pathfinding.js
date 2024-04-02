@@ -590,35 +590,6 @@ function cleanGridPath(pathPoints) {
   if ( newPath.length > 1
     && orient2d(prev2, prev, lastPoint).almostEqual(0) ) newPath.pop();
   newPath.push(lastPoint);
-
-
-  // Remove points in middle of straight line.
-  //   nPoints = newPath.length;
-  //   prev = newPath[0];
-  //   curr = newPath[1];
-  //   let filteredPath = [prev];
-  //   for ( let i = 2; i < nPoints; i += 1 ) {
-  //     const next = newPath[i];
-  //     if ( orient2d(prev, curr, next).almostEqual(0) ) {
-  //       curr = next;
-  //       continue;
-  //     }
-  //     filteredPath.push(curr);
-  //     prev = curr;
-  //     curr = next;
-  //   }
-  //   filteredPath.push(newPath.at(-1));
-
-  //   if ( slowMethod.length !== newPath.length )
-  //     console.debug("Slow Method returned different path", [...slowMethod], [...newPath]);
-  //   for ( let i = 0; i < slowMethod.length; i += 1 ) {
-  //     if ( !slowMethod[i].to2d().equals(newPath[i].to2d()) ) {
-  //       console.debug("Slow Method returned different path", [...slowMethod], [...newPath]);
-  //       break;
-  //     }
-  //   }
-
-
   return newPath;
 }
 

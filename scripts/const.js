@@ -177,87 +177,76 @@ Hooks.once("init", function() {
   DashSpeedCategory.multiplier = defaultDashMultiplier();
 });
 
-export function defaultWalkAttribute() {
-  switch (game.system.id) {
-    case "CoC7":
-      return "actor.system.attribs.mov.value";
-    case "dcc":
-      return "actor.system.attributes.speed.value";
-    case "sfrpg":
-      return "actor.system.attributes.speed.value";
-    case "dnd4e":
-      return "actor.system.movement.walk.value";
-    case "dnd5e":
-      return "actor.system.attributes.movement.walk";
-    case "lancer":
-      return "actor.system.derived.speed";
-    case "pf1":
-    case "D35E":
-      return "actor.system.attributes.speed.land.total";
-    case "shadowrun5e":
-      return "actor.system.movement.walk.value";
-    case "swade":
-      return "actor.system.stats.speed.adjusted";
-    case "ds4":
-      return "actor.system.combatValues.movement.total";
-    case "splittermond":
-      return "actor.derivedValues.speed.value";
-    case "wfrp4e":
-      return "actor.system.details.move.walk";
-    case "crucible":
-      return "actor.system.movement.stride";
+export function defaultHPAttribute() {
+  switch ( game.system.id ) {
+    case "dnd5e":         return "actor.system.attributes.hp.value";
+    default:              return "actor.system.attributes.hp.value";
   }
-  return "";
+}
+
+export function defaultWalkAttribute() {
+  switch ( game.system.id ) {
+    case "CoC7":          return "actor.system.attribs.mov.value";
+    case "dcc":           return "actor.system.attributes.speed.value";
+    case "sfrpg":         return "actor.system.attributes.speed.value";
+    case "dnd4e":         return "actor.system.movement.walk.value";
+    case "dnd5e":         return "actor.system.attributes.movement.walk";
+    case "lancer":        return "actor.system.derived.speed";
+
+    case "pf1":
+    case "D35E":          return "actor.system.attributes.speed.land.total";
+    case "shadowrun5e":   return "actor.system.movement.walk.value";
+    case "swade":         return "actor.system.stats.speed.adjusted";
+    case "ds4":           return "actor.system.combatValues.movement.total";
+    case "splittermond":  return "actor.derivedValues.speed.value";
+    case "wfrp4e":        return "actor.system.details.move.walk";
+    case "crucible":      return "actor.system.movement.stride";
+    default:              return "";
+  }
 }
 
 export function defaultFlyAttribute() {
-  switch (game.system.id) {
+  switch ( game.system.id ) {
     // Missing attribute case "CoC7":
     // Missing attribute case "dcc":
-    case "sfrpg":
-      return "actor.system.attributes.flying.value";
+    case "sfrpg":         return "actor.system.attributes.flying.value";
     // Missing attribute case "dnd4e":
-    case "dnd5e":
-      return "actor.system.attributes.movement.fly";
+    case "dnd5e":         return "actor.system.attributes.movement.fly";
     // Missing attribute case "lancer":
     case "pf1":
-    case "D35E":
-      return "actor.system.attributes.speed.fly.total";
+    case "D35E":          return "actor.system.attributes.speed.fly.total";
     // Missing attribute case "shadowrun5e":
     // Missing attribute case "swade":
     // Missing attribute case "ds4":
     // Missing attribute case "splittermond":
     // Missing attribute case "wfrp4e":
     // Missing attribute case "crucible":
+    default:              return "";
   }
-  return "";
 }
 
 export function defaultBurrowAttribute() {
-  switch (game.system.id) {
+  switch ( game.system.id ) {
     // Missing attribute case "CoC7":
     // Missing attribute case "dcc":
-    case "sfrpg":
-      return "actor.system.attributes.burrowing.value";
+    case "sfrpg":         return "actor.system.attributes.burrowing.value";
     // Missing attribute case "dnd4e":
-    case "dnd5e":
-      return "actor.system.attributes.movement.burrow";
+    case "dnd5e":         return "actor.system.attributes.movement.burrow";
     // Missing attribute case "lancer":
     case "pf1":
-    case "D35E":
-      return "actor.system.attributes.speed.burrow.total";
+    case "D35E":          return "actor.system.attributes.speed.burrow.total";
     // Missing attribute case "shadowrun5e":
     // Missing attribute case "swade":
     // Missing attribute case "ds4":
     // Missing attribute case "splittermond":
     // Missing attribute case "wfrp4e":
     // Missing attribute case "crucible":
+    default:              return "";
   }
-  return "";
 }
 
 export function defaultDashMultiplier() {
-  switch (game.system.id) {
+  switch ( game.system.id ) {
     case "dcc":
     case "dnd4e":
     case "dnd5e":
@@ -266,19 +255,16 @@ export function defaultDashMultiplier() {
     case "D35E":
     case "sfrpg":
     case "shadowrun5e":
-    case "ds4":
-      return 2;
-    case "CoC7":
-      return 5;
-    case "splittermond":
-      return 3;
-    case "wfrp4e":
-      return 2;
+    case "ds4":           return 2;
+
+    case "CoC7":          return 5;
+    case "splittermond":  return 3;
+    case "wfrp4e":        return 2;
+
     case "crucible":
-    case "swade":
-      return 0;
+    case "swade":         return 0;
+    default:              return 0;
   }
-  return 0;
 }
 
 /**

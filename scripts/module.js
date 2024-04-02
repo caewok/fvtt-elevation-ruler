@@ -2,7 +2,6 @@
 canvas,
 game,
 CONFIG,
-CONST,
 Hooks,
 ui
 */
@@ -11,7 +10,7 @@ ui
 
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
-import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS } from "./const.js";
+import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS, defaultHPAttribute } from "./const.js";
 import { registerGeometry } from "./geometry/registration.js";
 import { registerElevationConfig } from "./geometry/elevation_configs.js";
 
@@ -74,13 +73,29 @@ Hooks.once("init", function() {
     // Can be a serious performance hit.
     pathfindingCheckTerrains: false,
 
+    // Where to find token HP, used to ignore dead tokens when pathfinding.
+    tokenHPAttribute: defaultHPAttribute(),
+
+    // ID of Token statuses to ignore when pathfinding.
+    pathfindingIgnoreStatuses: new Set([
+      "sleeping",
+      "unconscious",
+      "dead",
+      "ethereal",
+      "incapacitated",
+      "paralyzed",
+      "petrified",
+      "restrained"]),
+
     // Enable certain debug console logging and tests.
     debug: false
   };
 
   /* To add a movement to the api:
   CONFIG.elevationruler.MOVEMENT_TYPES.SWIM = 3; // Increment by 1 from the highest-valued movement type
-  CONFIG.elevationruler.MOVEMENT_BUTTONS[CONFIG.elevationruler.MOVEMENT_TYPES.SWIM] = "person-swimming"; // From Font Awesome
+
+  // This label is from Font Awesome
+  CONFIG.elevationruler.MOVEMENT_BUTTONS[CONFIG.elevationruler.MOVEMENT_TYPES.SWIM] = "person-swimming";
   CONFIG.elevationruler.SPEED.ATTRIBUTES.SWIM = "actor.system.attributes.movement.swim"; // dnd5e
   */
 

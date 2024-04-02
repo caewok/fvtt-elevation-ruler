@@ -347,18 +347,11 @@ export class BorderTriangle {
     const destinations = this.getValidDestinations(priorTriangle, elevation, spacer);
     destinations.forEach(d => {
       d.cost = this._calculateMovementCost(fromPoint, d.entryPoint, token);
-      if ( !Number.isFinite(d.cost) ) {
-        if ( CONFIG[MODULE_ID].debug ) console.debug(`Destination d.entryPoint d.fromPoint has cost ${d.cost}`);
-        d.cost = 1e06; // NaN is bad--results in infinite loop; probably don't want to set NaN to 0 cost.
-      }
+
+      // NaN is bad--results in infinite loop; probably don't want to set NaN to 0 cost.
+      if ( !Number.isFinite(d.cost) ) d.cost = 1e06;
       d.fromPoint = fromPoint;
     });
-
-    if ( CONFIG[MODULE_ID].debug ) {
-      console.debug(`Pathfinding destinations from ${fromPoint}:`);
-      destinations.forEach(d => console.debug(`\t${d.entryPoint} cost: ${d.cost} distance: ${CONFIG.GeometryLib.utils.gridUnitsToPixels(PhysicalDistance.measure(fromPoint, d.entryPoint))}  Euclidean distance: ${PIXI.Point.distanceBetween(fromPoint, d.entryPoint)}`));
-    }
-
     return destinations;
   }
 
