@@ -1,5 +1,6 @@
 /* globals
-
+canvas,
+ui
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -25,8 +26,8 @@ function _onMeasuredRulerMovement(wrapped, context) {
 
   // For each controlled token, end the drag.
   canvas.tokens.clearPreviewContainer();
-  ruler.moveToken().then((response) => ruler._endMeasurement());
+  ruler.moveToken().then(_response => ruler._endMeasurement());
   return true;
 }
 
-PATCHES.TOKEN_RULER.STATIC_MIXES = { _onMeasuredRulerMovement }
+PATCHES.TOKEN_RULER.STATIC_MIXES = { _onMeasuredRulerMovement };

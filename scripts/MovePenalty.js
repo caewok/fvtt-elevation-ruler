@@ -1062,20 +1062,6 @@ const multiplicativeCompose = (...functions) => {
 };
 
 /**
- * Compose multiple functions, taking "OR" of each. Default return is false.
- * @param {function} ...      Functions to apply in turn, from left to right
- * @returns {boolean} || value, where false is the default for an empty function list.
- * Example:
- * fn = orCompose(x => !x, y => Boolean(y + 1))
- * fn(1) ==> !1 || (1 + 1) => true
- */
-const orCompose = (...functions) => {
-  return (...args) => {
-    return functions.reduce((acc, fn) => acc || fn(...args), false);
-  };
-};
-
-/**
  * Determine the percentage of the ray that intersects a set of shapes.
  * @param {Point3d} a                    Origin point of ray
  * @param {Point3d} b                    Destination point of ray

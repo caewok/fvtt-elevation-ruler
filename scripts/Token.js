@@ -109,10 +109,12 @@ function updateToken(document, changes, _options, _userId) {
     // Map to each unique combat.
     const combatId = game.combat.id;
     token._combatMoveData ??= new Map();
-    if ( !token._combatMoveData.has(combatId) ) token._combatMoveData.set(combatId, { lastMoveDistance: 0, lastRound: -1 });
+    if ( !token._combatMoveData.has(combatId) ) {
+      token._combatMoveData.set(combatId, { lastMoveDistance: 0, lastRound: -1 });
+    }
     const combatData = token._combatMoveData.get(combatId);
     if ( combatData.lastRound < game.combat.round ) combatData.lastMoveDistance = token._lastMoveDistance;
-    else combatData.lastMoveDistance += token._lastMoveDistance
+    else combatData.lastMoveDistance += token._lastMoveDistance;
     combatData.lastRound = game.combat.round;
   }
 }

@@ -108,7 +108,6 @@ async function _measureTiming(N, fn, ...args) {
   const t1 = performance.now();
   await _randomLoopFn(N, fn, ...args);
   const t2 = performance.now();
-  // return { t0, t1, t2 };
   return (t2 - t1) - (t1 - t0);
 }
 
@@ -129,7 +128,6 @@ async function _randomLoopFn(N = 1, fn, ...args) {
   }
   return res;
 }
-
 
 
 /**

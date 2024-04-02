@@ -1,9 +1,9 @@
 /* globals
+foundry
 */
 "use strict";
 
 import { Patcher } from "./Patcher.js";
-import { MODULES_ACTIVE } from "./const.js";
 
 import { PATCHES as PATCHES_Ruler } from "./Ruler.js";
 import { PATCHES as PATCHES_Token } from "./Token.js";

@@ -145,15 +145,6 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
   }
 
   /**
-   * Calculate physical distance between two points, returning the converted count
-   */
-  static _measure(a, b, { prevDiagonals = 0 } = {}) {
-    const changeCount = this.sumGridMoves(a, b);
-    this._convertElevationMovesToDiagonal(changeCount)
-
-  }
-
-  /**
    * Add diagonal distance; handle alternating diagonal rules.
    * @param {number} numDiagonal          Number of diagonal moves
    * @param {number} [numPrevDiagonal=0]  Number of previous diagonal moves; used for alternating
@@ -178,7 +169,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
         return (numDiagonal + nOdd) * diagonalDist;
       }
 
-      default: numDiagonal * diagonalDist;
+      default: return numDiagonal * diagonalDist;
     }
   }
 

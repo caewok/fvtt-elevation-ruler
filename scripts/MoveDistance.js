@@ -10,7 +10,6 @@ CONST
 import { PhysicalDistanceGridless, PhysicalDistanceGridded } from "./PhysicalDistance.js";
 import { MovePenalty, MovePenaltyGridless, MovePenaltyGridded } from "./MovePenalty.js";
 import { unitElevationFromCoordinates, pointFromGridCoordinates } from "./grid_coordinates.js";
-import { MODULE_ID } from "./const.js";
 
 export class MoveDistance {
   /**

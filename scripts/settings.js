@@ -1,7 +1,8 @@
 /* globals
 game,
 CONST,
-canvas
+canvas,
+Ruler
 */
 "use strict";
 

@@ -177,6 +177,8 @@ Hooks.once("init", function() {
   DashSpeedCategory.multiplier = defaultDashMultiplier();
 });
 
+
+/* eslint-disable no-multi-spaces */
 export function defaultHPAttribute() {
   switch ( game.system.id ) {
     case "dnd5e":         return "actor.system.attributes.hp.value";
@@ -266,6 +268,8 @@ export function defaultDashMultiplier() {
     default:              return 0;
   }
 }
+
+/* eslint-enable no-multi-spaces */
 
 /**
  * From Foundry v12

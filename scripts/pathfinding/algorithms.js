@@ -7,7 +7,6 @@ PIXI
 
 import { Draw } from "../geometry/Draw.js";
 import { PriorityQueueArray } from "./PriorityQueueArray.js";
-// import { PriorityQueue } from "./PriorityQueue.js";
 
 // See https://www.redblobgames.com/pathfinding/a-star/introduction.html
 
@@ -68,7 +67,7 @@ export class BreadthFirstPathSearch {
    * @returns {boolean} If true, goal is reached.
    */
   _step() {
-    const { cameFrom, frontier } = this;
+    const { frontier } = this;
     const current = frontier.pop();
     if ( this.debug ) current.entryTriangle.drawEdges();
     if ( this.debug ) Draw.point(current.entryPoint, { color: Draw.COLORS.lightgreen });
@@ -195,7 +194,7 @@ export class UniformCostPathSearch extends BreadthFirstPathSearch {
    * @returns {boolean} If true, goal is reached.
    */
   _step() {
-    const { cameFrom, frontier } = this;
+    const { frontier } = this;
     const current = frontier.dequeue();
     if ( this.debug ) current.entryTriangle.drawEdges();
     if ( this.debug ) Draw.point(current.entryPoint, { color: Draw.COLORS.lightgreen });
