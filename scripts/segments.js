@@ -240,7 +240,9 @@ export async function _animateSegment(token, segment, destination) {
     await token.document.update(destination, {
       rulerSegment: this.segments.length > 1,
       firstRulerSegment: segment.first,
-      lastRulerSegment: segment.last
+      lastRulerSegment: segment.last,
+      rulerSegmentOrigin: segment.ray.A,
+      rulerSegmentDestination: segment.ray.B
     });
     const anim = CanvasAnimation.getAnimation(token.animationName);
     await anim.promise;

@@ -4,6 +4,8 @@ Add indicator of past combat movement in the ruler.
 Allow for unlimited number of speed categories, colors, along with custom speed functions in the CONFIG. Closes issue #58.
 More aggressive path straightening using a reverse Ramer-Douglas-Peucker algorithm based on collision checking. Closes issue #48.
 Add CONFIG settings to ignore tokens for pathfinding based on HP attribute or set of token statuses. Closes issue #55.
+Add a keybind ("p") to temporarily toggle pathfinding.
+Add `rulerSegmentOrigin` and `rulerSegmentDestination` to options passed to token update.
 
 ### Bug fixes
 Refactor physical and move distance measurement in anticipation of Foundry v12. Closes issue #59 (measurement near waypoints).
