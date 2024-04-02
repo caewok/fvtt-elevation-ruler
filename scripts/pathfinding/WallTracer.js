@@ -383,7 +383,7 @@ export class WallTracerEdge extends GraphEdge {
     if ( Number.isFinite(tokenHP) && tokenHP <= 0 ) return false;
 
     // Don't block tokens with certain status.
-    if ( token.actor.statuses.intersects(pathfindingIgnoreStatuses) ) return false;
+    if ( token.actor?.statuses && token.actor.statuses.intersects(pathfindingIgnoreStatuses) ) return false;
 
     // Don't block tokens that share specific disposition with the moving token.
     tokenBlockType ??= Settings._tokenBlockType();
