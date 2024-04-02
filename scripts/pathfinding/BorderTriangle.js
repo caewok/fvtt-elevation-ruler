@@ -491,10 +491,10 @@ export class BorderTriangle {
 
         // Debug: should always have 2 elements: this borderTriangle and the other.
         if ( ixSet.size > 2 ) {
-          console.warn("aSet and bSet intersection is larger than expected.", pointMap, edge);
+          console.warn("aSet and bSet intersection is larger than expected.", { pointMap, edge });
         }
         if ( ixSet.size && !ixSet.has(borderTriangle) ) {
-          console.warn("ixSet does not have this borderTriangle", pointMap, edge, borderTriangle);
+          console.warn("ixSet does not have this borderTriangle", { pointMap, edge, borderTriangle });
         }
 
         if ( ixSet.size !== 2 ) continue; // No bordering triangle.
