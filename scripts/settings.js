@@ -65,7 +65,7 @@ const KEYBINDINGS = {
     ADD_WAYPOINT: "addWaypointTokenRuler",
     REMOVE_WAYPOINT: "removeWaypointTokenRuler"
   },
-  TOGGLE_PATHFINDING: "incrementElevation2"
+  TOGGLE_PATHFINDING: "togglePathfinding"
 };
 
 
