@@ -2,6 +2,7 @@
 ### New features
 Add indicator of past combat movement in the ruler.
 Allow for unlimited number of speed categories, colors, along with custom speed functions in the CONFIG.
+More aggressive path straightening using a reverse Ramer-Douglas-Peucker algorithm based on collision checking.
 
 ### Bug fixes
 Refactor physical and move distance measurement in anticipation of Foundry v12. Closes issue #59 (measurement near waypoints).
