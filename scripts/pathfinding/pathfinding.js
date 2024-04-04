@@ -1,9 +1,7 @@
 /* globals
 canvas,
 CanvasQuadtree,
-ClockwiseSweepPolygon,
 CONFIG,
-CONST,
 foundry,
 game,
 PIXI
@@ -11,12 +9,15 @@ PIXI
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 import { BorderTriangle, BorderEdge } from "./BorderTriangle.js";
-import { boundsForPoint, log } from "../util.js";
+import { boundsForPoint, segmentBounds, log } from "../util.js";
 import { Draw } from "../geometry/Draw.js";
 import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./algorithms.js";
 import { SCENE_GRAPH } from "./WallTracer.js";
 import { cdt2dConstrainedGraph, cdt2dToBorderTriangles } from "../delaunator/cdt2d_access_functions.js";
 import { Settings } from "../settings.js";
+import { PhysicalDistanceGridless } from "../PhysicalDistance.js";
+import { MODULE_ID } from "../const.js";
+import { MovePenalty } from "../MovePenalty.js";
 
 /* Testing
 
@@ -58,7 +59,7 @@ endPoint = _token.center
 startPoint = _token.center;
 
 pf = new Pathfinder(token);
-pf = token.elevationruler.pathfinder
+pf = _token.elevationruler.pathfinder
 
 path = pf.runPath(startPoint, endPoint, "breadth")
 pathPoints = Pathfinder.getPathPoints(path);
@@ -87,6 +88,9 @@ pathPoints = Pathfinder.getPathPoints(path);
 paths = pf.algorithm.breadth.getAllPathPoints()
 paths.forEach(path => pf.algorithm.astar.drawPath(path, { color: Draw.COLORS.gray }))
 pf.drawPath(pathPoints, { color: Draw.COLORS.white })
+
+cleanedPathPoints = pf.cleanPath(pathPoints);
+pf.drawPath(cleanedPathPoints, { color: Draw.COLORS.green })
 
 // Walk through an algorithm
 
@@ -194,10 +198,12 @@ export class Pathfinder {
   }
 
   /** @type {number} */
-  _spacer = 0;
+  #spacer = 0;
 
   get spacer() {
-    return this._spacer || (Math.min(this.token.w, this.token.h) * 0.5) || (canvas.dimensions.size * 0.5);
+    return this.#spacer
+      || (Math.min(this.token.w, this.token.h) * 0.5)
+      || (canvas.dimensions.size * 0.5);
   }
 
   /** @enum {BreadthFirstPathSearch} */
@@ -262,9 +268,9 @@ export class Pathfinder {
    * @param {PathNode} goal
    * @param {PathNode} current
    */
-  // TODO: Handle 3d points?
   _heuristic(goal, current) {
-    return CONFIG.GeometryLib.utils.gridUnitsToPixels(canvas.grid.measureDistance(goal.entryPoint, current.entryPoint));
+    const distance = PhysicalDistanceGridless.measure(goal.entryPoint, current.entryPoint);
+    return CONFIG.GeometryLib.utils.gridUnitsToPixels(distance);
   }
 
   /**
@@ -322,7 +328,10 @@ export class Pathfinder {
       return [newNode];
     }
 
-    const destinations = pathNode.entryTriangle.getValidDestinations(pathNode.priorTriangle, this.startElevation, this.spacer);
+    const destinations = pathNode.entryTriangle.getValidDestinations(
+      pathNode.priorTriangle,
+      this.startElevation,
+      this.spacer);
     return this.#filterDestinationsbyExploration(destinations);
   }
 
@@ -336,14 +345,14 @@ export class Pathfinder {
     if ( pathNode.entryTriangle === goal.entryTriangle ) {
       // Need a copy so we can modify cost for this goal node only.
       const newNode = {...goal};
-      newNode.cost = goal.entryTriangle._calculateMovementCost(pathNode.entryPoint, goal.entryPoint);
+      newNode.cost = goal.entryTriangle._calculateMovementCost(pathNode.entryPoint, goal.entryPoint, this.token);
       newNode.priorTriangle = pathNode.priorTriangle;
       newNode.fromPoint = pathNode.entryPoint;
       return [newNode];
     }
 
     const destinations = pathNode.entryTriangle.getValidDestinationsWithCost(
-      pathNode.priorTriangle, this.startElevation, this.spacer, pathNode.entryPoint);
+      pathNode.priorTriangle, this.startElevation, this.spacer, pathNode.entryPoint, this.token);
     return this.#filterDestinationsbyExploration(destinations);
   }
 
@@ -424,206 +433,103 @@ export class Pathfinder {
 
   /**
    * Clean an array of path points.
-   * Straighten path and remove points that are very close to one another.
-   * If gridded, attempt to center the points on the grid.
-   * If not gridded, keep within the canvas grid size.
-   * Do not move a point if the path collides with a wall.
-   * Do not move a point if it would take it outside its grid square (to limit
-   * possibility that it would move the path into a terrain).
+   * Straighten path by removing unnecessary points.
    * @param {PIXI.Point[]} pathPoints
    * @returns {PIXI.Point[]}
    */
-  static cleanPath(pathPoints) {
-    if ( canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) return cleanNonGridPath(pathPoints);
-    else return cleanGridPath(pathPoints);
-  }
-}
-
-/**
- * For given point on a grid:
- * - if next point shares this grid square, delete if prev --> next has no collision.
- * - temporarily move to the grid center.
- * - if collision, move back and go to next point. Otherwise keep at center.
- * Don't move the start or end points.
- * @param {PIXI.Point[]} pathPoints
- * @returns {PIXI.Point[]}
- */
-function cleanGridPath(pathPoints) {
-  let nPoints = pathPoints.length;
-  if ( nPoints < 3 ) return pathPoints;
-  // Debug: pathPoints.forEach(pt => Draw.point(pt, { alpha: 0.5, color: Draw.COLORS.blue }))
-
-  // const slowMethod = cleanGridPathSlow(pathPoints);
-
-  const orient2d = foundry.utils.orient2dFast;
-  const config = { mode: "any", type: "move" };
-  let prev2;
-  let prev = pathPoints[0];
-  let curr = pathPoints[1];
-  let newPath = [prev];
-  for ( let i = 2; i < nPoints; i += 1 ) {
-    const next = pathPoints[i];
-
-    // Move points to the center of the grid square if no collision for previous or next.
-    const currCenter = getGridCenterPoint(curr);
-    if ( !(ClockwiseSweepPolygon.testCollision(prev, currCenter, config)
-      || ClockwiseSweepPolygon.testCollision(currCenter, next, config)) ) curr = currCenter;
-
-    // Remove duplicate points.
-    if ( curr.almostEqual(prev) ) {
-      curr = next;
-      continue;
-    }
-
-    // Remove points in middle of straight line.
-    if ( prev2 && orient2d(prev2, prev, curr).almostEqual(0) ) newPath.pop();
-
-    newPath.push(curr);
-    prev2 = prev;
-    prev = curr;
-    curr = next;
-  }
-
-  // Remove point in middle of straight line at the end of the path.
-  const lastPoint = pathPoints.at(-1);
-  if ( newPath.length > 1
-    && orient2d(prev2, prev, lastPoint).almostEqual(0) ) newPath.pop();
-  newPath.push(lastPoint);
-
-
-  // Remove points in middle of straight line.
-//   nPoints = newPath.length;
-//   prev = newPath[0];
-//   curr = newPath[1];
-//   let filteredPath = [prev];
-//   for ( let i = 2; i < nPoints; i += 1 ) {
-//     const next = newPath[i];
-//     if ( orient2d(prev, curr, next).almostEqual(0) ) {
-//       curr = next;
-//       continue;
-//     }
-//     filteredPath.push(curr);
-//     prev = curr;
-//     curr = next;
-//   }
-//   filteredPath.push(newPath.at(-1));
-
-//   if ( slowMethod.length !== newPath.length ) console.debug("Slow Method returned different path", [...slowMethod], [...newPath]);
-//   for ( let i = 0; i < slowMethod.length; i += 1 ) {
-//     if ( !slowMethod[i].to2d().equals(newPath[i].to2d()) ) {
-//       console.debug("Slow Method returned different path", [...slowMethod], [...newPath]);
-//       break;
-//     }
-//   }
-
-
-  return newPath;
+  cleanPath(pathPoints) { return cleanGridPathRDP(pathPoints, this.token); }
 }
 
 
 /**
- * For given point on a grid:
- * - if next point shares this grid square, delete if prev --> next has no collision.
- * - temporarily move to the grid center.
- * - if collision, move back and go to next point. Otherwise keep at center.
- * Don't move the start or end points.
+ * Reverse Ramer–Douglas–Peucker algorithm to straighten points.
+ * Take start and end points. If no collisions, drop all points in between and end.
+ * Find farthest point.
+ *   a. start --> farthest. If no collisions, drop all points in between and break
+ *   b. farthest --> end. If no collisions, drop all points in between and break
+ * If (a), call again, finding farthest point between start --> old farthest.
+ * If (b), call again, finding farthest point between old farthest --> end
+ * If enabled, collisions include terrain collisions.
+ * If start and end are the same or no points between, end.
  * @param {PIXI.Point[]} pathPoints
+ * @param {Token} token               Move token, used when testing for some collisions
  * @returns {PIXI.Point[]}
  */
-function cleanGridPathSlow(pathPoints) {
-  let nPoints = pathPoints.length;
-  if ( nPoints < 3 ) return pathPoints;
-  // Debug: pathPoints.forEach(pt => Draw.point(pt, { alpha: 0.5, color: Draw.COLORS.blue }))
+function cleanGridPathRDP(pathPoints, token, _depth = 0) {
+  if ( pathPoints.length < 3 ) return pathPoints;
 
-  // Move points to the center of the grid square if no collision for previous or next.
-  const config = { mode: "any", type: "move" };
-  let prev = pathPoints[0];
-  let curr = pathPoints[1];
-  let centeredPath = [prev];
-  for ( let i = 2; i < nPoints; i += 1 ) {
-    const next = pathPoints[i];
-    const currCenter = getGridCenterPoint(curr);
-    if ( !(ClockwiseSweepPolygon.testCollision(prev, currCenter, config)
-      || ClockwiseSweepPolygon.testCollision(currCenter, next, config)) ) curr = currCenter;
-    centeredPath.push(curr);
-    prev = curr;
-    curr = next;
+  if ( _depth > 1000 ) {
+    console.warn("cleanGridPathRDP exceeded depth max", { pathPoints, token });
+    return pathPoints;
   }
-  centeredPath.push(pathPoints.at(-1));
-  // Debug: centeredPath.forEach(pt => Draw.point(pt, { alpha: 0.5, color: Draw.COLORS.green }))
 
-  // Remove duplicate points.
-  prev = centeredPath[0];
-  let dedupedPath = [prev];
-  for ( let i = 1; i < nPoints; i += 1 ) {
-    const curr = centeredPath[i];
-    if ( curr.almostEqual(prev) ) continue;
-    dedupedPath.push(curr);
-    prev = curr;
-  }
-  // Debug: dedupedPath.forEach(pt => Draw.point(pt, { color: Draw.COLORS.orange }))
+  // Test for collision between first and last points.
+  const a = pathPoints.at(0);
+  const b = pathPoints.at(-1);
+  if ( !hasAnyCollisions(a, b, token) ) return [a, b];
 
-  // Remove points in middle of straight line.
-  const orient2d = foundry.utils.orient2dFast;
-  nPoints = dedupedPath.length;
-  prev = dedupedPath[0];
-  curr = dedupedPath[1];
-  let filteredPath = [prev];
-  for ( let i = 2; i < nPoints; i += 1 ) {
-    const next = dedupedPath[i];
-    if ( orient2d(prev, curr, next).almostEqual(0) ) {
-      curr = next;
-      continue;
+  // Locate the index of the farthest point from segment a|b.
+  let farthestIndex = 0;
+  let maxDist2 = -1;
+  const nInterior = pathPoints.length - 2;
+  for ( let i = 1; i < nInterior; i += 1 ) {
+    const dist2 = distanceSquaredToSegment(a, b, pathPoints[i]);
+    if ( dist2 > maxDist2 ) {
+      maxDist2 = dist2;
+      farthestIndex = i;
     }
-    filteredPath.push(curr);
-    prev = curr;
-    curr = next;
   }
-  filteredPath.push(dedupedPath.at(-1));
-  // Debug: filteredPath.forEach(pt => Draw.point(pt))
+  // Adjust index by one to account for interior.
+  farthestIndex += 1;
 
-  return filteredPath;
-}
-
-function getGridCenterPoint(pt) {
-  const [x, y] = canvas.grid.grid.getCenter(pt.x, pt.y);
-  return new PIXI.Point(x, y);
+  // Test the two halves: a|farthest, farthest|b. Remember to not duplicate farthest when combining.
+  const firstHalf = cleanGridPathRDP(pathPoints.slice(0, farthestIndex + 1), token, _depth += 1);
+  const secondHalf = cleanGridPathRDP(pathPoints.slice(farthestIndex), token, _depth += 1);
+  return [...firstHalf, ...secondHalf.slice(1)];
 }
 
 /**
- * For given point not on a grid:
- * - Radial test: if next point is within canvas.dimensions.size * 0.5, delete if prev --> next has no collision.
- * - Also (not yet implemented): Try Ramer–Douglas–Peucker to straighten line by removing points if no collision.
- * Don't move the start or end points.
- * @param {PIXI.Point[]} pathPoints
- * @returns {PIXI.Point[]}
+ * Distance squared from point to a segment a|b.
+ * If point is between a and b, this is the perpendicular distance squared.
+ * Otherwise, it is the distance squared to the closer of a or b.
+ * @param {Point} a
+ * @param {Point} b
+ * @param {Point} pt
+ * @returns {number}
  */
-function cleanNonGridPath(pathPoints) {
-  const nPoints = pathPoints.length;
-  if ( nPoints < 3 ) return pathPoints;
+function distanceSquaredToSegment(a, b, pt) {
+  const closestPt = foundry.utils.closestPointToSegment(pt, a, b);
+  return PIXI.Point.distanceSquaredBetween(pt, closestPt);
+}
 
-  const MAX_DIST2 = Math.pow(canvas.scene.dimensions.size * 0.5, 2);
-  const config = { mode: "any", type: "move" };
-  let prev = pathPoints[0];
-  let curr = pathPoints[1];
-  const newPath = [prev];
-  for ( let i = 2; i < nPoints; i += 1 ) {
-    const next = pathPoints[i];
+/**
+ * Identify if there are potential collisions between two points.
+ * @param {Point} a
+ * @param {Point} b
+ * @param {Token} token     Movement token, for some terrain collisions
+ * @returns {boolean} True if collision is present between a|b.
+ */
+function hasAnyCollisions(a, b, token) {
+  return hasCollision(a, b, token)
+    || (CONFIG[MODULE_ID].pathfindingCheckTerrains && MovePenalty.anyTerrainPlaceablesAlongSegment(a, b, token));
+}
 
-    // If next is sufficiently close to current, see if we can remove current.
-    if ( next
-      && PIXI.Point.distanceSquaredBetween(curr, next) < MAX_DIST2
-      && !ClockwiseSweepPolygon.testCollision(curr, next, config) ) {
-      curr = next;
-      continue;
-    }
-
-    newPath.push(curr);
-    prev = curr;
-    curr = next;
-  }
-  newPath.push(pathPoints.at(-1));
-  return newPath;
+/**
+ * Instead of a typical `token.checkCollision` test, test for collisions against the edge graph.
+ * With this approach, collisions with enemy tokens trigger pathfinding.
+ * @param {PIXI.Point} a          Origin point for the move
+ * @param {PIXI.Point} b          Destination point for the move
+ * @param {Token} token           Token that is moving
+ * @returns {boolean}
+ */
+export function hasCollision(a, b, token) {
+  const lineSegmentIntersects = foundry.utils.lineSegmentIntersects;
+  const tokenBlockType = Settings._tokenBlockType();
+  // SCENE_GRAPH has way less edges than Pathfinder and has quadtree for the edges.
+  // Edges are WallTracerEdge
+  const edges = SCENE_GRAPH.edgesQuadtree.getObjects(segmentBounds(a, b));
+  return edges.some(edge => lineSegmentIntersects(a, b, edge.A, edge.B)
+    && edge.edgeBlocks(a, token, tokenBlockType, token.elevationZ));
 }
 
 /**
@@ -636,7 +542,6 @@ function cleanNonGridPath(pathPoints) {
  *   - @returns {boolean}  True if explored, false if unexplored. If no fog, always true.
  */
 export function fogIsExploredFn() {
-  // log("Checking for new fog texture");
   const tex = canvas.fog.exploration?.getTexture();
   if ( !tex || !tex.valid ) return undefined;
 

@@ -10,10 +10,37 @@ ui
 
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
-import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS } from "./const.js";
-import { iterateGridUnderLine, gridShapeFromGridCoords } from "./util.js";
+import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS, defaultHPAttribute } from "./const.js";
 import { registerGeometry } from "./geometry/registration.js";
 import { registerElevationConfig } from "./geometry/elevation_configs.js";
+
+// Grid coordinates
+import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d, gridShape } from "./grid_coordinates.js";
+
+// Measure classes
+import {
+  PhysicalDistance,
+  PhysicalDistanceGridless,
+  PhysicalDistanceGridded } from "./PhysicalDistance.js";
+
+import {
+  MoveDistance,
+  MoveDistanceGridless,
+  MoveDistanceGridded } from "./MoveDistance.js";
+
+import {
+  MovePenalty,
+  MovePenaltyGridless,
+  MovePenaltyGridded,
+
+  // For debugging
+  TokenMovePenaltyGridless,
+  TerrainMovePenaltyGridless,
+  DrawingMovePenaltyGridless,
+
+  TokenMovePenaltyGridded,
+  DrawingMovePenaltyGridded,
+  TerrainMovePenaltyGridded } from "./MovePenalty.js";
 
 // Pathfinding
 import { BorderTriangle, BorderEdge } from "./pathfinding/BorderTriangle.js";
@@ -25,8 +52,6 @@ import { benchPathfinding } from "./pathfinding/benchmark.js";
 
 // Wall updates for pathfinding
 import { SCENE_GRAPH, WallTracer, WallTracerEdge, WallTracerVertex } from "./pathfinding/WallTracer.js";
-
-import { iterateGridProjectedElevation, iterateGridMoves, sumGridMoves } from "./measure_distance.js";
 
 Hooks.once("init", function() {
   // Cannot access localization until init.
@@ -44,23 +69,68 @@ Hooks.once("init", function() {
     // Types of movement.
     MOVEMENT_TYPES,
 
+    // Account for terrains/tokens in pathfinding.
+    // Can be a serious performance hit.
+    pathfindingCheckTerrains: false,
+
+    // Where to find token HP, used to ignore dead tokens when pathfinding.
+    tokenHPAttribute: defaultHPAttribute(),
+
+    // ID of Token statuses to ignore when pathfinding.
+    pathfindingIgnoreStatuses: new Set([
+      "sleeping",
+      "unconscious",
+      "dead",
+      "ethereal",
+      "incapacitated",
+      "paralyzed",
+      "petrified",
+      "restrained"]),
+
+    // Enable certain debug console logging and tests.
     debug: false
   };
 
   /* To add a movement to the api:
   CONFIG.elevationruler.MOVEMENT_TYPES.SWIM = 3; // Increment by 1 from the highest-valued movement type
-  CONFIG.elevationruler.MOVEMENT_BUTTONS[CONFIG.elevationruler.MOVEMENT_TYPES.SWIM] = "person-swimming"; // From Font Awesome
+
+  // This label is from Font Awesome
+  CONFIG.elevationruler.MOVEMENT_BUTTONS[CONFIG.elevationruler.MOVEMENT_TYPES.SWIM] = "person-swimming";
   CONFIG.elevationruler.SPEED.ATTRIBUTES.SWIM = "actor.system.attributes.movement.swim"; // dnd5e
   */
 
 
   game.modules.get(MODULE_ID).api = {
-    iterateGridUnderLine,
-    iterateGridProjectedElevation,
-    iterateGridMoves,
-    sumGridMoves,
-    gridShapeFromGridCoords,
+    gridShape,
     PATCHER,
+
+    coordinates: {
+      pointFromGridCoordinates,
+      getCenterPoint3d,
+      getGridPosition3d
+    },
+
+    // Measure classes
+    measure: {
+      PhysicalDistance,
+      PhysicalDistanceGridless,
+      PhysicalDistanceGridded,
+      MoveDistance,
+      MoveDistanceGridless,
+      MoveDistanceGridded,
+      MovePenalty,
+      MovePenaltyGridless,
+      MovePenaltyGridded,
+
+      // For debugging
+      TokenMovePenaltyGridless,
+      TerrainMovePenaltyGridless,
+      DrawingMovePenaltyGridless,
+
+      TokenMovePenaltyGridded,
+      DrawingMovePenaltyGridded,
+      TerrainMovePenaltyGridded
+    },
 
     // Pathfinding
     pathfinding: {

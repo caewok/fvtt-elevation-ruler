@@ -3,20 +3,19 @@ canvas,
 CanvasAnimation,
 CONFIG,
 CONST,
-foundry,
 game,
 PIXI
 */
 "use strict";
 
-import { SPEED, MODULE_ID, MODULES_ACTIVE } from "./const.js";
+import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
-import { perpendicularPoints, log, segmentBounds } from "./util.js";
-import { Pathfinder } from "./pathfinding/pathfinding.js";
-import { BorderEdge } from "./pathfinding/BorderTriangle.js";
-import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
+import { Point3d } from "./geometry/3d/Point3d.js";
+import { perpendicularPoints, log } from "./util.js";
+import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
 import { elevationAtWaypoint } from "./terrain_elevation.js";
+import { MovePenalty } from "./MovePenalty.js";
 
 /**
  * Mixed wrap of  Ruler.prototype._getMeasurementSegments
@@ -52,12 +51,15 @@ export function _getMeasurementSegments(wrapped) {
   }
 
   // If currently pathfinding, set path for the last segment, overriding any prior path.
+  // Pathfinding when: the pathfinding icon is enabled or the temporary toggle key is held.
   const lastSegment = segments.at(-1);
-  const pathPoints = Settings.get(Settings.KEYS.CONTROLS.PATHFINDING)
+  const pathPoints = (Settings.get(Settings.KEYS.CONTROLS.PATHFINDING) ^ Settings.FORCE_TOGGLE_PATHFINDING)
     ? calculatePathPointsForSegment(lastSegment, token)
     : [];
-  if ( pathPoints.length > 2 ) segmentMap.set(lastSegment.ray.A.to2d().key, pathPoints);
-  else segmentMap.delete(lastSegment.ray.A.to2d().key);
+
+  const lastA = PIXI.Point.fromObject(lastSegment.ray.A); // Want 2d version.
+  if ( pathPoints.length > 2 ) segmentMap.set(lastA.key, pathPoints);
+  else segmentMap.delete(lastA.key);
 
   // For each segment, replace with path sub-segment if pathfinding was used for that segment.
   const t2 = performance.now();
@@ -73,15 +75,18 @@ export function _getMeasurementSegments(wrapped) {
  * @returns {PIXI.Point[]}
  */
 function calculatePathPointsForSegment(segment, token) {
-  const { A, B } = segment.ray;
+  const A = Point3d.fromObject(segment.ray.A);
+  const B = Point3d.fromObject(segment.ray.B);
 
   // If no collision present, no pathfinding required.
   const tC = performance.now();
-  if ( !hasCollision(A, B, token) ) {
+  if ( !hasCollision(A, B, token)
+    && !(CONFIG[MODULE_ID].pathfindingCheckTerrains && MovePenalty.anyTerrainPlaceablesAlongSegment(A, B, token)) ) {
     const tEnd = performance.now();
     log(`Determined no collision for ${Pathfinder.triangleEdges.size} edges in ${tEnd - tC} ms.`);
     return [];
   }
+
   const tEnd = performance.now();
   log(`Found collision for ${Pathfinder.triangleEdges.size} edges in ${tEnd - tC} ms.`);
 
@@ -96,7 +101,7 @@ function calculatePathPointsForSegment(segment, token) {
 
   // Clean the path
   const t2 = performance.now();
-  pathPoints = Pathfinder.cleanPath(pathPoints);
+  pathPoints = pf.cleanPath(pathPoints);
   const t3 = performance.now();
   log(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t3 - t2} ms.`, pathPoints);
 
@@ -109,24 +114,6 @@ function calculatePathPointsForSegment(segment, token) {
   return pathPoints;
 }
 
-/**
- * Instead of a typical `token.checkCollision` test, test for collisions against the edge graph.
- * With this approach, collisions with enemy tokens trigger pathfinding.
- * @param {PIXI.Point} A          Origin point for the move
- * @param {PIXI.Point} B          Destination point for the move
- * @param {Token} token           Token that is moving
- * @returns {boolean}
- */
-function hasCollision(A, B, token) {
-  BorderEdge.moveToken = token; // Set the token so we can test token edge blocking.
-  const lineSegmentIntersects = foundry.utils.lineSegmentIntersects;
-
-  // SCENE_GRAPH has way less edges than Pathfinder and has quadtree for the edges.
-  const edges = SCENE_GRAPH.edgesQuadtree.getObjects(segmentBounds(A, B));
-  const tokenBlockType = Settings._tokenBlockType();
-  return edges.some(edge => lineSegmentIntersects(A, B, edge.A, edge.B)
-    && edge.edgeBlocks(A, token, tokenBlockType));
-}
 
 /**
  * Check provided array of segments against stored path points.
@@ -142,7 +129,8 @@ function constructPathfindingSegments(segments, segmentMap) {
   if ( !segmentMap.size ) return segments;
   const newSegments = [];
   for ( const segment of segments ) {
-    const { A, B } = segment.ray;
+    const A = Point3d.fromObject(segment.ray.A);
+    const B = Point3d.fromObject(segment.ray.B);
     const pathPoints = segmentMap.get(A.to2d().key);
     if ( !pathPoints ) {
       newSegments.push(segment);
@@ -199,7 +187,13 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
     } else moveLabel = `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${newMoveDistance}${units}`;
   }
 
-  return `${origLabel}\n${elevLabel}${moveLabel}`;
+  let combatLabel = "";
+  if ( game.combat?.started && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) {
+    const pastMoveDistance = this._movementToken?.lastMoveDistance;
+    if ( pastMoveDistance ) combatLabel = `\nPrior: ${pastMoveDistance}${units}`;
+  }
+
+  return `${origLabel}\n${elevLabel}${moveLabel}${combatLabel}`;
 }
 
 /**
@@ -235,11 +229,16 @@ export async function _animateSegment(token, segment, destination) {
   // This can happen when setting artificial segments for highlighting or pathfinding.
   if ( token.document.x !== destination.x
     || token.document.y !== destination.y ) {
+
+    log(`Updating ${token.name} destination from ({${token.document.x},${token.document.y}) to (${destination.x},${destination.y}) for segment (${segment.ray.A.x},${segment.ray.A.y})|(${segment.ray.B.x},${segment.ray.B.y})`);
+
     // Same as wrapped but pass an option.
     await token.document.update(destination, {
       rulerSegment: this.segments.length > 1,
       firstRulerSegment: segment.first,
-      lastRulerSegment: segment.last
+      lastRulerSegment: segment.last,
+      rulerSegmentOrigin: segment.ray.A,
+      rulerSegmentDestination: segment.ray.B
     });
     const anim = CanvasAnimation.getAnimation(token.animationName);
     await anim.promise;
@@ -293,7 +292,7 @@ export function _highlightMeasurementSegment(wrapped, segment) {
     && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING);
 
   // Highlight each split in turn, changing highlight color each time.
-  if ( doSpeedHighlighting ) this.color = SPEED.COLORS[segment.speed];
+  if ( doSpeedHighlighting ) this.color = segment.speed.color;
 
   // Call Foundry version and return if not speed highlighting.
   const res = wrapped(segment);

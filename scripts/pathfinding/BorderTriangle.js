@@ -9,6 +9,9 @@ Wall
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
+import { MODULE_ID } from "../const.js";
+import { MoveDistance } from "../MoveDistance.js";
+import { PhysicalDistance } from "../PhysicalDistance.js";
 import { Draw } from "../geometry/Draw.js";
 import { WallTracerEdge } from "./WallTracer.js";
 
@@ -75,6 +78,29 @@ export class BorderEdge {
   otherTriangle(triangle) { return this.cwTriangle === triangle ? this.ccwTriangle : this.cwTriangle; }
 
   /**
+   * Get the triangle either cw or ccw to this edge, as measured from a given vertex key.
+   * vertexKey --> otherVertex --> otherTriangleVertex
+   * @param {number} vertexKey        Key for the anchor vertex
+   * @param {string} [direction]      Either ccw or cw
+   * @returns {BorderTriangle}
+   */
+  findTriangleFromVertexKey(vertexKey, dir = "ccw") {
+    const [a, b] = this.a.key === vertexKey ? [this.a, this.b] : [this.b, this.a];
+    const cCCW = this._nonSharedVertex(this.ccwTriangle);
+    return (foundry.utils.orient2dFast(a, b, cCCW) > 0) ^ (dir !== "ccw") ? this.ccwTriangle : this.cwTriangle;
+  }
+
+  /**
+   * Get the non-shared vertex for a triangle of this edge.
+   * @param {number} vertexKey
+   * @param {BorderTriangle} [tri]    The shared triangle with this edge
+   * @returns {Point}
+   */
+  _nonSharedVertex(tri = this.ccwTriangle) {
+    return Object.values(tri.vertices).find(v => !this.endpointKeys.has(v.key));
+  }
+
+  /**
    * Remove the triangle link.
    * @param {BorderTriangle}
    */
@@ -101,10 +127,16 @@ export class BorderEdge {
     const length = this.length;
     const destinations = [];
 
-    // No destination if edge is smaller than 2x spacer unless it is a door.
-    // Cheat a little on the spacing so tokens exactly the right size will fit.
-    if ( this.edgeBlocks(origin, elevation)
-      || (!this.isOpenDoor && (length < (spacer * 1.9))) ) return destinations;
+    // If both vertices block, limit destinations to edges 2x spacer.
+    // (Strongly suggests a hallway or other walling on both sides of the edge.)
+    // Otherwise, don't test for spacer because edges could be non-blocking on either side,
+    // which increases the size of the space.
+    // For doors, let the token through regardless.
+    if ( this.edgeBlocks(origin, elevation) ) return destinations;
+    if ( !this.isOpenDoor
+       && this.vertexBlocks(this.a.key)
+       && this.vertexBlocks(this.b.key)
+       && length < (spacer * 1.9) ) return destinations;
     destinations.push(this.median);
 
     // Skip corners if not at least spacer away from median.
@@ -138,6 +170,15 @@ export class BorderEdge {
    * @returns {boolean}
    */
   edgeBlocks(origin, elevation = 0) {
+    if ( !origin ) {
+      if ( !this.ccwTriangle.center || !this.cwTriangle.center) {
+        console.warn("edgeBlocks|Triangle centers not defined.");
+        return false;
+      }
+      return this.edgeBlocks(this.ccwTriangle.center, elevation)
+                       || this.edgeBlocks(this.cwTriangle.center, elevation);
+    }
+
     const { moveToken, tokenBlockType } = this.constructor;
     return this.objects.some(obj => {
       if ( obj instanceof Wall ) return WallTracerEdge.wallBlocks(obj, origin, elevation);
@@ -161,6 +202,54 @@ export class BorderEdge {
     const orient2d = foundry.utils.orient2dFast;
     if ( orient2d(a, b, otherEndpoint) > 0 ) this.ccwTriangle = triangle;
     else this.cwTriangle = triangle;
+  }
+
+  /**
+   * Test if at least one edge of this vertex is blocking.
+   * (Used to decide when to limit movement through the edge.)
+   * Does not test this edge.
+   * @param {number} vertexKey
+   * @param {Point} origin    Measure wall blocking from perspective of this origin point.
+   * @returns {boolean}
+   */
+  vertexBlocks(vertexKey, elevation = 0) {
+    const iter = this.sharedVertexEdges(vertexKey);
+    for ( const edge of iter ) {
+      if ( edge === this ) continue; // Could break here b/c this edge implicitly is always last.
+      if ( edge.edgeBlocks(undefined, elevation) ) return true;
+    }
+  }
+
+  /**
+   * Iterator to retrieve all edges that share the given vertex.
+   * @param {number} vertexKey
+   * @yields {BorderEdge}
+   */
+  *sharedVertexEdges(vertexKey) {
+    // Circle around the vertex, retrieving each new edge of the triangles in turn.
+    let currEdge = this;
+    let iter = 0;
+    const MAX_ITER = 1000;
+    do {
+      currEdge = currEdge._nextEdge(vertexKey, "ccw");
+      yield currEdge;
+      iter += 1;
+      if ( iter > MAX_ITER ) {
+        console.warn("sharedVertexEdges iterations exceeded.");
+        break;
+      }
+    } while ( currEdge !== this );
+  }
+
+  /**
+   * Retrieve the next ccw edge that shares the given vertex for the given triangle.
+   * @param {number} vertexKey        Key for the anchor vertex
+   * @param {string} [direction]      Either ccw or c.
+   * @returns {BorderEdge}
+   */
+  _nextEdge(vertexKey, dir = "ccw") {
+    const tri = this.findTriangleFromVertexKey(vertexKey, dir);
+    return Object.values(tri.edges).find(e => e !== this && e.endpointKeys.has(vertexKey));
   }
 
   /**
@@ -305,7 +394,7 @@ export class BorderTriangle {
    * @param {BorderTriangle|null} priorTriangle       Triangle that preceded this one along the path
    * @param {number} elevation                        Assumed elevation of the move, for testing edge walls, tokens.
    * @param {number} spacer                           How far from the corner to set the corner destinations
-   * @returns {PathNode} Each element has properties describing the destination, conforming to pathfinding
+   * @returns {PathNode[]} Each element has properties describing the destination, conforming to pathfinding
    *   - {number} key
    *   - {PIXI.Point} entryPoint
    *   - {BorderTriangle} entryTriangle
@@ -334,14 +423,19 @@ export class BorderTriangle {
   /**
    * Retrieve destinations with cost calculation added.
    * @param {BorderTriangle|null} priorTriangle     Triangle that preceded this one along the path
-   * @param {number} elevation                        Assumed elevation of the move, for testing edge walls, tokens.
+   * @param {number} elevation                      Assumed elevation of the move, for testing edge walls, tokens.
    * @param {number} spacer                         How far from the corner to set the corner destinations
    * @param {Point} fromPoint                       Point to measure from, for cost
+   * @param {Token} [token]                         Token doing the movement
+   * @returns {PathNode[]}
    */
-  getValidDestinationsWithCost(priorTriangle, elevation, spacer, fromPoint) {
+  getValidDestinationsWithCost(priorTriangle, elevation, spacer, fromPoint, token) {
     const destinations = this.getValidDestinations(priorTriangle, elevation, spacer);
     destinations.forEach(d => {
-      d.cost = this._calculateMovementCost(fromPoint, d.entryPoint);
+      d.cost = this._calculateMovementCost(fromPoint, d.entryPoint, token);
+
+      // NaN is bad--results in infinite loop; probably don't want to set NaN to 0 cost.
+      if ( !Number.isFinite(d.cost) ) d.cost = 1e06;
       d.fromPoint = fromPoint;
     });
     return destinations;
@@ -349,14 +443,20 @@ export class BorderTriangle {
 
   /**
    * Calculate the cost for a single path node from a given point.
-   * @param {PathNode} node
-   * @param {Point} fromPoint
+   * @param {Point} fromPoint                         Where the movement starts
+   * @param {Point} toPoint                           Where the movement ends
+   * @param {Token} [token]                           Token doing the movement
    * @returns {number} Cost value
    */
-  _calculateMovementCost(fromPoint, toPoint) {
+  _calculateMovementCost(fromPoint, toPoint, token) {
     // TODO: Handle 3d distance. Probably Ray3d with measureDistance or measureDistances.
     // TODO: Handle terrain distance.
-    return CONFIG.GeometryLib.utils.gridUnitsToPixels(canvas.grid.measureDistance(fromPoint, toPoint));
+    if ( CONFIG[MODULE_ID].pathfindingCheckTerrains ) {
+      const pathRes = MoveDistance.measure(fromPoint, toPoint, { token });
+      return CONFIG.GeometryLib.utils.gridUnitsToPixels(pathRes.moveDistance);
+    }
+    const distance = PhysicalDistance.measure(fromPoint, toPoint);
+    return CONFIG.GeometryLib.utils.gridUnitsToPixels(distance);
   }
 
   /**
@@ -477,10 +577,10 @@ export class BorderTriangle {
 
         // Debug: should always have 2 elements: this borderTriangle and the other.
         if ( ixSet.size > 2 ) {
-          console.warn("aSet and bSet intersection is larger than expected.", pointMap, edge);
+          console.warn("aSet and bSet intersection is larger than expected.", { pointMap, edge });
         }
         if ( ixSet.size && !ixSet.has(borderTriangle) ) {
-          console.warn("ixSet does not have this borderTriangle", pointMap, edge, borderTriangle);
+          console.warn("ixSet does not have this borderTriangle", { pointMap, edge, borderTriangle });
         }
 
         if ( ixSet.size !== 2 ) continue; // No bordering triangle.

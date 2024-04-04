@@ -1,6 +1,8 @@
 /* globals
 CanvasQuadtree,
+CONFIG,
 CONST,
+getProperty,
 PIXI,
 Token,
 Wall
@@ -16,6 +18,7 @@ import { Draw } from "../geometry/Draw.js";
 import { Graph, GraphVertex, GraphEdge } from "../geometry/Graph.js";
 import { Settings } from "../settings.js";
 import { doSegmentsOverlap, IX_TYPES, segmentCollision } from "../geometry/util.js";
+import { MODULE_ID } from "../const.js";
 
 /* WallTracerVertex
 
@@ -266,7 +269,7 @@ export class WallTracerEdge extends GraphEdge {
    * @returns {PIXI.Point} The point along the wall line. Ratio 0: endpoint A; 1: endpoint B.
    */
   static pointAtEdgeRatio(edgeA, edgeB, edgeT) {
-    edgeT = Math.roundDecimals(edgeT, WallTracerEdge.PLACES);
+    edgeT = CONFIG.GeometryLib.utils.roundDecimals(edgeT, WallTracerEdge.PLACES);
     if ( edgeT.almostEqual(0) ) return edgeA;
     if ( edgeT.almostEqual(1) ) return edgeB;
     return edgeA.projectToward(edgeB, edgeT);
@@ -372,9 +375,17 @@ export class WallTracerEdge extends GraphEdge {
    */
   static tokenEdgeBlocks(token, moveToken, tokenBlockType, elevation = 0) {
     if ( !moveToken || moveToken === token ) return false;
-
     if ( !elevation.between(token.topZ, token.bottomZ) ) return false;
 
+    // Don't block dead tokens (HP <= 0).
+    const { tokenHPAttribute, pathfindingIgnoreStatuses } = CONFIG[MODULE_ID];
+    const tokenHP = Number(getProperty(token, tokenHPAttribute));
+    if ( Number.isFinite(tokenHP) && tokenHP <= 0 ) return false;
+
+    // Don't block tokens with certain status.
+    if ( token.actor?.statuses && token.actor.statuses.intersects(pathfindingIgnoreStatuses) ) return false;
+
+    // Don't block tokens that share specific disposition with the moving token.
     tokenBlockType ??= Settings._tokenBlockType();
     const D = CONST.TOKEN_DISPOSITIONS;
     const moveTokenD = moveToken.document.disposition;
@@ -411,7 +422,7 @@ export class WallTracer extends Graph {
    * @param {WallTracerCollision} c   Collision to group
    * @returns {number} The t0 property, rounded.
    */
-  static _keyGetter(c) { return Math.roundDecimals(c.t0, WallTracer.PLACES); }
+  static _keyGetter(c) { return CONFIG.GeometryLib.utils.roundDecimals(c.t0, WallTracer.PLACES); }
 
   /**
    * Map of a set of edges, keyed to the placeable's id.
@@ -675,8 +686,10 @@ export class WallTracer extends Graph {
     if ( _recurse ) {
       const remainingObjects = edgesArr.reduce((acc, curr) => acc = acc.union(curr.objects), new Set());
       if ( !remainingObjects.size ) return;
-      remainingObjects.forEach(obj => obj instanceof Wall ? this.removeWall(obj.id, false) : this.removeToken(obj.id, false));
-      remainingObjects.forEach(obj => obj instanceof Wall ? this.addWall(obj) : this.addToken(obj));
+      remainingObjects.forEach(obj => obj instanceof Wall
+        ? this.removeWall(obj.id, false) : this.removeToken(obj.id, false));
+      remainingObjects.forEach(obj => obj instanceof Wall
+        ? this.addWall(obj) : this.addToken(obj));
     }
   }
 

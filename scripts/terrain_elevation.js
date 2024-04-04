@@ -1,7 +1,8 @@
 /* globals
 canvas,
-ui,
-PIXI
+CONFIG,
+PIXI,
+ui
 */
 "use strict";
 
@@ -92,7 +93,7 @@ export function terrainElevationAtLocation(location, { startingElevation, moveme
 
   // If certain modules are active, use them to calculate elevation.
   let elevation = 0;
-  if ( MODULES_ACTIVE.ELEVATED_VISION ) elevation = EVElevationAtPoint(location, startingElevation, movementToken, );
+  if ( MODULES_ACTIVE.ELEVATED_VISION ) elevation = EVElevationAtPoint(location, startingElevation, movementToken);
   else if ( MODULES_ACTIVE.LEVELS ) elevation = LevelsElevationAtPoint(location, startingElevation);
   if ( isFinite(elevation) ) return elevation;
 

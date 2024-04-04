@@ -12,14 +12,17 @@
     "elevationruler.keybindings.removeWaypointTokenRuler.name": "Remove Token Ruler Waypoint",
     "elevationruler.keybindings.removeWaypointTokenRuler.hint": "When token ruler is enabled, remove a waypoint while dragging the token.",
 
+    "elevationruler.keybindings.togglePathfinding.name": "Temporarily Toggle Pathfinding",
+    "elevationruler.keybindings.togglePathfinding.hint": "If the pathfinding button is enabled, holding this key will temporarily disable pathfinding. If the pathfinding button is not enabled, holding this key will temporarily enable pathfinding.",
+
     "elevationruler.settings.levels-use-floor-label.name": "Levels Floor Label",
     "elevationruler.settings.levels-use-floor-label.hint": "If Levels module is active, label the ruler with the current floor, if the Levels UI floors are named.",
     "elevationruler.settings.levels-labels-never": "Never",
     "elevationruler.settings.levels-labels-ui": "Only when Levels UI is active",
     "elevationruler.settings.levels-labels-always": "Always",
 
-    "elevationruler.settings.prefer-token-elevation.name": "Add token elevation control",
-    "elevationruler.settings.prefer-token-elevation.hint": "Add a control to the token toolbar to prefer the token elevation when measuring. When toggled on, the control will keep the ruler at the elevation of the measuring token unless another token is encountered or the grid space is at a higher elevation than the token. Otherwise, the ruler will assume the elevation of the grid space or the token encountered.",
+    "elevationruler.settings.prefer-token-elevation.name": "Add Token Elevation Control",
+    "elevationruler.settings.prefer-token-elevation.hint": "Add a control to the token toolbar. When toggled on, the control will keep the ruler at the elevation of the measuring token. Otherwise, the ruler destination will assume the elevation of the grid space or the token encountered at the destination point of the ruler.",
 
     "elevationruler.settings.enable-token-ruler.name": "Use Token Ruler",
     "elevationruler.settings.enable-token-ruler.hint": "Display the ruler when dragging tokens.",
@@ -43,9 +46,9 @@
     "elevationruler.settings.token-speed-multiplier.hint": "For token speed highlighting, this is the multiplier used to go from walk to run (dash) to maximum. For example, with a multiplier of 2, a token with 25 walk speed will have its ruler highlight orange after the first 25 units of distance, and red after the first 50.",
 
     "elevationruler.settings.round-to-multiple.name": "Round Distance to Multiple",
-    "elevationruler.settings.round-to-multiple.hint": "For gridless distance measurement, round the distance displayed to the nearest multiple of the number entered. Leave blank to disable rounding.",
+    "elevationruler.settings.round-to-multiple.hint": "For gridless distance measurement, round the distance displayed to the nearest multiple of the number entered. Set to 0 to disable rounding.",
 
-    "elevationruler.settings.token-terrain-multiplier.name": "Token As Terrain Multiplier",
+    "elevationruler.settings.token-terrain-multiplier.name": "Token as Terrain Multiplier",
     "elevationruler.settings.token-terrain-multiplier.hint": "Multiplier to use to calculate movement speed when moving through other tokens. Set to 1 to ignore. Values less than 1 treat token spaces as faster than normal; values greater than 1 penalize movement through token spaces.",
 
     "elevationruler.settings.pathfinding_tokens_block.name": "Tokens Block",

@@ -1,3 +1,66 @@
+# 0.8.10
+## New features
+Add indicator of past combat movement in the ruler.
+Allow for unlimited number of speed categories, colors, along with custom speed functions in the CONFIG. Closes issue #58.
+More aggressive path straightening using a reverse Ramer-Douglas-Peucker algorithm based on collision checking. Closes issue #48.
+Add CONFIG settings to ignore tokens for pathfinding based on HP attribute or set of token statuses. Closes issue #55.
+Add a keybind ("p") to temporarily toggle pathfinding.
+Add `rulerSegmentOrigin` and `rulerSegmentDestination` to options passed to token update.
+
+## Bug fixes
+Refactor physical and move distance measurement in anticipation of Foundry v12. Closes issue #59 (measurement near waypoints).
+Refactor how segments are split for purposes of speed highlighting.
+Fix for counting alternating diagonals across ruler segments/waypoints.
+Fix for token stopping prematurely if the mouse is released after space bar pressed when using the Ruler.
+Fix for "drunken token movement" in which a token would wander off the path when moving through several fake waypoints that were not centered on the grid.
+Allow large tokens to move through triangle edge unless both vertices of the edge shares a blocking edge. This allows pathfinding to work for large tokens in more situations, while still not taking paths through narrow spaces constrained on both sides by walls.
+
+## BREAKING
+Options for `CONFIG.elevationruler.SPEED` have changed. To change the speed highlighting, you will need to change the array of speed categories in `CONFIG.elevationruler.SPEED.CATEGORIES`. A speed category is defined as:
+```js
+/**
+ * @typedef {object} SpeedCategory
+ *
+ * Object that stores the name, multiplier, and color of a given speed category.
+ * Custom properties are permitted. The SpeedCategory is passed to SPEED.maximumCategoryDistance,
+ * which in turn can be defined to use custom properties to calculate the maximum distance for the category.
+ *
+ * @prop {Color} color          Color used with ruler highlighting
+ * @prop {string} name          Unique name of the category (relative to other SpeedCategories)
+ * @prop {number} [multiplier]  This times the token movement equals the distance for this category
+ */
+```
+
+For more complex options, you can now replace two functions that control token speed measurements. You may also want to add additional properties to the `SpeedCategory` for your use case.
+```js
+/**
+ * Given a token, get the maximum distance the token can travel for a given type.
+ * Distance measured from 0, so types overlap. E.g.
+ *   WALK (x1): Token speed 25, distance = 25.
+ *   DASH (x2): Token speed 25, distance = 50.
+ *
+ * @param {Token} token                   Token whose speed should be used
+ * @param {SpeedCategory} speedCategory   Category for which the maximum distance is desired
+ * @param {number} [tokenSpeed]           Optional token speed to avoid repeated lookups
+ * @returns {number}
+ */
+SPEED.maximumCategoryDistance = function(token, speedCategory, tokenSpeed) {
+  tokenSpeed ??= SPEED.tokenSpeed(token);
+  return speedCategory.multiplier * tokenSpeed;
+};
+
+/**
+ * Given a token, retrieve its base speed.
+ * @param {Token} token                   Token whose speed is required
+ * @returns {number} Distance, in grid units
+ */
+SPEED.tokenSpeed = function(token) {
+  const speedAttribute = SPEED.ATTRIBUTES[token.movementType] ?? SPEED.ATTRIBUTES.WALK;
+  return Number(foundry.utils.getProperty(token, speedAttribute));
+};
+
+```
+
 # 0.8.9
 ### New features
 Track combat moves on a per-combat basis. Add settings toggle to have movement speed highlighting reflect sum of moves for that combat round.

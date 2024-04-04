@@ -3,10 +3,10 @@ canvas,
 PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
+"use strict";
 
 import { Draw } from "../geometry/Draw.js";
 import { PriorityQueueArray } from "./PriorityQueueArray.js";
-// import { PriorityQueue } from "./PriorityQueue.js";
 
 // See https://www.redblobgames.com/pathfinding/a-star/introduction.html
 
@@ -27,6 +27,12 @@ export class BreadthFirstPathSearch {
   /** @type {boolean} */
   debug = false;
 
+  /** @type {PathNode} */
+  _start;
+
+  /** @type {PathNode} */
+  _goal;
+
   /**
    * Run the breadth first search on the graph.
    * Each object must have a unique key property used for comparison.
@@ -36,28 +42,60 @@ export class BreadthFirstPathSearch {
    */
   run(start, goal) {
     this.clear();
-    const { cameFrom, frontier } = this;
-    frontier.unshift(start);
+    this.start = start;
+    this.goal = goal;
+    this._run();
 
-    while ( frontier.length ) {
-      const current = frontier.pop();
-      if ( this.debug ) current.entryTriangle.drawEdges();
-      if ( this.debug ) Draw.point(current.entryPoint, { color: Draw.COLORS.lightgreen });
-      if ( this.goalReached(goal, current) ) break;
-
-      // Get each neighbor destination in turn.
-      for ( const next of this.getNeighbors(current, goal) ) {
-        if ( !cameFrom.has(next.key) ) {
-          if ( this.debug ) Draw.point(next.entryPoint, { color: Draw.COLORS.lightyellow });
-          frontier.unshift(next);
-          cameFrom.set(next.key, current);
-        }
-      }
-    }
-
+    // Mark the start and goal for the resulting path.
+    const cameFrom = this.cameFrom;
     cameFrom.goal = goal;
     cameFrom.start = start;
     return cameFrom;
+  }
+
+  /**
+   * Helper that can be extended by subclasses to run the pathfinding.
+   */
+  _run() {
+    const frontier = this.frontier;
+    frontier.unshift(this.start);
+    while ( frontier.length ) { if ( this._step() ) break; }
+  }
+
+  /**
+   * Evaluate destinations from the current location along the path.
+   * @returns {boolean} If true, goal is reached.
+   */
+  _step() {
+    const { frontier } = this;
+    const current = frontier.pop();
+    if ( this.debug ) current.entryTriangle.drawEdges();
+    if ( this.debug ) Draw.point(current.entryPoint, { color: Draw.COLORS.lightgreen });
+    if ( this.goalReached(current) ) return true;
+    this._evaluateNeighbors(current);
+    return false;
+  }
+
+  /**
+   * Get each neighbor destionation and evaluate.
+   * @param {PathNode} current
+   */
+  _evaluateNeighbors(current) {
+    for ( const next of this.getNeighbors(current, this.goal) ) this._evaluateNeighbor(current, next);
+  }
+
+  /**
+   * Evaluate a neighboring destination.
+   * @param {PathNode} current
+   * @param {PathNode} next
+   */
+  _evaluateNeighbor(current, next) {
+    const { cameFrom, frontier } = this;
+    if ( !cameFrom.has(next.key) ) {
+      if ( this.debug ) Draw.point(next.entryPoint, { color: Draw.COLORS.lightyellow });
+      frontier.unshift(next);
+      cameFrom.set(next.key, current);
+    }
   }
 
   /**
@@ -66,7 +104,7 @@ export class BreadthFirstPathSearch {
    * @param {PathNode} current    Current node
    * @returns {boolean} True if goal has been reached and pathfinding should stop.
    */
-  goalReached(goal, current) { return goal.key === current.key; }
+  goalReached(current) { return this.goal.key === current.key; }
 
   /**
    * Neighbor method that can be overriden to handle different objects.
@@ -80,6 +118,8 @@ export class BreadthFirstPathSearch {
    * Clear the path properties.
    */
   clear() {
+    this.start = undefined;
+    this.goal = undefined;
     this.frontier.length = 0;
     this.cameFrom.clear();
   }
@@ -132,47 +172,52 @@ export class UniformCostPathSearch extends BreadthFirstPathSearch {
   costSoFar = new Map();
 
   clear() {
+    this.start = undefined;
+    this.goal = undefined;
     this.frontier.clear();
     this.costSoFar.clear();
     this.cameFrom.clear();
   }
 
   /**
-   * Run the cost search on the graph.
-   * Each PathNode must have a unique key property used for comparison
-   * and cost property used to value cost so far.
-   * @param {PathNode} start    Path node representing start
-   * @param {PathNode} goal     Path node representing end
-   * @returns {Map<PathNode>} Path as the cameFrom map. Note that rerunning will change this return.
+   * Helper that can be extended by subclasses to run the pathfinding.
    */
-  run(start, goal) {
-    this.clear();
-    const { cameFrom, costSoFar, frontier } = this;
+  _run() {
+    const { costSoFar, frontier } = this;
+    frontier.enqueue(this.start, 0);
+    costSoFar.set(this.start.key, 0);
+    while ( frontier.length ) { if ( this._step() ) break; }
+  }
 
-    frontier.enqueue(start, 0);
-    costSoFar.set(start.key, 0);
+  /**
+   * Evaluate destinations from the current location along the path.
+   * @returns {boolean} If true, goal is reached.
+   */
+  _step() {
+    const { frontier } = this;
+    const current = frontier.dequeue();
+    if ( this.debug ) current.entryTriangle.drawEdges();
+    if ( this.debug ) Draw.point(current.entryPoint, { color: Draw.COLORS.lightgreen });
+    if ( this.goalReached(current) ) return true;
+    this._evaluateNeighbors(current);
+    return false;
+  }
+
+  /**
+   * Evaluate a neighboring destination.
+   * @param {PathNode} current
+   * @param {PathNode} next
+   */
+  _evaluateNeighbor(current, next) {
     const MAX_COST = canvas.dimensions.maxR;
+    const { costSoFar, frontier } = this;
+    const newCost = (costSoFar.get(current.key) ?? MAX_COST) + next.cost;
+    if ( costSoFar.has(next.key) && newCost >= costSoFar.get(next.key) ) return;
 
-    while ( frontier.length ) {
-      const current = frontier.dequeue();
-      if ( this.debug ) Draw.point(current.entryPoint, { color: Draw.COLORS.green });
-      if ( this.goalReached(goal, current) ) break;
-
-      // Get each neighbor destination in turn.
-      for ( const next of this.getNeighbors(current, goal) ) {
-        const newCost = (costSoFar.get(current.key) ?? MAX_COST) + next.cost;
-        if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
-          if ( this.debug ) Draw.point(next.entryPoint, { color: Draw.COLORS.lightgreen });
-          costSoFar.set(next.key, newCost);
-          frontier.enqueue(next, newCost); // Priority is newCost
-          cameFrom.set(next.key, current);
-        }
-      }
-    }
-
-    cameFrom.goal = goal;
-    cameFrom.start = start;
-    return cameFrom;
+    if ( this.debug ) Draw.point(next.entryPoint, { color: Draw.COLORS.orange });
+    costSoFar.set(next.key, newCost);
+    frontier.enqueue(next, newCost); // Priority is newCost
+    this.cameFrom.set(next.key, current);
   }
 }
 
@@ -184,6 +229,8 @@ export class GreedyPathSearch extends BreadthFirstPathSearch {
   frontier = new PriorityQueueArray("low");
 
   clear() {
+    this.start = undefined;
+    this.goal = undefined;
     this.frontier.clear();
     this.cameFrom.clear();
   }
@@ -197,40 +244,31 @@ export class GreedyPathSearch extends BreadthFirstPathSearch {
   heuristic = (goal, current) => PIXI.Point.distanceBetween(goal.entryPoint, current.entryPoint);
 
   /**
-   * Run the cost search on the graph.
-   * Each PathNode must have a unique key property used for comparison
-   * and cost property used to value cost so far.
+   * Helper that can be extended by subclasses to run the pathfinding.
    * @param {PathNode} start    Path node representing start
    * @param {PathNode} goal     Path node representing end
-   * @returns {Map<PathNode>} Path as the cameFrom map. Note that rerunning will change this return.
    */
-  run(start, goal) {
-    this.clear();
-    const { cameFrom, frontier } = this;
+  _run() {
+    const frontier = this.frontier;
+    frontier.enqueue(this.start, 0);
+    while ( frontier.length ) { if ( this._step() ) break; }
+  }
 
-    frontier.enqueue(start, 0);
+  /**
+   * Evaluate a neighboring destination.
+   * @param {PathNode} current
+   * @param {PathNode} next
+   */
+  _evaluateNeighbor(current, next) {
+    const cameFrom = this.cameFrom;
+    if ( cameFrom.has(next.key) ) return;
+
     const MAX_COST = canvas.dimensions.maxR;
+    if ( this.debug ) Draw.point(next.entryPoint, { color: Draw.COLORS.orange });
+    const priority = this.heuristic(this.goal, next) ?? MAX_COST;
+    this.frontier.enqueue(next, priority);
+    cameFrom.set(next.key, current);
 
-    while ( frontier.length ) {
-      const current = frontier.dequeue();
-      if ( this.debug ) current.entryTriangle.drawEdges();
-      if ( this.debug ) Draw.point(current.entryPoint, { color: Draw.COLORS.green });
-      if ( this.goalReached(goal, current) ) break;
-
-      // Get each neighbor destination in turn.
-      for ( const next of this.getNeighbors(current, goal) ) {
-        if ( !cameFrom.has(next.key) ) {
-          if ( this.debug ) Draw.point(next.entryPoint, { color: Draw.COLORS.lightgreen });
-          const priority = this.heuristic(goal, next) ?? MAX_COST;
-          frontier.enqueue(next, priority);
-          cameFrom.set(next.key, current);
-        }
-      }
-    }
-
-    cameFrom.goal = goal;
-    cameFrom.start = start;
-    return cameFrom;
   }
 }
 
@@ -244,41 +282,20 @@ export class AStarPathSearch extends UniformCostPathSearch {
   heuristic = (goal, current) => PIXI.Point.distanceBetween(goal.entryPoint, current.entryPoint);
 
   /**
-   * Run the cost search on the graph.
-   * Each PathNode must have a unique key property used for comparison
-   * and cost property used to value cost so far.
-   * @param {PathNode} start    Path node representing start
-   * @param {PathNode} goal     Path node representing end
-   * @returns {Map<PathNode>} Path as the cameFrom map. Note that rerunning will change this return.
+   * Evaluate a neighboring destination.
+   * @param {PathNode} current
+   * @param {PathNode} next
    */
-  run(start, goal) {
-    this.clear();
-    const { cameFrom, costSoFar, frontier } = this;
-
-    frontier.enqueue(start, 0);
-    costSoFar.set(start.key, 0);
+  _evaluateNeighbor(current, next) {
     const MAX_COST = canvas.dimensions.maxR;
+    const { costSoFar, frontier } = this;
+    const newCost = (costSoFar.get(current.key) ?? MAX_COST) + next.cost;
+    if ( costSoFar.has(next.key) && newCost >= costSoFar.get(next.key) ) return;
 
-    while ( frontier.length ) {
-      const current = frontier.dequeue();
-      if ( this.debug ) Draw.point(current.entryPoint, { color: Draw.COLORS.green });
-      if ( this.goalReached(goal, current) ) break;
-
-      // Get each neighbor destination in turn.
-      for ( const next of this.getNeighbors(current, goal) ) {
-        const newCost = (costSoFar.get(current.key) ?? MAX_COST) + next.cost;
-        if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
-          if ( this.debug ) Draw.point(next.entryPoint, { color: Draw.COLORS.lightgreen });
-          costSoFar.set(next.key, newCost);
-          const priority = newCost + this.heuristic(goal, next);
-          frontier.enqueue(next, priority);
-          cameFrom.set(next.key, current);
-        }
-      }
-    }
-
-    cameFrom.goal = goal;
-    cameFrom.start = start;
-    return cameFrom;
+    if ( this.debug ) Draw.point(next.entryPoint, { color: Draw.COLORS.orange });
+    costSoFar.set(next.key, newCost);
+    const priority = newCost + this.heuristic(this.goal, next);
+    frontier.enqueue(next, priority);
+    this.cameFrom.set(next.key, current);
   }
 }
