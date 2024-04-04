@@ -230,9 +230,8 @@ export async function _animateSegment(token, segment, destination) {
   if ( token.document.x !== destination.x
     || token.document.y !== destination.y ) {
 
-    if ( CONFIG[MODULE_ID].debug ) {
-      console.debug(`Updating ${token.name} destination from ({${token.document.x},${token.document.y}) to (${destination.x},${destination.y}) for segment (${segment.ray.A.x},${segment.ray.A.y})|(${segment.ray.B.x},${segment.ray.B.y})`);
-    }
+    log(`Updating ${token.name} destination from ({${token.document.x},${token.document.y}) to (${destination.x},${destination.y}) for segment (${segment.ray.A.x},${segment.ray.A.y})|(${segment.ray.B.x},${segment.ray.B.y})`);
+
     // Same as wrapped but pass an option.
     await token.document.update(destination, {
       rulerSegment: this.segments.length > 1,

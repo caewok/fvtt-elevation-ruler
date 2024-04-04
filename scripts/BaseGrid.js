@@ -5,6 +5,7 @@ CONFIG
 
 // Patches for BaseGrid class
 import { MODULE_ID } from "./const.js";
+import { log } from "./util.js";
 
 
 export const PATCHES = {};
@@ -20,7 +21,7 @@ PATCHES.BASIC = {};
  * @return {Point}
  */
 function _getRulerDestination(ray, offset, _token) {
-  if ( CONFIG[MODULE_ID].debug ) console.debug(`Offsetting destination for ${_token.name}`, { dest: ray.B, offset });
+  log(`Offsetting destination for ${_token.name}`, { dest: ray.B, offset });
   return ray.B.add(offset).roundDecimals();
 }
 
