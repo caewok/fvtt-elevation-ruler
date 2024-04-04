@@ -202,7 +202,7 @@ export class Pathfinder {
 
   get spacer() {
     return this.#spacer
-      || (Math.min(this.token.w, this.token.h, canvas.dimensions.size * 1.5) * 0.25)
+      || (Math.min(this.token.w, this.token.h) * 0.5)
       || (canvas.dimensions.size * 0.5);
   }
 
