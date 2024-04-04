@@ -78,6 +78,29 @@ export class BorderEdge {
   otherTriangle(triangle) { return this.cwTriangle === triangle ? this.ccwTriangle : this.cwTriangle; }
 
   /**
+   * Get the triangle either cw or ccw to this edge, as measured from a given vertex key.
+   * vertexKey --> otherVertex --> otherTriangleVertex
+   * @param {number} vertexKey        Key for the anchor vertex
+   * @param {string} [direction]      Either ccw or cw
+   * @returns {BorderTriangle}
+   */
+  findTriangleFromVertexKey(vertexKey, dir = "ccw") {
+    const [a, b] = this.a.key === vertexKey ? [this.a, this.b] : [this.b, this.a];
+    const cCCW = this._nonSharedVertex(this.ccwTriangle);
+    return (foundry.utils.orient2dFast(a, b, cCCW) > 0) ^ (dir !== "ccw") ? this.ccwTriangle : this.cwTriangle;
+  }
+
+  /**
+   * Get the non-shared vertex for a triangle of this edge.
+   * @param {number} vertexKey
+   * @param {BorderTriangle} [tri]    The shared triangle with this edge
+   * @returns {Point}
+   */
+  _nonSharedVertex(tri = this.ccwTriangle) {
+    return Object.values(tri.vertices).find(v => !this.endpointKeys.has(v.key));
+  }
+
+  /**
    * Remove the triangle link.
    * @param {BorderTriangle}
    */
@@ -104,10 +127,16 @@ export class BorderEdge {
     const length = this.length;
     const destinations = [];
 
-    // No destination if edge is smaller than 2x spacer unless it is a door.
-    // Cheat a little on the spacing so tokens exactly the right size will fit.
-    if ( this.edgeBlocks(origin, elevation)
-      || (!this.isOpenDoor && (length < (spacer * 1.9))) ) return destinations;
+    // If both vertices block, limit destinations to edges 2x spacer.
+    // (Strongly suggests a hallway or other walling on both sides of the edge.)
+    // Otherwise, don't test for spacer because edges could be non-blocking on either side,
+    // which increases the size of the space.
+    // For doors, let the token through regardless.
+    if ( this.edgeBlocks(origin, elevation) ) return destinations;
+    if ( !this.isOpenDoor
+       && this.vertexBlocks(this.a.key)
+       && this.vertexBlocks(this.b.key)
+       && length < (spacer * 1.9) ) return destinations;
     destinations.push(this.median);
 
     // Skip corners if not at least spacer away from median.
@@ -141,6 +170,15 @@ export class BorderEdge {
    * @returns {boolean}
    */
   edgeBlocks(origin, elevation = 0) {
+    if ( !origin ) {
+      if ( !this.ccwTriangle.center || !this.cwTriangle.center) {
+        console.warn("edgeBlocks|Triangle centers not defined.");
+        return false;
+      }
+      return this.edgeBlocks(this.ccwTriangle.center, elevation)
+                       || this.edgeBlocks(this.cwTriangle.center, elevation);
+    }
+
     const { moveToken, tokenBlockType } = this.constructor;
     return this.objects.some(obj => {
       if ( obj instanceof Wall ) return WallTracerEdge.wallBlocks(obj, origin, elevation);
@@ -164,6 +202,54 @@ export class BorderEdge {
     const orient2d = foundry.utils.orient2dFast;
     if ( orient2d(a, b, otherEndpoint) > 0 ) this.ccwTriangle = triangle;
     else this.cwTriangle = triangle;
+  }
+
+  /**
+   * Test if at least one edge of this vertex is blocking.
+   * (Used to decide when to limit movement through the edge.)
+   * Does not test this edge.
+   * @param {number} vertexKey
+   * @param {Point} origin    Measure wall blocking from perspective of this origin point.
+   * @returns {boolean}
+   */
+  vertexBlocks(vertexKey, elevation = 0) {
+    const iter = this.sharedVertexEdges(vertexKey);
+    for ( const edge of iter ) {
+      if ( edge === this ) continue; // Could break here b/c this edge implicitly is always last.
+      if ( edge.edgeBlocks(undefined, elevation) ) return true;
+    }
+  }
+
+  /**
+   * Iterator to retrieve all edges that share the given vertex.
+   * @param {number} vertexKey
+   * @yields {BorderEdge}
+   */
+  *sharedVertexEdges(vertexKey) {
+    // Circle around the vertex, retrieving each new edge of the triangles in turn.
+    let currEdge = this;
+    let iter = 0;
+    const MAX_ITER = 1000;
+    do {
+      currEdge = currEdge._nextEdge(vertexKey, "ccw");
+      yield currEdge;
+      iter += 1;
+      if ( iter > MAX_ITER ) {
+        console.warn("sharedVertexEdges iterations exceeded.");
+        break;
+      }
+    } while ( currEdge !== this );
+  }
+
+  /**
+   * Retrieve the next ccw edge that shares the given vertex for the given triangle.
+   * @param {number} vertexKey        Key for the anchor vertex
+   * @param {string} [direction]      Either ccw or c.
+   * @returns {BorderEdge}
+   */
+  _nextEdge(vertexKey, dir = "ccw") {
+    const tri = this.findTriangleFromVertexKey(vertexKey, dir);
+    return Object.values(tri.edges).find(e => e !== this && e.endpointKeys.has(vertexKey));
   }
 
   /**

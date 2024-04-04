@@ -198,10 +198,12 @@ export class Pathfinder {
   }
 
   /** @type {number} */
-  _spacer = 0;
+  #spacer = 0;
 
   get spacer() {
-    return this._spacer || (Math.min(this.token.w, this.token.h) * 0.5) || (canvas.dimensions.size * 0.5);
+    return this.#spacer
+      || (Math.min(this.token.w, this.token.h) * 0.5)
+      || (canvas.dimensions.size * 0.5);
   }
 
   /** @enum {BreadthFirstPathSearch} */
