@@ -1,4 +1,5 @@
 /* globals
+CONFIG
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -19,13 +20,8 @@ PATCHES.BASIC = {};
  * @return {Point}
  */
 function _getRulerDestination(ray, offset, _token) {
-  if ( CONFIG[MODULE_ID].debug ) console.debug(`Offsetting destination for ${_token.name}`, { dest: ray.B, offset })
-
+  if ( CONFIG[MODULE_ID].debug ) console.debug(`Offsetting destination for ${_token.name}`, { dest: ray.B, offset });
   return ray.B.add(offset).roundDecimals();
-//   return {
-//     x: Math.round(ray.B.x + offset.x),
-//     y: Math.round(ray.B.y + offset.y)
-//   };
 }
 
 PATCHES.BASIC.OVERRIDES = { _getRulerDestination };

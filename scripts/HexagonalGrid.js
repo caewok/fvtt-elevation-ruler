@@ -20,15 +20,9 @@ PATCHES.BASIC = {};
  * @return {Point}
  */
 function _getRulerDestination(ray, offset, _token) {
-//   const dest = new PIXI.Point(Math.round(ray.B.x + offset.x), Math.round(ray.B.y + offset.y));
-//   return dest.add(hexOffset(token), dest).roundDecimals();
   const recalculatedOffset = canvas.controls.ruler._recalculatedOffset;
   log(`Offsetting destination for ${_token.name}`, { dest: ray.B, offset, recalculatedOffset });
   return ray.B.add(recalculatedOffset).roundDecimals();
-//   return {
-//     x: Math.round(ray.B.x + recalculatedOffset.x),
-//     y: Math.round(ray.B.y + recalculatedOffset.y)
-//   };
 }
 
 PATCHES.BASIC.OVERRIDES = { _getRulerDestination };
