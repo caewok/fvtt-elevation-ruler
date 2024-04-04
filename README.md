@@ -90,7 +90,34 @@ This is particularly useful where you have an elevated character at the origin, 
 
 As with the normal Foundry ruler, if you begin a measurement at your token, you can hit spacebar to move the token. Elevation is modified at the end of each waypoint segment move. This may allow you, for example, to jump over a wall if that wall has a maximum height under your current elevation as can be set up using the Wall Height module (or Levels + Wall Height).
 
+# Token controls
+
+Elevation Ruler adds two token controls. The "Use Pathfinding" control toggles pathfinding on/off. The "Prefer Token Elevation" control, when enabled, will not adjust the destination elevation when hovering over other tokens. Typically, without this enabled, the ruler will change the destination elevation to match the elevation of a token at the destination point. 
+
 # Key bindings
+
+Elevation Ruler defines certain keybindings:
+- Decrement Ruler Elevation (`[`): When measuring or dragging tokens, decrease the destination elevation by one grid unit. If you trigger a token move, its elevation will be adjusted accordingly.
+- Increment Ruler Elevation (`]`): See Decrement.
+- Add Token Ruler Waypoint (`=`): When dragging tokens, add a waypoint.
+- Remove Token Ruler Waypoint (`-`): When dragging tokens, remove a waypoint.
+- Temporarily Toggle Pathfinding (`p`): If pathfinding is enabled, temporarily disable while holding this key. If disabled, then temporarily enable it.
+
+# Settings
+
+- Add token elevation control: Add the "Prefer Token Elevation Control" to the Token controls.
+- Tokens Block: When pathfinding, select whether none, hostile, or all tokens block the path.
+- Limit Pathfinding to Explored Areas: For users, should the pathfinding stop working when they move the ruler destination into an unexplored area?
+- Use Token Ruler: Display the ruler when dragging tokens.
+- Use Token Speed Highlighting: Highlight grid squares under the ruler based on the token's speed. See API, below, for how to modify colors and speed categories.
+- Track Combat Move: When displaying the speed highlighting during combat, count any movement already made by the token this combat round.
+- Round Distance to Multiple: Round the measurement display by this multiple. For example, "10" will round 111.23 to 110.
+- Token as Terrain Multiplier: How much does a token penalize movement through that token?
+- Terrain Grid Measurement: When measuring movement through terrain on a gridded map, how should the terrain be accounted for?
+  - Center Point: if the terrain overlaps the grid square/hex center point, that grid square/hex will have penalized movement.
+  - Percent Area: if the terrain area excees some threshold coverage of the grid square/hex center point, that grid square/hex will have penalized movement.
+  - Euclidean: A line moving through the terrain will be proportionally penalized based on the percentage of that line within the terrain.
+- Percent Area Threshold: Defines the threshold in Terrain Grid Measurement: Percent Area.
 
 # API
 
@@ -186,10 +213,6 @@ If you set `CONFIG.elevationruler.pathfindingCheckTerrains` to `true`, it will t
 You can tell the pathfinding algorithm to ignore certain tokens. By default it ignores dead tokens for dnd5e. To change this, set the string in `CONFIG.elevationruler.SPEED.tokenHPAttribute` (or set it to "" to pathfind around dead tokens). If you want default support for a system, open a git issue and preferably tell me how to find the HP value for that system's tokens. 
 
 You can also tell the pathfinding algorithm to ignore tokens with certain statuses. The default Set is at `CONFIG.elevationruler.pathfindingIgnoreStatuses`.
-
-
-
-
 
 
 
