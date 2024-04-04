@@ -219,7 +219,7 @@ async function _animateMovement(wrapped, token) {
 
   this.segments.forEach((s, idx) => s.idx = idx);
 
-  if ( canvas.grid.isHex ) _recalculateOffset.call(this, token);
+  if ( canvas.grid.isHex ) _recalculateOffset2.call(this, token);
   const promises = [wrapped(token)];
   for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;
@@ -265,14 +265,13 @@ function _recalculateOffset2(token) {
   const h2 = canvas.grid.grid.h * 0.5;
 
   const origin = this.segments[0].ray.A;
-  const xDiff = token.document.x - origin.x;
-  const yDiff = token.document.y - origin.y;
-  if ( yDiff.between(-h2 * 2, -h2 * 4) ) h2 += (h2 - w2) * 2;
+  const tl = PIXI.Point.fromObject(token.document);
+  const tlOrigin = new PIXI.Point(...canvas.grid.grid.getTopLeft(origin.x, origin.y));
 
-
-  const dx = Math.round((token.document.x - origin.x) / w2) * w2;
-  const dy = Math.round((token.document.y - origin.y) / h2) * h2;
-  this._recalculatedOffset = new PIXI.Point(dx, dy);
+  // w2 and h2 are distance from tl to center
+  const diff = tlOrigin.subtract(tl);
+  diff.add({ x: w2, y: h2 }, diff);
+  this._recalculatedOffset = diff.multiplyScalar(-1, diff);
 }
 
 /**
