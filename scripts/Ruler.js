@@ -219,6 +219,7 @@ async function _animateMovement(wrapped, token) {
 
   this.segments.forEach((s, idx) => s.idx = idx);
 
+  _recalculateOffset.call(this, token);
   const promises = [wrapped(token)];
   for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;
@@ -231,6 +232,28 @@ async function _animateMovement(wrapped, token) {
   return Promise.allSettled(promises);
 }
 
+/**
+ * Recalculate the offset used by _getRulerDestination.
+ * Needed for hex grids.
+ *
+ * Adds a temporary parameter to the ruler used by HexagonalGrid.prototype._getRulerDestination.
+ * @param {Token} token
+ */
+function _recalculateOffset(token) {
+  if ( !canvas.grid.isHex ) return;
+  const w2 = canvas.grid.grid.w * 0.5;
+  const h2 = canvas.grid.grid.h * 0.5;
+  const origin = this.segments[0].ray.A;
+  const tl = PIXI.Point.fromObject(token.document);
+  const tlOrigin = new PIXI.Point(...canvas.grid.grid.getTopLeft(origin.x, origin.y));
+
+  // Determine difference between top left token and top left of the origin grid space.
+  // Add in the w2 and h2: distance from top left origin to center origin.
+  // Negate that sum to offset each segment destination (dest + offset).
+  const diff = tlOrigin.subtract(tl);
+  diff.add({ x: w2, y: h2 }, diff);
+  this._recalculatedOffset = diff.multiplyScalar(-1, diff);
+}
 
 /**
  * Wrap Ruler.prototype._canMove
