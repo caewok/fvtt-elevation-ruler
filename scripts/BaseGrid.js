@@ -21,7 +21,7 @@ PATCHES.BASIC = {};
 function _getRulerDestination(ray, offset, _token) {
   if ( CONFIG[MODULE_ID].debug ) console.debug(`Offsetting destination for ${_token.name}`, { dest: ray.B, offset })
 
-  return ray.B.x.add(offset).roundDecimals();
+  return ray.B.add(offset).roundDecimals();
 //   return {
 //     x: Math.round(ray.B.x + offset.x),
 //     y: Math.round(ray.B.y + offset.y)
