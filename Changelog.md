@@ -13,6 +13,7 @@ Refactor how segments are split for purposes of speed highlighting.
 Fix for counting alternating diagonals across ruler segments/waypoints.
 Fix for token stopping prematurely if the mouse is released after space bar pressed when using the Ruler.
 Fix for "drunken token movement" in which a token would wander off the path when moving through several fake waypoints that were not centered on the grid.
+Allow large tokens to move through triangle edge unless both vertices of the edge shares a blocking edge. This allows pathfinding to work for large tokens in more situations, while still not taking paths through narrow spaces constrained on both sides by walls.
 
 # 0.8.9
 ### New features
