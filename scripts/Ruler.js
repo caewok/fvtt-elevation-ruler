@@ -219,6 +219,7 @@ async function _animateMovement(wrapped, token) {
 
   this.segments.forEach((s, idx) => s.idx = idx);
 
+  if ( canvas.grid.isHex ) _recalculateOffset.call(this, token);
   const promises = [wrapped(token)];
   for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;
@@ -230,6 +231,83 @@ async function _animateMovement(wrapped, token) {
   }
   return Promise.allSettled(promises);
 }
+
+/**
+ * Recalculate the offset used by _getRulerDestination.
+ * Needed for hex grids.
+ */
+function _recalculateOffset(token) {
+  const s2 = canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS ? 1 : (canvas.dimensions.size * 0.5);
+  let w2 = s2;
+  let h2 = s2;
+  if ( canvas.grid.isHex ) {
+    w2 = Math.round(canvas.grid.grid.w) * 0.5;
+    h2 = Math.round(canvas.grid.grid.h) * 0.5;
+  }
+
+//   w2 = Math.round(w2);
+//   h2 = Math.round(h2);
+
+  const origin = this.segments[0].ray.A;
+  const xDiff = token.document.x - origin.x;
+  const yDiff = token.document.y - origin.y;
+  if ( yDiff.between(-h2 * 2, -h2 * 4) ) h2 += (h2 - w2) * 2;
+
+
+  const dx = Math.round((token.document.x - origin.x) / w2) * w2;
+  const dy = Math.round((token.document.y - origin.y) / h2) * h2;
+  this._recalculatedOffset = new PIXI.Point(dx, dy);
+}
+
+function _recalculateOffset2(token) {
+  if ( !canvas.grid.isHex ) return;
+  const w2 = canvas.grid.grid.w * 0.5;
+  const h2 = canvas.grid.grid.h * 0.5;
+
+  const origin = this.segments[0].ray.A;
+  const xDiff = token.document.x - origin.x;
+  const yDiff = token.document.y - origin.y;
+  if ( yDiff.between(-h2 * 2, -h2 * 4) ) h2 += (h2 - w2) * 2;
+
+
+  const dx = Math.round((token.document.x - origin.x) / w2) * w2;
+  const dy = Math.round((token.document.y - origin.y) / h2) * h2;
+  this._recalculatedOffset = new PIXI.Point(dx, dy);
+}
+
+/**
+ * Recalculate the offset used by _getRulerDestination.
+ * Needed for hex grids.
+ */
+// function _recalculateOffset2(token) {
+//   const { w, h } = canvas.grid.grid;
+//   const origin = PIXI.Point.fromObject(this.segments[0].ray.A);
+//   const tl = PIXI.Point.fromObject(token);
+//   const diff = tl.subtract(origin)
+//
+//   const w_1_4 = w * 0.25;
+//   const h_1_4 = h * 0.25;
+//
+//   multX = Math.abs(diff.x / w_1_4)
+//   multY = Math.abs(diff.y / h_1_4)
+//
+// //   w_1_2 * 3
+// //   h_1_2 * 2.5
+//
+//
+//
+//   // 150, 145
+//
+//   Math.round(diff.y / h_1_2) * h_1_2
+//
+//   const mult = diff.multiply({ x: 1 / w_1_2, y: 1 / w_1_2 })
+//
+//   const mult = diff.multiply({ x: 1/w, y: 1/h }, diff);
+//   this._recalculatedOffset = new PIXI.Point(
+//     w * Math.floor(mult.x),
+//     h * Math.floor(mult.y)
+//   );
+// }
 
 
 /**
