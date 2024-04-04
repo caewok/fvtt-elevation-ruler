@@ -90,16 +90,107 @@ This is particularly useful where you have an elevated character at the origin, 
 
 As with the normal Foundry ruler, if you begin a measurement at your token, you can hit spacebar to move the token. Elevation is modified at the end of each waypoint segment move. This may allow you, for example, to jump over a wall if that wall has a maximum height under your current elevation as can be set up using the Wall Height module (or Levels + Wall Height).
 
+# Key bindings
+
 # API
 
-You can modify the system attributes used for walk/fly/burrow as well as the colors used in `CONFIG.elevationruler.SPEED`. You can modify the Token HUD icons in `CONFIG.elevationruler.MOVEMENT_BUTTONS`.
-
-You can modify the icon used when hovering over difficult terrain:
-- `CONFIG.elevationruler.SPEED.terrainSymbol`: You can use any text string here. Paste in a unicode symbol if you want a different symbol. For Font Awesome icons, use, e.g., "\uf0e7". (This is the code for [FA lightning bolt](https://fontawesome.com/icons/bolt?f=classic&s=solid).)
-- `CONFIG.elevationruler.SPEED.useFontAwesome`: Set to true to interpet the `terrainSymbol` as FA unicode.
-
-Elevation Ruler adds a token property to get the token movement type: `_token.movementType`. You may also want the enumerated movement types: `game.modules.get("elevationruler").api.MOVEMENT_TYPES`.
+You can access defined properties used by Elevation Ruler at `CONFIG.elevationruler`. You can access some of this module's classes and advanced data at `game.modules.get("elevationruler").api`. 
 
 Elevation Ruler adds token properties to track the last movement made by the token:
 - `_token.lastMoveDistance`: Movement units expended on the last move. May not be physical distance; this instead accounts for additional movement due to difficult terrain. If the token has not moved this combat round, this value will be 0.
 - `_token._lastMoveDistance`: Same as above, but does not account for combat rounds.
+
+## Setting speed colors
+
+To change how speed highlighting works, you will need to change the array of speed categories in `CONFIG.elevationruler.SPEED.CATEGORIES`. A speed category is defined as:
+```js
+/**
+ * @typedef {object} SpeedCategory
+ *
+ * Object that stores the name, multiplier, and color of a given speed category.
+ * Custom properties are permitted. The SpeedCategory is passed to SPEED.maximumCategoryDistance,
+ * which in turn can be defined to use custom properties to calculate the maximum distance for the category.
+ *
+ * @prop {Color} color          Color used with ruler highlighting
+ * @prop {string} name          Unique name of the category (relative to other SpeedCategories)
+ * @prop {number} [multiplier]  This times the token movement equals the distance for this category
+ */
+```
+The default categories are as follows, although these properties may vary by system:
+```js
+const WalkSpeedCategory = {
+  name: "Walk",
+  color: Color.from(0x00ff00),
+  multiplier: 1
+};
+
+const DashSpeedCategory = {
+  name: "Dash",
+  color: Color.from(0xffff00),
+  multiplier: 2
+};
+```
+Categories are processed in order in the `SPEED.CATEGORIES` array. Usually (unless you modify the `SPEED.maximumCategoryDistance` function per below) you would want the categories sorted from smallest to largest multiplier. For example, a token with speed 30 could walk for 30 * 1 grid units, and dash for 30 * 2 = 60 grid units. So the first 30 grid units would be highlighted for walk, the next 30 highlighted for dash, and everything byond that highlighted with the maximum color.
+
+There is a also a "Maximum" property for when the distances for the categories above are exceeded. You can set the default color at `SPEED.MAXIMUM_COLOR`. 
+
+If you have a specific system that you would like supported by default, please open a Git issue and explain how the system measures speed and, preferably, what properties need to be changed.
+
+## Advanced speed modifications
+
+For more complex options, you can replace two functions that control token speed measurements. You may also want to add additional properties to the `SpeedCategory` for your use case.
+```js
+/**
+ * Given a token, get the maximum distance the token can travel for a given type.
+ * Distance measured from 0, so types overlap. E.g.
+ *   WALK (x1): Token speed 25, distance = 25.
+ *   DASH (x2): Token speed 25, distance = 50.
+ *
+ * @param {Token} token                   Token whose speed should be used
+ * @param {SpeedCategory} speedCategory   Category for which the maximum distance is desired
+ * @param {number} [tokenSpeed]           Optional token speed to avoid repeated lookups
+ * @returns {number}
+ */
+SPEED.maximumCategoryDistance = function(token, speedCategory, tokenSpeed) {
+  tokenSpeed ??= SPEED.tokenSpeed(token);
+  return speedCategory.multiplier * tokenSpeed;
+};
+
+/**
+ * Given a token, retrieve its base speed.
+ * @param {Token} token                   Token whose speed is required
+ * @returns {number} Distance, in grid units
+ */
+SPEED.tokenSpeed = function(token) {
+  const speedAttribute = SPEED.ATTRIBUTES[token.movementType] ?? SPEED.ATTRIBUTES.WALK;
+  return Number(foundry.utils.getProperty(token, speedAttribute));
+};
+```
+
+## Controlling movement buttons
+
+You can modify the system attributes used for walk/fly/burrow  in `CONFIG.elevationruler.SPEED.ATTRIBUTES`. You can modify the Token HUD icons in `CONFIG.elevationruler.MOVEMENT_BUTTONS`.
+
+Elevation Ruler adds a token property to get the token movement type: `_token.movementType`. You may also want the enumerated movement types: `game.modules.get("elevationruler").api.MOVEMENT_TYPES`.
+
+## Controlling terrain display
+
+You can modify the icon used when hovering over difficult terrain:
+- `CONFIG.elevationruler.SPEED.terrainSymbol`: You can use any text string here. Paste in a unicode symbol if you want a different symbol. For Font Awesome icons, use, e.g., "\uf0e7". (This is the code for [FA lightning bolt](https://fontawesome.com/icons/bolt?f=classic&s=solid).)
+- `CONFIG.elevationruler.SPEED.useFontAwesome`: Set to true to interpet the `terrainSymbol` as FA unicode.
+  
+## Controlling pathfinding
+
+If you set `CONFIG.elevationruler.pathfindingCheckTerrains` to `true`, it will test for Terrain Mapper terrains (including Tiles), Drawings, and Tokens for terrain penalties. This is currently a serious performance hit and so is not enabled by default. (By default, tokens can block pathfinding per user settings but advanced terrain penalties are not considered.) This may change depending on Foundry VTT v12's approach to scene regions.
+
+You can tell the pathfinding algorithm to ignore certain tokens. By default it ignores dead tokens for dnd5e. To change this, set the string in `CONFIG.elevationruler.SPEED.tokenHPAttribute` (or set it to "" to pathfind around dead tokens). If you want default support for a system, open a git issue and preferably tell me how to find the HP value for that system's tokens. 
+
+You can also tell the pathfinding algorithm to ignore tokens with certain statuses. The default Set is at `CONFIG.elevationruler.pathfindingIgnoreStatuses`.
+
+
+
+
+
+
+
+
