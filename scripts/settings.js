@@ -16,9 +16,7 @@ import { BorderEdge } from "./pathfinding/BorderTriangle.js";
 
 const SETTINGS = {
   CONTROLS: {
-    PATHFINDING: "pathfinding-control",
-    PREFER_TOKEN_ELEVATION: "prefer-token-elevation",
-    PREFER_TOKEN_ELEVATION_CURRENT_VALUE: "prefer-token-elevation-current-value"
+    PATHFINDING: "pathfinding-control"
   },
 
   PATHFINDING: {
@@ -65,7 +63,8 @@ const KEYBINDINGS = {
     ADD_WAYPOINT: "addWaypointTokenRuler",
     REMOVE_WAYPOINT: "removeWaypointTokenRuler"
   },
-  TOGGLE_PATHFINDING: "togglePathfinding"
+  TOGGLE_PATHFINDING: "togglePathfinding",
+  FORCE_TO_GROUND: "forceToGround"
 };
 
 
@@ -76,7 +75,11 @@ export class Settings extends ModuleSettingsAbstract {
   /** @type {object} */
   static KEYBINDINGS = KEYBINDINGS;
 
+  /** @type {boolean} */
   static FORCE_TOGGLE_PATHFINDING = false;
+
+  /** @type {boolean} */
+  static FORCE_TO_GROUND = false;
 
   /**
    * Register all settings
@@ -96,25 +99,6 @@ export class Settings extends ModuleSettingsAbstract {
         [KEYS.LEVELS_LABELS.UI_ONLY]: localize(`${KEYS.LEVELS_LABELS.UI_ONLY}`),
         [KEYS.LEVELS_LABELS.ALWAYS]: localize(`${KEYS.LEVELS_LABELS.ALWAYS}`)
       }
-    });
-
-    register(KEYS.CONTROLS.PREFER_TOKEN_ELEVATION, {
-      name: localize(`${KEYS.CONTROLS.PREFER_TOKEN_ELEVATION}.name`),
-      hint: localize(`${KEYS.CONTROLS.PREFER_TOKEN_ELEVATION}.hint`),
-      scope: "user",
-      config: true,
-      default: false,
-      type: Boolean,
-      requiresReload: false,
-      onChange: reloadTokenControls
-    });
-
-    register(KEYS.CONTROLS.PREFER_TOKEN_ELEVATION_CURRENT_VALUE, {
-      scope: "user",
-      config: false,
-      default: false,
-      type: Boolean,
-      requiresReload: false
     });
 
     // ----- NOTE: Pathfinding ----- //
@@ -293,6 +277,22 @@ export class Settings extends ModuleSettingsAbstract {
         this.FORCE_TOGGLE_PATHFINDING &&= false;
         const ruler = canvas.controls.ruler;
         if ( ruler._state === Ruler.STATES.MEASURING ) ruler.measure(ruler.destination, { force: true });
+      },
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
+
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.FORCE_TO_GROUND, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.FORCE_TO_GROUND}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.FORCE_TO_GROUND}.hint`),
+      editable: [
+        { key: "KeyG" }
+      ],
+      onDown: _context => {
+        const ruler = canvas.controls.ruler;
+        if ( !ruler.active ) return;
+        this.FORCE_TO_GROUND = !this.FORCE_TO_GROUND;
+        ruler.measure(ruler.destination, { force: true });
+        ui.notifications.info(`Ruler measure to ground ${this.FORCE_TO_GROUND ? "enabled" : "disabled"}.`);
       },
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });

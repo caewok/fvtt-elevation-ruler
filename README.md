@@ -82,7 +82,7 @@ Finally, the DnD Euclidean rule relies on Pythagorean's Theorem, rounded to the 
 
 ## Token measurement
 
-If you drag the ruler over a token that has been elevated or lowered, the ruler will reflect the elevation of that token (plus or minus manually incremented values). (This does not happen if you are dragging tokens; you must use the ruler tool.)
+When measuring, the ruler will stay at the origin elevation (or originating token elevation) unless manually changed. But if you drag the ruler over a token that has been elevated or lowered, the ruler will reflect the elevation of that token (plus or minus manually incremented values). (This does not happen if you are dragging tokens; you must use the ruler tool.)
 
 This is particularly useful where you have an elevated character at the origin, and want to fire or move downwards. Or vice-versa where you are aiming at an elevated token and need total distance to the elevated target.
 
@@ -102,6 +102,7 @@ Elevation Ruler defines certain keybindings:
 - Add Token Ruler Waypoint (`=`): When dragging tokens, add a waypoint.
 - Remove Token Ruler Waypoint (`-`): When dragging tokens, remove a waypoint.
 - Temporarily Toggle Pathfinding (`p`): If pathfinding is enabled, temporarily disable while holding this key. If disabled, then temporarily enable it.
+- Force to Ground (`g`): If you hit `g` while using the ruler, it will move the destination to use the ground elevation. You can hit `g` again to revert back. Note that the decrement and increment elevation keybindings will still change elevation accordingly. You can use this keybinding when dragging a flying token that you want to "land." Or if you are measuring with the ruler and want the measurement to not accoutn for another token's elevation at a destination point.
 
 # Settings
 

@@ -289,7 +289,8 @@ export function _highlightMeasurementSegment(wrapped, segment) {
   const token = this._getMovementToken();
   const doSpeedHighlighting = token
     // && this.user === game.user
-    && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING);
+    && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING)
+    && segment.speed?.color;
 
   // Highlight each split in turn, changing highlight color each time.
   if ( doSpeedHighlighting ) this.color = segment.speed.color;
