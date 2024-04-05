@@ -42,7 +42,7 @@ elevationAtLocation -- all ruler types
 Used by ruler to get elevation at waypoints and at the end of the ruler.
 */
 
-import { MODULES_ACTIVE } from "./const.js";
+import { MODULES_ACTIVE, MOVEMENT_TYPES } from "./const.js";
 import { Settings } from "./settings.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 
@@ -114,41 +114,56 @@ export function elevationAtLocation(location, token) {
   token ??= this._getMovementToken();
   const isTokenRuler = Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED)
     && ui.controls.activeControl === "token"
-    && ui.controls.activeTool === "select";
+    && ui.controls.activeTool === "select"
+    && token;
 
-  // If at the token, use the token's elevation.
-  if ( token && location.almostEqual(token.center) ) return token.elevationE;
+  // 1. If forcing to ground, always use the terrain elevation.
 
-  // If normal ruler and not prioritizing the token elevation, use elevation of other tokens at this point.
-  if ( !isTokenRuler && !preferTokenElevation() ) {
-    const maxTokenE = retrieveVisibleTokens()
-      .filter(t => t.constrainedTokenBorder.contains(location.x, location.y))
-      .reduce((e, t) => Math.max(t.elevationE, e), Number.NEGATIVE_INFINITY);
-    if ( isFinite(maxTokenE) ) return maxTokenE;
+  /* If not forcing to ground:
+  2. No move token
+    --> Default: Use origin elevation
+    --> If hovering over a token, use that token's elevation
+  3. Move token, normal ruler
+    --> Default: Use move token elevation
+    --> If hovering over a token, use that token's elevation
+  4. Token ruler
+    --> Default: Use move token elevation
+    --> If token is walking, use terrain elevation
+  */
+  const terrainElevationFn = () => this.constructor.terrainElevationAtLocation(location, {
+    movementToken: token,
+    startingElevation: this.originElevation
+  });
+
+  // #1 Forcing to ground
+  if ( Settings.FORCE_TO_GROUND ) return terrainElevationFn();
+
+  // #4 token ruler
+  if ( isTokenRuler ) {
+    if ( token.movementType === MOVEMENT_TYPES.WALK ) return terrainElevationFn();
+    return token.elevationE;
   }
 
-  // Use the terrain at this point.
-  return this.constructor.terrainElevationAtLocation(location, {
-    movementToken: token,
-    startingElevation: this.originElevation });
+  // If at the token, use the token's elevation.
+  // if ( token && location.almostEqual(token.center) ) return token.elevationE;
+
+  // Check for other tokens at destination and use that elevation.
+  const maxTokenE = retrieveVisibleTokens()
+    .filter(t => t.constrainedTokenBorder.contains(location.x, location.y))
+    .reduce((e, t) => Math.max(t.elevationE, e), Number.NEGATIVE_INFINITY);
+  if ( isFinite(maxTokenE) ) return maxTokenE; // #2 or #3
+
+  // #3 move token
+  if ( token ) return token.elevationE;
+
+  // #2 no move token
+  return this.originElevation;
 }
 
 // ----- NOTE: HELPER FUNCTIONS ----- //
 
 function retrieveVisibleTokens() {
   return canvas.tokens.children[0].children.filter(c => c.visible);
-}
-
-/**
- * Determine if token elevation should be preferred
- * @returns {boolean}
- */
-function preferTokenElevation() {
-  const PREFER_TOKEN_ELEVATION = Settings.KEYS.CONTROLS.PREFER_TOKEN_ELEVATION;
-  if ( !Settings.get(PREFER_TOKEN_ELEVATION) ) return false;
-  const token_controls = ui.controls.controls.find(elem => elem.name === "token");
-  const prefer_token_control = token_controls.tools.find(elem => elem.name === PREFER_TOKEN_ELEVATION);
-  return prefer_token_control.active;
 }
 
 // ----- NOTE: ELEVATED VISION ELEVATION ----- //
