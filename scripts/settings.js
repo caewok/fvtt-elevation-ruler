@@ -63,7 +63,8 @@ const KEYBINDINGS = {
     ADD_WAYPOINT: "addWaypointTokenRuler",
     REMOVE_WAYPOINT: "removeWaypointTokenRuler"
   },
-  TOGGLE_PATHFINDING: "togglePathfinding"
+  TOGGLE_PATHFINDING: "togglePathfinding",
+  FORCE_TO_GROUND: "forceToGround"
 };
 
 
@@ -74,7 +75,11 @@ export class Settings extends ModuleSettingsAbstract {
   /** @type {object} */
   static KEYBINDINGS = KEYBINDINGS;
 
+  /** @type {boolean} */
   static FORCE_TOGGLE_PATHFINDING = false;
+
+  /** @type {boolean} */
+  static FORCE_TO_GROUND = false;
 
   /**
    * Register all settings
@@ -272,6 +277,20 @@ export class Settings extends ModuleSettingsAbstract {
         this.FORCE_TOGGLE_PATHFINDING &&= false;
         const ruler = canvas.controls.ruler;
         if ( ruler._state === Ruler.STATES.MEASURING ) ruler.measure(ruler.destination, { force: true });
+      },
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
+
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.FORCE_TO_GROUND, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.FORCE_TO_GROUND}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.FORCE_TO_GROUND}.hint`),
+      editable: [
+        { key: "KeyG" }
+      ],
+      onDown: _context => {
+        if ( !canvas.controls.ruler.active ) return;
+        this.FORCE_TO_GROUND = !this.FORCE_TO_GROUND;
+        ui.notifications.info(`Ruler measure to ground ${this.FORCE_TO_GROUND ? "enabled" : "disabled"}.`);
       },
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
