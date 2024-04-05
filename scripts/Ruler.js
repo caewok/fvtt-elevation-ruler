@@ -418,13 +418,6 @@ function _computeTokenSpeed() {
 
     totalCombatMoveDistance = token.lastMoveDistance;
     minDistance = totalCombatMoveDistance;
-//     while ( speedCategory
-//         && speedCategory.name !== "Maximum"
-//         && totalCombatMoveDistance > maxDistance ) {
-//
-//       speedCategory = categoryIter.next().value;
-//       maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
-//     }
   }
 
 
@@ -456,9 +449,8 @@ function _computeTokenSpeed() {
       }
 
       // Increment to the next speed category.
+      // Next category will be selected in the while loop above: first category to exceed minDistance.
       minDistance = maxDistance;
-//       speedCategory = categoryIter.next().value;
-//       maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
     }
 
     // Increment totals.

@@ -1,5 +1,11 @@
 # 0.8.11
+
+## New features
+Add a keybinding ("g") to force the ruler to measure from ground terrain. Replaces "Prefer Token Elevation," which was removed. Closes #63, #64.
+
+## Bug fixes
 Catch when a segment color is not defined, to avoid throwing an error.
+
 
 
 # 0.8.10
