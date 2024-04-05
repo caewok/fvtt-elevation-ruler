@@ -1,6 +1,11 @@
 # 0.8.11
-Catch when a segment color is not defined, to avoid throwing an error.
 
+## New features
+Add a keybinding ("g") to force the ruler to measure from ground terrain. Replaces "Prefer Token Elevation," which was removed. Closes #63, #64.
+
+## Bug fixes
+Catch when a segment color is not defined, to avoid throwing an error.
+Fix for incorrect combat speed movement highlighting after the first move. Closes #62.
 
 # 0.8.10
 ## New features

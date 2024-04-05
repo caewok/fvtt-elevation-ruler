@@ -396,13 +396,10 @@ function _computeTokenSpeed() {
   let totalDistance = 0;
   let totalMoveDistance = 0;
   let totalCombatMoveDistance = 0;
+  let minDistance = 0;
   let numPrevDiagonal = 0;
   let s = 0;
   let segment;
-
-  // Add in already moved combat distance.
-  if ( game.combat?.started
-    && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) totalCombatMoveDistance = token.lastMoveDistance;
 
   // Progress through each speed attribute in turn.
   const categoryIter = [...SPEED.CATEGORIES, MaximumSpeedCategory].values();
@@ -414,7 +411,23 @@ function _computeTokenSpeed() {
   let speedCategory = categoryIter.next().value;
   let maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
 
+  // Determine which speed category we are starting with
+  // Add in already moved combat distance and determine the starting category
+  if ( game.combat?.started
+    && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) {
+
+    totalCombatMoveDistance = token.lastMoveDistance;
+    minDistance = totalCombatMoveDistance;
+  }
+
+
   while ( (segment = this.segments[s]) ) {
+    // Skip speed categories that do not provide a distance larger than the last.
+    while ( speedCategory.name !== "Maximum" && maxDistance <= minDistance ) {
+      speedCategory = categoryIter.next().value;
+      maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
+    }
+
     segment.speed = speedCategory;
     let newPrevDiagonal = _measureSegment(segment, token, numPrevDiagonal);
 
@@ -436,8 +449,8 @@ function _computeTokenSpeed() {
       }
 
       // Increment to the next speed category.
-      speedCategory = categoryIter.next().value;
-      maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
+      // Next category will be selected in the while loop above: first category to exceed minDistance.
+      minDistance = maxDistance;
     }
 
     // Increment totals.
