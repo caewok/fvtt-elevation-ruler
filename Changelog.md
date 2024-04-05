@@ -1,3 +1,7 @@
+# 0.8.11
+Catch when a segment color is not defined, to avoid throwing an error.
+
+
 # 0.8.10
 ## New features
 Add indicator of past combat movement in the ruler.
