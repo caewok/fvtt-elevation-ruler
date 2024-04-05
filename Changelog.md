@@ -5,8 +5,7 @@ Add a keybinding ("g") to force the ruler to measure from ground terrain. Replac
 
 ## Bug fixes
 Catch when a segment color is not defined, to avoid throwing an error.
-
-
+Fix for incorrect combat speed movement highlighting after the first move. Closes #62.
 
 # 0.8.10
 ## New features
