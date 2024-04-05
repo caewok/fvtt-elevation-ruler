@@ -538,10 +538,12 @@ function segmentGridHalfIntersection(gridCoords, a, b) {
 /**
  * Wrap Ruler.prototype._onDragStart
  * Record whether shift is held.
+ * Reset FORCE_TO_GROUND
  * @param {PIXI.FederatedEvent} event   The drag start event
  * @see {Canvas._onDragLeftStart}
  */
 function _onDragStart(wrapped, event) {
+  Settings.FORCE_TO_GROUND = false;
   this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
   return wrapped(event);
 }
