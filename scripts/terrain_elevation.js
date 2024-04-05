@@ -120,7 +120,7 @@ export function elevationAtLocation(location, token) {
   if ( token && location.almostEqual(token.center) ) return token.elevationE;
 
   // If normal ruler and not prioritizing the token elevation, use elevation of other tokens at this point.
-  if ( !isTokenRuler && !preferTokenElevation() ) {
+  if ( !isTokenRuler ) {
     const maxTokenE = retrieveVisibleTokens()
       .filter(t => t.constrainedTokenBorder.contains(location.x, location.y))
       .reduce((e, t) => Math.max(t.elevationE, e), Number.NEGATIVE_INFINITY);
@@ -137,18 +137,6 @@ export function elevationAtLocation(location, token) {
 
 function retrieveVisibleTokens() {
   return canvas.tokens.children[0].children.filter(c => c.visible);
-}
-
-/**
- * Determine if token elevation should be preferred
- * @returns {boolean}
- */
-function preferTokenElevation() {
-  const PREFER_TOKEN_ELEVATION = Settings.KEYS.CONTROLS.PREFER_TOKEN_ELEVATION;
-  if ( !Settings.get(PREFER_TOKEN_ELEVATION) ) return false;
-  const token_controls = ui.controls.controls.find(elem => elem.name === "token");
-  const prefer_token_control = token_controls.tools.find(elem => elem.name === PREFER_TOKEN_ELEVATION);
-  return prefer_token_control.active;
 }
 
 // ----- NOTE: ELEVATED VISION ELEVATION ----- //

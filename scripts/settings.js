@@ -16,9 +16,7 @@ import { BorderEdge } from "./pathfinding/BorderTriangle.js";
 
 const SETTINGS = {
   CONTROLS: {
-    PATHFINDING: "pathfinding-control",
-    PREFER_TOKEN_ELEVATION: "prefer-token-elevation",
-    PREFER_TOKEN_ELEVATION_CURRENT_VALUE: "prefer-token-elevation-current-value"
+    PATHFINDING: "pathfinding-control"
   },
 
   PATHFINDING: {
@@ -96,25 +94,6 @@ export class Settings extends ModuleSettingsAbstract {
         [KEYS.LEVELS_LABELS.UI_ONLY]: localize(`${KEYS.LEVELS_LABELS.UI_ONLY}`),
         [KEYS.LEVELS_LABELS.ALWAYS]: localize(`${KEYS.LEVELS_LABELS.ALWAYS}`)
       }
-    });
-
-    register(KEYS.CONTROLS.PREFER_TOKEN_ELEVATION, {
-      name: localize(`${KEYS.CONTROLS.PREFER_TOKEN_ELEVATION}.name`),
-      hint: localize(`${KEYS.CONTROLS.PREFER_TOKEN_ELEVATION}.hint`),
-      scope: "user",
-      config: true,
-      default: false,
-      type: Boolean,
-      requiresReload: false,
-      onChange: reloadTokenControls
-    });
-
-    register(KEYS.CONTROLS.PREFER_TOKEN_ELEVATION_CURRENT_VALUE, {
-      scope: "user",
-      config: false,
-      default: false,
-      type: Boolean,
-      requiresReload: false
     });
 
     // ----- NOTE: Pathfinding ----- //
