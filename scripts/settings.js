@@ -288,8 +288,10 @@ export class Settings extends ModuleSettingsAbstract {
         { key: "KeyG" }
       ],
       onDown: _context => {
-        if ( !canvas.controls.ruler.active ) return;
+        const ruler = canvas.controls.ruler;
+        if ( !ruler.active ) return;
         this.FORCE_TO_GROUND = !this.FORCE_TO_GROUND;
+        ruler.measure(ruler.destination, { force: true });
         ui.notifications.info(`Ruler measure to ground ${this.FORCE_TO_GROUND ? "enabled" : "disabled"}.`);
       },
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL

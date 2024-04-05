@@ -544,6 +544,7 @@ function segmentGridHalfIntersection(gridCoords, a, b) {
  */
 function _onDragStart(wrapped, event) {
   Settings.FORCE_TO_GROUND = false;
+  this._userElevationIncrements = 0;
   this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
   return wrapped(event);
 }
