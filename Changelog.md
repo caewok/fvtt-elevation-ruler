@@ -1,3 +1,6 @@
+# 0.8.12
+Fix for speed highlighting not working if the Token HUD has not been used. Closes #65.
+
 # 0.8.11
 
 ## New features
