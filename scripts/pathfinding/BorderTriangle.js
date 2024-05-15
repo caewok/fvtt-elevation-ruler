@@ -97,7 +97,7 @@ export class BorderEdge {
    * @returns {Point}
    */
   _nonSharedVertex(tri = this.ccwTriangle) {
-    return Object.values(tri.vertices).find(v => !this.endpointKeys.has(v.key));
+    return tri?.vertices ? Object.values(tri.vertices).find(v => !this.endpointKeys.has(v.key)) : {};
   }
 
   /**
@@ -171,8 +171,8 @@ export class BorderEdge {
    */
   edgeBlocks(origin, elevation = 0) {
     if ( !origin ) {
-      if ( !this.ccwTriangle.center || !this.cwTriangle.center) {
-        console.warn("edgeBlocks|Triangle centers not defined.");
+      if ( !this.ccwTriangle?.center || !this.cwTriangle?.center) {
+        //console.warn("edgeBlocks|Triangle centers not defined.");
         return false;
       }
       return this.edgeBlocks(this.ccwTriangle.center, elevation)
@@ -235,7 +235,7 @@ export class BorderEdge {
       yield currEdge;
       iter += 1;
       if ( iter > MAX_ITER ) {
-        console.warn("sharedVertexEdges iterations exceeded.");
+        //console.warn("sharedVertexEdges iterations exceeded.");
         break;
       }
     } while ( currEdge !== this );
@@ -577,10 +577,10 @@ export class BorderTriangle {
 
         // Debug: should always have 2 elements: this borderTriangle and the other.
         if ( ixSet.size > 2 ) {
-          console.warn("aSet and bSet intersection is larger than expected.", { pointMap, edge });
+         // console.warn("aSet and bSet intersection is larger than expected.", { pointMap, edge });
         }
         if ( ixSet.size && !ixSet.has(borderTriangle) ) {
-          console.warn("ixSet does not have this borderTriangle", { pointMap, edge, borderTriangle });
+        //  console.warn("ixSet does not have this borderTriangle", { pointMap, edge, borderTriangle });
         }
 
         if ( ixSet.size !== 2 ) continue; // No bordering triangle.
