@@ -162,11 +162,13 @@ SPEED.maximumCategoryDistance = function(token, speedCategory, tokenSpeed) {
 /**
  * Given a token, retrieve its base speed.
  * @param {Token} token                   Token whose speed is required
- * @returns {number} Distance, in grid units
+ * @returns {number|null} Distance, in grid units. Null if no speed provided for that category.
+ *   (Null will disable speed highlighting.)
  */
 SPEED.tokenSpeed = function(token) {
-  const speedAttribute = SPEED.ATTRIBUTES[token.movementType] ?? SPEED.ATTRIBUTES.WALK;
-  return Number(foundry.utils.getProperty(token, speedAttribute));
+  const speed = foundry.utils.getProperty(token, SPEED.ATTRIBUTES[token.movementType]);
+  if ( speed === null ) return null;
+  return Number(speed);
 };
 
 // Avoid testing for the system id each time.
