@@ -68,6 +68,13 @@ async function _onDragLeftDrop(wrapped, event) {
     ruler._onMouseUp(event);
     return false;
   }
+
+  // If control was held, we want to create a new waypoint.
+//   if ( event.ctrlKey || event.metaKey ) {
+//     return ruler._onMouseUp(event);
+//     return false;
+//   }
+
   // ruler._state = Ruler.STATES.MOVING; // Do NOT set state to MOVING here in v12, as it will break the canvas.
   await ruler.moveToken();
   ruler._onMouseUp(event);
