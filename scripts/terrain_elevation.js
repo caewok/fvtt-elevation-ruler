@@ -111,7 +111,7 @@ export function terrainElevationAtLocation(location, { startingElevation, moveme
  */
 export function elevationAtLocation(location, token) {
   location = PIXI.Point.fromObject(location);
-  token ??= this._getMovementToken();
+  token ??= this.token;
   const isTokenRuler = Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED)
     && ui.controls.activeControl === "token"
     && ui.controls.activeTool === "select"

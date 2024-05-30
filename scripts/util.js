@@ -168,8 +168,12 @@ export function * iterateGridUnderLine(origin, destination, { reverse = false } 
     const {x, y} = origin.projectToward(destination, t);
 
     // Get grid position
+    // TODO: Clean up so it uses GridOffset / GridCoordinates
     const [r0, c0] = prior ?? [null, null];
-    const [r1, c1] = canvas.grid.grid.getGridPositionFromPixels(x, y);
+    const offset = canvas.grid.getOffset({x, y});
+    const r1 = offset.i;
+    const c1 = offset.j;
+    // const [r1, c1] = canvas.grid.grid.getGridPositionFromPixels(x, y);
     if ( r0 === r1 && c0 === c1 ) continue;
 
     // Skip the first one
@@ -177,7 +181,10 @@ export function * iterateGridUnderLine(origin, destination, { reverse = false } 
     if ( prior && !canvas.grid.isNeighbor(r0, c0, r1, c1) ) {
       const th = (t + tPrior) * 0.5;
       const {x: xh, y: yh} = origin.projectToward(destination, th);
-      yield canvas.grid.grid.getGridPositionFromPixels(xh, yh); // [rh, ch]
+      const hOffset = canvas.grid.getOffset({ x: xh, y: yh });
+      yield [hOffset.i, hOffset.j];
+
+      // yield canvas.grid.grid.getGridPositionFromPixels(xh, yh); // [rh, ch]
     }
 
     // After so the halfway point is done first.

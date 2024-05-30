@@ -3,7 +3,7 @@ canvas,
 CONFIG,
 CONST,
 game,
-isNewerVersion,
+foundry,
 PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -18,61 +18,48 @@ import { GRID_DIAGONALS } from "./const.js";
 // ----- NOTE: Conversion functions to handle v11 and v12 ----- //
 
 /**
+ * A pair of row and column coordinates of a grid space.
+ * @typedef {object} GridOffset
+ * @property {number} i    The row coordinate
+ * @property {number} j    The column coordinate
+ */
+
+/**
+ * An offset of a grid space or a point with pixel coordinates.
+ * @typedef {GridOffset|Point} GridCoordinates
+ */
+
+/**
  * Get the grid (i,j) coordinates for a given point.
  * @param {GridCoordinates} coords    Grid (i,j) offset or x,y coordinates
- * @returns {i, j}
+ * @returns {GridOffset}
  */
 function getGridPosition(coords) {
   if ( Object.hasOwn(coords, "i") ) return coords;
-  return arrayToCoordsIJ(canvas.grid.grid.getGridPositionFromPixels(coords.x, coords.y));
+  return canvas.grid.getOffset(coords);
 }
-
-function arrayToCoordsXY(arr) { return { x: arr[0], y: arr[1] }; }
-
-function arrayToCoordsIJ(arr) { return { i: arr[0], j: arr[1] }; }
 
 /**
  * Get the top left point on the grid for a given set of coordinates.
  * @param {GridCoordinates} coords    Grid (i,j) offset or x,y coordinates
  * @returns {Point}
  */
-export function getTopLeftPoint(coords) {
-  if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getTopLeftPoint(coords);
-
-  const arr = Object.hasOwn(coords, "i")
-    ? canvas.grid.grid.getPixelsFromGridPosition(coords.i, coords.j)
-    : canvas.grid.grid.getTopLeft(coords.x, coords.y);
-  return arrayToCoordsXY(arr);
-}
+export function getTopLeftPoint(coords) { return canvas.grid.getTopLeftPoint(coords); }
 
 /**
  * Get the center point on the grid for a given set of coordinates.
  * @param {GridCoordinates} coords    Grid (i,j) offset or x,y coordinates
  * @returns {Point}
  */
-export function getCenterPoint(coords) {
-  if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getCenterPoint(coords);
-
-  if ( Object.hasOwn(coords, "i") ) coords = getTopLeftPoint(coords);
-  const arr = canvas.grid.grid.getCenter(coords.x, coords.y);
-  return arrayToCoordsXY(arr);
-}
+export function getCenterPoint(coords) { return canvas.grid.getCenterPoint(coords); }
 
 /**
  * Get the grid coordinates between two points. Uses Bresenham's algorithm.
  * @param {GridCoordinates} startCoords    Grid (i,j) offset or x,y coordinates
  * @param {GridCoordinates} endCoords    Grid (i,j) offset or x,y coordinates
- * @returns {GridCoordinates[]} An array of [i,j] coordinates
+ * @returns {GridOffset[]} An array of [i,j] coordinates
  */
-export function getDirectPath(startCoords, endCoords) {
-  if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getDirectPath([startCoords, endCoords]);
-
-  // Closest parallel to v12 getDirectPath is probably iterateGridUnderLine.
-  startCoords = Object.hasOwn(startCoords, "i") ? getCenterPoint(startCoords) : startCoords;
-  endCoords = Object.hasOwn(endCoords, "i") ? getCenterPoint(endCoords) : endCoords;
-  const offsets = [...iterateGridUnderLine(startCoords, endCoords)];
-  return offsets.map(o => arrayToCoordsIJ(o));
-}
+export function getDirectPath(startCoords, endCoords) { return canvas.grid.getDirectPath([startCoords, endCoords]); }
 
 // ----- NOTE: Grid diagonals ----- //
 
@@ -80,17 +67,7 @@ export function getDirectPath(startCoords, endCoords) {
  * Retrieve the current diagonal rule.
  * @returns {GRID_DIAGONALS}
  */
-export function diagonalRule() {
-  if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.diagonals;
-
-  switch ( canvas.grid.diagonalRule ) {
-    case "555": return GRID_DIAGONALS.EQUIDISTANT;
-    case "5105": return GRID_DIAGONALS.ALTERNATING_1;
-    case "EUCL": return GRID_DIAGONALS.EXACT;
-    case "MANHATTAN": return GRID_DIAGONALS.RECTILINEAR;
-    default: return GRID_DIAGONALS.APPROXIMATE;
-  }
-}
+export function diagonalRule() { return canvas.grid.diagonals; }
 
 
 // ----- NOTE: Grid shape ----- //
@@ -127,13 +104,7 @@ export function squareGridShape(coords) {
  * @returns {PIXI.Polygon}
  */
 export function hexGridShape(coords) {
-  if ( isNewerVersion(game.version, 12) ) return new PIXI.Polygon(...canvas.grid.grid.getVertices(coords));
-  const { x, y } = getTopLeftPoint(coords);
-  const points = canvas.grid.grid.getBorderPolygon(1, 1, 0); // Width = 1, height = 1
-  const pointsTranslated = [];
-  const ln = points.length;
-  for ( let i = 0; i < ln; i += 2) pointsTranslated.push(points[i] + x, points[i+1] + y);
-  return new PIXI.Polygon(pointsTranslated);
+  return new PIXI.Polygon(...canvas.grid.getVertices(coords));
 }
 
 // ----- NOTE: GridCoordinates3d ----- //

@@ -12,7 +12,6 @@ import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS, defaultHPAttribute } from "./const.js";
 import { registerGeometry } from "./geometry/registration.js";
-import { registerElevationConfig } from "./geometry/elevation_configs.js";
 
 // Grid coordinates
 import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d, gridShape } from "./grid_coordinates.js";
@@ -158,7 +157,6 @@ Hooks.once("setup", function() {
   Settings.registerKeybindings(); // Should go before registering settings, so hotkey group is defined
   Settings.registerAll();
   initializePatching();
-  registerElevationConfig("DrawingConfig", "Elevation Ruler");
 });
 
 // For https://github.com/League-of-Foundry-Developers/foundryvtt-devMode

@@ -295,7 +295,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
     // If vertical projection, increment elevation only.
     // If diagonal or horizontal, increment both elevation and grid step.
     // Flip horizontal/vertical for hex rows.
-    const diagAllowed = canvas.grid.grid.diagonals !== GRID_DIAGONALS.ILLEGAL;
+    const diagAllowed = canvas.grid.diagonals !== GRID_DIAGONALS.ILLEGAL;
     const [elevOnlyMove, canvasOnlyMove] = isHexRow() ? ["H", "V"] : ["V", "H"];
     let prevProjPt = projPtsIter.next().value;
     let prevPt = pts2dIter.next().value;

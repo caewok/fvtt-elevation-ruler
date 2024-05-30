@@ -68,7 +68,14 @@ async function _onDragLeftDrop(wrapped, event) {
     ruler._onMouseUp(event);
     return false;
   }
-  ruler._state = Ruler.STATES.MOVING; // Do this before the await.
+
+  // If control was held, we want to create a new waypoint.
+//   if ( event.ctrlKey || event.metaKey ) {
+//     return ruler._onMouseUp(event);
+//     return false;
+//   }
+
+  // ruler._state = Ruler.STATES.MOVING; // Do NOT set state to MOVING here in v12, as it will break the canvas.
   await ruler.moveToken();
   ruler._onMouseUp(event);
 }
@@ -102,7 +109,7 @@ function updateToken(document, changes, _options, _userId) {
     || !(Object.hasOwn(changes, "x")|| Object.hasOwn(changes, "y") || Object.hasOwn(changes, "elevation")) ) return;
 
   const ruler = canvas.controls.ruler;
-  if ( ruler.active && ruler._getMovementToken() === token ) token._lastMoveDistance = ruler.totalMoveDistance;
+  if ( ruler.active && ruler.token === token ) token._lastMoveDistance = ruler.totalMoveDistance;
   else token._lastMoveDistance = Ruler.measureMoveDistance(token.position, token.document, { token }).moveDistance;
   if ( game.combat?.started ) {
     // Store the combat move distance and the last round for which the combat move occurred.
