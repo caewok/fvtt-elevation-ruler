@@ -189,7 +189,7 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
 
   let combatLabel = "";
   if ( game.combat?.started && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) {
-    const pastMoveDistance = this._movementToken?.lastMoveDistance;
+    const pastMoveDistance = this.token?.lastMoveDistance;
     if ( pastMoveDistance ) combatLabel = `\nPrior: ${pastMoveDistance}${units}`;
   }
 

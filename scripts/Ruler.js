@@ -83,16 +83,6 @@ UX goals:
 // ----- NOTE: Wrappers ----- //
 
 /**
- * Wrap Ruler.prototype.clear
- * Reset properties used to track when the user increments/decrements elevation
- */
-function clear(wrapper) {
-  // User increments/decrements to the elevation for the current destination
-  this._movementToken = undefined;
-  return wrapper();
-}
-
-/**
  * Wrap Ruler.prototype._getMeasurementData
  * Store the current userElevationIncrements for the destination.
  * Store segment information, possibly including pathfinding.
@@ -604,24 +594,7 @@ function _onMouseUp(wrapped, event) {
   return wrapped(event);
 }
 
-/**
- * Add cached movement token.
- * Mixed to avoid error if waypoints have no length.
- */
-function _getMovementToken(wrapped) {
-  if ( !this.waypoints.length ) {
-    log("Waypoints length 0");
-    return undefined;
-  }
-
-  if ( typeof this._movementToken !== "undefined" ) return this._movementToken;
-  this._movementToken = wrapped();
-  if ( !this._movementToken ) this._movementToken = null; // So we can skip next time.
-  return this._movementToken;
-}
-
 PATCHES.BASIC.WRAPS = {
-  clear,
   _getMeasurementData,
   update,
   _addWaypoint,
@@ -639,7 +612,7 @@ PATCHES.BASIC.WRAPS = {
   _canMove
 };
 
-PATCHES.BASIC.MIXES = { _animateMovement, _getMovementToken, _getMeasurementSegments, _onMouseUp };
+PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments, _onMouseUp };
 
 PATCHES.BASIC.OVERRIDES = { _computeDistance, _animateSegment };
 
