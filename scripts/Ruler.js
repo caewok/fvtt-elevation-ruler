@@ -83,25 +83,12 @@ UX goals:
 // ----- NOTE: Wrappers ----- //
 
 /**
- * Wrap Ruler.prototype.clear
- * Reset properties used to track when the user increments/decrements elevation
- */
-function clear(wrapper) {
-  // User increments/decrements to the elevation for the current destination
-  this._movementToken = undefined;
-  return wrapper();
-}
-
-/**
- * Wrap Ruler.prototype.toJSON
+ * Wrap Ruler.prototype._getMeasurementData
  * Store the current userElevationIncrements for the destination.
  * Store segment information, possibly including pathfinding.
  */
-function toJSON(wrapper) {
-  // If debugging, log will not display on user's console
-  // console.log("constructing ruler json!")
+function _getMeasurementData(wrapper) {
   const obj = wrapper();
-
   const myObj = obj[MODULE_ID] = {};
 
   // Segment information
@@ -172,7 +159,7 @@ function _addWaypoint(wrapper, point) {
     const oldWaypoint = foundry.utils.duplicate(this.waypoints[0]);
     this.waypoints[0].x = point.x;
     this.waypoints[0].y = point.y;
-    const token = this._getMovementToken();
+    const token = this.token;
     if ( token && !tokenIsSnapped(token) ) this._unsnappedOrigin = true;
     else {
       this.waypoints[0].x = oldWaypoint.x;
@@ -240,12 +227,12 @@ async function _animateMovement(wrapped, token) {
  * @param {Token} token
  */
 function _recalculateOffset(token) {
-  if ( !canvas.grid.isHex ) return;
-  const w2 = canvas.grid.grid.w * 0.5;
-  const h2 = canvas.grid.grid.h * 0.5;
+  if ( !canvas.grid.isHexagonal ) return;
+  const w2 = canvas.grid.sizeX * 0.5;
+  const h2 = canvas.grid.sizeY * 0.5;
   const origin = this.segments[0].ray.A;
   const tl = PIXI.Point.fromObject(token.document);
-  const tlOrigin = new PIXI.Point(...canvas.grid.grid.getTopLeft(origin.x, origin.y));
+  const tlOrigin = PIXI.Point.fromObject(canvas.grid.getTopLeftPoint(origin));
 
   // Determine difference between top left token and top left of the origin grid space.
   // Add in the w2 and h2: distance from top left origin to center origin.
@@ -326,7 +313,7 @@ function _computeDistance() {
  * with or without the segment breaks.
  */
 function _computeSegmentDistances() {
-  const token = this._getMovementToken();
+  const token = this.token;
 
   // Loop over each segment in turn, adding the physical distance and the move distance.
   let totalDistance = 0;
@@ -382,7 +369,7 @@ function _measureSegment(segment, token, numPrevDiagonal = 0) {
  */
 function _computeTokenSpeed() {
   // Requires a movement token and a defined token speed.
-  const token = this._getMovementToken();
+  const token = this.token;
   if ( !token ) return;
 
   // Precalculate the token speed.
@@ -602,30 +589,13 @@ function _onMouseMove(wrapped, event) {
  * @see {Canvas._onDragLeftDrop}
  */
 function _onMouseUp(wrapped, event) {
-  if ( this._state === Ruler.STATES.MOVING ) return;
+  //if ( this._state === Ruler.STATES.MOVING ) return;
   this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
   return wrapped(event);
 }
 
-/**
- * Add cached movement token.
- * Mixed to avoid error if waypoints have no length.
- */
-function _getMovementToken(wrapped) {
-  if ( !this.waypoints.length ) {
-    log("Waypoints length 0");
-    return undefined;
-  }
-
-  if ( typeof this._movementToken !== "undefined" ) return this._movementToken;
-  this._movementToken = wrapped();
-  if ( !this._movementToken ) this._movementToken = null; // So we can skip next time.
-  return this._movementToken;
-}
-
 PATCHES.BASIC.WRAPS = {
-  clear,
-  toJSON,
+  _getMeasurementData,
   update,
   _addWaypoint,
   _removeWaypoint,
@@ -642,7 +612,7 @@ PATCHES.BASIC.WRAPS = {
   _canMove
 };
 
-PATCHES.BASIC.MIXES = { _animateMovement, _getMovementToken, _getMeasurementSegments, _onMouseUp };
+PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments, _onMouseUp };
 
 PATCHES.BASIC.OVERRIDES = { _computeDistance, _animateSegment };
 
@@ -722,7 +692,7 @@ function addWaypointElevationIncrements(ruler, _point) {
   newWaypoint._userElevationIncrements = 0;
 
   if ( ln === 1 ) {
-    const moveToken = ruler._getMovementToken();
+    const moveToken = ruler.token;
     newWaypoint._terrainElevation = moveToken ? moveToken.elevationE : Ruler.terrainElevationAtLocation(newWaypoint);
 
   } else {

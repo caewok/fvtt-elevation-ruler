@@ -37,7 +37,7 @@ export function _getMeasurementSegments(wrapped) {
 
   // Elevate the segments
   const segments = elevateSegments(this, wrapped()) ?? [];
-  const token = this._getMovementToken();
+  const token = this.token;
 
   // If no movement token, then no pathfinding.
   if ( !token ) return segments;
@@ -144,7 +144,7 @@ function constructPathfindingSegments(segments, segmentMap) {
       const currPt = pathPoints[i];
       currPt.z = A.z;
       const newSegment = { ray: new Ray3d(prevPt, currPt) };
-      newSegment.ray.pathfinding = true; // Used by  canvas.grid.grid._getRulerDestination.
+      newSegment.ray.pathfinding = true; // TODO: Was used by  canvas.grid.grid._getRulerDestination.
       newSegments.push(newSegment);
       prevPt = currPt;
     }
@@ -189,7 +189,7 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
 
   let combatLabel = "";
   if ( game.combat?.started && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) {
-    const pastMoveDistance = this._movementToken?.lastMoveDistance;
+    const pastMoveDistance = this.token?.lastMoveDistance;
     if ( pastMoveDistance ) combatLabel = `\nPrior: ${pastMoveDistance}${units}`;
   }
 
@@ -286,7 +286,7 @@ export function _highlightMeasurementSegment(wrapped, segment) {
 
   // Adjust the color if this user has selected speed highlighting.
   const priorColor = this.color;
-  const token = this._getMovementToken();
+  const token = this.token;
   const doSpeedHighlighting = token
     // && this.user === game.user
     && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING)
