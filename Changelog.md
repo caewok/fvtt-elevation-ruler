@@ -1,3 +1,10 @@
+# 0.9.1
+Fix errors when using the ruler on gridless scenes.
+Correct speed highlighting on gridless scenes.
+
+## New features
+Add a configuration option (`CONFIG.elevationruler.gridlessHighlightWidthMultiplier`) to adjust the width of the gridless highlight.
+
 # 0.9.0
 Initial support for Foundry v12.
 
