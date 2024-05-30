@@ -144,7 +144,7 @@ function constructPathfindingSegments(segments, segmentMap) {
       const currPt = pathPoints[i];
       currPt.z = A.z;
       const newSegment = { ray: new Ray3d(prevPt, currPt) };
-      newSegment.ray.pathfinding = true; // Used by  canvas.grid.grid._getRulerDestination.
+      newSegment.ray.pathfinding = true; // TODO: Was used by  canvas.grid.grid._getRulerDestination.
       newSegments.push(newSegment);
       prevPt = currPt;
     }

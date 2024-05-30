@@ -227,12 +227,12 @@ async function _animateMovement(wrapped, token) {
  * @param {Token} token
  */
 function _recalculateOffset(token) {
-  if ( !canvas.grid.isHex ) return;
-  const w2 = canvas.grid.grid.w * 0.5;
-  const h2 = canvas.grid.grid.h * 0.5;
+  if ( !canvas.grid.isHexagonal ) return;
+  const w2 = canvas.grid.sizeX * 0.5;
+  const h2 = canvas.grid.sizeY * 0.5;
   const origin = this.segments[0].ray.A;
   const tl = PIXI.Point.fromObject(token.document);
-  const tlOrigin = new PIXI.Point(...canvas.grid.grid.getTopLeft(origin.x, origin.y));
+  const tlOrigin = PIXI.Point.fromObject(canvas.grid.getTopLeftPoint(origin));
 
   // Determine difference between top left token and top left of the origin grid space.
   // Add in the w2 and h2: distance from top left origin to center origin.

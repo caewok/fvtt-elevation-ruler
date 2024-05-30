@@ -18,40 +18,48 @@ import { GRID_DIAGONALS } from "./const.js";
 // ----- NOTE: Conversion functions to handle v11 and v12 ----- //
 
 /**
+ * A pair of row and column coordinates of a grid space.
+ * @typedef {object} GridOffset
+ * @property {number} i    The row coordinate
+ * @property {number} j    The column coordinate
+ */
+
+/**
+ * An offset of a grid space or a point with pixel coordinates.
+ * @typedef {GridOffset|Point} GridCoordinates
+ */
+
+/**
  * Get the grid (i,j) coordinates for a given point.
  * @param {GridCoordinates} coords    Grid (i,j) offset or x,y coordinates
- * @returns {i, j}
+ * @returns {GridOffset}
  */
 function getGridPosition(coords) {
   if ( Object.hasOwn(coords, "i") ) return coords;
-  return arrayToCoordsIJ(canvas.grid.grid.getGridPositionFromPixels(coords.x, coords.y));
+  return canvas.grid.getOffset(coords);
 }
-
-function arrayToCoordsXY(arr) { return { x: arr[0], y: arr[1] }; }
-
-function arrayToCoordsIJ(arr) { return { i: arr[0], j: arr[1] }; }
 
 /**
  * Get the top left point on the grid for a given set of coordinates.
  * @param {GridCoordinates} coords    Grid (i,j) offset or x,y coordinates
  * @returns {Point}
  */
-export function getTopLeftPoint(coords) { return canvas.grid.grid.getTopLeftPoint(coords); }
+export function getTopLeftPoint(coords) { return canvas.grid.getTopLeftPoint(coords); }
 
 /**
  * Get the center point on the grid for a given set of coordinates.
  * @param {GridCoordinates} coords    Grid (i,j) offset or x,y coordinates
  * @returns {Point}
  */
-export function getCenterPoint(coords) { return canvas.grid.grid.getCenterPoint(coords); }
+export function getCenterPoint(coords) { return canvas.grid.getCenterPoint(coords); }
 
 /**
  * Get the grid coordinates between two points. Uses Bresenham's algorithm.
  * @param {GridCoordinates} startCoords    Grid (i,j) offset or x,y coordinates
  * @param {GridCoordinates} endCoords    Grid (i,j) offset or x,y coordinates
- * @returns {GridCoordinates[]} An array of [i,j] coordinates
+ * @returns {GridOffset[]} An array of [i,j] coordinates
  */
-export function getDirectPath(startCoords, endCoords) { return canvas.grid.grid.getDirectPath([startCoords, endCoords]); }
+export function getDirectPath(startCoords, endCoords) { return canvas.grid.getDirectPath([startCoords, endCoords]); }
 
 // ----- NOTE: Grid diagonals ----- //
 
@@ -59,7 +67,7 @@ export function getDirectPath(startCoords, endCoords) { return canvas.grid.grid.
  * Retrieve the current diagonal rule.
  * @returns {GRID_DIAGONALS}
  */
-export function diagonalRule() { return canvas.grid.grid.diagonals; }
+export function diagonalRule() { return canvas.grid.diagonals; }
 
 
 // ----- NOTE: Grid shape ----- //
@@ -96,7 +104,7 @@ export function squareGridShape(coords) {
  * @returns {PIXI.Polygon}
  */
 export function hexGridShape(coords) {
-  return new PIXI.Polygon(...canvas.grid.grid.getVertices(coords));
+  return new PIXI.Polygon(...canvas.grid.getVertices(coords));
 }
 
 // ----- NOTE: GridCoordinates3d ----- //
