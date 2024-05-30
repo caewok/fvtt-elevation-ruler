@@ -153,7 +153,11 @@ function _addWaypoint(wrapper, point) {
   wrapper(point);
 
   // If shift was held, use the precise point.
-  if ( this._unsnap ) this.waypoints.at(-1).copyFrom(point);
+  if ( this._unsnap ) {
+    const lastWaypoint = this.waypoints.at(-1);
+    lastWaypoint.x = point.x;
+    lastWaypoint.y = point.y;
+  }
   else if ( this.waypoints.length === 1 ) {
     // Move the waypoint to find unsnapped token.
     const oldWaypoint = foundry.utils.duplicate(this.waypoints[0]);
@@ -191,7 +195,10 @@ function _removeWaypoint(wrapper, point, { snap = true } = {}) {
  */
 function _getMeasurementDestination(wrapped, destination) {
   const pt = wrapped(destination);
-  if ( this._unsnap ) pt.copyFrom(destination);
+  if ( this._unsnap ) {
+    pt.x = destination.x;
+    pt.y = destination.y;
+  }
   return pt;
 }
 
