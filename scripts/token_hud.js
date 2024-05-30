@@ -55,7 +55,7 @@ PATCHES.MOVEMENT_SELECTION.HOOKS = { renderTokenHUD };
  * @type {MOVEMENT_TYPE}
  */
 function movementType() {
-  let selectedMovement = this.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_SELECTION);
+  let selectedMovement = this.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_SELECTION) ?? MOVEMENT_TYPES.AUTO;
   if ( selectedMovement === MOVEMENT_TYPES.AUTO ) return determineMovementType(this);
   return keyForValue(MOVEMENT_TYPES, selectedMovement);
 }
