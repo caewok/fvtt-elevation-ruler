@@ -21,8 +21,8 @@
     "elevationruler.settings.levels-labels-ui": "Only when Levels UI is active",
     "elevationruler.settings.levels-labels-always": "Always",
 
-    "elevationruler.settings.prefer-token-elevation.name": "Add token elevation control",
-    "elevationruler.settings.prefer-token-elevation.hint": "Add a control to the token toolbar to prefer the token elevation when measuring. When toggled on, the control will keep the ruler at the elevation of the measuring token unless another token is encountered or the grid space is at a higher elevation than the token. Otherwise, the ruler will assume the elevation of the grid space or the token encountered.",
+    "elevationruler.settings.prefer-token-elevation.name": "Add Token Elevation Control",
+    "elevationruler.settings.prefer-token-elevation.hint": "Add a control to the token toolbar. When toggled on, the control will keep the ruler at the elevation of the measuring token. Otherwise, the ruler destination will assume the elevation of the grid space or the token encountered at the destination point of the ruler.",
 
     "elevationruler.settings.enable-token-ruler.name": "Use Token Ruler",
     "elevationruler.settings.enable-token-ruler.hint": "Display the ruler when dragging tokens.",
@@ -48,7 +48,7 @@
     "elevationruler.settings.round-to-multiple.name": "Round Distance to Multiple",
     "elevationruler.settings.round-to-multiple.hint": "For gridless distance measurement, round the distance displayed to the nearest multiple of the number entered. Set to 0 to disable rounding.",
 
-    "elevationruler.settings.token-terrain-multiplier.name": "Token As Terrain Multiplier",
+    "elevationruler.settings.token-terrain-multiplier.name": "Token as Terrain Multiplier",
     "elevationruler.settings.token-terrain-multiplier.hint": "Multiplier to use to calculate movement speed when moving through other tokens. Set to 1 to ignore. Values less than 1 treat token spaces as faster than normal; values greater than 1 penalize movement through token spaces.",
 
     "elevationruler.settings.pathfinding_tokens_block.name": "Tokens Block",
