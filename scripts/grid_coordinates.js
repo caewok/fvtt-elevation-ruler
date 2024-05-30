@@ -3,7 +3,7 @@ canvas,
 CONFIG,
 CONST,
 game,
-isNewerVersion,
+foundry,
 PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -37,7 +37,7 @@ function arrayToCoordsIJ(arr) { return { i: arr[0], j: arr[1] }; }
  * @returns {Point}
  */
 export function getTopLeftPoint(coords) {
-  if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getTopLeftPoint(coords);
+  if ( foundry.utils.isNewerVersion(game.version, 12) ) return canvas.grid.grid.getTopLeftPoint(coords);
 
   const arr = Object.hasOwn(coords, "i")
     ? canvas.grid.grid.getPixelsFromGridPosition(coords.i, coords.j)
@@ -51,7 +51,7 @@ export function getTopLeftPoint(coords) {
  * @returns {Point}
  */
 export function getCenterPoint(coords) {
-  if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getCenterPoint(coords);
+  if ( foundry.utils.isNewerVersion(game.version, 12) ) return canvas.grid.grid.getCenterPoint(coords);
 
   if ( Object.hasOwn(coords, "i") ) coords = getTopLeftPoint(coords);
   const arr = canvas.grid.grid.getCenter(coords.x, coords.y);
@@ -65,7 +65,7 @@ export function getCenterPoint(coords) {
  * @returns {GridCoordinates[]} An array of [i,j] coordinates
  */
 export function getDirectPath(startCoords, endCoords) {
-  if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.getDirectPath([startCoords, endCoords]);
+  if ( foundry.utils.isNewerVersion(game.version, 12) ) return canvas.grid.grid.getDirectPath([startCoords, endCoords]);
 
   // Closest parallel to v12 getDirectPath is probably iterateGridUnderLine.
   startCoords = Object.hasOwn(startCoords, "i") ? getCenterPoint(startCoords) : startCoords;
@@ -81,7 +81,7 @@ export function getDirectPath(startCoords, endCoords) {
  * @returns {GRID_DIAGONALS}
  */
 export function diagonalRule() {
-  if ( isNewerVersion(game.version, 12) ) return canvas.grid.grid.diagonals;
+  if ( foundry.utils.isNewerVersion(game.version, 12) ) return canvas.grid.grid.diagonals;
 
   switch ( canvas.grid.diagonalRule ) {
     case "555": return GRID_DIAGONALS.EQUIDISTANT;
@@ -127,7 +127,7 @@ export function squareGridShape(coords) {
  * @returns {PIXI.Polygon}
  */
 export function hexGridShape(coords) {
-  if ( isNewerVersion(game.version, 12) ) return new PIXI.Polygon(...canvas.grid.grid.getVertices(coords));
+  if ( foundry.utils.isNewerVersion(game.version, 12) ) return new PIXI.Polygon(...canvas.grid.grid.getVertices(coords));
   const { x, y } = getTopLeftPoint(coords);
   const points = canvas.grid.grid.getBorderPolygon(1, 1, 0); // Width = 1, height = 1
   const pointsTranslated = [];
