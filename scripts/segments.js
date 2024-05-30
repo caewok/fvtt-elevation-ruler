@@ -312,7 +312,7 @@ export function _highlightMeasurementSegment(wrapped, segment) {
       ptsB[0],
       ptsB[1]
     ]);
-    canvas.grid.highlightPosition(this.name, {color: this.color, shape});
+    canvas.interface.grid.highlightPosition(this.name, { x: A.x, y: A.y, color: this.color, shape});
   }
 
   // Reset to the default color.

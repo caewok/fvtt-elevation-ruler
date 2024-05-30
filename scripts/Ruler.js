@@ -395,6 +395,12 @@ function _computeTokenSpeed() {
   let s = 0;
   let segment;
 
+  // Debugging
+//   if ( this.segments[0].moveDistance > 25 ) log(`${this.segments[0].moveDistance}`);
+//   if ( this.segments[0].moveDistance > 30 ) log(`${this.segments[0].moveDistance}`);
+//   if ( this.segments[0].moveDistance > 50 ) log(`${this.segments[0].moveDistance}`);
+//   if ( this.segments[0].moveDistance > 60 ) log(`${this.segments[0].moveDistance}`);
+
   // Progress through each speed attribute in turn.
   const categoryIter = [...SPEED.CATEGORIES, MaximumSpeedCategory].values();
   const maxDistFn = (token, speedCategory, tokenSpeed) => {
