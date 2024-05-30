@@ -589,7 +589,7 @@ function _onMouseMove(wrapped, event) {
  * @see {Canvas._onDragLeftDrop}
  */
 function _onMouseUp(wrapped, event) {
-  if ( this._state === Ruler.STATES.MOVING ) return;
+  //if ( this._state === Ruler.STATES.MOVING ) return;
   this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
   return wrapped(event);
 }
