@@ -97,7 +97,7 @@ function clear(wrapper) {
  * Store the current userElevationIncrements for the destination.
  * Store segment information, possibly including pathfinding.
  */
-function toJSON(wrapper) {
+function _getMeasurementData(wrapper) {
   const obj = wrapper();
   const myObj = obj[MODULE_ID] = {};
 
@@ -622,7 +622,7 @@ function _getMovementToken(wrapped) {
 
 PATCHES.BASIC.WRAPS = {
   clear,
-  toJSON,
+  _getMeasurementData,
   update,
   _addWaypoint,
   _removeWaypoint,
