@@ -6,6 +6,8 @@
 ![Latest Release Download Count](https://img.shields.io/github/downloads/caewok/fvtt-elevation-ruler/latest/module.zip)
 ![All Downloads](https://img.shields.io/github/downloads/caewok/fvtt-elevation-ruler/total)
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/H2H3Y7IJW)
+
 # Elevation Ruler
 
 This module allows the default Foundry measurement ruler to track change in elevation. Elevation can be changed while using the ruler :
