@@ -303,7 +303,7 @@ export function _highlightMeasurementSegment(wrapped, segment) {
   // If gridless, highlight a rectangular shaped portion of the line.
   if ( canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) {
     const { A, B } = segment.ray;
-    const width = Math.floor(canvas.scene.dimensions.size * 0.2);
+    const width = Math.floor(canvas.scene.dimensions.size * (CONFIG[MODULE_ID].gridlessHighlightWidthMultiplier ?? 0.2));
     const ptsA = perpendicularPoints(A, B, width * 0.5);
     const ptsB = perpendicularPoints(B, A, width * 0.5);
     const shape = new PIXI.Polygon([
