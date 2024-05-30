@@ -23,6 +23,8 @@ If you choose to move the origin token (by hitting spacebar) after measuring, th
 As of v0.7, Elevation Ruler adds a setting to display the Foundry ruler when dragging tokens.
 As of v0.8, Elevation Ruler adds a toggle to enable pathfinding when using the ruler or dragging tokens with the Token Ruler enabled.
 
+Version v0.9 requires Foundry v12.
+
 # Installation
 Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json) in Foundry to install.
 
@@ -42,6 +44,9 @@ Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/
 - [Terrain Ruler](https://github.com/manuelVo/foundryvtt-terrain-ruler)
 - [Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer)
 - [Drag Ruler](https://github.com/manuelVo/foundryvtt-drag-ruler). Elevation ruler v0.6 series worked with Drag Ruler, but v0.7+ no longer supports Drag Ruler.
+
+## Known issues (Foundry v12, Elevation Ruler v0.9.0)
+- Pathfinding does not work. Error thrown at canvas start re `canvas.walls.outerBounds is not iterable` is related to pathfinding but can be ignored for now.
 
 In general, modules that overwrite or extend the Ruler Class may cause the elevation ruler module to fail to display or calculate correctly.
 
@@ -92,7 +97,7 @@ As with the normal Foundry ruler, if you begin a measurement at your token, you 
 
 # Token controls
 
-Elevation Ruler adds two token controls. The "Use Pathfinding" control toggles pathfinding on/off. The "Prefer Token Elevation" control, when enabled, will not adjust the destination elevation when hovering over other tokens. Typically, without this enabled, the ruler will change the destination elevation to match the elevation of a token at the destination point. 
+Elevation Ruler adds two token controls. The "Use Pathfinding" control toggles pathfinding on/off. The "Prefer Token Elevation" control, when enabled, will not adjust the destination elevation when hovering over other tokens. Typically, without this enabled, the ruler will change the destination elevation to match the elevation of a token at the destination point.
 
 # Key bindings
 
@@ -122,7 +127,7 @@ Elevation Ruler defines certain keybindings:
 
 # API
 
-You can access defined properties used by Elevation Ruler at `CONFIG.elevationruler`. You can access some of this module's classes and advanced data at `game.modules.get("elevationruler").api`. 
+You can access defined properties used by Elevation Ruler at `CONFIG.elevationruler`. You can access some of this module's classes and advanced data at `game.modules.get("elevationruler").api`.
 
 Elevation Ruler adds token properties to track the last movement made by the token:
 - `_token.lastMoveDistance`: Movement units expended on the last move. May not be physical distance; this instead accounts for additional movement due to difficult terrain. If the token has not moved this combat round, this value will be 0.
@@ -160,7 +165,7 @@ const DashSpeedCategory = {
 ```
 Categories are processed in order in the `SPEED.CATEGORIES` array. Usually (unless you modify the `SPEED.maximumCategoryDistance` function per below) you would want the categories sorted from smallest to largest multiplier. For example, a token with speed 30 could walk for 30 * 1 grid units, and dash for 30 * 2 = 60 grid units. So the first 30 grid units would be highlighted for walk, the next 30 highlighted for dash, and everything byond that highlighted with the maximum color.
 
-There is a also a "Maximum" property for when the distances for the categories above are exceeded. You can set the default color at `SPEED.MAXIMUM_COLOR`. 
+There is a also a "Maximum" property for when the distances for the categories above are exceeded. You can set the default color at `SPEED.MAXIMUM_COLOR`.
 
 If you have a specific system that you would like supported by default, please open a Git issue and explain how the system measures speed and, preferably, what properties need to be changed.
 
@@ -206,12 +211,12 @@ Elevation Ruler adds a token property to get the token movement type: `_token.mo
 You can modify the icon used when hovering over difficult terrain:
 - `CONFIG.elevationruler.SPEED.terrainSymbol`: You can use any text string here. Paste in a unicode symbol if you want a different symbol. For Font Awesome icons, use, e.g., "\uf0e7". (This is the code for [FA lightning bolt](https://fontawesome.com/icons/bolt?f=classic&s=solid).)
 - `CONFIG.elevationruler.SPEED.useFontAwesome`: Set to true to interpet the `terrainSymbol` as FA unicode.
-  
+
 ## Controlling pathfinding
 
 If you set `CONFIG.elevationruler.pathfindingCheckTerrains` to `true`, it will test for Terrain Mapper terrains (including Tiles), Drawings, and Tokens for terrain penalties. This is currently a serious performance hit and so is not enabled by default. (By default, tokens can block pathfinding per user settings but advanced terrain penalties are not considered.) This may change depending on Foundry VTT v12's approach to scene regions.
 
-You can tell the pathfinding algorithm to ignore certain tokens. By default it ignores dead tokens for dnd5e. To change this, set the string in `CONFIG.elevationruler.SPEED.tokenHPAttribute` (or set it to "" to pathfind around dead tokens). If you want default support for a system, open a git issue and preferably tell me how to find the HP value for that system's tokens. 
+You can tell the pathfinding algorithm to ignore certain tokens. By default it ignores dead tokens for dnd5e. To change this, set the string in `CONFIG.elevationruler.SPEED.tokenHPAttribute` (or set it to "" to pathfind around dead tokens). If you want default support for a system, open a git issue and preferably tell me how to find the HP value for that system's tokens.
 
 You can also tell the pathfinding algorithm to ignore tokens with certain statuses. The default Set is at `CONFIG.elevationruler.pathfindingIgnoreStatuses`.
 

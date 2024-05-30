@@ -1,3 +1,9 @@
+# 0.9.0
+Initial support for Foundry v12.
+
+## KNOWN ISSUES
+Pathfinding does not work. Error at startup `canvas.walls.outerBounds is not iterable` is related to pathfinding but can be otherwise ignored.
+
 # 0.8.12
 Fix for speed highlighting not working if the Token HUD has not been used. Closes #65.
 
