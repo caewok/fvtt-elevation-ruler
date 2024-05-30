@@ -93,15 +93,12 @@ function clear(wrapper) {
 }
 
 /**
- * Wrap Ruler.prototype.toJSON
+ * Wrap Ruler.prototype._getMeasurementData
  * Store the current userElevationIncrements for the destination.
  * Store segment information, possibly including pathfinding.
  */
 function toJSON(wrapper) {
-  // If debugging, log will not display on user's console
-  // console.log("constructing ruler json!")
   const obj = wrapper();
-
   const myObj = obj[MODULE_ID] = {};
 
   // Segment information
