@@ -37,7 +37,7 @@ export function _getMeasurementSegments(wrapped) {
 
   // Elevate the segments
   const segments = elevateSegments(this, wrapped()) ?? [];
-  const token = this._getMovementToken();
+  const token = this.token;
 
   // If no movement token, then no pathfinding.
   if ( !token ) return segments;
@@ -286,7 +286,7 @@ export function _highlightMeasurementSegment(wrapped, segment) {
 
   // Adjust the color if this user has selected speed highlighting.
   const priorColor = this.color;
-  const token = this._getMovementToken();
+  const token = this.token;
   const doSpeedHighlighting = token
     // && this.user === game.user
     && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING)

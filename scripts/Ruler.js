@@ -159,7 +159,7 @@ function _addWaypoint(wrapper, point) {
     const oldWaypoint = foundry.utils.duplicate(this.waypoints[0]);
     this.waypoints[0].x = point.x;
     this.waypoints[0].y = point.y;
-    const token = this._getMovementToken();
+    const token = this.token;
     if ( token && !tokenIsSnapped(token) ) this._unsnappedOrigin = true;
     else {
       this.waypoints[0].x = oldWaypoint.x;
@@ -313,7 +313,7 @@ function _computeDistance() {
  * with or without the segment breaks.
  */
 function _computeSegmentDistances() {
-  const token = this._getMovementToken();
+  const token = this.token;
 
   // Loop over each segment in turn, adding the physical distance and the move distance.
   let totalDistance = 0;
@@ -369,7 +369,7 @@ function _measureSegment(segment, token, numPrevDiagonal = 0) {
  */
 function _computeTokenSpeed() {
   // Requires a movement token and a defined token speed.
-  const token = this._getMovementToken();
+  const token = this.token;
   if ( !token ) return;
 
   // Precalculate the token speed.
@@ -692,7 +692,7 @@ function addWaypointElevationIncrements(ruler, _point) {
   newWaypoint._userElevationIncrements = 0;
 
   if ( ln === 1 ) {
-    const moveToken = ruler._getMovementToken();
+    const moveToken = ruler.token;
     newWaypoint._terrainElevation = moveToken ? moveToken.elevationE : Ruler.terrainElevationAtLocation(newWaypoint);
 
   } else {
