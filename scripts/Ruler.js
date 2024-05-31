@@ -152,6 +152,10 @@ function update(wrapper, data) {
 function _addWaypoint(wrapper, point) {
   wrapper(point);
 
+  // In case the waypoint was never added.
+  if ( (this.state !== Ruler.STATES.STARTING) && (this.state !== Ruler.STATES.MEASURING ) ) return;
+  if ( !this.waypoints.length ) return;
+
   // If shift was held, use the precise point.
   if ( this._unsnap ) {
     const lastWaypoint = this.waypoints.at(-1);
