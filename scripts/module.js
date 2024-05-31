@@ -57,23 +57,41 @@ Hooks.once("init", function() {
 
   // Configuration
   CONFIG[MODULE_ID] = {
-    // Configurations related to measuring token speed for ruler highlighting.
+    /**
+     * Configurations related to measuring token speed for ruler highlighting. See const.js.
+     * @type { object }
+     */
     SPEED,
 
-    // Font awesome identifiers for the Token HUD speed selection.
+    /**
+     * Font awesome identifiers for the Token HUD speed selection. See const.js.
+     * @type {object}
+     */
     MOVEMENT_BUTTONS,
 
-    // Types of movement.
+    /**
+     * Types of movement. See const.js.
+     * @type {enum}
+     */
     MOVEMENT_TYPES,
 
-    // Account for terrains/tokens in pathfinding.
-    // Can be a serious performance hit.
+    /**
+     * Account for terrains/tokens in pathfinding.
+     * Can be a serious performance hit.
+     * @type {boolean}
+     */
     pathfindingCheckTerrains: false,
 
-    // Where to find token HP, used to ignore dead tokens when pathfinding.
+    /**
+     * Where to find token HP, used to ignore dead tokens when pathfinding.
+     * @type {string}
+     */
     tokenHPAttribute: defaultHPAttribute(),
 
-    // ID of Token statuses to ignore when pathfinding.
+    /**
+     * ID of Token statuses to ignore when pathfinding.
+     * @type {Set<string>}
+     */
     pathfindingIgnoreStatuses: new Set([
       "sleeping",
       "unconscious",
@@ -84,7 +102,17 @@ Hooks.once("init", function() {
       "petrified",
       "restrained"]),
 
-    // Enable certain debug console logging and tests.
+    /**
+     * Adjust the width of the highlighting in gridless maps.
+     * Percentage of `canvas.scene.dimensions.size` that determines the width.
+     * @type {number}
+     */
+    gridlessHighlightWidthMultiplier: 0.2,
+
+    /**
+     * Enable certain debug console logging and tests.
+     * @type {boolean}
+     */
     debug: false
   };
 

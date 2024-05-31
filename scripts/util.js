@@ -20,17 +20,19 @@ export function log(...args) {
 
 /**
  * Get the two points perpendicular to line A --> B at A, a given distance from the line A --> B
- * @param {PIXI.Point} A
- * @param {PIXI.Point} B
+ * @param {PIXI.Point|Point} A
+ * @param {PIXI.Point|Point} B
  * @param {number} distance
  * @returns {[PIXI.Point, PIXI.Point]} Points on either side of A.
  */
 export function perpendicularPoints(A, B, distance = 1) {
-  const delta = B.subtract(A);
-  const pt0 = new PIXI.Point(A.x - delta.y, A.y + delta.x);
+  A = PIXI.Point._tmp.copyFrom(A);
+  B = PIXI.Point._tmp2.copyFrom(B);
+  const delta = B.subtract(A, PIXI.Point._tmp3);
+  const normal = new PIXI.Point(A.x - delta.y, A.y + delta.x);
   return [
-    A.towardsPoint(pt0, distance),
-    A.towardsPoint(pt0, -distance)
+    A.towardsPoint(normal, distance),
+    A.towardsPoint(normal, -distance)
   ];
 }
 
