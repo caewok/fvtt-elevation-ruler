@@ -153,7 +153,11 @@ function _addWaypoint(wrapper, point) {
   wrapper(point);
 
   // If shift was held, use the precise point.
-  if ( this._unsnap ) this.waypoints.at(-1).copyFrom(point);
+  if ( this._unsnap ) {
+    const lastWaypoint = this.waypoints.at(-1);
+    lastWaypoint.x = point.x;
+    lastWaypoint.y = point.y;
+  }
   else if ( this.waypoints.length === 1 ) {
     // Move the waypoint to find unsnapped token.
     const oldWaypoint = foundry.utils.duplicate(this.waypoints[0]);
@@ -191,7 +195,10 @@ function _removeWaypoint(wrapper, point, { snap = true } = {}) {
  */
 function _getMeasurementDestination(wrapped, destination) {
   const pt = wrapped(destination);
-  if ( this._unsnap ) pt.copyFrom(destination);
+  if ( this._unsnap ) {
+    pt.x = destination.x;
+    pt.y = destination.y;
+  }
   return pt;
 }
 
@@ -218,6 +225,7 @@ async function _animateMovement(wrapped, token) {
   }
   return Promise.allSettled(promises);
 }
+
 
 /**
  * Recalculate the offset used by _getRulerDestination.
@@ -387,6 +395,12 @@ function _computeTokenSpeed() {
   let numPrevDiagonal = 0;
   let s = 0;
   let segment;
+
+  // Debugging
+//   if ( this.segments[0].moveDistance > 25 ) log(`${this.segments[0].moveDistance}`);
+//   if ( this.segments[0].moveDistance > 30 ) log(`${this.segments[0].moveDistance}`);
+//   if ( this.segments[0].moveDistance > 50 ) log(`${this.segments[0].moveDistance}`);
+//   if ( this.segments[0].moveDistance > 60 ) log(`${this.segments[0].moveDistance}`);
 
   // Progress through each speed attribute in turn.
   const categoryIter = [...SPEED.CATEGORIES, MaximumSpeedCategory].values();
@@ -658,11 +672,27 @@ function decrementElevation() {
   game.user.broadcastActivity({ ruler: ruler.toJSON() });
 }
 
+/**
+ * Add Ruler.prototype.moveWithoutAnimation
+ * Move the token and stop the ruler measurement
+ * @returns {boolean} False if the movement did not occur
+ */
+async function teleport(context) {
+  if ( this._state !== this.constructor.STATES.MEASURING ) return false;
+  if ( !this._canMove(this.token) ) return false;
+
+  // Change all segments to teleport.
+  this.segments.forEach(s => s.teleport = true);
+  return this.moveToken();
+}
+
+
 PATCHES.BASIC.METHODS = {
   incrementElevation,
   decrementElevation,
   elevationAtLocation,
-  _computeTokenSpeed
+  _computeTokenSpeed,
+  teleport
 };
 
 PATCHES.BASIC.GETTERS = {
