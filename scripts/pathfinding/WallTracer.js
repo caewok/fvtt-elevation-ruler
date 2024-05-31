@@ -2,7 +2,7 @@
 CanvasQuadtree,
 CONFIG,
 CONST,
-getProperty,
+foundry,
 PIXI,
 Token,
 Wall
@@ -379,7 +379,7 @@ export class WallTracerEdge extends GraphEdge {
 
     // Don't block dead tokens (HP <= 0).
     const { tokenHPAttribute, pathfindingIgnoreStatuses } = CONFIG[MODULE_ID];
-    const tokenHP = Number(getProperty(token, tokenHPAttribute));
+    const tokenHP = Number(foundry.utils.getProperty(token, tokenHPAttribute));
     if ( Number.isFinite(tokenHP) && tokenHP <= 0 ) return false;
 
     // Don't block tokens with certain status.
