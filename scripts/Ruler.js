@@ -226,6 +226,7 @@ async function _animateMovement(wrapped, token) {
   return Promise.allSettled(promises);
 }
 
+
 /**
  * Recalculate the offset used by _getRulerDestination.
  * Needed for hex grids.
@@ -671,11 +672,27 @@ function decrementElevation() {
   game.user.broadcastActivity({ ruler: ruler.toJSON() });
 }
 
+/**
+ * Add Ruler.prototype.moveWithoutAnimation
+ * Move the token and stop the ruler measurement
+ * @returns {boolean} False if the movement did not occur
+ */
+async function teleport(context) {
+  if ( this._state !== this.constructor.STATES.MEASURING ) return false;
+  if ( !this._canMove(this.token) ) return false;
+
+  // Change all segments to teleport.
+  this.segments.forEach(s => s.teleport = true);
+  return this.moveToken();
+}
+
+
 PATCHES.BASIC.METHODS = {
   incrementElevation,
   decrementElevation,
   elevationAtLocation,
-  _computeTokenSpeed
+  _computeTokenSpeed,
+  teleport
 };
 
 PATCHES.BASIC.GETTERS = {

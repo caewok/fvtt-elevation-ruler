@@ -18,6 +18,9 @@
     "elevationruler.keybindings.forceToGround.name": "Force Ruler Elevation to Ground",
     "elevationruler.keybindings.forceToGround.hint": "When measuring, press this key to get the distance to the ground. Press again to revert.",
 
+    "elevationruler.keybindings.teleport.name": "Teleport along ruler",
+    "elevationruler.keybindings.teleport.hint": "When measuring, press this key to move the token to the ruler destination without animation",
+
     "elevationruler.settings.levels-use-floor-label.name": "Levels Floor Label",
     "elevationruler.settings.levels-use-floor-label.hint": "If Levels module is active, label the ruler with the current floor, if the Levels UI floors are named.",
     "elevationruler.settings.levels-labels-never": "Never",
