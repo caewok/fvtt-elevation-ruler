@@ -30,7 +30,8 @@ function initializeEdges() {
     if ( edge.object instanceof Wall ) {
       SCENE_GRAPH.addWall(edge.object);
       numWalls += 1;
-    }
+    } else if ( edge.type === "outerBounds"
+             || edge.type === "innerBounds" ) SCENE_GRAPH.addCanvasEdge(edge);
   }
 
   Settings.setTokenBlocksPathfinding();

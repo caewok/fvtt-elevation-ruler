@@ -15,6 +15,16 @@ import { PhysicalDistance } from "../PhysicalDistance.js";
 import { Draw } from "../geometry/Draw.js";
 import { WallTracerEdge } from "./WallTracer.js";
 
+const OTHER_DIRECTION = {
+  ccw: "cw",
+  cw: "ccw"
+};
+
+const OTHER_TRIANGLE = {
+  cwTriangle: "ccwTriangle",
+  ccwTriangle: "cwTriangle"
+};
+
 /**
  * An edge that makes up the triangle-shaped polygon
  */
@@ -86,8 +96,14 @@ export class BorderEdge {
    */
   findTriangleFromVertexKey(vertexKey, dir = "ccw") {
     const [a, b] = this.a.key === vertexKey ? [this.a, this.b] : [this.b, this.a];
-    const cCCW = this._nonSharedVertex(this.ccwTriangle);
-    return (foundry.utils.orient2dFast(a, b, cCCW) > 0) ^ (dir !== "ccw") ? this.ccwTriangle : this.cwTriangle;
+
+    if ( this.ccwTriangle ) {
+      const cCCW = this._nonSharedVertex(this.ccwTriangle);
+      return (foundry.utils.orient2dFast(a, b, cCCW) > 0) ^ (dir !== "ccw") ? this.ccwTriangle : this.cwTriangle;
+    } else {
+      const cCW = this._nonSharedVertex(this.cwTriangle);
+      return (foundry.utils.orient2dFast(a, b, cCW) < 0) ^ (dir !== "cw") ? this.cwTriangle : this.ccwTriangle;
+    }
   }
 
   /**
@@ -171,12 +187,13 @@ export class BorderEdge {
    */
   edgeBlocks(origin, elevation = 0) {
     if ( !origin ) {
-      if ( !this.ccwTriangle.center || !this.cwTriangle.center) {
-        console.warn("edgeBlocks|Triangle centers not defined.");
-        return false;
-      }
-      return this.edgeBlocks(this.ccwTriangle.center, elevation)
-                       || this.edgeBlocks(this.cwTriangle.center, elevation);
+//       if ( !this.ccwTriangle || !this.cwTriangle || !this.ccwTriangle.center || !this.cwTriangle.center) {
+//         console.warn("edgeBlocks|Triangle centers not defined.");
+//         return false;
+//       }
+      const ccwBlocks = this.ccwTriangle ? this.edgeBlocks(this.ccwTriangle.center, elevation) : false;
+      const cwBlocks = this.cwTriangle ? this.edgeBlocks(this.cwTriangle.center, elevation) : false;
+      return ccwBlocks || cwBlocks;
     }
 
     const { moveToken, tokenBlockType } = this.constructor;
@@ -199,7 +216,18 @@ export class BorderEdge {
     const otherEndpoint = !this.endpointKeys.has(aTri.key) ? aTri
       : !this.endpointKeys.has(bTri.key) ? bTri
         : cTri;
+
+    // Debugging
+    if ( !this.endpointKeys.has(aTri.key)
+      && !this.endpointKeys.has(bTri.key)
+      && !this.endpointKeys.has(cTri.key) ) console.error(`Triangle ${triangle.id} keys not found ${aTri.key}, ${bTri.key}, ${cTri.key}`, this);
+
     const orient2d = foundry.utils.orient2dFast;
+    const oABE = orient2d(a, b, otherEndpoint);
+
+    // Debugging
+    if ( oABE === 0 ) console.error(`Triangle ${triangle.id} collinear to this edge at ${otherEndpoint.x},${otherEndpoint.y}`, this);
+
     if ( orient2d(a, b, otherEndpoint) > 0 ) this.ccwTriangle = triangle;
     else this.cwTriangle = triangle;
   }
@@ -215,6 +243,7 @@ export class BorderEdge {
   vertexBlocks(vertexKey, elevation = 0) {
     const iter = this.sharedVertexEdges(vertexKey);
     for ( const edge of iter ) {
+      // if ( !edge.ccwTriangle || !edge.cwTriangle ) console.warn("vertexBlocks|Edge triangles not defined."); // Debugging.
       if ( edge === this ) continue; // Could break here b/c this edge implicitly is always last.
       if ( edge.edgeBlocks(undefined, elevation) ) return true;
     }
@@ -247,9 +276,24 @@ export class BorderEdge {
    * @param {string} [direction]      Either ccw or c.
    * @returns {BorderEdge}
    */
-  _nextEdge(vertexKey, dir = "ccw") {
+  _nextEdge(vertexKey, dir = "ccw", _recurse = true) {
     const tri = this.findTriangleFromVertexKey(vertexKey, dir);
-    return Object.values(tri.edges).find(e => e !== this && e.endpointKeys.has(vertexKey));
+    if ( tri ) return Object.values(tri.edges).find(e => e !== this && e.endpointKeys.has(vertexKey));
+
+    // Edge is at a border, vertex at the corner of the border.
+    // Need to run the opposite direction until we get undefined in that direction.
+    if ( !_recurse ) return null;
+    const maxIter = 100;
+    let iter = 0;
+    let edge = this;
+    let prevEdge;
+    const otherDir = OTHER_DIRECTION[dir];
+    do {
+      prevEdge = edge;
+      iter += 1;
+      edge = prevEdge._nextEdge(vertexKey, otherDir, false);
+    } while ( iter < maxIter && edge && edge !== this );
+    return prevEdge;
   }
 
   /**

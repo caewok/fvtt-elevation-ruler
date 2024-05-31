@@ -212,11 +212,16 @@ export class WallTracerEdge extends GraphEdge {
   get tokens() { return this.objects.filter(o => o instanceof Token); }
 
   /**
+   * Filter set for CanvasEdges
+   */
+  get canvasEdges() { return this.objects.filter(o => o instanceof foundry.canvas.edges.Edge); }
+
+  /**
    * Construct an edge.
    * To be used instead of constructor in most cases.
    * @param {Point} edgeA                 First object edge endpoint
    * @param {Point} edgeB                 Other object edge endpoint
-   * @param {PlaceableObject} [object[]]    Object(s) that contains this edge
+   * @param {PlaceableObject[]} [objects] Object(s) that contains this edge, if any
    * @param {number} [tA=0]               Where the A endpoint of this edge falls on the object
    * @param {number} [tB=1]               Where the B endpoint of this edge falls on the object
    * @returns {SegmentTracerEdge}
@@ -232,7 +237,7 @@ export class WallTracerEdge extends GraphEdge {
     const B = new WallTracerVertex(eB.x, eB.y);
     const dist = PIXI.Point.distanceSquaredBetween(A.point, B.point);
     const edge = new this(A, B, dist);
-    if ( objects ) objects.forEach(obj => edge.objects.add(obj));
+    objects.forEach(obj => edge.objects.add(obj));
     return edge;
   }
 
@@ -243,6 +248,14 @@ export class WallTracerEdge extends GraphEdge {
    * @returns {WallTracerEdge}
    */
   static fromWall(wall) { return this.fromObject(wall.edge.a, wall.edge.b, [wall]); }
+
+  /**
+   * Construct an edge from a Canvas Edge
+   * Used for boundary walls.
+   * @param {Edge} edge       Canvas edge
+   * @returns {WallTracerEdge}
+   */
+  static fromCanvasEdge(edge) { return this.fromObject(edge.a, edge.b, [edge]); }
 
   /**
    * Construct an array of edges form the constrained token border.
@@ -331,9 +344,9 @@ export class WallTracerEdge extends GraphEdge {
    */
   edgeBlocks(origin, moveToken, tokenBlockType, elevation = 0) {
     return this.objects.some(obj =>
-      (obj instanceof Wall) ? this.constructor.wallBlocks(obj, origin, elevation)
-        : (obj instanceof Token) ? this.constructor.tokenEdgeBlocks(obj, moveToken, tokenBlockType, elevation)
-          : false);
+        (obj instanceof Wall) ? this.constructor.wallBlocks(obj, origin, elevation)
+          : (obj instanceof Token) ? this.constructor.tokenEdgeBlocks(obj, moveToken, tokenBlockType, elevation)
+            : false);
   }
 
   /**
@@ -432,6 +445,12 @@ export class WallTracer extends Graph {
   objectEdges = new Map();
 
   /**
+   * Set of canvas edge ids represented in this graph.
+   * @type {Set<string>}
+   */
+  canvasEdgeIds = new Set();
+
+  /**
    * Set of wall ids represented in this graph.
    * @type {Set<string>}
    */
@@ -454,6 +473,7 @@ export class WallTracer extends Graph {
     this.objectEdges.clear();
     this.wallIds.clear();
     this.tokenIds.clear();
+    this.canvasEdgeIds.clear();
     super.clear();
   }
 
@@ -527,7 +547,8 @@ export class WallTracer extends Graph {
     // If no collisions, then a single edge can represent this edge object.
     const collisions = this.findEdgeCollisions(edgeA, edgeB);
     if ( !collisions.size ) {
-      const edge = WallTracerEdge.fromObjects(edgeA, edgeB, [object]);
+      const objects = object ? [object] : [];
+      const edge = WallTracerEdge.fromObjects(edgeA, edgeB, objects);
       this.addEdge(edge);
       return;
     }
@@ -539,7 +560,7 @@ export class WallTracer extends Graph {
    * @param {SegmentIntersection[]} collisions
    * @param {PIXI.Point} edgeA                  First edge endpoint
    * @param {PIXI.Point} edgeB                  Other edge endpoint
-   * @param {Wall|Token} object
+   * @param {Wall|Token|Edge} object
    */
   #processCollisions(collisions, edgeA, edgeB, object) {
     // Sort the keys so we can progress from A --> B along the edge.
@@ -657,6 +678,19 @@ export class WallTracer extends Graph {
   }
 
   /**
+   * Split the canvas edge by edges already in this graph.
+   * @param {Edge} edge   Canvas edge to convert to edge(s)
+   */
+  addCanvasEdge(edge) {
+    const id = edge.id;
+    if ( this.edges.has(id) ) return;
+
+    // Construct a new canvas edge set
+    this.addObjectEdge(PIXI.Point.fromObject(edge.a), PIXI.Point.fromObject(edge.b), edge);
+    this.canvasEdgeIds.add(id);
+  }
+
+  /**
    * Remove all associated edges with this edge set and object id.
    * @param {string} id             Id of the edge object to remove
    * @param {Map<string, Set<TokenTracerEdge>>} Map of edges to remove from
@@ -685,7 +719,6 @@ export class WallTracer extends Graph {
     // This will remove unnecessary vertices and recombine edges.
     if ( _recurse ) {
       const remainingObjects = edgesArr.reduce((acc, curr) => acc = acc.union(curr.objects), new Set());
-      if ( !remainingObjects.size ) return;
       remainingObjects.forEach(obj => obj instanceof Wall
         ? this.removeWall(obj.id, false) : this.removeToken(obj.id, false));
       remainingObjects.forEach(obj => obj instanceof Wall
@@ -711,6 +744,16 @@ export class WallTracer extends Graph {
     if ( tokenId instanceof Token ) tokenId = tokenId.id;
     this.tokenIds.delete(tokenId);
     return this.removeObject(tokenId, _recurse);
+  }
+
+  /**
+   * Remove all associated edges with this canvas edge.
+   * @param {string|Edge} edgeId
+   */
+  removeCanvasEdge(edgeId, _recurse = true) {
+    if ( edgeId instanceof foundry.canvas.edges.Edge ) edgeId = edgeId.id;
+    this.canvasEdgeIds.delete(edgeId);
+    return this.removeObject(edgeId, _recurse);
   }
 
   /**
@@ -766,6 +809,17 @@ canvas.tokens.placeables.filter(t => !SCENE_GRAPH.tokenIds.has(t.id))
 
 // do we have all the walls?
 canvas.walls.placeables.filter(w => !SCENE_GRAPH.wallIds.has(w.id))
+
+// Every object edge id should be in one of the three sets and vice versa.
+objectEdgeKeys = new Set(SCENE_GRAPH.objectEdges.keys())
+SCENE_GRAPH.canvasEdgeIds.difference(objectEdgeKeys).size
+SCENE_GRAPH.tokenIds.difference(objectEdgeKeys).size
+SCENE_GRAPH.wallIds.difference(objectEdgeKeys).size
+objectEdgeKeys.equals(SCENE_GRAPH.canvasEdgeIds.union(SCENE_GRAPH.tokenIds).union(SCENE_GRAPH.wallIds))
+
+
+
+
 
 // Draw all edges
 SCENE_GRAPH.drawEdges()
