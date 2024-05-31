@@ -612,6 +612,17 @@ function _onMouseUp(wrapped, event) {
   return wrapped(event);
 }
 
+/**
+ * Wrap Ruler.prototype._onMoveKeyDown
+ * If the teleport key is held, teleport the token.
+ * @param {KeyboardEventContext} context
+ */
+function _onMoveKeyDown(wrapped, context) {
+  const teleportKeys = new Set(game.keybindings.get(MODULE_ID, Settings.KEYBINDINGS.TELEPORT).map(binding => binding.key));
+  if ( teleportKeys.intersects(game.keyboard.downKeys) ) this.segments.forEach(s => s.teleport = true);
+  wrapped(context);
+}
+
 PATCHES.BASIC.WRAPS = {
   _getMeasurementData,
   update,
@@ -627,7 +638,8 @@ PATCHES.BASIC.WRAPS = {
   _onClickLeft,
   _onClickRight,
   _onMouseMove,
-  _canMove
+  _canMove,
+  _onMoveKeyDown
 };
 
 PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments, _onMouseUp };

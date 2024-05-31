@@ -302,20 +302,8 @@ export class Settings extends ModuleSettingsAbstract {
       name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TELEPORT}.name`),
       hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TELEPORT}.hint`),
       editable: [
-        { key: "ArrowRight" }
+        { key: "keyF" }
       ],
-      onDown: async function(context) {
-        const ruler = canvas.controls.ruler;
-        if ( !ruler.active ) return;
-        canvas.mouseInteractionManager.cancel(context.event); // Unclear if this is doing anything.
-        const token = ruler.token;
-        await ruler.teleport(context);
-        if ( token ) {
-          token._preview?._onDragEnd(); // Unclear if this is doing anything.
-          token._onDragEnd(); // Unclear if this is doing anything.
-        }
-        canvas.mouseInteractionManager.reset(); // Unclear if this is doing anything.
-      },
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
   }
