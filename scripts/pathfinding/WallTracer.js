@@ -222,8 +222,8 @@ export class WallTracerEdge extends GraphEdge {
    * @returns {SegmentTracerEdge}
    */
   static fromObjects(edgeA, edgeB, objects, tA = 0, tB = 1) {
-    tA = Math.clamped(tA, 0, 1);
-    tB = Math.clamped(tB, 0, 1);
+    tA = Math.clamp(tA, 0, 1);
+    tB = Math.clamp(tB, 0, 1);
     edgeA = PIXI.Point.fromObject(edgeA);
     edgeB = PIXI.Point.fromObject(edgeB);
     const eA = this.pointAtEdgeRatio(edgeA, edgeB, tA);
@@ -302,7 +302,7 @@ export class WallTracerEdge extends GraphEdge {
    * @returns {WallTracerEdge[]|null} Array of two edge tracer edges that share t endpoint.
    */
   splitAtT(edgeT) {
-    edgeT = Math.clamped(edgeT, 0, 1);
+    edgeT = Math.clamp(edgeT, 0, 1);
     if ( edgeT.almostEqual(0) || edgeT.almostEqual(1) ) return null;
 
     // Construct two new edges, divided at the edgeT location.
