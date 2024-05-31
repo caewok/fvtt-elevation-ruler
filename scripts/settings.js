@@ -125,7 +125,7 @@ export class Settings extends ModuleSettingsAbstract {
         [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.HOSTILE]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.HOSTILE}`),
         [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL}`)
       },
-      onChange: value => this.toggleTokenBlocksPathfinding(value)
+      onChange: value => this.setTokenBlocksPathfinding(value)
     });
 
     register(KEYS.PATHFINDING.LIMIT_TOKEN_LOS, {
@@ -320,7 +320,7 @@ export class Settings extends ModuleSettingsAbstract {
     });
   }
 
-  static toggleTokenBlocksPathfinding(blockSetting) {
+  static setTokenBlocksPathfinding(blockSetting) {
     const C = this.KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES;
     blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
     if ( blockSetting === C.NO ) { // Disable
