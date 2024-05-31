@@ -1,46 +1,17 @@
 /* globals
-canvas,
-Hooks
 */
 "use strict";
 
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
-import { MODULE_ID } from "../const.js";
 import { SCENE_GRAPH } from "./WallTracer.js";
 import { Pathfinder } from "./pathfinding.js";
-import { Settings } from "../settings.js";
 
 // Track wall creation, update, and deletion, constructing WallTracerEdges as we go.
 // Use to update the pathfinding triangulation.
 
 export const PATCHES = {};
 PATCHES.PATHFINDING = {};
-
-
-// When canvas is ready, the existing walls are not created, so must re-do here.
-Hooks.on("canvasReady", async function() {
-  const t0 = performance.now();
-  SCENE_GRAPH.clear();
-  const walls = [
-    ...canvas.walls.placeables,
-    ...canvas.walls.outerBounds,
-    ...canvas.walls.innerBounds
-  ];
-  for ( const wall of walls ) SCENE_GRAPH.addWall(wall);
-
-  // Must happen when the canvas is set so tokens (and walls) are available.
-  Settings.toggleTokenBlocksPathfinding();
-  const t1 = performance.now();
-
-  // Use the scene graph to initialize Pathfinder triangulation.
-  Pathfinder.initialize();
-  const t2 = performance.now();
-
-  console.debug(`${MODULE_ID}|Tracked ${walls.length} walls in ${t1 - t0} ms.`);
-  console.debug(`${MODULE_ID}|Initialized pathfinding in ${t2 - t1} ms.`);
-});
-
 
 /**
  * Hook createWall to update the scene graph and triangulation.

@@ -1,12 +1,8 @@
 /* globals
-canvas,
-Hooks
 */
 "use strict";
-
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
-import { MODULE_ID } from "../const.js";
 import { SCENE_GRAPH } from "./WallTracer.js";
 import { Pathfinder } from "./pathfinding.js";
 
