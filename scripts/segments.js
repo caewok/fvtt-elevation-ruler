@@ -218,6 +218,7 @@ export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance)
   return { newSegmentDistance, newMoveDistance, newTotalDistance };
 }
 
+
 /**
  * Mixed wrap Ruler.prototype._animateSegment
  * When moving the token along the segments, update the token elevation to the destination + increment
@@ -225,24 +226,29 @@ export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance)
  * Mark the token update if pathfinding for this segment.
  */
 export async function _animateSegment(token, segment, destination) {
-  // If the token is already at the destination, _animateSegment will throw an error when the animation is undefined.
-  // This can happen when setting artificial segments for highlighting or pathfinding.
-  if ( token.document.x !== destination.x
-    || token.document.y !== destination.y ) {
+  log(`Updating ${token.name} destination from ({${token.document.x},${token.document.y}) to (${destination.x},${destination.y}) for segment (${segment.ray.A.x},${segment.ray.A.y})|(${segment.ray.B.x},${segment.ray.B.y})`);
 
-    log(`Updating ${token.name} destination from ({${token.document.x},${token.document.y}) to (${destination.x},${destination.y}) for segment (${segment.ray.A.x},${segment.ray.A.y})|(${segment.ray.B.x},${segment.ray.B.y})`);
+  // If the segment is teleporting and the segment destination is not a waypoint or ruler destination, skip.
+//   if ( segment.teleport
+//     && !(segment.B.x === this.destination.x && segment.B.y === this.destination.y )
+//     && !this.waypoints.some(w => segment.B.x === w.x && segment.B.y === w.y) ) return;
 
-    // Same as wrapped but pass an option.
-    await token.document.update(destination, {
-      rulerSegment: this.segments.length > 1,
-      firstRulerSegment: segment.first,
-      lastRulerSegment: segment.last,
-      rulerSegmentOrigin: segment.ray.A,
-      rulerSegmentDestination: segment.ray.B
-    });
-    const anim = CanvasAnimation.getAnimation(token.animationName);
-    await anim.promise;
+  let name;
+  if ( segment.animation?.name === undefined ) name = token.animationName;
+  else name ||= Symbol(token.animationName);
+  const updateOptions = {
+    rulerSegment: this.segments.length > 1,
+    firstRulerSegment: segment.first,
+    lastRulerSegment: segment.last,
+    rulerSegmentOrigin: segment.ray.A,
+    rulerSegmentDestination: segment.ray.B,
+    teleport: segment.teleport,
+    animation: {...segment.animation, name}
   }
+  const {x, y} = token.document._source;
+  await token.animate({x, y}, {name, duration: 0});
+  await token.document.update(destination, updateOptions);
+  await CanvasAnimation.getAnimation(name)?.promise;
 
   // Update elevation after the token move.
   if ( segment.ray.A.z !== segment.ray.B.z ) {

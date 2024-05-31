@@ -5,6 +5,8 @@ Correct speed highlighting on gridless scenes.
 ## New features
 Add a configuration option (`CONFIG.elevationruler.gridlessHighlightWidthMultiplier`) to adjust the width of the gridless highlight.
 
+Add a "teleport" keybind and associated `Ruler.prototype.method`. If a ruler is active, this will set all segments to "teleport" and will jump to any user-set waypoints and then the destination, very quickly.
+
 # 0.9.0
 Initial support for Foundry v12.
 

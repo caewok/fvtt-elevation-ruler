@@ -64,7 +64,8 @@ const KEYBINDINGS = {
     REMOVE_WAYPOINT: "removeWaypointTokenRuler"
   },
   TOGGLE_PATHFINDING: "togglePathfinding",
-  FORCE_TO_GROUND: "forceToGround"
+  FORCE_TO_GROUND: "forceToGround",
+  TELEPORT: "teleport"
 };
 
 
@@ -293,6 +294,27 @@ export class Settings extends ModuleSettingsAbstract {
         this.FORCE_TO_GROUND = !this.FORCE_TO_GROUND;
         ruler.measure(ruler.destination, { force: true });
         ui.notifications.info(`Ruler measure to ground ${this.FORCE_TO_GROUND ? "enabled" : "disabled"}.`);
+      },
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
+
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.TELEPORT, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TELEPORT}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TELEPORT}.hint`),
+      editable: [
+        { key: "ArrowRight" }
+      ],
+      onDown: async function(context) {
+        const ruler = canvas.controls.ruler;
+        if ( !ruler.active ) return;
+        canvas.mouseInteractionManager.cancel(context.event); // Unclear if this is doing anything.
+        const token = ruler.token;
+        await ruler.teleport(context);
+        if ( token ) {
+          token._preview?._onDragEnd(); // Unclear if this is doing anything.
+          token._onDragEnd(); // Unclear if this is doing anything.
+        }
+        canvas.mouseInteractionManager.reset(); // Unclear if this is doing anything.
       },
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
