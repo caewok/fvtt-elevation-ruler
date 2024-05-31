@@ -108,6 +108,7 @@ Elevation Ruler defines certain keybindings:
 - Remove Token Ruler Waypoint (`-`): When dragging tokens, remove a waypoint.
 - Temporarily Toggle Pathfinding (`p`): If pathfinding is enabled, temporarily disable while holding this key. If disabled, then temporarily enable it.
 - Force to Ground (`g`): If you hit `g` while using the ruler, it will move the destination to use the ground elevation. You can hit `g` again to revert back. Note that the decrement and increment elevation keybindings will still change elevation accordingly. You can use this keybinding when dragging a flying token that you want to "land." Or if you are measuring with the ruler and want the measurement to not accoutn for another token's elevation at a destination point.
+- Teleport (`→`): (Foundry v12) If you hit `→` (right arrow key) while the ruler is active, it will jump the token to the end destination without the full slow animation. Instead, it will quickly animate to each user-defined waypoint and then the destination. So the token is updating and "stopping" at each waypoint in turn, just very fast!
 
 # Settings
 
