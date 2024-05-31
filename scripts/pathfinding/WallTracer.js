@@ -242,7 +242,7 @@ export class WallTracerEdge extends GraphEdge {
    * @param {Wall} wall       Wall represented by this edge
    * @returns {WallTracerEdge}
    */
-  static fromWall(wall) { return this.fromObject(wall.A, wall.B, [wall]); }
+  static fromWall(wall) { return this.fromObject(wall.edge.a, wall.edge.b, [wall]); }
 
   /**
    * Construct an array of edges form the constrained token border.
@@ -348,7 +348,7 @@ export class WallTracerEdge extends GraphEdge {
     if ( !wall.document.move || wall.isOpen ) return false;
 
     // Ignore one-directional walls which are facing away from the center
-    const side = wall.orientPoint(origin);
+    const side = wall.edge.orientPoint(origin);
 
     /* Unneeded?
     const wdm = PointSourcePolygon.WALL_DIRECTION_MODES;
@@ -652,7 +652,7 @@ export class WallTracer extends Graph {
     if ( this.edges.has(wallId) ) return;
 
     // Construct a new wall edge set.
-    this.addObjectEdge(PIXI.Point.fromObject(wall.A), PIXI.Point.fromObject(wall.B), wall);
+    this.addObjectEdge(PIXI.Point.fromObject(wall.edge.a), PIXI.Point.fromObject(wall.edge.b), wall);
     this.wallIds.add(wallId);
   }
 
