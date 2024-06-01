@@ -131,6 +131,8 @@ function update(wrapper, data) {
   // Reconstruct segments.
   if ( myData._segments ) this.segments = myData._segments.map(s => {
     s.ray = new Ray3d(s.ray.A, s.ray.B);
+    if ( s.speed ) s.speed.color = s.speed.name === "Maximum"
+      ? MaximumSpeedCategory.color : Color.from(s.speed.color);
     return s;
   });
 
@@ -406,7 +408,7 @@ function _computeTokenSpeed() {
 //   if ( this.segments[0].moveDistance > 25 ) log(`${this.segments[0].moveDistance}`);
 //   if ( this.segments[0].moveDistance > 30 ) log(`${this.segments[0].moveDistance}`);
 //   if ( this.segments[0].moveDistance > 50 ) log(`${this.segments[0].moveDistance}`);
-//   if ( this.segments[0].moveDistance > 60 ) log(`${this.segments[0].moveDistance}`);
+  if ( this.segments[0].moveDistance > 60 ) log(`${this.segments[0].moveDistance}`);
 
   // Progress through each speed attribute in turn.
   const categoryIter = [...SPEED.CATEGORIES, MaximumSpeedCategory].values();
