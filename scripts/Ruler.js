@@ -101,7 +101,7 @@ function _getMeasurementData(wrapper) {
       B: s.ray.B
     };
     newObj.label = Boolean(s.label);
-    newObj.speed ??= newObj.speed.name;
+    if ( s.speed ) s.speed = s.speed.name;
     return newObj;
   });
 
