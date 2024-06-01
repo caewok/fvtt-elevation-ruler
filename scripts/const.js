@@ -174,6 +174,8 @@ Hooks.once("init", function() {
 export function defaultHPAttribute() {
   switch ( game.system.id ) {
     case "dnd5e":         return "actor.system.attributes.hp.value";
+    case "dragonbane":    return "actor.system.hitpoints.value";
+    case "twodsix":       return "actor.system.hits.value";
     default:              return "actor.system.attributes.hp.value";
   }
 }
@@ -195,6 +197,8 @@ export function defaultWalkAttribute() {
     case "splittermond":  return "actor.derivedValues.speed.value";
     case "wfrp4e":        return "actor.system.details.move.walk";
     case "crucible":      return "actor.system.movement.stride";
+    case "dragonbane":    return "actor.system.movement";
+    case "twodsix":       return "actor.system.movement.walk";
     default:              return "";
   }
 }
@@ -215,6 +219,8 @@ export function defaultFlyAttribute() {
     // Missing attribute case "splittermond":
     // Missing attribute case "wfrp4e":
     // Missing attribute case "crucible":
+    // Missing attribute case "dragonbane":
+    case "twodsix":       return "actor.system.movement.fly";
     default:              return "";
   }
 }
@@ -235,6 +241,8 @@ export function defaultBurrowAttribute() {
     // Missing attribute case "splittermond":
     // Missing attribute case "wfrp4e":
     // Missing attribute case "crucible":
+    // Missing attribute case "dragonbane":
+    case "twodsix":       return "actor.system.movement.burrow";
     default:              return "";
   }
 }
@@ -249,6 +257,8 @@ export function defaultDashMultiplier() {
     case "D35E":
     case "sfrpg":
     case "shadowrun5e":
+    case "dragonbane":
+    case "twodsix":
     case "ds4":           return 2;
 
     case "CoC7":          return 5;
