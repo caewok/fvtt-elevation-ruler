@@ -1,5 +1,6 @@
 // Priority queue using a heap
 // from https://www.digitalocean.com/community/tutorials/js-binary-heaps
+import { radixSortObj } from "../geometry/RadixSort.js";
 
 class Node {
   /** @param {object} */

@@ -8,12 +8,12 @@ import { Patcher } from "./Patcher.js";
 import { PATCHES as PATCHES_Ruler } from "./Ruler.js";
 import { PATCHES as PATCHES_Token } from "./Token.js";
 import { PATCHES as PATCHES_ClientKeybindings } from "./ClientKeybindings.js";
-import { PATCHES as PATCHES_TokenPF } from "./pathfinding/Token.js";
 import { PATCHES as PATCHES_DrawingConfig } from "./DrawingConfig.js";
-
 
 // Pathfinding
 import { PATCHES as PATCHES_Wall } from "./pathfinding/Wall.js";
+import { PATCHES as PATCHES_CanvasEdges } from "./pathfinding/CanvasEdges.js";
+import { PATCHES as PATCHES_TokenPF } from "./pathfinding/Token.js";
 
 // Movement tracking
 import { PATCHES as PATCHES_TokenHUD } from "./token_hud.js";
@@ -26,6 +26,7 @@ const mergeObject = foundry.utils.mergeObject;
 const PATCHES = {
   ClientKeybindings: PATCHES_ClientKeybindings,
   ClientSettings: PATCHES_ClientSettings,
+  ["foundry.canvas.edges.CanvasEdges"]: PATCHES_CanvasEdges,
   DrawingConfig: PATCHES_DrawingConfig,
   Ruler: PATCHES_Ruler,
   Token: mergeObject(mergeObject(PATCHES_Token, PATCHES_TokenPF), PATCHES_TokenHUD),

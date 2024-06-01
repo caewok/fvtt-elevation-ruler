@@ -26,6 +26,7 @@ api = game.modules.get("elevationruler").api
 Pathfinder = api.pathfinding.Pathfinder
 SCENE_GRAPH = api.pathfinding.SCENE_GRAPH
 BorderEdge = api.pathfinding.BorderEdge
+BorderTriangle = api.pathfinding.BorderTriangle
 PriorityQueueArray = api.pathfinding.PriorityQueueArray;
 PriorityQueue = api.pathfinding.PriorityQueue;
 
@@ -44,13 +45,46 @@ pq.enqueue({"C": 3}, 3);
 pq.enqueue({"B": 2}, 2);
 pq.data
 
+// Test SCENE_GRAPH
+SCENE_GRAPH.drawEdges()
+
+// Ensure the token edges get updated after moving
+SCENE_GRAPH.drawEdges()
+
 // Test pathfinding
 Pathfinder.initialize()
-
 Draw.clearDrawings()
-
 BorderEdge.moveToken = _token;
+
+
 Pathfinder.drawTriangles();
+
+for ( const tri of Pathfinder.borderTriangles ) {
+  for ( const edgeLabel of ["AB", "BC", "CA"] ) {
+    const edge = tri.edges[edgeLabel];
+    if ( !(edge instanceof BorderEdge) ) {
+      console.log(`Tri ${tri.id}, edge ${edgeLabel} is not a BorderEdge.`);
+      continue;
+    }
+    if ( !(edge.ccwTriangle instanceof BorderTriangle)
+      || !(edge.cwTriangle instanceof BorderTriangle) ) console.log(`Tri ${tri.id}, edge ${edgeLabel} cw/ccw Triangle is not a BorderTriangle.`);
+  }
+}
+
+edges = []
+for ( const edge of Pathfinder.triangleEdges ) {
+  if ( !edge.ccwTriangle ) {
+    console.log(`ccw Triangle is not a BorderTriangle.`, edge);
+    edges.push(edge);
+  } else if ( !edge.cwTriangle ) {
+    console.log(`cw Triangle is not a BorderTriangle.`, edge);
+    edges.push(edge);
+  }
+}
+
+
+pf = _token.elevationruler.pathfinder
+
 
 
 endPoint = _token.center

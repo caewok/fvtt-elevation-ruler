@@ -1,5 +1,6 @@
 /* globals
 canvas,
+Color,
 CONFIG,
 CONST,
 foundry,
@@ -15,7 +16,7 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
-import { SPEED, MODULE_ID, MaximumSpeedCategory } from "./const.js";
+import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
@@ -100,8 +101,10 @@ function _getMeasurementData(wrapper) {
       B: s.ray.B
     };
     newObj.label = Boolean(s.label);
+    newObj.speed ??= newObj.speed.name;
     return newObj;
   });
+
 
   myObj._userElevationIncrements = this._userElevationIncrements;
   myObj._unsnap = this._unsnap;
@@ -117,6 +120,7 @@ function _getMeasurementData(wrapper) {
  * Retrieve the current snap status.
  */
 function update(wrapper, data) {
+  if ( !data || (data.state === Ruler.STATES.INACTIVE) ) return wrapper(data);
   const myData = data[MODULE_ID];
   if ( !myData ) return wrapper(data); // Just in case.
 
@@ -129,6 +133,7 @@ function update(wrapper, data) {
   // Reconstruct segments.
   if ( myData._segments ) this.segments = myData._segments.map(s => {
     s.ray = new Ray3d(s.ray.A, s.ray.B);
+    s.speed ??= SPEED.CATEGORIES.find(s => s.name === s.speed);
     return s;
   });
 
@@ -151,6 +156,10 @@ function update(wrapper, data) {
  */
 function _addWaypoint(wrapper, point) {
   wrapper(point);
+
+  // In case the waypoint was never added.
+  if ( (this.state !== Ruler.STATES.STARTING) && (this.state !== Ruler.STATES.MEASURING ) ) return;
+  if ( !this.waypoints.length ) return;
 
   // If shift was held, use the precise point.
   if ( this._unsnap ) {
@@ -397,20 +406,17 @@ function _computeTokenSpeed() {
   let segment;
 
   // Debugging
-//   if ( this.segments[0].moveDistance > 25 ) log(`${this.segments[0].moveDistance}`);
-//   if ( this.segments[0].moveDistance > 30 ) log(`${this.segments[0].moveDistance}`);
-//   if ( this.segments[0].moveDistance > 50 ) log(`${this.segments[0].moveDistance}`);
-//   if ( this.segments[0].moveDistance > 60 ) log(`${this.segments[0].moveDistance}`);
+  if ( CONFIG[MODULE_ID].debug ) {
+    if ( this.segments[0].moveDistance > 25 ) log(`${this.segments[0].moveDistance}`);
+    if ( this.segments[0].moveDistance > 30 ) log(`${this.segments[0].moveDistance}`);
+    if ( this.segments[0].moveDistance > 50 ) log(`${this.segments[0].moveDistance}`);
+    if ( this.segments[0].moveDistance > 60 ) log(`${this.segments[0].moveDistance}`);
+  }
 
   // Progress through each speed attribute in turn.
-  const categoryIter = [...SPEED.CATEGORIES, MaximumSpeedCategory].values();
-  const maxDistFn = (token, speedCategory, tokenSpeed) => {
-    if ( speedCategory.name === "Maximum" ) return Number.POSITIVE_INFINITY;
-    return SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
-  };
-
+  const categoryIter = [...SPEED.CATEGORIES].values();
   let speedCategory = categoryIter.next().value;
-  let maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
+  let maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
 
   // Determine which speed category we are starting with
   // Add in already moved combat distance and determine the starting category
@@ -424,10 +430,11 @@ function _computeTokenSpeed() {
 
   while ( (segment = this.segments[s]) ) {
     // Skip speed categories that do not provide a distance larger than the last.
-    while ( speedCategory.name !== "Maximum" && maxDistance <= minDistance ) {
+    while ( speedCategory && maxDistance <= minDistance ) {
       speedCategory = categoryIter.next().value;
-      maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
+      maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
     }
+    if ( !speedCategory ) speedCategory = SPEED.CATEGORIES.at(-1);
 
     segment.speed = speedCategory;
     let newPrevDiagonal = _measureSegment(segment, token, numPrevDiagonal);
@@ -608,6 +615,17 @@ function _onMouseUp(wrapped, event) {
   return wrapped(event);
 }
 
+/**
+ * Wrap Ruler.prototype._onMoveKeyDown
+ * If the teleport key is held, teleport the token.
+ * @param {KeyboardEventContext} context
+ */
+function _onMoveKeyDown(wrapped, context) {
+  const teleportKeys = new Set(game.keybindings.get(MODULE_ID, Settings.KEYBINDINGS.TELEPORT).map(binding => binding.key));
+  if ( teleportKeys.intersects(game.keyboard.downKeys) ) this.segments.forEach(s => s.teleport = true);
+  wrapped(context);
+}
+
 PATCHES.BASIC.WRAPS = {
   _getMeasurementData,
   update,
@@ -623,7 +641,8 @@ PATCHES.BASIC.WRAPS = {
   _onClickLeft,
   _onClickRight,
   _onMouseMove,
-  _canMove
+  _canMove,
+  _onMoveKeyDown
 };
 
 PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments, _onMouseUp };
@@ -677,7 +696,7 @@ function decrementElevation() {
  * Move the token and stop the ruler measurement
  * @returns {boolean} False if the movement did not occur
  */
-async function teleport(context) {
+async function teleport(_context) {
   if ( this._state !== this.constructor.STATES.MEASURING ) return false;
   if ( !this._canMove(this.token) ) return false;
 

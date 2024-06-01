@@ -229,6 +229,8 @@ export async function _animateSegment(token, segment, destination) {
   log(`Updating ${token.name} destination from ({${token.document.x},${token.document.y}) to (${destination.x},${destination.y}) for segment (${segment.ray.A.x},${segment.ray.A.y})|(${segment.ray.B.x},${segment.ray.B.y})`);
 
   // If the segment is teleporting and the segment destination is not a waypoint or ruler destination, skip.
+  // Doesn't work because _animateMovement stops the movement if the token does not make it to the
+  // next waypoint.
 //   if ( segment.teleport
 //     && !(segment.B.x === this.destination.x && segment.B.y === this.destination.y )
 //     && !this.waypoints.some(w => segment.B.x === w.x && segment.B.y === w.y) ) return;
