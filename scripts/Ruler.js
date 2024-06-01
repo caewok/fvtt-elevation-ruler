@@ -103,6 +103,7 @@ function _getMeasurementData(wrapper) {
     return newObj;
   });
 
+
   myObj._userElevationIncrements = this._userElevationIncrements;
   myObj._unsnap = this._unsnap;
   myObj._unsnappedOrigin = this._unsnappedOrigin;
@@ -117,6 +118,7 @@ function _getMeasurementData(wrapper) {
  * Retrieve the current snap status.
  */
 function update(wrapper, data) {
+  if ( !data || (data.state === Ruler.STATES.INACTIVE) ) return wrapper(data);
   const myData = data[MODULE_ID];
   if ( !myData ) return wrapper(data); // Just in case.
 

@@ -1,3 +1,8 @@
+# 0.9.2
+Fix pathfinding.
+Change the keybind for teleport to "F" (fast-forward) to avoid collision with arrow-key usage on the canvas. Switch to requiring "F" to be held when the user triggers the move to get teleport, to avoid weirdness with the drag still being active when using a separate trigger key.
+Catch error if waypoint is not added in `_addWaypoint`.
+
 # 0.9.1
 Fix errors when using the ruler on gridless scenes.
 Correct speed highlighting on gridless scenes.

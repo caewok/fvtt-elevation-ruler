@@ -302,7 +302,7 @@ export class Settings extends ModuleSettingsAbstract {
       name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TELEPORT}.name`),
       hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TELEPORT}.hint`),
       editable: [
-        { key: "keyF" }
+        { key: "KeyF" }
       ],
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
