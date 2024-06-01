@@ -1,3 +1,6 @@
+# 0.9.3
+Fix for speed color error.
+
 # 0.9.2
 Fix pathfinding.
 Change the keybind for teleport to "F" (fast-forward) to avoid collision with arrow-key usage on the canvas. Switch to requiring "F" to be held when the user triggers the move to get teleport, to avoid weirdness with the drag still being active when using a separate trigger key.
