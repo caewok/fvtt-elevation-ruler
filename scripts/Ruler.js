@@ -1,5 +1,6 @@
 /* globals
 canvas,
+Color,
 CONFIG,
 CONST,
 foundry,
@@ -15,7 +16,7 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
-import { SPEED, MODULE_ID, MaximumSpeedCategory } from "./const.js";
+import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
@@ -100,6 +101,7 @@ function _getMeasurementData(wrapper) {
       B: s.ray.B
     };
     newObj.label = Boolean(s.label);
+    newObj.speed ??= newObj.speed.name;
     return newObj;
   });
 
@@ -131,8 +133,7 @@ function update(wrapper, data) {
   // Reconstruct segments.
   if ( myData._segments ) this.segments = myData._segments.map(s => {
     s.ray = new Ray3d(s.ray.A, s.ray.B);
-    if ( s.speed ) s.speed.color = s.speed.name === "Maximum"
-      ? MaximumSpeedCategory.color : Color.from(s.speed.color);
+    s.speed ??= SPEED.CATEGORIES.find(s => s.name === s.speed);
     return s;
   });
 
@@ -413,14 +414,9 @@ function _computeTokenSpeed() {
   }
 
   // Progress through each speed attribute in turn.
-  const categoryIter = [...SPEED.CATEGORIES, MaximumSpeedCategory].values();
-  const maxDistFn = (token, speedCategory, tokenSpeed) => {
-    if ( speedCategory.name === "Maximum" ) return Number.POSITIVE_INFINITY;
-    return SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
-  };
-
+  const categoryIter = [...SPEED.CATEGORIES].values();
   let speedCategory = categoryIter.next().value;
-  let maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
+  let maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
 
   // Determine which speed category we are starting with
   // Add in already moved combat distance and determine the starting category
@@ -434,10 +430,11 @@ function _computeTokenSpeed() {
 
   while ( (segment = this.segments[s]) ) {
     // Skip speed categories that do not provide a distance larger than the last.
-    while ( speedCategory.name !== "Maximum" && maxDistance <= minDistance ) {
+    while ( speedCategory && maxDistance <= minDistance ) {
       speedCategory = categoryIter.next().value;
-      maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
+      maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
     }
+    if ( !speedCategory ) speedCategory = SPEED.CATEGORIES.at(-1);
 
     segment.speed = speedCategory;
     let newPrevDiagonal = _measureSegment(segment, token, numPrevDiagonal);
@@ -699,7 +696,7 @@ function decrementElevation() {
  * Move the token and stop the ruler measurement
  * @returns {boolean} False if the movement did not occur
  */
-async function teleport(context) {
+async function teleport(_context) {
   if ( this._state !== this.constructor.STATES.MEASURING ) return false;
   if ( !this._canMove(this.token) ) return false;
 
