@@ -3,6 +3,7 @@ Fix pathfinding.
 Change the keybind for teleport to "F" (fast-forward) to avoid collision with arrow-key usage on the canvas. Switch to requiring "F" to be held when the user triggers the move to get teleport, to avoid weirdness with the drag still being active when using a separate trigger key.
 Catch error if waypoint is not added in `_addWaypoint`.
 Correct error when sending ruler data from one user to another.
+Move Maximum speed category to `CONFIG.elevationruler.SPEED.CATEGORIES`. Should now be possible to define specific colors per user in the CONFIG, so long as category names are same.
 
 # 0.9.1
 Fix errors when using the ruler on gridless scenes.
