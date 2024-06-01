@@ -133,7 +133,7 @@ function update(wrapper, data) {
   // Reconstruct segments.
   if ( myData._segments ) this.segments = myData._segments.map(s => {
     s.ray = new Ray3d(s.ray.A, s.ray.B);
-    s.speed ??= SPEED.CATEGORIES.find(s => s.name === s.speed);
+    if ( s.speed ) s.speed = SPEED.CATEGORIES.find(s => s.name === s.speed);
     return s;
   });
 
