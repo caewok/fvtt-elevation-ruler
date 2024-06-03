@@ -23,7 +23,7 @@ The distance calculation updates based on the distance measured, assuming a stra
 
 To enable/disable pathfinding, toggle the pathfinding icon in the token controls (upper left controls in Foundry). You can also hold the specified hotkey (default 'P').  
 
-When dragging a token, the ruler will automaticaly appear if you have enabled "Token Ruler" in the module settings. To set waypoints when dragging a token, hit the specified hotkey (default '=' to add and '-' to remove). To adjust the colors that appear for designated speeds see [Setting speed colors](## Setting speed colors). If you would like specific system support, please feel free to submit a git issue.
+When dragging a token, the ruler will automatically appear if you have enabled "Token Ruler" in the module settings. To set waypoints when dragging a token, hit the specified hotkey (default '=' to add and '-' to remove). To adjust the colors that appear for designated speeds see [Setting speed colors](## Setting speed colors). If you would like specific system support, please feel free to submit a git issue.
 
 ## Module history
 As of v0.7, Elevation Ruler adds a setting to display the Foundry ruler when dragging tokens.
