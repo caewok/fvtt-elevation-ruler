@@ -10,18 +10,22 @@
 
 # Elevation Ruler
 
-This module allows the default Foundry measurement ruler to track change in elevation. Elevation can be changed while using the ruler :
+This module displays the ruler when dragging tokens, does pathfinding for the ruler, tracks movement speed and movement history in combat, and can display elevation changes.
+
+Elevation can be changed while using the ruler :
 1. Manually. Hit the specified hot key (default: '[' to increment and ']' to decrement).
 2. Token. When hovering over a token with the ruler, the origin or destination elevation (as applicable) will update.
 3. Elevated Vision. If the Elevated Vision module is present, it will use that elevation information. (Elevation Ruler v0.5+)
 4. Levels. If the Levels module is present, the ruler will look for Levels-enabled tiles  and default to the bottom elevation of that tile. In Elevation Ruler v0.5+, it will also originate elevation at the bottom of the active layer if the Levels layers UI is active.
+5. If you hold the specified hot key (default 'G'), it will force the ruler to measure elevation from the ground.
 
-The distance calculation updates based on the distance measured, assuming a straight line in three dimensions between origin and destination, taking into account elevation change.
+The distance calculation updates based on the distance measured, assuming a straight line in three dimensions between origin and destination, taking into account elevation change. If you add a waypoint, elevation will be tracked at each waypoint. If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint.
 
-If you add a waypoint, elevation will be tracked at each waypoint.
+To enable/disable pathfinding, toggle the pathfinding icon in the token controls (upper left controls in Foundry). You can also hold the specified hotkey (default 'P').  
 
-If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint.
+When dragging a token, the ruler will automaticaly appear if you have enabled "Token Ruler" in the module settings. To set waypoints when dragging a token, hit the specified hotkey (default '=' to add and '-' to remove). To adjust the colors that appear for designated speeds see [Setting speed colors](## Setting speed colors). If you would like specific system support, please feel free to submit a git issue.
 
+## Module history
 As of v0.7, Elevation Ruler adds a setting to display the Foundry ruler when dragging tokens.
 As of v0.8, Elevation Ruler adds a toggle to enable pathfinding when using the ruler or dragging tokens with the Token Ruler enabled.
 Version v0.9 requires Foundry v12.
@@ -161,10 +165,14 @@ const DashSpeedCategory = {
   color: Color.from(0xffff00),
   multiplier: 2
 };
-```
-Categories are processed in order in the `SPEED.CATEGORIES` array. Usually (unless you modify the `SPEED.maximumCategoryDistance` function per below) you would want the categories sorted from smallest to largest multiplier. For example, a token with speed 30 could walk for 30 * 1 grid units, and dash for 30 * 2 = 60 grid units. So the first 30 grid units would be highlighted for walk, the next 30 highlighted for dash, and everything byond that highlighted with the maximum color.
 
-There is a also a "Maximum" property for when the distances for the categories above are exceeded. You can set the default color at `SPEED.MAXIMUM_COLOR`.
+const MaximumSpeedCategory = {
+  name: "Maximum",
+  color: Color.from(0xff0000),
+  multiplier: Number.POSITIVE_INFINITY
+};
+```
+Categories are processed in order in the `SPEED.CATEGORIES` array. Usually (unless you modify the `SPEED.maximumCategoryDistance` function per below) you would want the categories sorted from smallest to largest multiplier. For example, a token with speed 30 could walk for 30 * 1 grid units, and dash for 30 * 2 = 60 grid units. So the first 30 grid units would be highlighted for walk, the next 30 highlighted for dash, and everything beyond that highlighted with the maximum color. 
 
 If you have a specific system that you would like supported by default, please open a Git issue and explain how the system measures speed and, preferably, what properties need to be changed.
 
