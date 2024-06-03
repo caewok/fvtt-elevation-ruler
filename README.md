@@ -24,7 +24,6 @@ If you choose to move the origin token (by hitting spacebar) after measuring, th
 
 As of v0.7, Elevation Ruler adds a setting to display the Foundry ruler when dragging tokens.
 As of v0.8, Elevation Ruler adds a toggle to enable pathfinding when using the ruler or dragging tokens with the Token Ruler enabled.
-
 Version v0.9 requires Foundry v12.
 
 # Installation
@@ -46,9 +45,6 @@ Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/
 - [Terrain Ruler](https://github.com/manuelVo/foundryvtt-terrain-ruler)
 - [Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer)
 - [Drag Ruler](https://github.com/manuelVo/foundryvtt-drag-ruler). Elevation ruler v0.6 series worked with Drag Ruler, but v0.7+ no longer supports Drag Ruler.
-
-## Known issues (Foundry v12, Elevation Ruler v0.9.0)
-- Pathfinding does not work. Error thrown at canvas start re `canvas.walls.outerBounds is not iterable` is related to pathfinding but can be ignored for now.
 
 In general, modules that overwrite or extend the Ruler Class may cause the elevation ruler module to fail to display or calculate correctly.
 
