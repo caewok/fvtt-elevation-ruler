@@ -104,6 +104,20 @@ function toJSON(wrapper) {
 
   const myObj = obj[MODULE_ID] = {};
 
+  // debugging
+//   if ( this.segments ) {
+//     switch(this.segments.length) {
+//       case 0: console.log(`toJSON: ${this.segments.length}`); break;
+//       case 1: console.log(`toJSON: ${this.segments.length}`); break;
+//       case 2: console.log(`toJSON: ${this.segments.length}`); break;
+//       case 3: console.log(`toJSON: ${this.segments.length}`); break;
+//       case 4: console.log(`toJSON: ${this.segments.length}`); break;
+//       case 5: console.log(`toJSON: ${this.segments.length}`); break;
+//     }
+//   }
+
+
+
   // Segment information
   // Simplify the ray.
   if ( this.segments ) myObj._segments = this.segments.map(segment => {
@@ -122,6 +136,9 @@ function toJSON(wrapper) {
   myObj._unsnappedOrigin = this._unsnappedOrigin;
   myObj.totalDistance = this.totalDistance;
   myObj.totalMoveDistance = this.totalMoveDistance;
+
+  const token = this._getMovementToken();
+  myObj._movementTokenId = token ? token.id : null;
   return obj;
 }
 
@@ -133,6 +150,18 @@ function toJSON(wrapper) {
 function update(wrapper, data) {
   const myData = data[MODULE_ID];
   if ( !myData ) return wrapper(data); // Just in case.
+
+  // debugging
+//   if ( myData._segments ) {
+//     switch(myData._segments.length) {
+//       case 0: console.log(`toJSON: ${myData._segments.length}`); break;
+//       case 1: console.log(`toJSON: ${myData._segments.length}`); break;
+//       case 2: console.log(`toJSON: ${myData._segments.length}`); break;
+//       case 3: console.log(`toJSON: ${myData._segments.length}`); break;
+//       case 4: console.log(`toJSON: ${myData._segments.length}`); break;
+//       case 5: console.log(`toJSON: ${myData._segments.length}`); break;
+//     }
+//   }
 
   // Fix for displaying user elevation increments as they happen.
   const triggerMeasure = this._userElevationIncrements !== myData._userElevationIncrements;
@@ -150,6 +179,9 @@ function update(wrapper, data) {
   // Add the calculated distance totals.
   this.totalDistance = myData.totalDistance;
   this.totalMoveDistance = myData.totalMoveDistance;
+
+  // Add the movement token, if any.
+  this._movementToken = myData._movementTokenId ? (canvas.scene.tokens.get(myData._movementTokenId) ?? null) : null;
 
   wrapper(data);
 
