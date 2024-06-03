@@ -97,6 +97,12 @@ const DashSpeedCategory = {
   multiplier: 2
 };
 
+const MaximumSpeedCategory = {
+  name: "Maximum",
+  color: Color.from(0xff0000),
+  multiplier: Number.POSITIVE_INFINITY
+}
+
 export const SPEED = {
   /**
    * Object of strings indicating where on the actor to locate the given attribute.
@@ -110,13 +116,7 @@ export const SPEED = {
    * in the first category is the next category considered.
    * @type {SpeedCategory[]}
    */
-  CATEGORIES: [WalkSpeedCategory, DashSpeedCategory],
-
-  /**
-   * Color to use once all SpeedCategory distances have been exceeded.
-   * @type {Color}
-   */
-  MAXIMUM_COLOR: Color.from(0xff0000),
+  CATEGORIES: [WalkSpeedCategory, DashSpeedCategory, MaximumSpeedCategory],
 
   // Use Font Awesome font unicode instead of basic unicode for displaying terrain symbol.
 
@@ -133,15 +133,6 @@ export const SPEED = {
    */
   terrainSymbol: "🥾"
 };
-
-export const MaximumSpeedCategory = {
-  name: "Maximum",
-  multiplier: Number.POSITIVE_INFINITY
-};
-
-Object.defineProperty(MaximumSpeedCategory, "color", {
-  get: () => SPEED.MAXIMUM_COLOR
-});
 
 /**
  * Given a token, get the maximum distance the token can travel for a given type.
@@ -179,8 +170,6 @@ Hooks.once("init", function() {
   DashSpeedCategory.multiplier = defaultDashMultiplier();
 });
 
-
-/* eslint-disable no-multi-spaces */
 export function defaultHPAttribute() {
   switch ( game.system.id ) {
     case "dnd5e":         return "actor.system.attributes.hp.value";

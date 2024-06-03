@@ -15,7 +15,7 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
-import { SPEED, MODULE_ID, MaximumSpeedCategory } from "./const.js";
+import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
@@ -106,13 +106,14 @@ function toJSON(wrapper) {
 
   // Segment information
   // Simplify the ray.
-  if ( this.segments ) myObj._segments = this.segments.map(s => {
-    const newObj = { ...s };
+  if ( this.segments ) myObj._segments = this.segments.map(segment => {
+    const newObj = { ...segment };
     newObj.ray = {
-      A: s.ray.A,
-      B: s.ray.B
+      A: segment.ray.A,
+      B: segment.ray.B
     };
-    newObj.label = Boolean(s.label);
+    newObj.label = Boolean(segment.label);
+    if ( segment.speed ) newObj.speed = segment.speed.name;
     return newObj;
   });
 
@@ -140,9 +141,10 @@ function update(wrapper, data) {
   this._unsnappedOrigin = myData._unsnappedOrigin;
 
   // Reconstruct segments.
-  if ( myData._segments ) this.segments = myData._segments.map(s => {
-    s.ray = new Ray3d(s.ray.A, s.ray.B);
-    return s;
+  if ( myData._segments ) this.segments = myData._segments.map(segment => {
+    segment.ray = new Ray3d(segment.ray.A, segment.ray.B);
+    if ( segment.speed ) segment.speed = SPEED.CATEGORIES.find(category => category.name === segment.speed);
+    return segment;
   });
 
   // Add the calculated distance totals.
@@ -401,15 +403,9 @@ function _computeTokenSpeed() {
   let s = 0;
   let segment;
 
-  // Progress through each speed attribute in turn.
-  const categoryIter = [...SPEED.CATEGORIES, MaximumSpeedCategory].values();
-  const maxDistFn = (token, speedCategory, tokenSpeed) => {
-    if ( speedCategory.name === "Maximum" ) return Number.POSITIVE_INFINITY;
-    return SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
-  };
-
+  const categoryIter = [...SPEED.CATEGORIES].values();
   let speedCategory = categoryIter.next().value;
-  let maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
+  let maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
 
   // Determine which speed category we are starting with
   // Add in already moved combat distance and determine the starting category
@@ -420,13 +416,13 @@ function _computeTokenSpeed() {
     minDistance = totalCombatMoveDistance;
   }
 
-
   while ( (segment = this.segments[s]) ) {
     // Skip speed categories that do not provide a distance larger than the last.
-    while ( speedCategory.name !== "Maximum" && maxDistance <= minDistance ) {
+    while ( speedCategory && maxDistance <= minDistance ) {
       speedCategory = categoryIter.next().value;
-      maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
+      maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
     }
+    if ( !speedCategory ) speedCategory = SPEED.CATEGORIES.at(-1);
 
     segment.speed = speedCategory;
     let newPrevDiagonal = _measureSegment(segment, token, numPrevDiagonal);
