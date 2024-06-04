@@ -278,7 +278,7 @@ export class Settings extends ModuleSettingsAbstract {
       name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT}.name`),
       hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT}.hint`),
       editable: [
-        { key: "=" }
+        { key: "Equal" }
       ],
       onDown: context => toggleTokenRulerWaypoint(context, true),
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
@@ -288,7 +288,7 @@ export class Settings extends ModuleSettingsAbstract {
       name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.REMOVE_WAYPOINT}.name`),
       hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.REMOVE_WAYPOINT}.hint`),
       editable: [
-        { key: "-" }
+        { key: "Minus" }
       ],
       onDown: context => toggleTokenRulerWaypoint(context, false),
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
