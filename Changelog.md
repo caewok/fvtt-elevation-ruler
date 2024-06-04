@@ -1,3 +1,15 @@
+# 0.9.4
+Remove custom unsnap code now that v12's `Ruler` allows unsnapping properly.
+Fix for displaying colors to other users (from v0.8.13).
+Fix definitions of the add/remove waypoint key modifiers.
+Improve placement of tokens when dragging with the Token Ruler.
+Fix for tracking arrow-key movement of tokens for combat history. Issue #74.
+Set pathfinding to default to "on." Issue #73.
+
+## New Features
+Add setting for hiding speed highlighting for hostiles (from v0.8.13).
+Add setting for using speed highlighting only during combat (from v0.8.13).
+
 # 0.9.3
 Fix for speed color error.
 
