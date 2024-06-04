@@ -1,6 +1,5 @@
 /* globals
 canvas,
-Color,
 CONFIG,
 CONST,
 foundry,
@@ -94,17 +93,16 @@ function _getMeasurementData(wrapper) {
 
   // Segment information
   // Simplify the ray.
-  if ( this.segments ) myObj._segments = this.segments.map(s => {
-    const newObj = { ...s };
+  if ( this.segments ) myObj._segments = this.segments.map(segment => {
+    const newObj = { ...segment };
     newObj.ray = {
-      A: s.ray.A,
-      B: s.ray.B
+      A: segment.ray.A,
+      B: segment.ray.B
     };
-    newObj.label = Boolean(s.label);
-    if ( s.speed ) s.speed = s.speed.name;
+    newObj.label = Boolean(segment.label);
+    if ( segment.speed ) newObj.speed = segment.speed.name;
     return newObj;
   });
-
 
   myObj._userElevationIncrements = this._userElevationIncrements;
   myObj._unsnap = this._unsnap;
@@ -131,10 +129,10 @@ function update(wrapper, data) {
   this._unsnappedOrigin = myData._unsnappedOrigin;
 
   // Reconstruct segments.
-  if ( myData._segments ) this.segments = myData._segments.map(s => {
-    s.ray = new Ray3d(s.ray.A, s.ray.B);
-    if ( s.speed ) s.speed = SPEED.CATEGORIES.find(s => s.name === s.speed);
-    return s;
+  if ( myData._segments ) this.segments = myData._segments.map(segment => {
+    segment.ray = new Ray3d(segment.ray.A, segment.ray.B);
+    if ( segment.speed ) segment.speed = SPEED.CATEGORIES.find(category => category.name === segment.speed);
+    return segment;
   });
 
   // Add the calculated distance totals.
@@ -284,7 +282,7 @@ function _computeDistance() {
 
   // Determine the distance of each segment.
   _computeSegmentDistances.call(this);
-  if ( Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING) ) _computeTokenSpeed.call(this);
+  _computeTokenSpeed.call(this); // Always compute speed if there is a token b/c other users may get to see the speed.
 
   if ( debug ) {
     switch ( this.segments.length ) {
@@ -426,7 +424,6 @@ function _computeTokenSpeed() {
     totalCombatMoveDistance = token.lastMoveDistance;
     minDistance = totalCombatMoveDistance;
   }
-
 
   while ( (segment = this.segments[s]) ) {
     // Skip speed categories that do not provide a distance larger than the last.
