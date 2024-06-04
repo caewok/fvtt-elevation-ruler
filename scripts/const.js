@@ -270,8 +270,6 @@ export function defaultDashMultiplier() {
   }
 }
 
-/* eslint-enable no-multi-spaces */
-
 /**
  * From Foundry v12
  * The different rules to define and measure diagonal distance/cost in a square grid.

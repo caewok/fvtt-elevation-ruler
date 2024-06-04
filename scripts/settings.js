@@ -364,8 +364,8 @@ export class Settings extends ModuleSettingsAbstract {
     if ( !token || !token.actor ) return false;
     const SH = this.KEYS.SPEED_HIGHLIGHTING;
     const choice = this.get(SH.CHOICE);
-    if ( choice === SH.CHOICE.NEVER
-      || (choice === SH.COMBAT && !game.combat?.started) ) return false;
+    if ( choice === SH.CHOICES.NEVER
+      || (choice === SH.CHOICES.COMBAT && !game.combat?.started) ) return false;
     if ( game.user.isGM || !this.get(SH.NO_HOSTILES) ) return true;
 
     // For hostiles, true if Observer or token is not hostile.
