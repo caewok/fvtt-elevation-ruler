@@ -118,7 +118,7 @@ export class Settings extends ModuleSettingsAbstract {
     register(KEYS.CONTROLS.PATHFINDING, {
       scope: "user",
       config: false,
-      default: false,
+      default: true,
       type: Boolean,
       requiresReload: false
     });
