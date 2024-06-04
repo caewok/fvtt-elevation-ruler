@@ -33,7 +33,7 @@ import {
   _highlightMeasurementSegment
 } from "./segments.js";
 
-import { log } from "./util.js";
+import { log, unsnappedTokenPositionAt } from "./util.js";
 
 import { PhysicalDistance } from "./PhysicalDistance.js";
 
@@ -104,6 +104,8 @@ function _getMeasurementData(wrapper) {
   myObj.totalDistance = this.totalDistance;
   myObj.totalMoveDistance = this.totalMoveDistance;
   myObj._isTokenRuler = this._isTokenRuler;
+  myObj._originAdjX = this._originAdjX;
+  myObj._originAdjY = this._originAdjY;
   return obj;
 }
 
@@ -121,6 +123,8 @@ function update(wrapper, data) {
   const triggerMeasure = this._userElevationIncrements !== myData._userElevationIncrements;
   this._userElevationIncrements = myData._userElevationIncrements;
   this._isTokenRuler = myData._isTokenRuler;
+  this._originAdjX = myData._originAdjX;
+  this.__originAdjY = myData._originAdjY;
 
   // Reconstruct segments.
   if ( myData._segments ) this.segments = myData._segments.map(segment => {
@@ -171,7 +175,7 @@ function _removeWaypoint(wrapper, point, { snap = true } = {}) {
 /**
  * Wrap Ruler.prototype._getMeasurementOrigin
  * Get the measurement origin.
- * If Token Ruler, shift the measurement origin to the token center.
+ * If Token Ruler, shift the measurement origin to the token center, adjusted for non-symmetrical tokens.
  * @param {Point} point                    The waypoint
  * @param {object} [options]               Additional options
  * @param {boolean} [options.snap=true]    Snap the waypoint?
@@ -183,8 +187,50 @@ function _getMeasurementOrigin(wrapped, point, {snap=true}={}) {
   if ( !this._isTokenRuler || !token ) return point;
 
   // Shift to token center or snapped center.
-  log(`_getMeasurementOrigin|Shifting ruler origin to ${token.center.x},${token.center.y}`);
-  return token.center;
+  // Adjust for non-symmetrical token sizes.
+  // Non-symmetrical move from the innermost right/left or top/bottom from center.
+  // log(`_getMeasurementOrigin|Shifting ruler origin to ${token.center.x},${token.center.y}`);
+  const dSize = canvas.dimensions.size;
+  const tCenter = token.center;
+  const { width, height } = token.getSize();
+  const adjX = (((width / dSize) + 1) % 2) / 2;
+  const adjY = (((height / dSize) + 1) % 2) / 2;
+  const signX = Math.sign(point.x - tCenter.x);
+  const signY = Math.sign(point.y - tCenter.y);
+
+  this._originAdjX = (adjX * signX * dSize);
+  this._originAdjY = (adjY * signY * dSize);
+  return {
+    x: tCenter.x + this._originAdjX,
+    y: tCenter.y + this._originAdjY
+  }
+
+  // return token.center;
+  // return point;
+}
+
+/**
+ * Wrap Ruler.prototype._getMeasurementDestination
+ * Get the destination point. By default the point is snapped to grid space centers.
+ * Adjust the destination point match where the preview token is placed.
+ * @param {Point} point                    The point coordinates
+ * @param {object} [options]               Additional options
+ * @param {boolean} [options.snap=true]    Snap the point?
+ * @returns {Point}                        The snapped destination point
+ * @protected
+ */
+function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
+  point = wrapped(point, { snap });
+  const token = this.token;
+  if ( !this._isTokenRuler || !token ) return point;
+  if ( !(this._originAdjX || this._originAdjY) ) return point;
+  if ( !token._preview ) return point;
+
+  const tCenter = token._preview.center;
+  return {
+    x: tCenter.x + this._originAdjX,
+    y: tCenter.y + this._originAdjY
+  };
 }
 
 /**
@@ -538,6 +584,7 @@ PATCHES.BASIC.WRAPS = {
   _addWaypoint,
   _removeWaypoint,
   _getMeasurementOrigin,
+  _getMeasurementDestination,
 
   // Wraps related to segments
   _getSegmentLabel,
