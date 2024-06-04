@@ -13,7 +13,7 @@
 This module displays the ruler when dragging tokens, does pathfinding for the ruler, tracks movement speed and movement history in combat, and can display elevation changes.
 
 ## Elevation
-[Uploading Screen Recording 2024-06-04 at 4.41.56 PM.webm…]()
+[Screen Recording 2024-06-04 at 4.41.56 PM.webm](https://github.com/caewok/fvtt-elevation-ruler/assets/1267134/eb71786a-7852-43e3-99e2-b4def15a9f83)
 
 Elevation can be changed while using the ruler (default: '[' to increment and ']' to decrement). The distance calculation updates based on the distance measured, assuming a straight line in three dimensions between origin and destination, taking into account elevation change. If you add a waypoint, elevation will be tracked at each waypoint. If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint.
 
@@ -27,6 +27,7 @@ Elevation Ruler supports coloring the ruler highlighting to represent token spee
 
 ## Pathfinding
 [Screen Recording 2024-06-04 at 4.26.31 PM.webm](https://github.com/caewok/fvtt-elevation-ruler/assets/1267134/1efca6e2-41b1-4cdb-87a3-2fb5e48be5cd)
+
 As of version 0.8.0, a button in the Token controls enables pathfinding for the ruler (or Token Ruler, when enabled). Pathfinding works on gridded (both hex and square) and gridless maps. If using the ruler, start a measurement at a token in order to start pathfinding. 
 
 Settings allow you to designate all tokens or hostile tokens as spaces to be avoided. 
