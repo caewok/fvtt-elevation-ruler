@@ -33,7 +33,7 @@ import {
   _highlightMeasurementSegment
 } from "./segments.js";
 
-import { log, snappedTokenPositionAt } from "./util.js";
+import { log } from "./util.js";
 
 import { PhysicalDistance } from "./PhysicalDistance.js";
 
@@ -184,7 +184,7 @@ function _getMeasurementOrigin(wrapped, point, {snap=true}={}) {
 
   // Shift to token center or snapped center.
   log(`_getMeasurementOrigin|Shifting ruler origin to ${token.center.x},${token.center.y}`);
-  return snap ? token.getCenterPoint(snappedTokenPositionAt(token.center, token)) : token.center;
+  return token.center;
 }
 
 /**
