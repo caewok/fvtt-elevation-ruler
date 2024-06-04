@@ -23,7 +23,8 @@ function _onDragLeftStart(wrapped, event) {
 
   // If Token Ruler, start a ruler measurement.
   if ( !Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED) ) return;
-  canvas.controls.ruler._onDragStart(event);
+
+  canvas.controls.ruler._onDragStart(event, { isTokenDrag: true });
 }
 
 /**

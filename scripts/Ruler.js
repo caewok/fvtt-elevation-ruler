@@ -2,7 +2,6 @@
 canvas,
 CONFIG,
 CONST,
-foundry,
 game,
 PIXI,
 Ruler,
@@ -31,13 +30,10 @@ import {
   _getMeasurementSegments,
   _getSegmentLabel,
   _animateSegment,
-  hasSegmentCollision,
   _highlightMeasurementSegment
 } from "./segments.js";
 
-import {
-  tokenIsSnapped,
-  log } from "./util.js";
+import { log, unsnappedTokenPositionAt } from "./util.js";
 
 import { PhysicalDistance } from "./PhysicalDistance.js";
 
@@ -105,10 +101,11 @@ function _getMeasurementData(wrapper) {
   });
 
   myObj._userElevationIncrements = this._userElevationIncrements;
-  myObj._unsnap = this._unsnap;
-  myObj._unsnappedOrigin = this._unsnappedOrigin;
   myObj.totalDistance = this.totalDistance;
   myObj.totalMoveDistance = this.totalMoveDistance;
+  myObj._isTokenRuler = this._isTokenRuler;
+  myObj._originAdjX = this._originAdjX;
+  myObj._originAdjY = this._originAdjY;
   return obj;
 }
 
@@ -125,8 +122,9 @@ function update(wrapper, data) {
   // Fix for displaying user elevation increments as they happen.
   const triggerMeasure = this._userElevationIncrements !== myData._userElevationIncrements;
   this._userElevationIncrements = myData._userElevationIncrements;
-  this._unsnap = myData._unsnap;
-  this._unsnappedOrigin = myData._unsnappedOrigin;
+  this._isTokenRuler = myData._isTokenRuler;
+  this._originAdjX = myData._originAdjX;
+  this.__originAdjY = myData._originAdjY;
 
   // Reconstruct segments.
   if ( myData._segments ) this.segments = myData._segments.map(segment => {
@@ -159,25 +157,6 @@ function _addWaypoint(wrapper, point) {
   if ( (this.state !== Ruler.STATES.STARTING) && (this.state !== Ruler.STATES.MEASURING ) ) return;
   if ( !this.waypoints.length ) return;
 
-  // If shift was held, use the precise point.
-  if ( this._unsnap ) {
-    const lastWaypoint = this.waypoints.at(-1);
-    lastWaypoint.x = point.x;
-    lastWaypoint.y = point.y;
-  }
-  else if ( this.waypoints.length === 1 ) {
-    // Move the waypoint to find unsnapped token.
-    const oldWaypoint = foundry.utils.duplicate(this.waypoints[0]);
-    this.waypoints[0].x = point.x;
-    this.waypoints[0].y = point.y;
-    const token = this.token;
-    if ( token && !tokenIsSnapped(token) ) this._unsnappedOrigin = true;
-    else {
-      this.waypoints[0].x = oldWaypoint.x;
-      this.waypoints[0].y = oldWaypoint.y;
-    }
-  }
-
   // Elevate the waypoint.
   addWaypointElevationIncrements(this, point);
 }
@@ -194,19 +173,64 @@ function _removeWaypoint(wrapper, point, { snap = true } = {}) {
 }
 
 /**
- * Wrap Ruler.prototype._getMeasurementDestination
- * If shift was held, use the precise destination instead of snapping.
- * If dragging a token, use the center of the token as the destination.
- * @param {Point} destination     The current pixel coordinates of the mouse movement
- * @returns {Point}               The destination point, a center of a grid space
+ * Wrap Ruler.prototype._getMeasurementOrigin
+ * Get the measurement origin.
+ * If Token Ruler, shift the measurement origin to the token center, adjusted for non-symmetrical tokens.
+ * @param {Point} point                    The waypoint
+ * @param {object} [options]               Additional options
+ * @param {boolean} [options.snap=true]    Snap the waypoint?
+ * @protected
  */
-function _getMeasurementDestination(wrapped, destination) {
-  const pt = wrapped(destination);
-  if ( this._unsnap ) {
-    pt.x = destination.x;
-    pt.y = destination.y;
+function _getMeasurementOrigin(wrapped, point, {snap=true}={}) {
+  point = wrapped(point, { snap });
+  const token = this.token;
+  if ( !this._isTokenRuler || !token ) return point;
+
+  // Shift to token center or snapped center.
+  // Adjust for non-symmetrical token sizes.
+  // Non-symmetrical move from the innermost right/left or top/bottom from center.
+  // log(`_getMeasurementOrigin|Shifting ruler origin to ${token.center.x},${token.center.y}`);
+  const dSize = canvas.dimensions.size;
+  const tCenter = token.center;
+  const { width, height } = token.getSize();
+  const adjX = (((width / dSize) + 1) % 2) / 2;
+  const adjY = (((height / dSize) + 1) % 2) / 2;
+  const signX = Math.sign(point.x - tCenter.x);
+  const signY = Math.sign(point.y - tCenter.y);
+
+  this._originAdjX = (adjX * signX * dSize);
+  this._originAdjY = (adjY * signY * dSize);
+  return {
+    x: tCenter.x + this._originAdjX,
+    y: tCenter.y + this._originAdjY
   }
-  return pt;
+
+  // return token.center;
+  // return point;
+}
+
+/**
+ * Wrap Ruler.prototype._getMeasurementDestination
+ * Get the destination point. By default the point is snapped to grid space centers.
+ * Adjust the destination point match where the preview token is placed.
+ * @param {Point} point                    The point coordinates
+ * @param {object} [options]               Additional options
+ * @param {boolean} [options.snap=true]    Snap the point?
+ * @returns {Point}                        The snapped destination point
+ * @protected
+ */
+function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
+  point = wrapped(point, { snap });
+  const token = this.token;
+  if ( !this._isTokenRuler || !token ) return point;
+  if ( !(this._originAdjX || this._originAdjY) ) return point;
+  if ( !token._preview ) return point;
+
+  const tCenter = token._preview.center;
+  return {
+    x: tCenter.x + this._originAdjX,
+    y: tCenter.y + this._originAdjY
+  };
 }
 
 /**
@@ -220,41 +244,17 @@ async function _animateMovement(wrapped, token) {
 
   this.segments.forEach((s, idx) => s.idx = idx);
 
-  _recalculateOffset.call(this, token);
+  //_recalculateOffset.call(this, token);
   const promises = [wrapped(token)];
   for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;
-    if ( !this.user.isGM && hasSegmentCollision(controlledToken, this.segments) ) {
+    if ( !(this.user.isGM || this._canMove(controlledToken)) ) {
       ui.notifications.error(`${game.i18n.localize("RULER.MovementNotAllowed")} for ${controlledToken.name}`);
       continue;
     }
     promises.push(wrapped(controlledToken));
   }
   return Promise.allSettled(promises);
-}
-
-
-/**
- * Recalculate the offset used by _getRulerDestination.
- * Needed for hex grids.
- *
- * Adds a temporary parameter to the ruler used by HexagonalGrid.prototype._getRulerDestination.
- * @param {Token} token
- */
-function _recalculateOffset(token) {
-  if ( !canvas.grid.isHexagonal ) return;
-  const w2 = canvas.grid.sizeX * 0.5;
-  const h2 = canvas.grid.sizeY * 0.5;
-  const origin = this.segments[0].ray.A;
-  const tl = PIXI.Point.fromObject(token.document);
-  const tlOrigin = PIXI.Point.fromObject(canvas.grid.getTopLeftPoint(origin));
-
-  // Determine difference between top left token and top left of the origin grid space.
-  // Add in the w2 and h2: distance from top left origin to center origin.
-  // Negate that sum to offset each segment destination (dest + offset).
-  const diff = tlOrigin.subtract(tl);
-  diff.add({ x: w2, y: h2 }, diff);
-  this._recalculatedOffset = diff.multiplyScalar(-1, diff);
 }
 
 /**
@@ -560,55 +560,10 @@ function segmentGridHalfIntersection(gridCoords, a, b) {
  * @param {PIXI.FederatedEvent} event   The drag start event
  * @see {Canvas._onDragLeftStart}
  */
-function _onDragStart(wrapped, event) {
+function _onDragStart(wrapped, event, { isTokenDrag = false } = {}) {
   Settings.FORCE_TO_GROUND = false;
   this._userElevationIncrements = 0;
-  this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
-  return wrapped(event);
-}
-
-/**
- * Wrap Ruler.prototype._onClickLeft.
- * Record whether shift is held.
- * @param {PIXI.FederatedEvent} event   The pointer-down event
- * @see {Canvas._onDragLeftStart}
- */
-function _onClickLeft(wrapped, event) {
-  this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
-  return wrapped(event);
-}
-
-/**
- * Wrap Ruler.prototype._onClickRight
- * Record whether shift is held.
- * @param {PIXI.FederatedEvent} event   The pointer-down event
- * @see {Canvas._onClickRight}
- */
-function _onClickRight(wrapped, event) {
-  this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
-  return wrapped(event);
-}
-
-/**
- * Wrap Ruler.prototype._onMouseMove
- * Record whether shift is held.
- * @param {PIXI.FederatedEvent} event   The mouse move event
- * @see {Canvas._onDragLeftMove}
- */
-function _onMouseMove(wrapped, event) {
-  this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
-  return wrapped(event);
-}
-
-/**
- * Wrap Ruler.prototype._onMouseUp
- * Record whether shift is held
- * @param {PIXI.FederatedEvent} event   The pointer-up event
- * @see {Canvas._onDragLeftDrop}
- */
-function _onMouseUp(wrapped, event) {
-  //if ( this._state === Ruler.STATES.MOVING ) return;
-  this._unsnap = event.shiftKey || canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS;
+  this._isTokenRuler = isTokenDrag;
   return wrapped(event);
 }
 
@@ -628,6 +583,7 @@ PATCHES.BASIC.WRAPS = {
   update,
   _addWaypoint,
   _removeWaypoint,
+  _getMeasurementOrigin,
   _getMeasurementDestination,
 
   // Wraps related to segments
@@ -635,14 +591,11 @@ PATCHES.BASIC.WRAPS = {
 
   // Events
   _onDragStart,
-  _onClickLeft,
-  _onClickRight,
-  _onMouseMove,
   _canMove,
   _onMoveKeyDown
 };
 
-PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments, _onMouseUp };
+PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments };
 
 PATCHES.BASIC.OVERRIDES = { _computeDistance, _animateSegment };
 
