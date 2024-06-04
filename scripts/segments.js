@@ -188,7 +188,7 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
   }
 
   let combatLabel = "";
-  if ( game.combat?.started && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) {
+  if ( game.combat?.started && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
     const pastMoveDistance = this._movementToken?.lastMoveDistance;
     if ( pastMoveDistance ) combatLabel = `\nPrior: ${pastMoveDistance}${units}`;
   }
@@ -280,20 +280,20 @@ export function hasSegmentCollision(token, segments) {
  * Wrap Ruler.prototype._highlightMeasurementSegment
  */
 export function _highlightMeasurementSegment(wrapped, segment) {
+
   // Temporarily ensure the ray distance is two-dimensional, so highlighting selects correct squares.
   // Otherwise the highlighting algorithm can get confused for high-elevation segments.
   segment.ray._distance = PIXI.Point.distanceBetween(segment.ray.A, segment.ray.B);
 
   // Adjust the color if this user has selected speed highlighting.
   const priorColor = this.color;
-  const token = this._getMovementToken();
-  const doSpeedHighlighting = token
-    // && this.user === game.user
-    && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING)
-    && segment.speed?.color;
+  const doSpeedHighlighting = segment.speed?.color && Settings.useSpeedHighlighting(this._getMovementToken());
 
   // Highlight each split in turn, changing highlight color each time.
-  if ( doSpeedHighlighting ) this.color = segment.speed.color;
+  if ( doSpeedHighlighting ) {
+    log(`_highlightMeasurementSegment|Changing color from ${this.color} to ${segment.speed.color}`);
+    this.color = segment.speed.color;
+  }
 
   // Call Foundry version and return if not speed highlighting.
   const res = wrapped(segment);
@@ -316,6 +316,7 @@ export function _highlightMeasurementSegment(wrapped, segment) {
   }
 
   // Reset to the default color.
+  log(`_highlightMeasurementSegment|Resetting color from ${this.color} to ${priorColor}`);
   this.color = priorColor;
 }
 

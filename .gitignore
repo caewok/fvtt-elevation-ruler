@@ -4,3 +4,5 @@ test_sync_to_module.sh
 sync_module.sh
 
 *.sh
+
+eslint.config.mjs

@@ -15,7 +15,7 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
-import { SPEED, MODULE_ID, MaximumSpeedCategory } from "./const.js";
+import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
@@ -104,15 +104,30 @@ function toJSON(wrapper) {
 
   const myObj = obj[MODULE_ID] = {};
 
+  // debugging
+//   if ( this.segments ) {
+//     switch(this.segments.length) {
+//       case 0: console.log(`toJSON: ${this.segments.length}`); break;
+//       case 1: console.log(`toJSON: ${this.segments.length}`); break;
+//       case 2: console.log(`toJSON: ${this.segments.length}`); break;
+//       case 3: console.log(`toJSON: ${this.segments.length}`); break;
+//       case 4: console.log(`toJSON: ${this.segments.length}`); break;
+//       case 5: console.log(`toJSON: ${this.segments.length}`); break;
+//     }
+//   }
+
+
+
   // Segment information
   // Simplify the ray.
-  if ( this.segments ) myObj._segments = this.segments.map(s => {
-    const newObj = { ...s };
+  if ( this.segments ) myObj._segments = this.segments.map(segment => {
+    const newObj = { ...segment };
     newObj.ray = {
-      A: s.ray.A,
-      B: s.ray.B
+      A: segment.ray.A,
+      B: segment.ray.B
     };
-    newObj.label = Boolean(s.label);
+    newObj.label = Boolean(segment.label);
+    if ( segment.speed ) newObj.speed = segment.speed.name;
     return newObj;
   });
 
@@ -121,6 +136,9 @@ function toJSON(wrapper) {
   myObj._unsnappedOrigin = this._unsnappedOrigin;
   myObj.totalDistance = this.totalDistance;
   myObj.totalMoveDistance = this.totalMoveDistance;
+
+  const token = this._getMovementToken();
+  myObj._movementTokenId = token ? token.id : null;
   return obj;
 }
 
@@ -133,6 +151,18 @@ function update(wrapper, data) {
   const myData = data[MODULE_ID];
   if ( !myData ) return wrapper(data); // Just in case.
 
+  // debugging
+//   if ( myData._segments ) {
+//     switch(myData._segments.length) {
+//       case 0: console.log(`toJSON: ${myData._segments.length}`); break;
+//       case 1: console.log(`toJSON: ${myData._segments.length}`); break;
+//       case 2: console.log(`toJSON: ${myData._segments.length}`); break;
+//       case 3: console.log(`toJSON: ${myData._segments.length}`); break;
+//       case 4: console.log(`toJSON: ${myData._segments.length}`); break;
+//       case 5: console.log(`toJSON: ${myData._segments.length}`); break;
+//     }
+//   }
+
   // Fix for displaying user elevation increments as they happen.
   const triggerMeasure = this._userElevationIncrements !== myData._userElevationIncrements;
   this._userElevationIncrements = myData._userElevationIncrements;
@@ -140,14 +170,20 @@ function update(wrapper, data) {
   this._unsnappedOrigin = myData._unsnappedOrigin;
 
   // Reconstruct segments.
-  if ( myData._segments ) this.segments = myData._segments.map(s => {
-    s.ray = new Ray3d(s.ray.A, s.ray.B);
-    return s;
+  if ( myData._segments ) this.segments = myData._segments.map(segment => {
+    segment.ray = new Ray3d(segment.ray.A, segment.ray.B);
+    if ( segment.speed ) segment.speed = SPEED.CATEGORIES.find(category => category.name === segment.speed);
+    return segment;
   });
 
   // Add the calculated distance totals.
   this.totalDistance = myData.totalDistance;
   this.totalMoveDistance = myData.totalMoveDistance;
+
+  // Add the movement token, if any.
+  this._movementToken = myData._movementTokenId
+    ? (canvas.scene.tokens.get(myData._movementTokenId)?.object ?? null)
+      : null;
 
   wrapper(data);
 
@@ -280,7 +316,7 @@ function _computeDistance() {
 
   // Determine the distance of each segment.
   _computeSegmentDistances.call(this);
-  if ( Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING) ) _computeTokenSpeed.call(this);
+  _computeTokenSpeed.call(this); // Always compute speed if there is a token b/c other users may get to see the speed.
 
   if ( debug ) {
     switch ( this.segments.length ) {
@@ -401,32 +437,26 @@ function _computeTokenSpeed() {
   let s = 0;
   let segment;
 
-  // Progress through each speed attribute in turn.
-  const categoryIter = [...SPEED.CATEGORIES, MaximumSpeedCategory].values();
-  const maxDistFn = (token, speedCategory, tokenSpeed) => {
-    if ( speedCategory.name === "Maximum" ) return Number.POSITIVE_INFINITY;
-    return SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
-  };
-
+  const categoryIter = [...SPEED.CATEGORIES].values();
   let speedCategory = categoryIter.next().value;
-  let maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
+  let maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
 
   // Determine which speed category we are starting with
   // Add in already moved combat distance and determine the starting category
   if ( game.combat?.started
-    && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) {
+    && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
 
     totalCombatMoveDistance = token.lastMoveDistance;
     minDistance = totalCombatMoveDistance;
   }
 
-
   while ( (segment = this.segments[s]) ) {
     // Skip speed categories that do not provide a distance larger than the last.
-    while ( speedCategory.name !== "Maximum" && maxDistance <= minDistance ) {
+    while ( speedCategory && maxDistance <= minDistance ) {
       speedCategory = categoryIter.next().value;
-      maxDistance = maxDistFn(token, speedCategory, tokenSpeed);
+      maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
     }
+    if ( !speedCategory ) speedCategory = SPEED.CATEGORIES.at(-1);
 
     segment.speed = speedCategory;
     let newPrevDiagonal = _measureSegment(segment, token, numPrevDiagonal);

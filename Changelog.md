@@ -1,3 +1,9 @@
+# 0.8.13
+Add support from dragonbane and twodsix systems from v12 branch.
+Update speed category handling to match v12 branch.
+Fix for speed colors not properly displaying between users.
+Change setting for using speed highlighting to allow it to display only during combat.
+
 # 0.8.12
 Fix for speed highlighting not working if the Token HUD has not been used. Closes #65.
 

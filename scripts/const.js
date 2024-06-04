@@ -97,6 +97,12 @@ const DashSpeedCategory = {
   multiplier: 2
 };
 
+const MaximumSpeedCategory = {
+  name: "Maximum",
+  color: Color.from(0xff0000),
+  multiplier: Number.POSITIVE_INFINITY
+}
+
 export const SPEED = {
   /**
    * Object of strings indicating where on the actor to locate the given attribute.
@@ -110,13 +116,7 @@ export const SPEED = {
    * in the first category is the next category considered.
    * @type {SpeedCategory[]}
    */
-  CATEGORIES: [WalkSpeedCategory, DashSpeedCategory],
-
-  /**
-   * Color to use once all SpeedCategory distances have been exceeded.
-   * @type {Color}
-   */
-  MAXIMUM_COLOR: Color.from(0xff0000),
+  CATEGORIES: [WalkSpeedCategory, DashSpeedCategory, MaximumSpeedCategory],
 
   // Use Font Awesome font unicode instead of basic unicode for displaying terrain symbol.
 
@@ -133,15 +133,6 @@ export const SPEED = {
    */
   terrainSymbol: "🥾"
 };
-
-export const MaximumSpeedCategory = {
-  name: "Maximum",
-  multiplier: Number.POSITIVE_INFINITY
-};
-
-Object.defineProperty(MaximumSpeedCategory, "color", {
-  get: () => SPEED.MAXIMUM_COLOR
-});
 
 /**
  * Given a token, get the maximum distance the token can travel for a given type.
@@ -179,11 +170,11 @@ Hooks.once("init", function() {
   DashSpeedCategory.multiplier = defaultDashMultiplier();
 });
 
-
-/* eslint-disable no-multi-spaces */
 export function defaultHPAttribute() {
   switch ( game.system.id ) {
     case "dnd5e":         return "actor.system.attributes.hp.value";
+    case "dragonbane":    return "actor.system.hitpoints.value";
+    case "twodsix":       return "actor.system.hits.value";
     default:              return "actor.system.attributes.hp.value";
   }
 }
@@ -205,6 +196,8 @@ export function defaultWalkAttribute() {
     case "splittermond":  return "actor.derivedValues.speed.value";
     case "wfrp4e":        return "actor.system.details.move.walk";
     case "crucible":      return "actor.system.movement.stride";
+    case "dragonbane":    return "actor.system.movement";
+    case "twodsix":       return "actor.system.movement.walk";
     default:              return "";
   }
 }
@@ -225,6 +218,8 @@ export function defaultFlyAttribute() {
     // Missing attribute case "splittermond":
     // Missing attribute case "wfrp4e":
     // Missing attribute case "crucible":
+    // Missing attribute case "dragonbane":
+    case "twodsix":       return "actor.system.movement.fly";
     default:              return "";
   }
 }
@@ -245,6 +240,8 @@ export function defaultBurrowAttribute() {
     // Missing attribute case "splittermond":
     // Missing attribute case "wfrp4e":
     // Missing attribute case "crucible":
+    // Missing attribute case "dragonbane":
+    case "twodsix":       return "actor.system.movement.burrow";
     default:              return "";
   }
 }
@@ -259,6 +256,8 @@ export function defaultDashMultiplier() {
     case "D35E":
     case "sfrpg":
     case "shadowrun5e":
+    case "dragonbane":
+    case "twodsix":
     case "ds4":           return 2;
 
     case "CoC7":          return 5;
@@ -270,8 +269,6 @@ export function defaultDashMultiplier() {
     default:              return 0;
   }
 }
-
-/* eslint-enable no-multi-spaces */
 
 /**
  * From Foundry v12
