@@ -235,11 +235,6 @@ export async function _animateSegment(token, segment, destination) {
 //     && !(segment.B.x === this.destination.x && segment.B.y === this.destination.y )
 //     && !this.waypoints.some(w => segment.B.x === w.x && segment.B.y === w.y) ) return;
 
-  if ( this._isTokenRuler && segment.last ) {
-    destination = unsnappedTokenPositionAt(segment.ray.B, token);
-    log(`Changing destination to ${destination.x},${destination.y} for last segment`);
-  }
-
   let name;
   if ( segment.animation?.name === undefined ) name = token.animationName;
   else name ||= Symbol(token.animationName);

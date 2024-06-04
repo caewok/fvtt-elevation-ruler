@@ -4,7 +4,8 @@ CONFIG,
 CONST,
 game,
 PIXI,
-Ruler
+Ruler,
+ui
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -32,7 +33,7 @@ import {
   _highlightMeasurementSegment
 } from "./segments.js";
 
-import { log } from "./util.js";
+import { log, snappedTokenPositionAt } from "./util.js";
 
 import { PhysicalDistance } from "./PhysicalDistance.js";
 
@@ -168,6 +169,25 @@ function _removeWaypoint(wrapper, point, { snap = true } = {}) {
 }
 
 /**
+ * Wrap Ruler.prototype._getMeasurementOrigin
+ * Get the measurement origin.
+ * If Token Ruler, shift the measurement origin to the token center.
+ * @param {Point} point                    The waypoint
+ * @param {object} [options]               Additional options
+ * @param {boolean} [options.snap=true]    Snap the waypoint?
+ * @protected
+ */
+function _getMeasurementOrigin(wrapped, point, {snap=true}={}) {
+  point = wrapped(point, { snap });
+  const token = this.token;
+  if ( !this._isTokenRuler || !token ) return point;
+
+  // Shift to token center or snapped center.
+  log(`_getMeasurementOrigin|Shifting ruler origin to ${token.center.x},${token.center.y}`);
+  return snap ? token.getCenterPoint(snappedTokenPositionAt(token.center, token)) : token.center;
+}
+
+/**
  * Mixed wrap Ruler.prototype._animateMovement
  * Add additional controlled tokens to the move, if permitted.
  */
@@ -182,10 +202,10 @@ async function _animateMovement(wrapped, token) {
   const promises = [wrapped(token)];
   for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;
-//     if ( !this.user.isGM && hasSegmentCollision(controlledToken, this.segments) ) {
-//       ui.notifications.error(`${game.i18n.localize("RULER.MovementNotAllowed")} for ${controlledToken.name}`);
-//       continue;
-//     }
+    if ( !(this.user.isGM || this._canMove(controlledToken)) ) {
+      ui.notifications.error(`${game.i18n.localize("RULER.MovementNotAllowed")} for ${controlledToken.name}`);
+      continue;
+    }
     promises.push(wrapped(controlledToken));
   }
   return Promise.allSettled(promises);
@@ -517,6 +537,7 @@ PATCHES.BASIC.WRAPS = {
   update,
   _addWaypoint,
   _removeWaypoint,
+  _getMeasurementOrigin,
 
   // Wraps related to segments
   _getSegmentLabel,
