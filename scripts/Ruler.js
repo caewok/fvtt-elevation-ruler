@@ -619,7 +619,8 @@ function incrementElevation() {
   ruler.measure(destination);
 
   // Broadcast the activity (see ControlsLayer.prototype._onMouseMove)
-  game.user.broadcastActivity({ ruler: ruler.toJSON() });
+  this._broadcastMeasurement();
+  // game.user.broadcastActivity({ ruler: ruler.toJSON() });
 }
 
 /**
@@ -638,7 +639,8 @@ function decrementElevation() {
   ruler.measure(destination);
 
   // Broadcast the activity (see ControlsLayer.prototype._onMouseMove)
-  game.user.broadcastActivity({ ruler: ruler.toJSON() });
+  this._broadcastMeasurement();
+  // game.user.broadcastActivity({ ruler: ruler.toJSON() });
 }
 
 /**

@@ -12,7 +12,7 @@ import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
-import { perpendicularPoints, log, unsnappedTokenPositionAt  } from "./util.js";
+import { perpendicularPoints, log  } from "./util.js";
 import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
 import { elevationAtWaypoint } from "./terrain_elevation.js";
 import { MovePenalty } from "./MovePenalty.js";
@@ -254,7 +254,8 @@ export async function _animateSegment(token, segment, destination) {
 
   // Update elevation after the token move.
   if ( segment.ray.A.z !== segment.ray.B.z ) {
-    const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z);
+    const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) ?? 1;
+    const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z).toNearest(multiple);
     await token.document.update({ elevation });
   }
 }

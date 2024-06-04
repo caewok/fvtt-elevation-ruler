@@ -5,6 +5,8 @@ Fix definitions of the add/remove waypoint key modifiers.
 Improve placement of tokens when dragging with the Token Ruler.
 Fix for tracking arrow-key movement of tokens for combat history. Issue #74.
 Set pathfinding to default to "on." Issue #73.
+Fix error when broadcasting ruler elevation changes.
+Round elevation to nearest multiple.
 
 ## New Features
 Add setting for hiding speed highlighting for hostiles (from v0.8.13).
