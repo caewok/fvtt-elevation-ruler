@@ -181,7 +181,9 @@ function update(wrapper, data) {
   this.totalMoveDistance = myData.totalMoveDistance;
 
   // Add the movement token, if any.
-  this._movementToken = myData._movementTokenId ? (canvas.scene.tokens.get(myData._movementTokenId) ?? null) : null;
+  this._movementToken = myData._movementTokenId
+    ? (canvas.scene.tokens.get(myData._movementTokenId)?.object ?? null)
+      : null;
 
   wrapper(data);
 
@@ -314,7 +316,7 @@ function _computeDistance() {
 
   // Determine the distance of each segment.
   _computeSegmentDistances.call(this);
-  if ( Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING) ) _computeTokenSpeed.call(this);
+  _computeTokenSpeed.call(this); // Always compute speed if there is a token b/c other users may get to see the speed.
 
   if ( debug ) {
     switch ( this.segments.length ) {
@@ -442,7 +444,7 @@ function _computeTokenSpeed() {
   // Determine which speed category we are starting with
   // Add in already moved combat distance and determine the starting category
   if ( game.combat?.started
-    && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) {
+    && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
 
     totalCombatMoveDistance = token.lastMoveDistance;
     minDistance = totalCombatMoveDistance;

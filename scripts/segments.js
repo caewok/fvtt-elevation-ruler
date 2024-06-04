@@ -188,7 +188,7 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
   }
 
   let combatLabel = "";
-  if ( game.combat?.started && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) {
+  if ( game.combat?.started && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
     const pastMoveDistance = this._movementToken?.lastMoveDistance;
     if ( pastMoveDistance ) combatLabel = `\nPrior: ${pastMoveDistance}${units}`;
   }
@@ -287,11 +287,7 @@ export function _highlightMeasurementSegment(wrapped, segment) {
 
   // Adjust the color if this user has selected speed highlighting.
   const priorColor = this.color;
-  const token = this._getMovementToken();
-  const doSpeedHighlighting = Boolean(token)
-    // && this.user === game.user
-    && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING)
-    && Boolean(segment.speed?.color);
+  const doSpeedHighlighting = segment.speed?.color && Settings.useSpeedHighlighting(this._getMovementToken());
 
   // Highlight each split in turn, changing highlight color each time.
   if ( doSpeedHighlighting ) {
