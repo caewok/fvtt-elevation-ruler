@@ -220,7 +220,7 @@ export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance)
 
 
 /**
- * Mixed wrap Ruler.prototype._animateSegment
+ * Override Ruler.prototype._animateSegment
  * When moving the token along the segments, update the token elevation to the destination + increment
  * for the given segment.
  * Mark the token update if pathfinding for this segment.
@@ -257,30 +257,6 @@ export async function _animateSegment(token, segment, destination) {
     const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z);
     await token.document.update({ elevation });
   }
-}
-
-/**
- * Check for token collision among the segments.
- * Differs from Ruler.prototype._canMove because it adjusts for token position.
- * See Ruler.prototype._animateMovement.
- * @param {Token} token         Token to test for collisions
- * @param {object} segments     Ruler segments to test
- * @returns {boolean} True if a collision is found.
- */
-export function hasSegmentCollision(token, segments) {
-  const rulerOrigin = segments[0].ray.A;
-  const collisionConfig = { type: "move", mode: "any" };
-  const s2 = canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS ? 1 : (canvas.dimensions.size / 2);
-  let priorOrigin = { x: token.document.x, y: token.document.y };
-  const dx = Math.round((priorOrigin.x - rulerOrigin.x) / s2) * s2;
-  const dy = Math.round((priorOrigin.y - rulerOrigin.y) / s2) * s2;
-  for ( const segment of segments ) {
-    const adjustedDestination = canvas.grid.grid._getRulerDestination(segment.ray, {x: dx, y: dy}, token);
-    collisionConfig.origin = priorOrigin;
-    if ( token.checkCollision(adjustedDestination, collisionConfig) ) return true;
-    priorOrigin = adjustedDestination;
-  }
-  return false;
 }
 
 // ----- NOTE: Segment highlighting ----- //

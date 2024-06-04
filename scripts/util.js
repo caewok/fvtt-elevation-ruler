@@ -37,17 +37,6 @@ export function perpendicularPoints(A, B, distance = 1) {
 }
 
 /**
- * Determine if a token is currently snapped to the grid.
- * @param {Token} token
- * @returns {boolean}
- */
-export function tokenIsSnapped(token) {
-  const tokenLoc = PIXI.Point.fromObject(token.document);
-  const snappedPt = getTopLeftPoint(tokenLoc);
-  return tokenLoc.almostEqual(snappedPt);
-}
-
-/**
  * Create a very small rectangle for a point to be used with Quadtree.
  * @param {Point} pt
  * @returns {PIXI.Rectangle}
