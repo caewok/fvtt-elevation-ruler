@@ -12,7 +12,7 @@ import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
-import { perpendicularPoints, log } from "./util.js";
+import { perpendicularPoints, log, unsnappedTokenPositionAt  } from "./util.js";
 import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
 import { elevationAtWaypoint } from "./terrain_elevation.js";
 import { MovePenalty } from "./MovePenalty.js";
@@ -188,7 +188,7 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
   }
 
   let combatLabel = "";
-  if ( game.combat?.started && Settings.get(Settings.KEYS.TOKEN_RULER.COMBAT_HISTORY) ) {
+  if ( game.combat?.started && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
     const pastMoveDistance = this.token?.lastMoveDistance;
     if ( pastMoveDistance ) combatLabel = `\nPrior: ${pastMoveDistance}${units}`;
   }
@@ -220,7 +220,7 @@ export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance)
 
 
 /**
- * Mixed wrap Ruler.prototype._animateSegment
+ * Override Ruler.prototype._animateSegment
  * When moving the token along the segments, update the token elevation to the destination + increment
  * for the given segment.
  * Mark the token update if pathfinding for this segment.
@@ -259,30 +259,6 @@ export async function _animateSegment(token, segment, destination) {
   }
 }
 
-/**
- * Check for token collision among the segments.
- * Differs from Ruler.prototype._canMove because it adjusts for token position.
- * See Ruler.prototype._animateMovement.
- * @param {Token} token         Token to test for collisions
- * @param {object} segments     Ruler segments to test
- * @returns {boolean} True if a collision is found.
- */
-export function hasSegmentCollision(token, segments) {
-  const rulerOrigin = segments[0].ray.A;
-  const collisionConfig = { type: "move", mode: "any" };
-  const s2 = canvas.scene.grid.type === CONST.GRID_TYPES.GRIDLESS ? 1 : (canvas.dimensions.size / 2);
-  let priorOrigin = { x: token.document.x, y: token.document.y };
-  const dx = Math.round((priorOrigin.x - rulerOrigin.x) / s2) * s2;
-  const dy = Math.round((priorOrigin.y - rulerOrigin.y) / s2) * s2;
-  for ( const segment of segments ) {
-    const adjustedDestination = canvas.grid.grid._getRulerDestination(segment.ray, {x: dx, y: dy}, token);
-    collisionConfig.origin = priorOrigin;
-    if ( token.checkCollision(adjustedDestination, collisionConfig) ) return true;
-    priorOrigin = adjustedDestination;
-  }
-  return false;
-}
-
 // ----- NOTE: Segment highlighting ----- //
 /**
  * Wrap Ruler.prototype._highlightMeasurementSegment
@@ -294,11 +270,8 @@ export function _highlightMeasurementSegment(wrapped, segment) {
 
   // Adjust the color if this user has selected speed highlighting.
   const priorColor = this.color;
-  const token = this.token;
-  const doSpeedHighlighting = token
-    // && this.user === game.user
-    && Settings.get(Settings.KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING)
-    && segment.speed?.color;
+  const doSpeedHighlighting = segment.speed?.color && Settings.useSpeedHighlighting(this.token);
+
 
   // Highlight each split in turn, changing highlight color each time.
   if ( doSpeedHighlighting ) this.color = segment.speed.color;

@@ -2,7 +2,8 @@
 game,
 CONST,
 canvas,
-Ruler
+Ruler,
+ui
 */
 "use strict";
 
@@ -40,9 +41,19 @@ const SETTINGS = {
   TOKEN_RULER: {
     ENABLED: "enable-token-ruler",
     ROUND_TO_MULTIPLE: "round-to-multiple",
-    SPEED_HIGHLIGHTING: "token-ruler-highlighting",
-    TOKEN_MULTIPLIER: "token-terrain-multiplier",
-    COMBAT_HISTORY: "token-ruler-combat-history"
+    TOKEN_MULTIPLIER: "token-terrain-multiplier"
+  },
+
+  SPEED_HIGHLIGHTING: {
+    DEPRECATED_ENABLED: "token-ruler-highlighting", // Old boolean setting for whether to enable speed highlighting.
+    CHOICE: "speed-highlighting-choice", // New multiple-choice for enabling speed highlighting.
+    NO_HOSTILES: "speed-highlighting-no-hostiles",
+    COMBAT_HISTORY: "token-ruler-combat-history",
+    CHOICES: {
+      NEVER: "speed-highlighting-choice-never",
+      COMBAT: "speed-highlighting-choice-combat",
+      ALWAYS: "speed-highlighting-choice-always"
+    }
   },
 
   GRID_TERRAIN: {
@@ -107,7 +118,7 @@ export class Settings extends ModuleSettingsAbstract {
     register(KEYS.CONTROLS.PATHFINDING, {
       scope: "user",
       config: false,
-      default: false,
+      default: true,
       type: Boolean,
       requiresReload: false
     });
@@ -149,19 +160,39 @@ export class Settings extends ModuleSettingsAbstract {
       requiresReload: false
     });
 
-    register(KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING, {
-      name: localize(`${KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING}.name`),
-      hint: localize(`${KEYS.TOKEN_RULER.SPEED_HIGHLIGHTING}.hint`),
+    // Previously SPEED_HIGHLIGHTING was a boolean. If false, set to Never. Otherwise set to always.
+    const prevSpeedHighlightSetting = this._getStorageValue(KEYS.SPEED_HIGHLIGHTING.DEPRECATED_ENABLED, "client");
+    const speedHighlightingDefault = prevSpeedHighlightSetting === "false"
+      ? KEYS.SPEED_HIGHLIGHTING.CHOICES.NEVER : KEYS.SPEED_HIGHLIGHTING.CHOICES.ALWAYS;
+
+    register(KEYS.SPEED_HIGHLIGHTING.CHOICE, {
+      name: localize(`${KEYS.SPEED_HIGHLIGHTING.CHOICE}.name`),
+      hint: localize(`${KEYS.SPEED_HIGHLIGHTING.CHOICE}.hint`),
       scope: "user",
+      config: true,
+      default: speedHighlightingDefault,
+      type: String,
+      choices: {
+        [KEYS.SPEED_HIGHLIGHTING.CHOICES.NEVER]: localize(`${KEYS.SPEED_HIGHLIGHTING.CHOICES.NEVER}`),
+        [KEYS.SPEED_HIGHLIGHTING.CHOICES.COMBAT]: localize(`${KEYS.SPEED_HIGHLIGHTING.CHOICES.COMBAT}`),
+        [KEYS.SPEED_HIGHLIGHTING.CHOICES.ALWAYS]: localize(`${KEYS.SPEED_HIGHLIGHTING.CHOICES.ALWAYS}`)
+      },
+      requiresReload: false
+    });
+
+    register(KEYS.SPEED_HIGHLIGHTING.NO_HOSTILES, {
+      name: localize(`${KEYS.SPEED_HIGHLIGHTING.NO_HOSTILES}.name`),
+      hint: localize(`${KEYS.SPEED_HIGHLIGHTING.NO_HOSTILES}.hint`),
+      scope: "world",
       config: true,
       default: false,
       type: Boolean,
       requiresReload: false
     });
 
-    register(KEYS.TOKEN_RULER.COMBAT_HISTORY, {
-      name: localize(`${KEYS.TOKEN_RULER.COMBAT_HISTORY}.name`),
-      hint: localize(`${KEYS.TOKEN_RULER.COMBAT_HISTORY}.hint`),
+    register(KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY, {
+      name: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY}.name`),
+      hint: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY}.hint`),
       scope: "user",
       config: true,
       default: false,
@@ -247,7 +278,7 @@ export class Settings extends ModuleSettingsAbstract {
       name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT}.name`),
       hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT}.hint`),
       editable: [
-        { key: "=" }
+        { key: "Equal" }
       ],
       onDown: context => toggleTokenRulerWaypoint(context, true),
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
@@ -257,7 +288,7 @@ export class Settings extends ModuleSettingsAbstract {
       name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.REMOVE_WAYPOINT}.name`),
       hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.REMOVE_WAYPOINT}.hint`),
       editable: [
-        { key: "-" }
+        { key: "Minus" }
       ],
       onDown: context => toggleTokenRulerWaypoint(context, false),
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
@@ -330,16 +361,27 @@ export class Settings extends ModuleSettingsAbstract {
       : blockSetting === C.HOSTILE ? D.HOSTILE
         : D.SECRET;
   }
-}
 
-/**
- * Force a reload of token controls layer.
- * Used to force the added control to appear/disappear.
- */
-function reloadTokenControls() {
-  if ( !canvas.tokens.active ) return;
-  canvas.tokens.deactivate();
-  canvas.tokens.activate();
+  /**
+   * Determine if speed highlighting should be enabled for this user and this token.
+   * If no hostiles, then user can see the speed if they have Observer or greater permissions
+   * or token is not hostile. GMs always see speed if enabled.
+   * @param {Token} token     Token whose speed would be displayed
+   * @returns {boolean} True if speed highlighting should be used.
+   */
+  static useSpeedHighlighting(token) {
+    if ( !token || !token.actor ) return false;
+    const SH = this.KEYS.SPEED_HIGHLIGHTING;
+    const choice = this.get(SH.CHOICE);
+    if ( choice === SH.CHOICES.NEVER
+      || (choice === SH.CHOICES.COMBAT && !game.combat?.started) ) return false;
+    if ( game.user.isGM || !this.get(SH.NO_HOSTILES) ) return true;
+
+    // For hostiles, true if Observer or token is not hostile.
+    if ( token.actor.testUserPermission(game.user, "OBSERVER") ) return true;
+    if ( token.document.disposition < 0 ) return false;
+    return true;
+  }
 }
 
 /**

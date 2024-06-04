@@ -1,3 +1,15 @@
+# 0.9.4
+Remove custom unsnap code now that v12's `Ruler` allows unsnapping properly.
+Fix for displaying colors to other users (from v0.8.13).
+Fix definitions of the add/remove waypoint key modifiers.
+Improve placement of tokens when dragging with the Token Ruler.
+Fix for tracking arrow-key movement of tokens for combat history. Issue #74.
+Set pathfinding to default to "on." Issue #73.
+
+## New Features
+Add setting for hiding speed highlighting for hostiles (from v0.8.13).
+Add setting for using speed highlighting only during combat (from v0.8.13).
+
 # 0.9.3
 Fix for speed color error.
 
@@ -22,6 +34,12 @@ Initial support for Foundry v12.
 
 ## KNOWN ISSUES
 Pathfinding does not work. Error at startup `canvas.walls.outerBounds is not iterable` is related to pathfinding but can be otherwise ignored.
+
+# 0.8.13
+Add support from dragonbane and twodsix systems from v12 branch.
+Update speed category handling to match v12 branch.
+Fix for speed colors not properly displaying between users.
+Change setting for using speed highlighting to allow it to display only during combat.
 
 # 0.8.12
 Fix for speed highlighting not working if the Token HUD has not been used. Closes #65.

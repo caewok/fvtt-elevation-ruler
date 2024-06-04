@@ -23,6 +23,23 @@ async function set(wrapper, namespace, key, value, options) {
 
 PATCHES.BASIC.WRAPS = { set };
 
+/**
+ * Wipe setting cache on update hook.
+ * Needed so world settings get wiped from all users.
+ * @param {Document} document                       The existing Document which was updated
+ * @param {object} changed                          Differential data that was used to update the document
+ * @param {Partial<DatabaseUpdateOperation>} options Additional options which modified the update request
+ * @param {string} userId                           The ID of the User who triggered the update workflow
+ */
+function updateSetting(document, changed, options, userId) {
+  const [theNamespace, key] = document.key.split(".", 2);
+  if ( !(theNamespace || key) ) return;
+  if ( theNamespace !== MODULE_ID ) return;
+  ModuleSettingsAbstract.cache.delete(key);
+}
+
+PATCHES.BASIC.HOOKS = { updateSetting };
+
 export class ModuleSettingsAbstract {
   /** @type {Map<string, *>} */
   static cache = new Map();
@@ -39,15 +56,15 @@ export class ModuleSettingsAbstract {
    * @returns {*}
    */
   static get(key) {
-    // TODO: Bring back a working cache.
 
     const cached = this.cache.get(key);
     if ( typeof cached !== "undefined" ) {
-      const origValue = game.settings.get(MODULE_ID, key);
-      if ( origValue !== cached ) {
-        console.debug(`Settings cache fail: ${origValue} !== ${cached} for key ${key}`);
-        return origValue;
-      }
+    // For debugging, can confirm against what the value should be.
+//       const origValue = game.settings.get(MODULE_ID, key);
+//       if ( origValue !== cached ) {
+//         console.debug(`Settings cache fail: ${origValue} !== ${cached} for key ${key}`);
+//         return origValue;
+//       }
 
       return cached;
 
@@ -94,4 +111,17 @@ export class ModuleSettingsAbstract {
    * Register all settings
    */
   static registerAll() {}
+
+  /**
+   * Check the stored value for a setting.
+   * Typically used to retrieve stored setting values prior to registration. E.g., in data migration.
+   * @param {string} storageKey                         The key from Settings.KEYS
+   * @param {"world"|"client"} [storageType="world"]    Whether this is a client or a world setting
+   * @returns {string|undefined} The stored setting as a string
+   */
+  static _getStorageValue(storageKey, storageType = "world") {
+    if ( !game.settings?.storage ) return undefined;
+    if ( storageType === "client" ) return game.settings.storage.get(storageType).getItem(`${MODULE_ID}.${storageKey}`);
+    return game.settings.storage.get(storageType).getSetting(`${MODULE_ID}.${storageKey}`).value;
+  }
 }

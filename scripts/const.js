@@ -98,7 +98,7 @@ const DashSpeedCategory = {
 };
 
 const MaximumSpeedCategory = {
-  Name: "Maximum",
+  name: "Maximum",
   color: Color.from(0xff0000),
   multiplier: Number.POSITIVE_INFINITY
 }
