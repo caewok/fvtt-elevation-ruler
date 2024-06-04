@@ -102,6 +102,7 @@ function _getMeasurementData(wrapper) {
   myObj._userElevationIncrements = this._userElevationIncrements;
   myObj.totalDistance = this.totalDistance;
   myObj.totalMoveDistance = this.totalMoveDistance;
+  myObj._isTokenRuler = this._isTokenRuler;
   return obj;
 }
 
@@ -118,6 +119,7 @@ function update(wrapper, data) {
   // Fix for displaying user elevation increments as they happen.
   const triggerMeasure = this._userElevationIncrements !== myData._userElevationIncrements;
   this._userElevationIncrements = myData._userElevationIncrements;
+  this._isTokenRuler = myData._isTokenRuler;
 
   // Reconstruct segments.
   if ( myData._segments ) this.segments = myData._segments.map(segment => {
@@ -492,9 +494,10 @@ function segmentGridHalfIntersection(gridCoords, a, b) {
  * @param {PIXI.FederatedEvent} event   The drag start event
  * @see {Canvas._onDragLeftStart}
  */
-function _onDragStart(wrapped, event) {
+function _onDragStart(wrapped, event, { isTokenDrag = false } = {}) {
   Settings.FORCE_TO_GROUND = false;
   this._userElevationIncrements = 0;
+  this._isTokenRuler = isTokenDrag;
   return wrapped(event);
 }
 

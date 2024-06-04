@@ -19,6 +19,30 @@ export function log(...args) {
 }
 
 /**
+ * Get the snapped grid position for the upper left corner of a token of any size.
+ * So a 2x2 token would return the upper left corner of that token, snapped to a grid corner.
+ * @param {Point} point   Point for which you want the upper left corner
+ * @param {Token} token   Token for which you want the point
+ * @returns {Point} The upper left corner
+ */
+export function snappedTokenPositionAt(point, token) {
+  const topLeft = unsnappedTokenPositionAt(point, token);
+  return token.getSnappedPosition(topLeft);
+}
+
+/**
+ * Get the unsnapped grid position for the upper left corner of a token of any size.
+ * So a 2x2 token would return the upper left corner of that token.
+ * @param {Point} point   Point for which you want the upper left corner
+ * @param {Token} token   Token for which you want the point
+ * @returns {Point} The upper left corner
+ */
+export function unsnappedTokenPositionAt(point, token) {
+  const pivot = token.getCenterPoint({x: 0, y: 0});
+  return {x: point.x - pivot.x, y: point.y - pivot.y};
+}
+
+/**
  * Get the two points perpendicular to line A --> B at A, a given distance from the line A --> B
  * @param {PIXI.Point|Point} A
  * @param {PIXI.Point|Point} B

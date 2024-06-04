@@ -12,7 +12,7 @@ import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
-import { perpendicularPoints, log } from "./util.js";
+import { perpendicularPoints, log, unsnappedTokenPositionAt  } from "./util.js";
 import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
 import { elevationAtWaypoint } from "./terrain_elevation.js";
 import { MovePenalty } from "./MovePenalty.js";
@@ -234,6 +234,11 @@ export async function _animateSegment(token, segment, destination) {
 //   if ( segment.teleport
 //     && !(segment.B.x === this.destination.x && segment.B.y === this.destination.y )
 //     && !this.waypoints.some(w => segment.B.x === w.x && segment.B.y === w.y) ) return;
+
+  if ( this._isTokenRuler && segment.last ) {
+    destination = unsnappedTokenPositionAt(segment.ray.B, token);
+    log(`Changing destination to ${destination.x},${destination.y} for last segment`);
+  }
 
   let name;
   if ( segment.animation?.name === undefined ) name = token.animationName;
