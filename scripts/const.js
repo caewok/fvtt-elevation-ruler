@@ -173,6 +173,7 @@ Hooks.once("init", function() {
 
 export function defaultHPAttribute() {
   switch ( game.system.id ) {
+    case "pf2e":
     case "dnd5e":         return "actor.system.attributes.hp.value";
     case "dragonbane":    return "actor.system.hitpoints.value";
     case "twodsix":       return "actor.system.hits.value";
@@ -183,6 +184,7 @@ export function defaultHPAttribute() {
 export function defaultWalkAttribute() {
   switch ( game.system.id ) {
     case "CoC7":          return "actor.system.attribs.mov.value";
+    case "pf2e":
     case "dcc":           return "actor.system.attributes.speed.value";
     case "sfrpg":         return "actor.system.attributes.speed.value";
     case "dnd4e":         return "actor.system.movement.walk.value";
@@ -221,6 +223,7 @@ export function defaultFlyAttribute() {
     // Missing attribute case "crucible":
     // Missing attribute case "dragonbane":
     case "twodsix":       return "actor.system.movement.fly";
+    // Missing attribute case "pf2e":
     default:              return "";
   }
 }
@@ -243,6 +246,7 @@ export function defaultBurrowAttribute() {
     // Missing attribute case "crucible":
     // Missing attribute case "dragonbane":
     case "twodsix":       return "actor.system.movement.burrow";
+    // Missing attribute case "pf2e":
     default:              return "";
   }
 }
@@ -259,6 +263,7 @@ export function defaultDashMultiplier() {
     case "shadowrun5e":
     case "dragonbane":
     case "twodsix":
+    case "pf2e":
     case "ds4":           return 2;
 
     case "CoC7":          return 5;
