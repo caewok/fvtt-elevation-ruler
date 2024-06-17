@@ -119,6 +119,9 @@ function update(wrapper, data) {
   const myData = data[MODULE_ID];
   if ( !myData ) return wrapper(data); // Just in case.
 
+  // Hide GM token ruler
+  if ( data.token && this.user.isGM && !game.user.isGM && Settings.get(Settings.KEYS.TOKEN_RULER.HIDE_GM)) return wrapper(data);
+
   // Fix for displaying user elevation increments as they happen.
   const triggerMeasure = this._userElevationIncrements !== myData._userElevationIncrements;
   this._userElevationIncrements = myData._userElevationIncrements;

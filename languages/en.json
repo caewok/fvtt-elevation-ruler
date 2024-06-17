@@ -33,6 +33,9 @@
     "elevationruler.settings.enable-token-ruler.name": "Use Token Ruler",
     "elevationruler.settings.enable-token-ruler.hint": "Display the ruler when dragging tokens.",
 
+    "elevationruler.settings.hide-gm-ruler.name": "Hide GM Token Ruler",
+    "elevationruler.settings.hide-gm-ruler.hint": "Do not display the GM's token ruler for other non-GM users.",
+
    "elevationruler.settings.speed-highlighting-choice.name": "Use Token Speed Highlighting",
     "elevationruler.settings.speed-highlighting-choice.hint": "When using the ruler, use different colors for token walk/dash/max distance.",
 

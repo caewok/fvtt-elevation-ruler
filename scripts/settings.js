@@ -40,6 +40,7 @@ const SETTINGS = {
   NO_MODS: "no-modules-message",
   TOKEN_RULER: {
     ENABLED: "enable-token-ruler",
+    HIDE_GM: "hide-gm-ruler",
     ROUND_TO_MULTIPLE: "round-to-multiple",
     TOKEN_MULTIPLIER: "token-terrain-multiplier"
   },
@@ -154,6 +155,16 @@ export class Settings extends ModuleSettingsAbstract {
       name: localize(`${KEYS.TOKEN_RULER.ENABLED}.name`),
       hint: localize(`${KEYS.TOKEN_RULER.ENABLED}.hint`),
       scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.TOKEN_RULER.HIDE_GM, {
+      name: localize(`${KEYS.TOKEN_RULER.HIDE_GM}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.HIDE_GM}.hint`),
+      scope: "world",
       config: true,
       default: false,
       type: Boolean,
