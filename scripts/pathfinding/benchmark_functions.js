@@ -71,7 +71,7 @@ export async function QBenchmarkLoop(iterations, thisArg, fn_name, ...args) {
   * Includes a 5% warmup (at least 1 iteration) and prints 10%/50%/90% quantiles along
   * with the mean timing.
   * @param {number} iterations    Number of repetitions. Will add an additional 5% warmup.
-  * @param {Function} fn          Function to benchmark
+  * @param {Function} fn            Function to benchmark
   * @param {string} name          Description to print to console
   * @param {Object} ...args       Additional arguments to pass to function
   * @return {Number[]}            Array with the time elapsed for each iteration.
@@ -80,55 +80,20 @@ export async function QBenchmarkLoopFn(iterations, fn, name, ...args) {
   const timings = [];
   const num_warmups = Math.ceil(iterations * .05);
 
-  // Determine number of randomLoop iterations needed to get a result
-  let N = 1;
-  for ( let i = 1; i < 20; i += 1 ) {
-    N = Math.pow(2, i);
-    const t = await _measureTiming(N, fn, ...args);
-    if ( t > 1 ) break; // At least 1 ms
-  }
-
-  const Ninv = 1 / N;
   for (let i = -num_warmups; i < iterations; i += 1) {
-    const t = await _measureTiming(N, fn, ...args);
-    if (i >= 0) { timings.push(t * Ninv); }
+    const t0 = performance.now();
+    await fn(...args);
+    const t1 = performance.now();
+    if (i >= 0) { timings.push(t1 - t0); }
   }
 
   const sum = timings.reduce((prev, curr) => prev + curr);
   const q = quantile(timings, [.1, .5, .9]);
 
-  console.log(`${name} | ${iterations} iterations | ${precision(sum, 4)}ms | ${precision(sum / iterations, 4)}ms per | 10/50/90: ${precision(q[.1], 10)} / ${precision(q[.5], 10)} / ${precision(q[.9], 10)}`);
+  console.log(`${name} | ${iterations} iterations | ${precision(sum, 4)}ms | ${precision(sum / iterations, 4)}ms per | 10/50/90: ${precision(q[.1], 6)} / ${precision(q[.5], 6)} / ${precision(q[.9], 6)}`);
 
   return timings;
 }
-
-async function _measureTiming(N, fn, ...args) {
-  const t0 = performance.now();
-  await _randomLoop(N);
-  const t1 = performance.now();
-  await _randomLoopFn(N, fn, ...args);
-  const t2 = performance.now();
-  return (t2 - t1) - (t1 - t0);
-}
-
-/**
- * Helper that sets a random number with a loop, to avoid excessive JS caching.
- */
-async function _randomLoop(N = 1) {
-  let res;
-  for ( let i = 0; i < N; i += 1 ) res = Math.random();
-  return res;
-}
-
-async function _randomLoopFn(N = 1, fn, ...args) {
-  let res;
-  for ( let i = 0; i < N; i += 1 ) {
-    res = Math.random();
-    await fn(...args);
-  }
-  return res;
-}
-
 
 /**
  * Benchmark a function using a setup function called outside the timing loop.
