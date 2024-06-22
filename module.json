@@ -45,6 +45,11 @@
       "lang": "pt-BR",
       "name": "Português (Brasil)",
       "path": "languages/pt-BR.json"
+    },
+    {
+      "lang": "ru",
+      "name": "Русский",
+      "path": "languages/ru.json"
     }
   ],
   "url": "#{URL}#",

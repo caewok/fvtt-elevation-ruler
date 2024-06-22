@@ -1,0 +1,90 @@
+{
+    "elevationruler.name": "Elevation Ruler",
+    "elevationruler.keybindings.decrementElevation.name": "Спуститься в следующем шаге",
+    "elevationruler.keybindings.decrementElevation.hint": "Уменьшает высоту в следующем шаге по сетке при перетаскивании токена (ступенька вниз).",
+
+    "elevationruler.keybindings.incrementElevation.name": "Подняться в следующем шаге",
+    "elevationruler.keybindings.incrementElevation.hint": "Увеличивает высоту в следующем шаге по сетке при перетаскивании токена (ступенька вверх).",
+
+    "elevationruler.keybindings.addWaypointTokenRuler.name": "Добавить точку пути",
+    "elevationruler.keybindings.addWaypointTokenRuler.hint": "Если включено измерение на токене - добавит путевую точку при перетаскивании.",
+
+    "elevationruler.keybindings.removeWaypointTokenRuler.name": "Удалить точку пути",
+    "elevationruler.keybindings.removeWaypointTokenRuler.hint": "Если включено измерение на токене - удалит предыдущую путевую точку.",
+
+    "elevationruler.keybindings.togglePathfinding.name": "Переключение Поиска Пути",
+    "elevationruler.keybindings.togglePathfinding.hint": "Переключает функцию Поиск Пути во время текущего перетаскивания",
+
+    "elevationruler.keybindings.forceToGround.name": "Принудительное измерение высоты",
+    "elevationruler.keybindings.forceToGround.hint": "Измерять высоту до земли. Нажмите еще раз, чтобы отключить это поведение.",
+
+    "elevationruler.keybindings.teleport.name": "Телепорт при перетаскивании",
+    "elevationruler.keybindings.teleport.hint": "Нажмите эту клавишу, чтобы сразу разместить токен в точке перемещения без анимации.",
+
+    "elevationruler.settings.levels-use-floor-label.name": "Название Уровней/Этажей",
+    "elevationruler.settings.levels-use-floor-label.hint": "Отображать название текущего уровня/этажа если включен модуль Levels.",
+    "elevationruler.settings.levels-labels-never": "Никогда",
+    "elevationruler.settings.levels-labels-ui": "Если активен UI модуля Levels",
+    "elevationruler.settings.levels-labels-always": "Всегда",
+
+    "elevationruler.settings.prefer-token-elevation.name": "Добавить управление Token Elevation",
+    "elevationruler.settings.prefer-token-elevation.hint": "Добавляет кнопку управления на панель токенов. При включении линейка будет удерживаться на высоте токена. В противном случае местом назначения линейки будет считаться высота пространства сетки или жетон, встречающийся в точке назначения линейки.",
+
+    "elevationruler.settings.enable-token-ruler.name": "Показывать расстояние",
+    "elevationruler.settings.enable-token-ruler.hint": "Отображает расстояние, на которое вы хотите перетащить токен.",
+
+   "elevationruler.settings.speed-highlighting-choice.name": "Цветовая маркировка линейки",
+    "elevationruler.settings.speed-highlighting-choice.hint": "Использовать зеленый/желтый/красный цвета для ходьбы/рывка/превышения дистанции.",
+
+    "elevationruler.settings.speed-highlighting-choice-never": "Никогда",
+    "elevationruler.settings.speed-highlighting-choice-combat": "Только в бою",
+    "elevationruler.settings.speed-highlighting-choice-always": "Всегда",
+
+     "elevationruler.settings.speed-highlighting-no-hostiles.name": "Не показывать игрокам цветовую маркировку для вражеских токенов",
+    "elevationruler.settings.speed-highlighting-no-hostiles.hint": "Когда эта функция включена, игроки не могут видеть скорость враждебного или секретного токена, если у них нет прав наблюдателя или владельца.",
+
+    "elevationruler.settings.token-ruler-combat-history.name": "Треккинг в бою",
+    "elevationruler.settings.token-ruler-combat-history.hint": "Если включено - будет вычисляться доступная(оставшаяся) скорость токена для текущего хода в бою. Опция 'Цветовая маркировка линейки' должна быть включена.",
+
+    "elevationruler.settings.token-speed-property.name": "Свойство Walk",
+    "elevationruler.settings.token-speed-property.hint": "Это свойство актера, представляющее скорость ходьбы токена.",
+
+    "elevationruler.settings.token-fly-property.name": "Свойство Fly",
+    "elevationruler.settings.token-fly-property.hint": "Это свойство актера, представляющее скорость полета токена.",
+
+    "elevationruler.settings.token-burrow-property.name": "Свойство Burrow",
+    "elevationruler.settings.token-burrow-property.hint": "Это свойство актера, представляющее скорость рытья токена.",
+
+    "elevationruler.settings.token-speed-multiplier.name": "Множитель скорости токена",
+    "elevationruler.settings.token-speed-multiplier.hint": "Для 'Цветовая маркировка линейки' - множитель, используемый для перехода от ходьбы к бегу и превышению.",
+
+    "elevationruler.settings.round-to-multiple.name": "Округлять расстояние:",
+    "elevationruler.settings.round-to-multiple.hint": "При измерении расстояния на сцене без сетки - округлять до ближайшего кратного введенного в этом поле числа. '0' - отключить округление.",
+
+    "elevationruler.settings.token-terrain-multiplier.name": "Стоимость скорости для клеток с другим токеном (штраф/бонус к передвижению)",
+    "elevationruler.settings.token-terrain-multiplier.hint": "'1' - игнорировать другие токены, 'Значение от 0 до 1' - даст бонус к скорости за клетку занятую другим токеном (используется как процент: например '0,5' уменьшит стоимость этой клетки на 50%), 'Значение больше 1' - даст штраф к скорости (аналогично: например '2' увеличит стоимость этой клетки на 100% (в 2 раза)).",
+
+    "elevationruler.settings.pathfinding_tokens_block.name": "Токен - как препятствие",
+    "elevationruler.settings.pathfinding_tokens_block.hint": "Для функции 'Поиск пути' - какие токены будут расцениваться как препятствия на пути.",
+    "elevationruler.settings.pathfinding_tokens_block_no": "Нет",
+    "elevationruler.settings.pathfinding_tokens_block_hostile": "Только враги",
+    "elevationruler.settings.pathfinding_tokens_block_all": "Все",
+
+    "elevationruler.settings.pathfinding_limit_token_los.name": "Ограничить 'Поиск пути' только исследованной зоной",
+    "elevationruler.settings.pathfinding_limit_token_los.hint": "Для всех кроме ГМ - поиск пути производится только в пределах исследованной зоны сцены.",
+
+    "elevationruler.settings.grid-terrain-algorithm.name": "Как измерять клетки с рельефом",
+    "elevationruler.settings.grid-terrain-algorithm.hint": "Как учитывать клетки с рельефом или другим токеном (для расчета штрафов/бонусов к стоимости скорости). Центр: применяется, если местность/жетон перекрывает центр клетки; Процент площади: применяется, если местность/токен занимает как минимум столько-то клеток/гексов сетки; Евклидово: пропорционально, исходя из процента отрезка линии на местности/токене между этой клеткой/гексом сетки и предыдущим.",
+    "elevationruler.settings.grid-terrain-choice-center-point": "Центр",
+    "elevationruler.settings.grid-terrain-choice-percent-area": "Процент площади",
+    "elevationruler.settings.grid-terrain-choice-euclidean": "Евклидово",
+
+    "elevationruler.settings.grid-terrain-area-threshold.name": "Порог для 'Процента площади'",
+    "elevationruler.settings.grid-terrain-area-threshold.hint": "Если для параметра 'Как измерять клетки с рельефом' выбрано значение 'Процент площади' - введенное значение определит необходимый процентн перекрытия, для учета эффектов местности/токена.",
+
+    "elevationruler.controls.prefer-token-elevation.name": "Prefer Token Elevation",
+    "elevationruler.controls.pathfinding-control.name": "Включить 'Поиск Пути'",
+
+    "elevationruler.drawingconfig.movementPenalty.name": "Штраф/Бонус cкорости",
+    "elevationruler.drawingconfig.movementPenalty.hint": "'1' - игнорировать, 'Значение от 0 до 1' - даст бонус к скорости за клетку (используется как процент: например '0,5' уменьшит стоимость этой клетки на 50%), 'Значение больше 1' - даст штраф к скорости (аналогично: например '2' увеличит стоимость этой клетки на 100% (в 2 раза))."
+}
