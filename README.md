@@ -12,18 +12,27 @@
 
 This module displays the ruler when dragging tokens, does pathfinding for the ruler, tracks movement speed and movement history in combat, and can display elevation changes.
 
-Elevation can be changed while using the ruler :
-1. Manually. Hit the specified hot key (default: '[' to increment and ']' to decrement).
-2. Token. When hovering over a token with the ruler, the origin or destination elevation (as applicable) will update.
-3. Elevated Vision. If the Elevated Vision module is present, it will use that elevation information. (Elevation Ruler v0.5+)
-4. Levels. If the Levels module is present, the ruler will look for Levels-enabled tiles  and default to the bottom elevation of that tile. In Elevation Ruler v0.5+, it will also originate elevation at the bottom of the active layer if the Levels layers UI is active.
-5. If you hold the specified hot key (default 'G'), it will force the ruler to measure elevation from the ground.
+## Elevation
+[Screen Recording 2024-06-04 at 4.41.56 PM.webm](https://github.com/caewok/fvtt-elevation-ruler/assets/1267134/eb71786a-7852-43e3-99e2-b4def15a9f83)
 
-The distance calculation updates based on the distance measured, assuming a straight line in three dimensions between origin and destination, taking into account elevation change. If you add a waypoint, elevation will be tracked at each waypoint. If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint.
+Elevation can be changed while using the ruler (default: '[' to increment and ']' to decrement). The distance calculation updates based on the distance measured, assuming a straight line in three dimensions between origin and destination, taking into account elevation change. If you add a waypoint, elevation will be tracked at each waypoint. If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint.
 
-To enable/disable pathfinding, toggle the pathfinding icon in the token controls (upper left controls in Foundry). You can also hold the specified hotkey (default 'P').  
+## Dragging tokens (Token Ruler)
+[Screen Recording 2024-06-04 at 4.26.55 PM.webm](https://github.com/caewok/fvtt-elevation-ruler/assets/1267134/c372407f-c26d-4d73-9ef3-25d9bb0aed2b)
 
 When dragging a token, the ruler will automatically appear if you have enabled "Token Ruler" in the module settings. To set waypoints when dragging a token, hit the specified hotkey (default '=' to add and '-' to remove). To adjust the colors that appear for designated speeds see [Setting speed colors](#setting-speed-colors). If you would like specific system support, please feel free to submit a git issue.
+
+## Movement speed / history
+Elevation Ruler supports coloring the ruler highlighting to represent token speeds based on various systems. The user can also control whether the speed for walking, burrowing, or flying should be used by changing the setting on the token hud. Settings determine, on a per-user basis, whether the speed highlighting should always be used, only during combat, or never. The GM can also from users the speeds of hostile tokens. Movement history during combat can also be tracked. 
+
+## Pathfinding
+[Screen Recording 2024-06-04 at 4.26.31 PM.webm](https://github.com/caewok/fvtt-elevation-ruler/assets/1267134/1efca6e2-41b1-4cdb-87a3-2fb5e48be5cd)
+
+As of version 0.8.0, a button in the Token controls enables pathfinding for the ruler (or Token Ruler, when enabled). Pathfinding works on gridded (both hex and square) and gridless maps. If using the ruler, start a measurement at a token in order to start pathfinding. 
+
+Settings allow you to designate all tokens or hostile tokens as spaces to be avoided. 
+
+To enable/disable pathfinding, toggle the pathfinding icon in the token controls (upper left controls in Foundry). You can also hold the specified hotkey (default 'P').  
 
 ## Module history
 As of v0.7, Elevation Ruler adds a setting to display the Foundry ruler when dragging tokens.
@@ -67,6 +76,16 @@ If you enable Token Speed Highlighting in settings, token speed will be estimate
 You can modify the system attributes used for walk/fly/burrow as well as the colors used in `CONFIG.elevationruler.SPEED`.
 
 # Details
+
+## Elevation
+Elevation can be changed while using the ruler :
+1. Manually. Hit the specified hot key (default: '[' to increment and ']' to decrement).
+2. Token. When hovering over a token with the ruler, the origin or destination elevation (as applicable) will update.
+3. Elevated Vision. If the Elevated Vision module is present, it will use that elevation information. (Elevation Ruler v0.5+)
+4. Levels. If the Levels module is present, the ruler will look for Levels-enabled tiles  and default to the bottom elevation of that tile. In Elevation Ruler v0.5+, it will also originate elevation at the bottom of the active layer if the Levels layers UI is active.
+5. If you hold the specified hot key (default 'G'), it will force the ruler to measure elevation from the ground.
+
+The distance calculation updates based on the distance measured, assuming a straight line in three dimensions between origin and destination, taking into account elevation change. If you add a waypoint, elevation will be tracked at each waypoint. If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint.
 
 ## Measuring diagonals
 Nearly every elevation measurement creates a diagonal path from the origin to the elevated or decremented altitude. Elevation Ruler attempts to use the default system measurement to measure these diagonals. For dnd5e, the total distance along the diagonal will follow the chosen dnd5e measurement rule: 5-5-5, 5-10-5, or Euclidean.
