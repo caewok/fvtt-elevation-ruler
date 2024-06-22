@@ -104,8 +104,6 @@ function _getMeasurementData(wrapper) {
   myObj.totalDistance = this.totalDistance;
   myObj.totalMoveDistance = this.totalMoveDistance;
   myObj._isTokenRuler = this._isTokenRuler;
-  myObj._originAdjX = this._originAdjX;
-  myObj._originAdjY = this._originAdjY;
   return obj;
 }
 
@@ -126,8 +124,6 @@ function update(wrapper, data) {
   const triggerMeasure = this._userElevationIncrements !== myData._userElevationIncrements;
   this._userElevationIncrements = myData._userElevationIncrements;
   this._isTokenRuler = myData._isTokenRuler;
-  this._originAdjX = myData._originAdjX;
-  this.__originAdjY = myData._originAdjY;
 
   // Reconstruct segments.
   if ( myData._segments ) this.segments = myData._segments.map(segment => {
@@ -190,32 +186,18 @@ function _getMeasurementOrigin(wrapped, point, {snap=true}={}) {
   if ( !this._isTokenRuler || !token ) return point;
 
   // Shift to token center or snapped center.
-  // Adjust for non-symmetrical token sizes.
-  // Non-symmetrical move from the innermost right/left or top/bottom from center.
-  // log(`_getMeasurementOrigin|Shifting ruler origin to ${token.center.x},${token.center.y}`);
-  const dSize = canvas.dimensions.size;
-  const tCenter = token.center;
   const { width, height } = token.getSize();
-  const adjX = (((width / dSize) + 1) % 2) / 2;
-  const adjY = (((height / dSize) + 1) % 2) / 2;
-  const signX = Math.sign(point.x - tCenter.x);
-  const signY = Math.sign(point.y - tCenter.y);
-
-  this._originAdjX = (adjX * signX * dSize);
-  this._originAdjY = (adjY * signY * dSize);
+  const tl = snap ? token.getSnappedPosition(token.document) : token.document;
   return {
-    x: tCenter.x + this._originAdjX,
-    y: tCenter.y + this._originAdjY
-  }
-
-  // return token.center;
-  // return point;
+    x: tl.x + width * 0.5,
+    y: tl.y + height * 0.5
+  };
 }
 
 /**
  * Wrap Ruler.prototype._getMeasurementDestination
  * Get the destination point. By default the point is snapped to grid space centers.
- * Adjust the destination point match where the preview token is placed.
+ * Adjust the destination point to match where the preview token is placed.
  * @param {Point} point                    The point coordinates
  * @param {object} [options]               Additional options
  * @param {boolean} [options.snap=true]    Snap the point?
@@ -226,13 +208,14 @@ function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
   point = wrapped(point, { snap });
   const token = this.token;
   if ( !this._isTokenRuler || !token ) return point;
-  if ( !(this._originAdjX || this._originAdjY) ) return point;
   if ( !token._preview ) return point;
 
-  const tCenter = token._preview.center;
+  // Shift to token center or snapped center
+  const { width, height } = token.getSize();
+  const tl = snap ? token._preview.getSnappedPosition(token._preview) : token._preview.document;
   return {
-    x: tCenter.x + this._originAdjX,
-    y: tCenter.y + this._originAdjY
+    x: tl.x + width * 0.5,
+    y: tl.y + height * 0.5
   };
 }
 
