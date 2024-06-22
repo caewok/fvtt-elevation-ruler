@@ -3,6 +3,9 @@ Added Brazilian translation. Thanks @Kharmans!
 Added Russian translation. Thanks @VirusNik21! Closes #96.
 Added setting to hide the GM ruler. Thanks @Mystler! Closes #86.
 
+Fix snapping of small tokens when using Token Ruler. Closes #70.
+
+
 # 0.9.4
 Remove custom unsnap code now that v12's `Ruler` allows unsnapping properly.
 Fix for displaying colors to other users (from v0.8.13).
