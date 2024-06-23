@@ -81,7 +81,7 @@ export function destinationElevation() {
 
 /**
  * Ruler.terrainElevationAtLocation
- * Measure elevation at a given location.
+ * Measure elevation at a given location. Terrain level: at or below this elevation.
  * @param {Point} location      Location to measure
  * @param {object} [opts]       Options that modify the calculation
  * @param {number} [opts.startingElevation=0]   Assumed starting elevation. Relevant for EV or Levels.
@@ -92,10 +92,12 @@ export function terrainElevationAtLocation(location, { startingElevation, moveme
   startingElevation ??= movementToken?.elevationE ?? 0;
 
   // If certain modules are active, use them to calculate elevation.
-  let elevation = 0;
-  if ( MODULES_ACTIVE.ELEVATED_VISION ) elevation = EVElevationAtPoint(location, startingElevation, movementToken);
-  else if ( MODULES_ACTIVE.LEVELS ) elevation = LevelsElevationAtPoint(location, startingElevation);
-  if ( isFinite(elevation) ) return elevation;
+  // For now, take the first one that is present.
+  const tmRes = TMElevationAtPoint(location, startingElevation);
+  if ( isFinite(tmRes) ) return tmRes;
+
+  const levelsRes = LevelsElevationAtPoint(location, startingElevation);
+  if ( isFinite(levelsRes) ) return levelsRes;
 
   // Default is the scene elevation.
   return 0;
@@ -166,29 +168,20 @@ function retrieveVisibleTokens() {
   return canvas.tokens.children[0].children.filter(c => c.visible);
 }
 
-// ----- NOTE: ELEVATED VISION ELEVATION ----- //
-/**
- * Measure the terrain elevation at a given point using Elevated Vision.
- * @param {Point} {x,y}         Point to measure, in {x, y} format
- * @param {number} elevation    Elevation from which to measure, in grid units.
- * @returns {Number|undefined} Point elevation or undefined if elevated vision layer is inactive
- */
-function EVElevationAtPoint(location, elevation, measuringToken) {
-  let EVCalc;
-  if ( measuringToken) {
-    elevation ??= measuringToken.elevationE;
-    EVCalc = new canvas.elevation.TokenElevationCalculator(measuringToken,
-      { location, elevation, overrideTokenPosition: true });
-  } else {
-    elevation = isFinite(elevation) ? elevation : Number.MAX_SAFE_INTEGER;
-    const location3d = Point3d.fromObject(location);
-    location3d.z = CONFIG.GeometryLib.utils.gridUnitsToPixels(elevation ?? 0);
-    EVCalc = new canvas.elevation.CoordinateElevationCalculator(location3d);
-    EVCalc.options.tileStep = Number.POSITIVE_INFINITY;
-    EVCalc.options.terrainStep = Number.POSITIVE_INFINITY;
-  }
+// ----- NOTE: TerrainMapper Elevation ----- //
 
-  return EVCalc.groundElevation();
+/**
+ * Measure the terrain elevation at a given point using Terrain Mapper
+ * @param {Point} {x,y}                 Point to measure, in {x, y} format
+ * @param {number} startingElevation    Elevation from which to measure, in grid units.
+ * @returns {Number|undefined} Point elevation or null if module not active or no region at location.
+ */
+function TMElevationAtPoint(location, startingElevation) {
+  const api = MODULES_ACTIVE.API.TERRAIN_MAPPER
+  if ( !api || !api.) return undefined;
+  const res = api.regionElevationAtPoint(location, { topE: startingElevation });
+  if ( isFinite(res) ) return res;
+  return canvas.scene.flags?.terrainmapper?.backgroundElevation;
 }
 
 // ----- NOTE: LEVELS ELEVATION ----- //
@@ -208,8 +201,10 @@ function EVElevationAtPoint(location, elevation, measuringToken) {
  * @return {Number|undefined} Levels elevation or undefined if levels is inactive or no levels found.
  */
 export function LevelsElevationAtPoint(p, startingElevation = 0) {
+  if ( !MODULES_ACTIVE.LEVELS ) return undefined;
+
   let tiles = [...levelsTilesAtPoint(p)];
-  if ( !tiles.length ) return undefined;
+  if ( !tiles.length ) return null;
 
   tiles = tiles
     .filter(t => startingElevation >= t.document.flags.levels.rangeBottom
