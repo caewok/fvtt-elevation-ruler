@@ -71,6 +71,8 @@ const SETTINGS = {
 const KEYBINDINGS = {
   INCREMENT: "incrementElevation",
   DECREMENT: "decrementElevation",
+  ADD_WAYPOINT: "addWaypoint",
+  REMOVE_WAYPOINT: "removeWaypoint",
   TOKEN_RULER: {
     ADD_WAYPOINT: "addWaypointTokenRuler",
     REMOVE_WAYPOINT: "removeWaypointTokenRuler"
@@ -285,13 +287,39 @@ export class Settings extends ModuleSettingsAbstract {
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
 
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.ADD_WAYPOINT, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.ADD_WAYPOINT}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.ADD_WAYPOINT}.hint`),
+      editable: [
+        { key: "Equal" }
+      ],
+      onDown: context => {
+        if ( canvas.controls?.ruler && !canvas.controls.ruler._isTokenRuler ) toggleTokenRulerWaypoint(context, true);
+      },
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
+
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.REMOVE_WAYPOINT, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.REMOVE_WAYPOINT}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.REMOVE_WAYPOINT}.hint`),
+      editable: [
+        { key: "Minus" }
+      ],
+      onDown: context => {
+        if ( canvas.controls?.ruler && !canvas.controls.ruler._isTokenRuler ) toggleTokenRulerWaypoint(context, false);
+      },
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
+
     game.keybindings.register(MODULE_ID, KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT, {
       name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT}.name`),
       hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT}.hint`),
       editable: [
         { key: "Equal" }
       ],
-      onDown: context => toggleTokenRulerWaypoint(context, true),
+      onDown: context => {
+         if ( canvas.controls?.ruler._isTokenRuler ) toggleTokenRulerWaypoint(context, true);
+      },
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
 
@@ -301,7 +329,9 @@ export class Settings extends ModuleSettingsAbstract {
       editable: [
         { key: "Minus" }
       ],
-      onDown: context => toggleTokenRulerWaypoint(context, false),
+      onDown: context => {
+        if ( canvas.controls?.ruler._isTokenRuler ) toggleTokenRulerWaypoint(context, false);
+      },
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
 

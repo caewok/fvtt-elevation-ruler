@@ -6,11 +6,17 @@
     "elevationruler.keybindings.incrementElevation.name": "Increment Ruler Elevation",
     "elevationruler.keybindings.incrementElevation.hint": "Increase the elevation in grid increments when using the ruler.",
 
+    "elevationruler.keybindings.addWaypoint.name": "Add Regular Ruler Waypoint",
+    "elevationruler.keybindings.addWaypoint.hint": "When using the canvas ruler, add a waypoint.",
+
+    "elevationruler.keybindings.removeWaypoint.name": "Remove Regular Ruler Waypoint",
+    "elevationruler.keybindings.removeWaypoint.hint": "When using the canvas ruler, remove a waypoint.",
+
     "elevationruler.keybindings.addWaypointTokenRuler.name": "Add Token Ruler Waypoint",
-    "elevationruler.keybindings.addWaypointTokenRuler.hint": "When token ruler is enabled, add a waypoint while dragging the token.",
+    "elevationruler.keybindings.addWaypointTokenRuler.hint": "When token ruler is enabled and you are dragging a token, add a waypoint.",
 
     "elevationruler.keybindings.removeWaypointTokenRuler.name": "Remove Token Ruler Waypoint",
-    "elevationruler.keybindings.removeWaypointTokenRuler.hint": "When token ruler is enabled, remove a waypoint while dragging the token.",
+    "elevationruler.keybindings.removeWaypointTokenRuler.hint": "When token ruler is enabled and you are dragging a token, remove a waypoint.",
 
     "elevationruler.keybindings.togglePathfinding.name": "Temporarily Toggle Pathfinding",
     "elevationruler.keybindings.togglePathfinding.hint": "If the pathfinding button is enabled, holding this key will temporarily disable pathfinding. If the pathfinding button is not enabled, holding this key will temporarily enable pathfinding.",

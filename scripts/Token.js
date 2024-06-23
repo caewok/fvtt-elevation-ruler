@@ -7,6 +7,7 @@ Ruler
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 import { Settings } from "./settings.js";
+import { log } from "./util.js";
 
 // Patches for the Token class
 export const PATCHES = {};
@@ -28,24 +29,36 @@ function _onDragLeftStart(wrapped, event) {
 }
 
 /**
- * Wrap Token.prototype._onDragLeftMove
+ * Wrap Token.prototype._onDragLeftCancel
  * Continue the ruler measurement
  */
 function _onDragLeftCancel(wrapped, event) {
+  log("Token#_onDragLeftCancel");
+
+  // Add waypoint on right click
+  const ruler = canvas.controls.ruler;
+  if ( event.button === 2 && ruler._isTokenRuler && ruler.active && ruler.state === Ruler.STATES.MEASURING )  {
+    log("Token#_onDragLeftMove|Token ruler active");
+    event.preventDefault();
+    if ( event.ctrlKey ) ruler._removeWaypoint(event.interactionData.origin, {snap: !event.shiftKey});
+    else ruler._addWaypoint(event.interactionData.origin, {snap: !event.shiftKey});
+    return false;
+  }
+
   wrapped(event);
 
   // Cancel a Ruler measurement.
   // If moving, handled by the drag left drop.
   if ( !Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED) ) return;
-  const ruler = canvas.controls.ruler;
   if ( ruler._state !== Ruler.STATES.MOVING ) canvas.controls.ruler._onMouseUp(event);
 }
 
 /**
- * Wrap Token.prototype._onDragLeftCancel
+ * Wrap Token.prototype._onDragLeftMove
  * Continue the ruler measurement
  */
 function _onDragLeftMove(wrapped, event) {
+  log("Token#_onDragLeftMove");
   wrapped(event);
 
   // Continue a Ruler measurement.
@@ -69,12 +82,6 @@ async function _onDragLeftDrop(wrapped, event) {
     ruler._onMouseUp(event);
     return false;
   }
-
-  // If control was held, we want to create a new waypoint.
-//   if ( event.ctrlKey || event.metaKey ) {
-//     return ruler._onMouseUp(event);
-//     return false;
-//   }
 
   // ruler._state = Ruler.STATES.MOVING; // Do NOT set state to MOVING here in v12, as it will break the canvas.
   ruler._onMoveKeyDown(event); // Movement is async here but not awaited in _onMoveKeyDown.
@@ -150,13 +157,12 @@ function noEndEase(easing) {
 
 PATCHES.TOKEN_RULER.WRAPS = {
   _onDragLeftStart,
-  _onDragLeftMove,
-  _onDragLeftCancel
+  _onDragLeftMove
 };
 
 PATCHES.PATHFINDING.WRAPS = { _onUpdate };
 
-PATCHES.TOKEN_RULER.MIXES = { _onDragLeftDrop };
+PATCHES.TOKEN_RULER.MIXES = { _onDragLeftDrop, _onDragLeftCancel };
 
 PATCHES.MOVEMENT_TRACKING.HOOKS = { updateToken };
 PATCHES.MOVEMENT_TRACKING.GETTERS = { lastMoveDistance };
