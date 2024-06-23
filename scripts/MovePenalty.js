@@ -44,7 +44,7 @@ export class MovePenalty {
   static get tokenMultiplier() { return Settings.get(Settings.KEYS.TOKEN_RULER.TOKEN_MULTIPLIER); }
 
   /** @type {object|undefined} */
-  static get terrainAPI() { return MODULES_ACTIVE.API.TERRAIN_MAPPER; }
+  static get terrainAPI() { return false; // MODULES_ACTIVE.API.TERRAIN_MAPPER; } // Not currently implemented for v12.
 
   /** @type {Terrain|undefined} */
   static get terrain() { return this.terrainAPI?.Terrain; }
