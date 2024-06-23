@@ -254,8 +254,7 @@ export async function _animateSegment(token, segment, destination) {
 
   // Update elevation after the token move.
   if ( segment.ray.A.z !== segment.ray.B.z ) {
-    const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) ?? 1;
-    const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z).toNearest(multiple);
+    const elevation = Math.round(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
     await token.document.update({ elevation });
   }
 }

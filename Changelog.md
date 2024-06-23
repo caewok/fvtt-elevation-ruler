@@ -4,6 +4,7 @@ Added Russian translation. Thanks @VirusNik21! Closes #96.
 Added setting to hide the GM ruler. Thanks @Mystler! Closes #86.
 
 Fix snapping of small tokens when using Token Ruler. Closes #70.
+Fix error re invalid elevation when adjusting elevation with the ruler. Closes #84, #92.
 
 
 # 0.9.4
