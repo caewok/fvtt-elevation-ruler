@@ -1,6 +1,5 @@
 /* globals
 canvas,
-CONFIG,
 PIXI,
 ui
 */
@@ -44,7 +43,6 @@ Used by ruler to get elevation at waypoints and at the end of the ruler.
 
 import { MODULES_ACTIVE, MOVEMENT_TYPES } from "./const.js";
 import { Settings } from "./settings.js";
-import { Point3d } from "./geometry/3d/Point3d.js";
 
 /**
  * Calculate the elevation for a given waypoint.
@@ -84,19 +82,20 @@ export function destinationElevation() {
  * Measure elevation at a given location. Terrain level: at or below this elevation.
  * @param {Point} location      Location to measure
  * @param {object} [opts]       Options that modify the calculation
- * @param {number} [opts.startingElevation=0]   Assumed starting elevation. Relevant for EV or Levels.
+ * @param {number} [opts.fixedElevation]        Any area that contains this elevation counts
+ * @param {number} [opts.maxElevation]          Any area below or equal to this grid elevation counts
  * @param {Token} [opts.movementToken]          Assumed token for the measurement. Relevant for EV.
  * @returns {number} Elevation, in grid units.
  */
-export function terrainElevationAtLocation(location, { startingElevation, movementToken } = {}) {
-  startingElevation ??= movementToken?.elevationE ?? 0;
+export function terrainElevationAtLocation(location, { maxElevation, fixedElevation, movementToken } = {}) {
+  maxElevation ??= movementToken?.elevationE ?? 0;
 
   // If certain modules are active, use them to calculate elevation.
   // For now, take the first one that is present.
-  const tmRes = TMElevationAtPoint(location, startingElevation);
+  const tmRes = TMElevationAtPoint(location, { fixedElevation: fixedElevation ?? maxElevation });
   if ( isFinite(tmRes) ) return tmRes;
 
-  const levelsRes = LevelsElevationAtPoint(location, startingElevation);
+  const levelsRes = LevelsElevationAtPoint(location, maxElevation);
   if ( isFinite(levelsRes) ) return levelsRes;
 
   // Default is the scene elevation.
@@ -105,7 +104,8 @@ export function terrainElevationAtLocation(location, { startingElevation, moveme
 
 /**
  * Ruler.prototype.elevationAtLocation.
- * Measure elevation for a given ruler position and token.
+ * Measure elevation for a given ruler position and token,
+ * accounting for straight-line movement from prior waypoint to location
  * Accounts for whether we are using regular Ruler or Token Ruler.
  * @param {Point} location      Position on canvas to measure
  * @param {Token} [token]       Token that is assumed to be moving if not this._movementToken
@@ -119,47 +119,56 @@ export function elevationAtLocation(location, token) {
     && ui.controls.activeTool === "select"
     && token;
 
-  // 1. If forcing to ground, always use the terrain elevation.
+  // For debugging, test at certain distance
+  const dist = CONFIG.GeometryLib.utils.pixelsToGridUnits(PIXI.Point.distanceBetween(this.waypoints.at(-1), location));
+  if ( dist > 5 ) console.debug(`elevationAtLocation ${dist}`);
+  if ( dist > 10 ) console.debug(`elevationAtLocation ${dist}`);
+  if ( dist > 20 ) console.debug(`elevationAtLocation ${dist}`);
+  if ( dist > 30 ) console.debug(`elevationAtLocation ${dist}`);
+  if ( dist > 40 ) console.debug(`elevationAtLocation ${dist}`);
 
-  /* If not forcing to ground:
-  2. No move token
-    --> Default: Use origin elevation
-    --> If hovering over a token, use that token's elevation
-  3. Move token, normal ruler
-    --> Default: Use move token elevation
-    --> If hovering over a token, use that token's elevation
-  4. Token ruler
-    --> Default: Use move token elevation
-    --> If token is walking, use terrain elevation
-  */
-  const terrainElevationFn = () => this.constructor.terrainElevationAtLocation(location, {
-    movementToken: token,
-    startingElevation: this.originElevation
-  });
 
-  // #1 Forcing to ground
-  if ( Settings.FORCE_TO_GROUND ) return terrainElevationFn();
 
-  // #4 token ruler
-  if ( isTokenRuler ) {
-    if ( token.movementType === MOVEMENT_TYPES.WALK ) return terrainElevationFn();
-    return token.elevationE;
+  // For normal ruler, if hovering over a token, use that token's elevation.
+  if ( !isTokenRuler && !Settings.FORCE_TO_GROUND ) {
+    // Check for other tokens at destination and use that elevation.
+    const maxTokenE = retrieveVisibleTokens()
+      .filter(t => t.constrainedTokenBorder.contains(location.x, location.y))
+      .reduce((e, t) => Math.max(t.elevationE, e), Number.NEGATIVE_INFINITY);
+    if ( isFinite(maxTokenE) ) return maxTokenE;
   }
 
-  // If at the token, use the token's elevation.
-  // if ( token && location.almostEqual(token.center) ) return token.elevationE;
+  let startElevation = this.originElevation;
 
-  // Check for other tokens at destination and use that elevation.
-  const maxTokenE = retrieveVisibleTokens()
-    .filter(t => t.constrainedTokenBorder.contains(location.x, location.y))
-    .reduce((e, t) => Math.max(t.elevationE, e), Number.NEGATIVE_INFINITY);
-  if ( isFinite(maxTokenE) ) return maxTokenE; // #2 or #3
+  // If no token present, then this is a straight measurement
+  if ( !token ) return startElevation;
 
-  // #3 move token
-  if ( token ) return token.elevationE;
+  let endElevation = startElevation;
+  const prevWaypoint = this.waypoints.at(-1);
+  if ( !prevWaypoint ) return startElevation; // Shouldn't happen.
 
-  // #2 no move token
-  return this.originElevation;
+  // Either ruler with an origin token or Token Ruler
+  // If at ruler origin (single waypoint):
+  // - If walking: use the terrain elevation
+  // - Not walking: use the token elevation
+  // Destination elevation is the terrain elevation if walking
+  const isWalking = token.movementType === "WALK" || Settings.FORCE_TO_GROUND;
+  if ( this.waypoints.length === 1 ) { // First waypoint is the token origin.
+    startElevation = isWalking ? this.constructor.terrainElevationAtLocation(prevWaypoint,
+        { movementToken: token, maxElevation: startElevation }) : token.elevationE;
+
+    // User can affect the starting elevation.
+    startElevation += (prevWaypoint._userElevationIncrements ?? 0) * canvas.dimensions.distance;
+  } else endElevation = isWalking ? this.constructor.terrainElevationAtLocation(location,
+        { movementToken: token, maxElevation: startElevation }) : startElevation;
+
+  // Adjust the destination for terrain setElevation regions.
+  const api = MODULES_ACTIVE.API.TERRAIN_MAPPER;
+  if ( !api || !api.estimateElevationForSegment ) return endElevation;
+  const segments = api.estimateElevationForSegment(prevWaypoint, location, { startElevation, endElevation });
+  if ( !segments.length ) return endElevation;
+  const elevationTM = segments.at(-1).elevation;
+  return isFinite(elevationTM) ? elevationTM : endElevation;
 }
 
 // ----- NOTE: HELPER FUNCTIONS ----- //
@@ -172,14 +181,17 @@ function retrieveVisibleTokens() {
 
 /**
  * Measure the terrain elevation at a given point using Terrain Mapper
- * @param {Point} {x,y}                 Point to measure, in {x, y} format
- * @param {number} startingElevation    Elevation from which to measure, in grid units.
+ * @param {Point} location                Point to measure, in {x, y} format
+ * @param {object} [opts]     Options that limit the regions to test; passed to TM's regionElevationAtPoint
+ * @param {number} [opts.fixedElevation]      Any region that contains this elevation counts
+ * @param {number} [opts.maxElevation]        Any region below or equal to this grid elevation counts
+ * @param {number} [opts.minElevation]        Any region above or equal to this grid elevation counts
  * @returns {Number|undefined} Point elevation or null if module not active or no region at location.
  */
-function TMElevationAtPoint(location, startingElevation) {
+function TMElevationAtPoint(location, opts) {
   const api = MODULES_ACTIVE.API.TERRAIN_MAPPER
-  if ( !api || !api.) return undefined;
-  const res = api.regionElevationAtPoint(location, { topE: startingElevation });
+  if ( !api || !api.regionElevationAtPoint ) return undefined;
+  const res = api.regionElevationAtPoint(location, opts);
   if ( isFinite(res) ) return res;
   return canvas.scene.flags?.terrainmapper?.backgroundElevation;
 }
