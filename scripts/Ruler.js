@@ -185,9 +185,9 @@ function _getMeasurementOrigin(wrapped, point, {snap=true}={}) {
   const token = this.token;
   if ( !this._isTokenRuler || !token ) return point;
 
-  // Shift to token center or snapped center.
+  // Shift to token center
   const { width, height } = token.getSize();
-  const tl = snap ? token.getSnappedPosition(token.document) : token.document;
+  const tl = token.document;
   return {
     x: tl.x + width * 0.5,
     y: tl.y + height * 0.5
@@ -212,7 +212,7 @@ function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
 
   // Shift to token center or snapped center
   const { width, height } = token.getSize();
-  const tl = snap ? token._preview.getSnappedPosition(token._preview) : token._preview.document;
+  const tl = snap ? token._preview.getSnappedPosition(token._preview.document) : token._preview.document;
   return {
     x: tl.x + width * 0.5,
     y: tl.y + height * 0.5
