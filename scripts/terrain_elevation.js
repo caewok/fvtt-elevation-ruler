@@ -54,9 +54,10 @@ import { Settings } from "./settings.js";
  * @returns {number}
  */
 export function elevationAtWaypoint(waypoint) {
-  return waypoint._prevElevation
-    + (waypoint._forceToGround ? groundElevationAtWaypoint(waypoint) : 0)
-    + userElevationChangeAtWaypoint(waypoint);
+  if ( waypoint._forceToGround ) {
+    return groundElevationAtWaypoint(waypoint) + userElevationChangeAtWaypoint(waypoint);
+  }
+  return waypoint._prevElevation + userElevationChangeAtWaypoint(waypoint);
 }
 
 /**
