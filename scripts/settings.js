@@ -364,6 +364,8 @@ export class Settings extends ModuleSettingsAbstract {
         const ruler = canvas.controls.ruler;
         if ( !ruler.active ) return;
         this.FORCE_TO_GROUND = !this.FORCE_TO_GROUND;
+        ruler.waypoints.at(-1)._forceToGround = this.FORCE_TO_GROUND;
+
         ruler.measure(ruler.destination, { force: true });
         ui.notifications.info(`Ruler measure to ground ${this.FORCE_TO_GROUND ? "enabled" : "disabled"}.`);
       },
