@@ -240,9 +240,8 @@ export async function _animateSegment(token, segment, destination) {
   // Only update drop to ground and user increment changes.
   // Leave the rest to region elevation from Terrain Mapper or other modules.
   const waypoint = this.waypoints[segment.waypointIdx];
-  const newElevation = token.elevationE
-    + userElevationChangeAtWaypoint(waypoint)
-    + (waypoint._forceToGround ? groundElevationAtWaypoint(waypoint) : 0);
+  const newElevation = (waypoint._forceToGround ? groundElevationAtWaypoint(waypoint) : token.elevationE)
+    + userElevationChangeAtWaypoint(waypoint);
   if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
 
   let name;
