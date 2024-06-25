@@ -1,6 +1,7 @@
 /* globals
 canvas,
 PIXI,
+Ruler,
 ui
 */
 "use strict";
@@ -41,28 +42,46 @@ elevationAtLocation -- all ruler types
 Used by ruler to get elevation at waypoints and at the end of the ruler.
 */
 
-import { MODULES_ACTIVE, MOVEMENT_TYPES } from "./const.js";
+import { MODULES_ACTIVE, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 
+
 /**
+ * Add getter Ruler.elevationAtWaypoint
  * Calculate the elevation for a given waypoint.
- * Terrain elevation + user increment
- * @param {object} waypoint
+ * Elevation from the previous path to this waypoint + terrain elevation + user increment
+ * @param {Point} waypoint
  * @returns {number}
  */
 export function elevationAtWaypoint(waypoint) {
-  const incr = waypoint._userElevationIncrements ?? 0;
-  const terrainE = waypoint._terrainElevation ?? 0;
-  return terrainE + (incr * canvas.dimensions.distance);
+  return waypoint._prevElevation
+    + (waypoint._forceToGround ? groundElevationAtWaypoint(waypoint) : 0)
+    + userElevationChangeAtWaypoint(waypoint);
 }
 
 /**
+ * Calculate the user change to elevation at this waypoint.
+ * @param {Point} waypoint
+ * @returns {number} Elevation delta in grid units
+ */
+export function userElevationChangeAtWaypoint(waypoint) {
+  return (waypoint._userElevationIncrements ?? 0) * canvas.dimensions.distance;
+}
+
+/**
+ * Calculate the ground elevation at this waypoint.
+ * @param {Point} waypoint
+ * @returns {number} Elevation in grid units
+ */
+export function groundElevationAtWaypoint(waypoint) { return waypoint._terrainElevation ?? (waypoint._terrainElevation = Ruler.terrainElevationAtLocation(waypoint)); }
+
+/**
  * Add getter Ruler.prototype.originElevation
- * Retrieve the elevation at the current ruler origin waypoint.
+ * Retrieve the elevation at the origin, taking into account terrain, token, and move-to-ground setting.
  * @returns {number|undefined} Elevation, in grid units. Undefined if the ruler has no waypoints.
  */
 export function originElevation() {
-  const firstWaypoint = this.waypoints[0];
+  const firstWaypoint = this.origin;
   return firstWaypoint ? elevationAtWaypoint(firstWaypoint) : undefined;
 }
 
@@ -103,34 +122,32 @@ export function terrainElevationAtLocation(location, { maxElevation, fixedElevat
 }
 
 /**
- * Ruler.prototype.elevationAtLocation.
- * Measure elevation for a given ruler position and token,
- * accounting for straight-line movement from prior waypoint to location
+ * Measure elevation from a given waypoint to a location.
  * Accounts for whether we are using regular Ruler or Token Ruler.
+ * Assumes straight-line movement from the prior waypoint to the location.
+ * @param {Point} waypoint      Waypoint to assume as the starting point. Uses that waypoint's elevation
  * @param {Point} location      Position on canvas to measure
  * @param {Token} [token]       Token that is assumed to be moving if not this._movementToken
- * @returns {number}
+
  */
-export function elevationAtLocation(location, token) {
-  location = PIXI.Point.fromObject(location);
-  token ??= this.token;
+export function elevationFromWaypoint(waypoint, location, token) {
   const isTokenRuler = Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED)
     && ui.controls.activeControl === "token"
     && ui.controls.activeTool === "select"
     && token;
 
   // For debugging, test at certain distance
-  const dist = CONFIG.GeometryLib.utils.pixelsToGridUnits(PIXI.Point.distanceBetween(this.waypoints.at(-1), location));
-  if ( dist > 5 ) console.debug(`elevationAtLocation ${dist}`);
-  if ( dist > 10 ) console.debug(`elevationAtLocation ${dist}`);
-  if ( dist > 20 ) console.debug(`elevationAtLocation ${dist}`);
-  if ( dist > 30 ) console.debug(`elevationAtLocation ${dist}`);
-  if ( dist > 40 ) console.debug(`elevationAtLocation ${dist}`);
-
-
+  if ( CONFIG[MODULE_ID].debug ) {
+    const dist = CONFIG.GeometryLib.utils.pixelsToGridUnits(PIXI.Point.distanceBetween(waypoint, location));
+    if ( dist > 40 ) console.debug(`elevationAtLocation ${dist}`);
+    else if ( dist > 30 ) console.debug(`elevationAtLocation ${dist}`);
+    else if ( dist > 20 ) console.debug(`elevationAtLocation ${dist}`);
+    else if ( dist > 10 ) console.debug(`elevationAtLocation ${dist}`);
+    else if ( dist > 5 ) console.debug(`elevationAtLocation ${dist}`);
+  }
 
   // For normal ruler, if hovering over a token, use that token's elevation.
-  if ( !isTokenRuler && !Settings.FORCE_TO_GROUND ) {
+  if ( !isTokenRuler && !waypoint._forceToGround ) {
     // Check for other tokens at destination and use that elevation.
     const maxTokenE = retrieveVisibleTokens()
       .filter(t => t.constrainedTokenBorder.contains(location.x, location.y))
@@ -138,38 +155,19 @@ export function elevationAtLocation(location, token) {
     if ( isFinite(maxTokenE) ) return maxTokenE;
   }
 
-  let startElevation = this.originElevation;
-
   // If no token present, then this is a straight measurement
+  const startElevation = elevationAtWaypoint(waypoint);
   if ( !token ) return startElevation;
 
-  let endElevation = startElevation;
-  const prevWaypoint = this.waypoints.at(-1);
-  if ( !prevWaypoint ) return startElevation; // Shouldn't happen.
-
-  // Either ruler with an origin token or Token Ruler
-  // If at ruler origin (single waypoint):
-  // - If walking: use the terrain elevation
-  // - Not walking: use the token elevation
-  // Destination elevation is the terrain elevation if walking
-  const isWalking = token.movementType === "WALK" || Settings.FORCE_TO_GROUND;
-  if ( this.waypoints.length === 1 ) { // First waypoint is the token origin.
-    startElevation = isWalking ? this.constructor.terrainElevationAtLocation(prevWaypoint,
-        { movementToken: token, maxElevation: startElevation }) : token.elevationE;
-
-    // User can affect the starting elevation.
-    startElevation += (prevWaypoint._userElevationIncrements ?? 0) * canvas.dimensions.distance;
-  } else endElevation = isWalking ? this.constructor.terrainElevationAtLocation(location,
-        { movementToken: token, maxElevation: startElevation }) : startElevation;
-
-  // Adjust the destination for terrain setElevation regions.
+  // --> At this point, either ruler with an origin token or Token Ruler
+  // Adjust the destination for Terrain Mapper setElevation regions.
   const api = MODULES_ACTIVE.API.TERRAIN_MAPPER;
-  if ( !api || !api.estimateElevationForSegment ) return endElevation;
-  const segments = api.estimateElevationForSegment(prevWaypoint, location, { startElevation, endElevation });
-  if ( !segments.length ) return endElevation;
-  const elevationTM = segments.at(-1).elevation;
-  return isFinite(elevationTM) ? elevationTM : endElevation;
+  if ( !api || !api.estimateElevationForSegment ) return startElevation;
+  const segments = api.estimateElevationForSegment(waypoint, location, { startElevation });
+  const elevationTM = segments.at(-1)?.elevation;
+  return isFinite(elevationTM) ? elevationTM : startElevation;
 }
+
 
 // ----- NOTE: HELPER FUNCTIONS ----- //
 
