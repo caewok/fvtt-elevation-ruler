@@ -6,6 +6,7 @@ Added setting to hide the GM ruler. Thanks @Mystler! Closes #86.
 Fix snapping of small tokens when using Token Ruler. Closes #70.
 Fix error re invalid elevation when adjusting elevation with the ruler. Closes #84, #92.
 Add separate add/remove waypoint keybindings for regular ruler vs token ruler. Handle right-clicking to add a waypoint (hold control to remove). Closes #99, #80
+Fix compatibility with Terrain Mapper. Refactor how elevation changes work. Now incrementing/decrementing elevation changes the elevation from the last waypoint. Allows tokens to maneuver over/under regions. Closes #100.
 
 # 0.9.4
 Remove custom unsnap code now that v12's `Ruler` allows unsnapping properly.
