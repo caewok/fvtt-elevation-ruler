@@ -37,7 +37,7 @@ export function _getMeasurementSegments(wrapped) {
   }
 
   // Elevate the segments
-  const segments = elevateSegments(this, wrapped()) ?? [];
+  const segments = elevateSegments(this, wrapped());
   const token = this.token;
 
   // If no movement token, then no pathfinding.
@@ -315,7 +315,6 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
   // Add destination as the final waypoint
   ruler.destination._terrainElevation = Ruler.terrainElevationAtLocation(ruler.destination);
   ruler.destination._userElevationIncrements = 0; // All increments affect previous waypoints.
-
   const destWaypoint = {
     x: ruler.destination.x,
     y: ruler.destination.y,
@@ -326,24 +325,18 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
   const waypoints = [...ruler.waypoints, destWaypoint];
 
   // Add the waypoint elevations to the corresponding segment endpoints.
-  // Skip the first waypoint, which will (likely) end up as p0.
-  const ln = waypoints.length;
-  for ( let i = 1, j = 0; i < ln; i += 1, j += 1 ) {
-    const segment = segments[j];
-    const p0 = waypoints[i - 1];
-    const p1 = waypoints[i];
-    const dist2 = PIXI.Point.distanceSquaredBetween(p0, p1);
-    if ( dist2 < 100 ) { // 10 ^ 2, from _getMeasurementSegments
-      j -= 1; // Stay on this segment and skip this waypoint
-      continue;
-    }
+  let currWaypoint;
+  for ( const segment of segments ) {
+    const ray = segment.ray;
+    const startWaypoint = waypoints.find(w => w.x === ray.A.x && w.y === ray.A.y);
+    const endWaypoint = waypoints.find(w => w.x === ray.B.x && w.y === ray.B.y);
+    if ( !startWaypoint || !endWaypoint ) continue;
 
     // Convert to 3d Rays
-    const Az = gridUnitsToPixels(Ruler.elevationAtWaypoint(p0));
-    const Bz = gridUnitsToPixels(Ruler.elevationAtWaypoint(p1));
-    segment.ray = Ray3d.from2d(segment.ray, { Az, Bz });
+    const Az = gridUnitsToPixels(Ruler.elevationAtWaypoint(startWaypoint));
+    const Bz = gridUnitsToPixels(Ruler.elevationAtWaypoint(endWaypoint));
+    segment.ray = Ray3d.from2d(ray, { Az, Bz });
   }
-
   return segments;
 }
 
