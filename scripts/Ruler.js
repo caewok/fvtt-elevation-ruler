@@ -75,6 +75,27 @@ When a waypoint is added, its _prevElevation is calculated. Then its elevation i
 // ----- NOTE: Wrappers ----- //
 
 /**
+ * Wrap Ruler.prototype.measure
+ * After a measurement, determine the current elevation of any dragged token
+ * @param {Point} destination                        The destination point to which to measure
+ * @param {object} [options]                         Additional options
+ * @param {boolean} [options.snap=true]              Snap the destination?
+ * @param {boolean} [options.force=false]            If not forced and the destination matches the current destination
+ *                                                   of this ruler, no measuring is done and nothing is returned
+ * @returns {RulerMeasurementSegment[]|void}         The array of measured segments if measured
+ */
+function measure(wrapper, destination, opts) {
+  wrapper(destination, opts);
+
+  if ( !(this._isTokenRuler && this.token._preview) ) return;
+  const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(this.segments.at(-1).ray.B.z);
+  if ( !isFinite(elevation) ) return;
+  if ( this.token._preview.document.elevation === elevation ) return;
+  this.token._preview.document.updateSource({ elevation });
+  this.token._preview.renderFlags.set({ refreshTooltip: true });
+}
+
+/**
  * Wrap Ruler.prototype._getMeasurementData
  * Store the current userElevationIncrements for the destination.
  * Store segment information, possibly including pathfinding.
@@ -578,6 +599,7 @@ PATCHES.BASIC.WRAPS = {
   _removeWaypoint,
   _getMeasurementOrigin,
   _getMeasurementDestination,
+  measure,
 
   // Wraps related to segments
   _getSegmentLabel,
