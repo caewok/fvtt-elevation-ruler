@@ -386,6 +386,7 @@ export class MethodPatch extends AbstractPatch {
     if ( typeof value !== "string" ) value = value.name; // Can pass the class or the class name as string.
     cfg.className = value;
     this.#cl = Patcher.lookupByClassName(cfg.className);
+    if ( !this.#cl ) console.error(`Patcher|${cfg.className} not found!`);
     if ( !cfg.isStatic ) this.#cl = this.#cl.prototype;
   }
 
@@ -454,6 +455,7 @@ export class LibWrapperPatch extends AbstractPatch {
     if ( typeof value !== "string" ) value = value.name; // Can pass the class or the class name as string.
     cfg.className = value;
     this.#className = Patcher.lookupByClassName(value, { returnPathString: true });
+    if ( !this.#className ) console.error(`Patcher|${cfg.className} not found!`);
     if ( !cfg.isStatic ) this.#className = `${this.#className}.prototype`;
   }
 

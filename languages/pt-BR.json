@@ -1,0 +1,90 @@
+{
+    "elevationruler.name": "Elevation Ruler",
+    "elevationruler.keybindings.decrementElevation.name": "Diminuir Elevação da Régua",
+    "elevationruler.keybindings.decrementElevation.hint": "Diminui a elevação em incrementos da grade ao usar a régua.",
+
+    "elevationruler.keybindings.incrementElevation.name": "Aumentar Elevação da Régua",
+    "elevationruler.keybindings.incrementElevation.hint": "Aumenta a elevação em incrementos da grade ao usar a régua.",
+
+    "elevationruler.keybindings.addWaypointTokenRuler.name": "Adicionar Parada na Régua do Token",
+    "elevationruler.keybindings.addWaypointTokenRuler.hint": "Quando a Régua de Token estiver habilitada, adiciona uma parada enquanto arrasta o token.",
+
+    "elevationruler.keybindings.removeWaypointTokenRuler.name": "Remover Parada na Régua do Token",
+    "elevationruler.keybindings.removeWaypointTokenRuler.hint": "Quando a Régua de Token estiver habilitada, remove uma parada enquanto arrasta o token.",
+
+    "elevationruler.keybindings.togglePathfinding.name": "Alternar a Descoberta de Rota",
+    "elevationruler.keybindings.togglePathfinding.hint": "Se o botão Descoberta de Rota estiver habilitado, segurar esta tecla desativará temporariamente o encontro da rota. Se o botão Descoberta de Rota não estiver habilitado, segurar esta tecla ativará temporariamente o encontro da rota.",
+
+    "elevationruler.keybindings.forceToGround.name": "Forçar Elevação da Régua ao Chão",
+    "elevationruler.keybindings.forceToGround.hint": "Ao medir, pressione esta tecla para saber a distância até o chão. Pressione novamente para reverter.",
+
+    "elevationruler.keybindings.teleport.name": "Teleportar pela Régua",
+    "elevationruler.keybindings.teleport.hint": "Ao medir, segure esta tecla ao soltar o token arrastado ou pressione a barra de espaço para mover o token para o destino da régua, sem animação.",
+
+    "elevationruler.settings.levels-use-floor-label.name": "Etiqueta de Piso do Levels",
+    "elevationruler.settings.levels-use-floor-label.hint": "Se o módulo Levels estiver ativo, rotule a régua com o piso atual, se os pisos da UI de Levels estiverem nomeados.",
+    "elevationruler.settings.levels-labels-never": "Nunca",
+    "elevationruler.settings.levels-labels-ui": "Apenas quando a UI de Levels estiver ativa",
+    "elevationruler.settings.levels-labels-always": "Sempre",
+
+    "elevationruler.settings.prefer-token-elevation.name": "Adicionar Controle de Elevação do Token",
+    "elevationruler.settings.prefer-token-elevation.hint": "Adiciona um controle à barra de ferramentas do token. Quando ativado, o controle manterá a régua na elevação do token de medição. Caso contrário, o destino da régua assumirá a elevação do espaço da grade ou do token encontrado no ponto de destino da régua.",
+
+    "elevationruler.settings.enable-token-ruler.name": "Usar Régua de Token",
+    "elevationruler.settings.enable-token-ruler.hint": "Exibir a régua ao arrastar tokens.",
+
+   "elevationruler.settings.speed-highlighting-choice.name": "Usar Destaque de Velocidade do Token",
+    "elevationruler.settings.speed-highlighting-choice.hint": "Ao usar a régua, use cores diferentes para caminhada/disparada/distância máxima do token.",
+
+    "elevationruler.settings.speed-highlighting-choice-never": "Nunca",
+    "elevationruler.settings.speed-highlighting-choice-combat": "Apenas em Combate",
+    "elevationruler.settings.speed-highlighting-choice-always": "Sempre",
+
+     "elevationruler.settings.speed-highlighting-no-hostiles.name": "Sem Destaque de Velocidade de Hostis",
+    "elevationruler.settings.speed-highlighting-no-hostiles.hint": "Quando ativado, o usuário não pode ver a velocidade de um token hostil ou secreto, a menos que o usuário tenha permissões de Observador ou Dono.",
+
+    "elevationruler.settings.token-ruler-combat-history.name": "Rastrear Movimento de Combate",
+    "elevationruler.settings.token-ruler-combat-history.hint": "Para destacar a velocidade do token, soma todos os movimentos do token na rodada, ao exibir o Destaque de Velocidade.",
+
+    "elevationruler.settings.token-speed-property.name": "Propriedade de Caminhada do Token",
+    "elevationruler.settings.token-speed-property.hint": "Para Destaque de Velocidade do token, esta é a propriedade do ator que representa a velocidade de caminhada do token.",
+
+    "elevationruler.settings.token-fly-property.name": "Propriedade de Voo do Token",
+    "elevationruler.settings.token-fly-property.hint": "Para Destaque de Velocidade do token, esta é a propriedade do ator que representa a velocidade de voo do token.",
+
+    "elevationruler.settings.token-burrow-property.name": "Propriedade de Escavação do Token",
+    "elevationruler.settings.token-burrow-property.hint": "Para Destaque de Velocidade do token, esta é a propriedade do ator que representa a velocidade de escavação do token.",
+
+    "elevationruler.settings.token-speed-multiplier.name": "Multiplicador de Vvelocidade do Token",
+    "elevationruler.settings.token-speed-multiplier.hint": "Para Destaque de Velocidade do token, este é o multiplicador usado para passar da caminhada para a corrida (disparada) até o máximo. Por exemplo, com um multiplicador de 2, um token com velocidade de caminhada de 25 terá sua régua destacada em laranja após as primeiras 25 unidades de distância e em vermelho após as primeiras 50.",
+
+    "elevationruler.settings.round-to-multiple.name": "Arredondar Distância para Multiplicar",
+    "elevationruler.settings.round-to-multiple.hint": "Para medição de distância sem grade, arredonda a distância exibida para o múltiplo mais próximo do número inserido. Defina como 0 para desativar o arredondamento.",
+
+    "elevationruler.settings.token-terrain-multiplier.name": "Token como Multiplicador de Terreno",
+    "elevationruler.settings.token-terrain-multiplier.hint": "Multiplicador a ser usado para calcular a velocidade de movimento ao passar por outros tokens. Defina como 1 para ignorar. Valores menores que 1 tratam os espaços ocupados por tokens como mais rápidos que o normal; valores maiores que 1 penalizam o movimento através de espaços ocupados por tokens.",
+
+    "elevationruler.settings.pathfinding_tokens_block.name": "Tokens Bloqueiam",
+    "elevationruler.settings.pathfinding_tokens_block.hint": "Para encontrar a rota, tokens bloqueiam o caminho?",
+    "elevationruler.settings.pathfinding_tokens_block_no": "Não",
+    "elevationruler.settings.pathfinding_tokens_block_hostile": "Apenas Hostis",
+    "elevationruler.settings.pathfinding_tokens_block_all": "Todos",
+
+    "elevationruler.settings.pathfinding_limit_token_los.name": "Limitar Descoberta de Rota às Áreas Exploradas",
+    "elevationruler.settings.pathfinding_limit_token_los.hint": "Ao encontrar rotas, limite o alcance da descoberta de rotas às áreas exploradas, a menos que o usuário seja o MJ.",
+
+    "elevationruler.settings.grid-terrain-algorithm.name": "Medição de Grade de Terreno",
+    "elevationruler.settings.grid-terrain-algorithm.hint": "Quando estiver em uma grade, como contabilizar penalidades de movimento ou bônus de terreno e tokens? Centro: aplica se o terreno/token se sobrepõe ao centro da grade; Percentual de Área: aplica se o terreno/token cobrir pelo menos esta parte do quadrado/hexágono da grade; Euclidiano: rateado com base na porcentagem do segmento de linha dentro do terreno/token entre esta grade quadrada/hexágono e o anterior.",
+    "elevationruler.settings.grid-terrain-choice-center-point": "Centro",
+    "elevationruler.settings.grid-terrain-choice-percent-area": "Percentual de Área",
+    "elevationruler.settings.grid-terrain-choice-euclidean": "Euclideano",
+
+    "elevationruler.settings.grid-terrain-area-threshold.name": "Limite do Percentual de Área",
+    "elevationruler.settings.grid-terrain-area-threshold.hint": "Se 'Percentual de Área' for selecionado para Medição de Grade de Terreno, isso determinará a porcentagem de sobreposição necessária para o terreno/token contar ao medir em grades.",
+
+    "elevationruler.controls.prefer-token-elevation.name": "Prefira Elevação do Token",
+    "elevationruler.controls.pathfinding-control.name": "Usar Descoberta de Rota",
+
+    "elevationruler.drawingconfig.movementPenalty.name": "Bônus/Penalidade de Movimento",
+    "elevationruler.drawingconfig.movementPenalty.hint": "Defina como 1 para nenhuma penalidade. Valores superiores a um penalizam o movimento nessa percentagem; valores menores que um concedem efetivamente um bônus ao movimento. Por exemplo, defina como 2 para duplicar o movimento nesta área."
+}

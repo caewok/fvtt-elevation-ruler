@@ -14,16 +14,17 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
-import { SPEED, MODULE_ID } from "./const.js";
+import { SPEED, MODULE_ID, FLAGS } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import {
+  elevationFromWaypoint,
   elevationAtWaypoint,
   originElevation,
   destinationElevation,
   terrainElevationAtLocation,
-  elevationAtLocation
+  userElevationChangeAtWaypoint
 } from "./terrain_elevation.js";
 
 import {
@@ -33,7 +34,7 @@ import {
   _highlightMeasurementSegment
 } from "./segments.js";
 
-import { log, unsnappedTokenPositionAt } from "./util.js";
+import { log } from "./util.js";
 
 import { PhysicalDistance } from "./PhysicalDistance.js";
 
@@ -58,22 +59,17 @@ import { gridShape, pointFromGridCoordinates, canvasElevationFromCoordinates } f
  * - clear when drag abandoned
  */
 
-/*
-UX goals:
-1. Ruler origin elevation is the starting token elevation, if any, or the terrain elevation.
-2. Dragging the ruler to the next space may cause it to drop if the token is elevated.
-- This is probably fine? If flying while everyone else is on the ground, the default should
-    account for that.
-- A bit cumbersome if measuring straight across elevated terrain, but (a) use terrain layer and
-    (b) other elevated tokens should change the destination elevation automatically. (see 3 below)
-3. If the destination space is an elevated token or terrain, use that elevation for destination.
-- So measuring that space will change the ruler elevation indicator accordingly.
-- This will cause the elevation indicator to change without other user input. This is probably fine?
-    User will be dragging the ruler, so that is appropriate feedback.
-4. User can at any time increment or decrement. This is absolute, in that it is added on top of any
-    default elevations from originating/destination tokens or terrain.
-- Meaning, origination could be 0, user increments 5 and then drags to a terrain space of 50; ruler
-    would go from 5 to 55.
+/* Elevation measurement
+
+Each waypoint has added properties:
+- _userElevationIncrements: Elevation shifts up or down at this point due to user input
+- _terrainElevation: Ground/terrain elevation, calculated as needed
+- _prevElevation: The calculated elevation of this waypoint, which is the previous waypoint elevation
+  plus changes due to moving across regions
+- _forceToGround: This waypoint should force its elevation to the terrain ground level.
+
+When a waypoint is added, its _prevElevation is calculated. Then its elevation is further modified by its properties.
+
 */
 
 // ----- NOTE: Wrappers ----- //
@@ -100,12 +96,9 @@ function _getMeasurementData(wrapper) {
     return newObj;
   });
 
-  myObj._userElevationIncrements = this._userElevationIncrements;
   myObj.totalDistance = this.totalDistance;
   myObj.totalMoveDistance = this.totalMoveDistance;
   myObj._isTokenRuler = this._isTokenRuler;
-  myObj._originAdjX = this._originAdjX;
-  myObj._originAdjY = this._originAdjY;
   return obj;
 }
 
@@ -119,12 +112,12 @@ function update(wrapper, data) {
   const myData = data[MODULE_ID];
   if ( !myData ) return wrapper(data); // Just in case.
 
+  // Hide GM token ruler
+  if ( data.token && this.user.isGM && !game.user.isGM && Settings.get(Settings.KEYS.TOKEN_RULER.HIDE_GM)) return wrapper(data);
+
   // Fix for displaying user elevation increments as they happen.
   const triggerMeasure = this._userElevationIncrements !== myData._userElevationIncrements;
-  this._userElevationIncrements = myData._userElevationIncrements;
   this._isTokenRuler = myData._isTokenRuler;
-  this._originAdjX = myData._originAdjX;
-  this.__originAdjY = myData._originAdjY;
 
   // Reconstruct segments.
   if ( myData._segments ) this.segments = myData._segments.map(segment => {
@@ -147,18 +140,31 @@ function update(wrapper, data) {
 }
 
 /**
- * Wrap Ruler.prototype._addWaypoint
- * Add elevation increments
+ * Override Ruler.prototype._addWaypoint
+ * Add elevation increments before measuring.
+ * @param {Point} point                    The waypoint
+ * @param {object} [options]               Additional options
+ * @param {boolean} [options.snap=true]    Snap the waypoint?
  */
-function _addWaypoint(wrapper, point) {
-  wrapper(point);
-
-  // In case the waypoint was never added.
+function _addWaypoint(point, {snap=true}={}) {
   if ( (this.state !== Ruler.STATES.STARTING) && (this.state !== Ruler.STATES.MEASURING ) ) return;
-  if ( !this.waypoints.length ) return;
+  const waypoint = this.state === Ruler.STATES.STARTING
+    ? this._getMeasurementOrigin(point, {snap})
+    : this._getMeasurementDestination(point, {snap});
 
-  // Elevate the waypoint.
-  addWaypointElevationIncrements(this, point);
+  // Set defaults
+  waypoint._userElevationIncrements = 0;
+  waypoint._forceToGround = Settings.FORCE_TO_GROUND;
+
+  // Determine the elevation up until this point
+  if ( !this.waypoints.length ) {
+    waypoint._prevElevation = this.token?.elevationE ?? canvas.scene.getFlag("terrainmapper", FLAGS.SCENE.BACKGROUND_ELEVATION) ?? 0;
+    waypoint._forceToGround ||= this.token.movementType === "WALK"
+  } else waypoint._prevElevation = elevationFromWaypoint(this.waypoints.at(-1), waypoint, this.token);
+
+  this.waypoints.push(waypoint);
+  this._state = Ruler.STATES.MEASURING;
+  this.measure(this.destination ?? point, {snap, force: true});
 }
 
 /**
@@ -168,7 +174,6 @@ function _addWaypoint(wrapper, point) {
  */
 function _removeWaypoint(wrapper, point, { snap = true } = {}) {
   if ( this._pathfindingSegmentMap ) this._pathfindingSegmentMap.delete(this.waypoints.at(-1));
-  this._userElevationIncrements = 0;
   wrapper(point, { snap });
 }
 
@@ -186,33 +191,19 @@ function _getMeasurementOrigin(wrapped, point, {snap=true}={}) {
   const token = this.token;
   if ( !this._isTokenRuler || !token ) return point;
 
-  // Shift to token center or snapped center.
-  // Adjust for non-symmetrical token sizes.
-  // Non-symmetrical move from the innermost right/left or top/bottom from center.
-  // log(`_getMeasurementOrigin|Shifting ruler origin to ${token.center.x},${token.center.y}`);
-  const dSize = canvas.dimensions.size;
-  const tCenter = token.center;
+  // Shift to token center
   const { width, height } = token.getSize();
-  const adjX = (((width / dSize) + 1) % 2) / 2;
-  const adjY = (((height / dSize) + 1) % 2) / 2;
-  const signX = Math.sign(point.x - tCenter.x);
-  const signY = Math.sign(point.y - tCenter.y);
-
-  this._originAdjX = (adjX * signX * dSize);
-  this._originAdjY = (adjY * signY * dSize);
+  const tl = token.document;
   return {
-    x: tCenter.x + this._originAdjX,
-    y: tCenter.y + this._originAdjY
-  }
-
-  // return token.center;
-  // return point;
+    x: tl.x + width * 0.5,
+    y: tl.y + height * 0.5
+  };
 }
 
 /**
  * Wrap Ruler.prototype._getMeasurementDestination
  * Get the destination point. By default the point is snapped to grid space centers.
- * Adjust the destination point match where the preview token is placed.
+ * Adjust the destination point to match where the preview token is placed.
  * @param {Point} point                    The point coordinates
  * @param {object} [options]               Additional options
  * @param {boolean} [options.snap=true]    Snap the point?
@@ -223,13 +214,14 @@ function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
   point = wrapped(point, { snap });
   const token = this.token;
   if ( !this._isTokenRuler || !token ) return point;
-  if ( !(this._originAdjX || this._originAdjY) ) return point;
   if ( !token._preview ) return point;
 
-  const tCenter = token._preview.center;
+  // Shift to token center or snapped center
+  const { width, height } = token.getSize();
+  const tl = snap ? token._preview.getSnappedPosition(token._preview.document) : token._preview.document;
   return {
-    x: tCenter.x + this._originAdjX,
-    y: tCenter.y + this._originAdjY
+    x: tl.x + width * 0.5,
+    y: tl.y + height * 0.5
   };
 }
 
@@ -302,23 +294,25 @@ function _computeDistance() {
   if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
 
   // Compute the waypoint distances for labeling. (Distance to immediately previous waypoint.)
-  const waypointKeys = new Set(this.waypoints.map(w => w.key));
+  const waypointKeys = new Set(this.waypoints.map(w => PIXI.Point._tmp.copyFrom(w).key));
   let waypointDistance = 0;
   let waypointMoveDistance = 0;
-  let waypointStartingElevation = 0;
+
+  let currWaypointIdx = -1;
   for ( const segment of this.segments ) {
-    const A = Point3d.fromObject(segment.ray.A);
-    const B = Point3d.fromObject(segment.ray.B);
-    if ( waypointKeys.has(A.to2d().key) ) {
+    // Segments assumed to be in order of the waypoint.
+    const A = PIXI.Point._tmp.copyFrom(segment.ray.A);
+    if ( waypointKeys.has(A.key) ) {
+      currWaypointIdx += 1;
       waypointDistance = 0;
       waypointMoveDistance = 0;
-      waypointStartingElevation = A.z;
     }
+    segment.waypointIdx = currWaypointIdx;
     waypointDistance += segment.distance;
     waypointMoveDistance += segment.moveDistance;
     segment.waypointDistance = waypointDistance;
     segment.waypointMoveDistance = waypointMoveDistance;
-    segment.waypointElevationIncrement = B.z - waypointStartingElevation;
+    segment.waypointElevationIncrement = userElevationChangeAtWaypoint(this.waypoints[currWaypointIdx]);
   }
 }
 
@@ -581,7 +575,6 @@ function _onMoveKeyDown(wrapped, context) {
 PATCHES.BASIC.WRAPS = {
   _getMeasurementData,
   update,
-  _addWaypoint,
   _removeWaypoint,
   _getMeasurementOrigin,
   _getMeasurementDestination,
@@ -597,7 +590,7 @@ PATCHES.BASIC.WRAPS = {
 
 PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments };
 
-PATCHES.BASIC.OVERRIDES = { _computeDistance, _animateSegment };
+PATCHES.BASIC.OVERRIDES = { _computeDistance, _animateSegment, _addWaypoint };
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 
@@ -605,18 +598,19 @@ PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 
 /**
  * Add Ruler.prototype.incrementElevation
- * Increase the elevation at the current ruler destination by one grid unit.
+ * Increase the elevation at the current ruler waypoint by one grid unit.
  */
 function incrementElevation() {
-  const ruler = canvas.controls.ruler;
+  const ruler = this;
   if ( !ruler || !ruler.active ) return;
-  ruler._userElevationIncrements ??= 0;
-  ruler._userElevationIncrements += 1;
 
-  // Weird, but slightly change the destination to trigger a measure
-  const destination = { x: this.destination.x, y: this.destination.y };
-  this.destination.x -= 1;
-  ruler.measure(destination);
+  // Increment the elevation at the last waypoint.
+  const waypoint = this.waypoints.at(-1);
+  waypoint._userElevationIncrements ??= 0;
+  waypoint._userElevationIncrements += 1;
+
+  // Update the ruler display.
+  ruler.measure(this.destination, { force: true });
 
   // Broadcast the activity (see ControlsLayer.prototype._onMouseMove)
   this._broadcastMeasurement();
@@ -625,18 +619,19 @@ function incrementElevation() {
 
 /**
  * Add Ruler.prototype.decrementElevation
- * Decrease the elevation at the current ruler destination by one grid unit.
+ * Decrease the elevation at the current ruler waypoint by one grid unit.
  */
 function decrementElevation() {
-  const ruler = canvas.controls.ruler;
+  const ruler = this;
   if ( !ruler || !ruler.active ) return;
-  ruler._userElevationIncrements ??= 0;
-  ruler._userElevationIncrements -= 1;
 
-  // Weird, but slightly change the destination to trigger a measure
-  const destination = { x: this.destination.x, y: this.destination.y };
-  this.destination.x -= 1;
-  ruler.measure(destination);
+  // Decrement the elevation at the last waypoint.
+  const waypoint = this.waypoints.at(-1);
+  waypoint._userElevationIncrements ??= 0;
+  waypoint._userElevationIncrements -= 1;
+
+  // Update the ruler display.
+  ruler.measure(this.destination, { force: true});
 
   // Broadcast the activity (see ControlsLayer.prototype._onMouseMove)
   this._broadcastMeasurement();
@@ -661,7 +656,6 @@ async function teleport(_context) {
 PATCHES.BASIC.METHODS = {
   incrementElevation,
   decrementElevation,
-  elevationAtLocation,
   _computeTokenSpeed,
   teleport
 };
@@ -679,25 +673,4 @@ PATCHES.BASIC.STATIC_METHODS = {
 };
 
 
-// ----- Helper functions ----- //
 
-/**
- * Helper to add elevation increments to waypoint
- */
-function addWaypointElevationIncrements(ruler, _point) {
-  const ln = ruler.waypoints.length;
-  const newWaypoint = ruler.waypoints[ln - 1];
-
-  // Set defaults.
-  newWaypoint._terrainElevation = 0;
-  newWaypoint._userElevationIncrements = 0;
-
-  if ( ln === 1 ) {
-    const moveToken = ruler.token;
-    newWaypoint._terrainElevation = moveToken ? moveToken.elevationE : Ruler.terrainElevationAtLocation(newWaypoint);
-
-  } else {
-    newWaypoint._userElevationIncrements = ruler._userElevationIncrements ?? 0;
-    newWaypoint._terrainElevation = ruler.elevationAtLocation(newWaypoint);
-  }
-}

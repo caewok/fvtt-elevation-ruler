@@ -2,7 +2,7 @@
   "name": "elevationruler",
   "title": "Elevation Ruler",
   "id": "elevationruler",
-  "description": "Modify Foundry VTT ruler to adjust for relative elevation of the destination.",
+  "description": "Modify Foundry VTT ruler for use when dragging tokens, pathfinding, and measuring elevation.",
   "version": "#{VERSION}#",
   "library": false,
   "manifestPlusVersion": "1.0.0",
@@ -40,6 +40,21 @@
       "lang": "en",
       "name": "English",
       "path": "languages/en.json"
+    },
+    {
+      "lang": "pt-BR",
+      "name": "Português (Brasil)",
+      "path": "languages/pt-BR.json"
+    },
+    {
+      "lang": "ru",
+      "name": "Русский",
+      "path": "languages/ru.json"
+    },
+    {
+      "lang": "pl",
+      "name": "Polski",
+      "path": "languages/pl.json"
     }
   ],
   "url": "#{URL}#",

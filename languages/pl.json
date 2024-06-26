@@ -1,0 +1,90 @@
+{
+    "elevationruler.name": "Elevation Ruler",
+    "elevationruler.keybindings.decrementElevation.name": "Zmniejszenie wysokości linijki",
+    "elevationruler.keybindings.decrementElevation.hint": "Zmniejsza wysokość w odstępach siatki podczas korzystania z linijki.",
+
+    "elevationruler.keybindings.incrementElevation.name": "Zwiększenie wysokości linijki",
+    "elevationruler.keybindings.incrementElevation.hint": "Zwiększa wysokość w odstępach siatki podczas korzystania z linijki.",
+
+    "elevationruler.keybindings.addWaypointTokenRuler.name": "Dodanie punktu trasy dla tokena",
+    "elevationruler.keybindings.addWaypointTokenRuler.hint": "Gdy linijka tokena jest włączona, dodaje punkt trasy podczas przeciągania tokena.",
+
+    "elevationruler.keybindings.removeWaypointTokenRuler.name": "Usunięcie punktu trasy tokena",
+    "elevationruler.keybindings.removeWaypointTokenRuler.hint": "Gdy linijka tokena jest włączona, usuwa punkt trasy podczas przeciągania tokena.",
+
+    "elevationruler.keybindings.togglePathfinding.name": "Tymczasowe wyłączenie wyszukiwania ścieżek",
+    "elevationruler.keybindings.togglePathfinding.hint": "Jeśli przycisk wyszukiwania ścieżki jest włączony, przytrzymanie tego przycisku spowoduje tymczasowe wyłączenie wyszukiwania ścieżki. Jeśli przycisk odnajdywania ścieżek nie jest włączony, przytrzymanie tego klawisza tymczasowo włączy odnajdywanie ścieżek.",
+
+    "elevationruler.keybindings.forceToGround.name": "Wymuszenie wysokości linijki do podłoża",
+    "elevationruler.keybindings.forceToGround.hint": "Podczas pomiaru naciśnij ten przycisk, aby uzyskać odległość względem podłoża. Naciśnij ponownie, aby powrócić.",
+
+    "elevationruler.keybindings.teleport.name": "Teleportacja wzdłuż linijki",
+    "elevationruler.keybindings.teleport.hint": "Podczas pomiaru przytrzymaj ten klawisz po zwolnieniu przeciągniętego tokena lub naciśnij spację, aby przesunąć token do miejsca docelowego linijki bez animacji.",
+
+    "elevationruler.settings.levels-use-floor-label.name": "Etykieta poziomu podłoża",
+    "elevationruler.settings.levels-use-floor-label.hint": "Jeśli aktywny jest moduł Levels, linijka zostanie oznaczona bieżącym piętrem, jeśli piętra w interfejsie Levels są nazwane.",
+    "elevationruler.settings.levels-labels-never": "Nigdy",
+    "elevationruler.settings.levels-labels-ui": "Tylko gdy UI Levels jest aktywny",
+    "elevationruler.settings.levels-labels-always": "Zawsze",
+
+    "elevationruler.settings.prefer-token-elevation.name": "Dodaj kontrolę wysokości tokena",
+    "elevationruler.settings.prefer-token-elevation.hint": "Dodaje narzędzie sterujące do paska narzędzi tokena. Po włączeniu kontrolka będzie utrzymywać linijkę na wysokości tokena pomiarowego. W przeciwnym razie miejsce docelowe linijki przyjmie wysokość przestrzeni siatki lub tokena napotkanego w punkcie docelowym linijki.",
+
+    "elevationruler.settings.enable-token-ruler.name": "Używanie linijki tokenów",
+    "elevationruler.settings.enable-token-ruler.hint": "Wyświetlanie linijki podczas przeciągania tokenów.",
+
+   "elevationruler.settings.speed-highlighting-choice.name": "Używanie podświetlenia prędkości tokenów",
+    "elevationruler.settings.speed-highlighting-choice.hint": "Podczas korzystania z linijki, używaj różnych kolorów dla tokenów chodu/dystansu/maksymalnego dystansu.",
+
+    "elevationruler.settings.speed-highlighting-choice-never": "Nigdy",
+    "elevationruler.settings.speed-highlighting-choice-combat": "Tylko w walce",
+    "elevationruler.settings.speed-highlighting-choice-always": "Zawsze",
+
+     "elevationruler.settings.speed-highlighting-no-hostiles.name": "Brak podświetlenia szybkości wrogów",
+    "elevationruler.settings.speed-highlighting-no-hostiles.hint": "Po włączeniu tej opcji użytkownik nie może zobaczyć szybkości wrogiego lub tajnego tokena, chyba że ma uprawnienia obserwatora lub właściciela.",
+
+    "elevationruler.settings.token-ruler-combat-history.name": "Śledzenie ruchu w walce",
+    "elevationruler.settings.token-ruler-combat-history.hint": "W przypadku podświetlania szybkości tokenów, podczas wyświetlania podświetlenia należy zsumować wszystkie ruchy tokenów w rundzie.",
+
+    "elevationruler.settings.token-speed-property.name": "Właściwość ruchu tokena",
+    "elevationruler.settings.token-speed-property.hint": "W przypadku podświetlania szybkości tokena jest to właściwość aktora reprezentująca szybkość chodzenia tokena.",
+
+    "elevationruler.settings.token-fly-property.name": "Właściwość lotu tokena",
+    "elevationruler.settings.token-fly-property.hint": "W przypadku podświetlania szybkości tokena jest to właściwość aktora reprezentująca szybkość latania tokena.",
+
+    "elevationruler.settings.token-burrow-property.name": "Właściwość przekopywania tokena",
+    "elevationruler.settings.token-burrow-property.hint": "W przypadku podświetlania szybkości tokenów jest to właściwość aktora reprezentująca szybkość przekopywania tokenów.",
+
+    "elevationruler.settings.token-speed-multiplier.name": "Mnożnik szybkości tokena",
+    "elevationruler.settings.token-speed-multiplier.hint": "W przypadku podświetlania szybkości tokena jest to mnożnik używany do przejścia od chodzenia do biegania (kreska) do maksimum. Na przykład, z mnożnikiem 2, token z prędkością chodu 25 będzie podświetlony na pomarańczowo po pierwszych 25 jednostkach odległości i na czerwono po pierwszych 50.",
+
+    "elevationruler.settings.round-to-multiple.name": "Dystans zaokrąglony do wielokrotności",
+    "elevationruler.settings.round-to-multiple.hint": "W przypadku pomiaru odległości bez siatki wyświetlana odległość jest zaokrąglana do najbliższej wielokrotności wprowadzonej liczby. Ustaw wartość 0, aby wyłączyć zaokrąglanie.",
+
+    "elevationruler.settings.token-terrain-multiplier.name": "Token jako współczynnik terenu",
+    "elevationruler.settings.token-terrain-multiplier.hint": "Mnożnik używany do obliczania prędkości ruchu podczas przechodzenia przez inne tokeny. Ustaw na 1, aby ignorować. Wartości mniejsze niż 1 traktują pola tokenów jako szybsze niż normalnie; wartości większe niż 1 karzą ruch przez pola tokenów.",
+
+    "elevationruler.settings.pathfinding_tokens_block.name": "Blokowanie przez tokeny",
+    "elevationruler.settings.pathfinding_tokens_block.hint": "Czy w przypadku wyszukiwania ścieżek tokeny blokują ścieżkę?",
+    "elevationruler.settings.pathfinding_tokens_block_no": "Nie",
+    "elevationruler.settings.pathfinding_tokens_block_hostile": "Tylko wrogo nastawieni",
+    "elevationruler.settings.pathfinding_tokens_block_all": "Wszystkie",
+
+    "elevationruler.settings.pathfinding_limit_token_los.name": "Ograniczenie wyszukiwania ścieżek do zbadanych obszarów",
+    "elevationruler.settings.pathfinding_limit_token_los.hint": "Podczas odnajdywania ścieżek należy ograniczyć ich zasięg do zbadanych obszarów, chyba że użytkownikiem jest MG.",
+
+    "elevationruler.settings.grid-terrain-algorithm.name": "Pomiar siatki terenu",
+    "elevationruler.settings.grid-terrain-algorithm.hint": "Jak uwzględnić kary lub premie za ruch wynikające z terenu i tokenów na siatce? Środek: zastosuj, jeśli teren/token pokrywa się ze środkiem siatki; Procent obszaru: zastosuj, jeśli teren/token pokrywa co najmniej taką część kwadratu/heksu siatki; Euklidesowy: proporcjonalnie na podstawie procentu segmentu linii w obrębie terenu/tokenu między tym kwadratem/heksem siatki a poprzednim.",
+    "elevationruler.settings.grid-terrain-choice-center-point": "Punkt środkowy",
+    "elevationruler.settings.grid-terrain-choice-percent-area": "Procent powierzchni",
+    "elevationruler.settings.grid-terrain-choice-euclidean": "Euklidesowy",
+
+    "elevationruler.settings.grid-terrain-area-threshold.name": "Próg procentowy obszaru",
+    "elevationruler.settings.grid-terrain-area-threshold.hint": "Jeśli dla opcji Pomiar siatki terenu wybrano opcję \"Procent powierzchni\", określa ona procent nakładania się wymagany do zliczenia terenu/tokenu podczas pomiaru na siatkach.",
+
+    "elevationruler.controls.prefer-token-elevation.name": "Preferuj wysokość tokena",
+    "elevationruler.controls.pathfinding-control.name": "Użyj wyszukiwania ścieżek",
+
+    "elevationruler.drawingconfig.movementPenalty.name": "Premia/kara za ruch",
+    "elevationruler.drawingconfig.movementPenalty.hint": "Wartość 1 oznacza brak kary. Wartości większe niż jeden powodują karę za ruch o ten procent; wartości mniejsze niż jeden zapewniają premię do ruchu. Na przykład, ustawienie wartości 2 podwaja ruch na tym obszarze."
+}

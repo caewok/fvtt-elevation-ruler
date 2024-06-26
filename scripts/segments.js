@@ -4,7 +4,8 @@ CanvasAnimation,
 CONFIG,
 CONST,
 game,
-PIXI
+PIXI,
+Ruler
 */
 "use strict";
 
@@ -14,7 +15,7 @@ import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { perpendicularPoints, log  } from "./util.js";
 import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
-import { elevationAtWaypoint } from "./terrain_elevation.js";
+import { userElevationChangeAtWaypoint, elevationFromWaypoint, groundElevationAtWaypoint } from "./terrain_elevation.js";
 import { MovePenalty } from "./MovePenalty.js";
 
 /**
@@ -36,7 +37,7 @@ export function _getMeasurementSegments(wrapped) {
   }
 
   // Elevate the segments
-  const segments = elevateSegments(this, wrapped()) ?? [];
+  const segments = elevateSegments(this, wrapped());
   const token = this.token;
 
   // If no movement token, then no pathfinding.
@@ -204,7 +205,7 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
  * @returns {object}
  */
 export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance) {
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || null;
+  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
   if (canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS || !multiple) return {
     newSegmentDistance: segmentDistance,
     newMoveDistance: Number(moveDistance.toFixed(2)),
@@ -235,6 +236,14 @@ export async function _animateSegment(token, segment, destination) {
 //     && !(segment.B.x === this.destination.x && segment.B.y === this.destination.y )
 //     && !this.waypoints.some(w => segment.B.x === w.x && segment.B.y === w.y) ) return;
 
+  // Update elevation before the token move.
+  // Only update drop to ground and user increment changes.
+  // Leave the rest to region elevation from Terrain Mapper or other modules.
+  const waypoint = this.waypoints[segment.waypointIdx];
+  const newElevation = (waypoint._forceToGround ? groundElevationAtWaypoint(waypoint) : token.elevationE)
+    + userElevationChangeAtWaypoint(waypoint);
+  if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
+
   let name;
   if ( segment.animation?.name === undefined ) name = token.animationName;
   else name ||= Symbol(token.animationName);
@@ -251,13 +260,6 @@ export async function _animateSegment(token, segment, destination) {
   await token.animate({x, y}, {name, duration: 0});
   await token.document.update(destination, updateOptions);
   await CanvasAnimation.getAnimation(name)?.promise;
-
-  // Update elevation after the token move.
-  if ( segment.ray.A.z !== segment.ray.B.z ) {
-    const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) ?? 1;
-    const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z).toNearest(multiple);
-    await token.document.update({ elevation });
-  }
 }
 
 // ----- NOTE: Segment highlighting ----- //
@@ -310,31 +312,30 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
   const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
 
   // Add destination as the final waypoint
-  ruler.destination._terrainElevation = ruler.elevationAtLocation(ruler.destination);
-  ruler.destination._userElevationIncrements = ruler._userElevationIncrements ?? 0;
-  const waypoints = ruler.waypoints.concat([ruler.destination]);
-
-  log(`Destination ${ruler.destination} terrainElevation: ${ruler.destination._terrainElevation} increments: ${ruler.destination._userElevationIncrements}`);
+  ruler.destination._terrainElevation = Ruler.terrainElevationAtLocation(ruler.destination);
+  ruler.destination._userElevationIncrements = 0; // All increments affect previous waypoints.
+  const destWaypoint = {
+    x: ruler.destination.x,
+    y: ruler.destination.y,
+    _userElevationIncrements: 0,
+    _forceToGround: Settings.FORCE_TO_GROUND,
+  }
+  destWaypoint._prevElevation = elevationFromWaypoint(ruler.waypoints.at(-1), destWaypoint, ruler.token);
+  const waypoints = [...ruler.waypoints, destWaypoint];
 
   // Add the waypoint elevations to the corresponding segment endpoints.
-  // Skip the first waypoint, which will (likely) end up as p0.
-  const ln = waypoints.length;
-  for ( let i = 1, j = 0; i < ln; i += 1, j += 1 ) {
-    const segment = segments[j];
-    const p0 = waypoints[i - 1];
-    const p1 = waypoints[i];
-    const dist2 = PIXI.Point.distanceSquaredBetween(p0, p1);
-    if ( dist2 < 100 ) { // 10 ^ 2, from _getMeasurementSegments
-      j -= 1; // Stay on this segment and skip this waypoint
-      continue;
-    }
+  let currWaypoint;
+  for ( const segment of segments ) {
+    const ray = segment.ray;
+    const startWaypoint = waypoints.find(w => w.x === ray.A.x && w.y === ray.A.y);
+    const endWaypoint = waypoints.find(w => w.x === ray.B.x && w.y === ray.B.y);
+    if ( !startWaypoint || !endWaypoint ) continue;
 
     // Convert to 3d Rays
-    const Az = gridUnitsToPixels(elevationAtWaypoint(p0));
-    const Bz = gridUnitsToPixels(elevationAtWaypoint(p1));
-    segment.ray = Ray3d.from2d(segment.ray, { Az, Bz });
+    const Az = gridUnitsToPixels(Ruler.elevationAtWaypoint(startWaypoint));
+    const Bz = gridUnitsToPixels(Ruler.elevationAtWaypoint(endWaypoint));
+    segment.ray = Ray3d.from2d(ray, { Az, Bz });
   }
-
   return segments;
 }
 
@@ -375,15 +376,17 @@ function levelNameAtElevation(e) {
 function segmentElevationLabel(s) {
   const units = canvas.scene.grid.units;
   const increment = s.waypointElevationIncrement;
-  const Bz = s.ray.B.z;
+  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
+  const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(s.ray.B.z).toNearest(multiple);
+  const Bz = s.ray.B.z.toNearest(multiple);
 
   const segmentArrow = (increment > 0) ? "↑"
     : (increment < 0) ? "↓" : "↕";
 
   // Take absolute value b/c segmentArrow will represent direction
   // Allow decimals to tenths ( Math.round(x * 10) / 10).
-  let label = `${segmentArrow}${Math.abs(Number(CONFIG.GeometryLib.utils.pixelsToGridUnits(increment).toFixed(1)))} ${units}`;
-  label += ` [@${Number(CONFIG.GeometryLib.utils.pixelsToGridUnits(Bz).toFixed(1))} ${units}]`;
+  let label = `${segmentArrow}${Math.abs(Number(increment))} ${units}`;
+  label += ` [@${Number(elevation)} ${units}]`;
 
   return label;
 }

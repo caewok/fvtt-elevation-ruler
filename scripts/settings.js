@@ -40,6 +40,7 @@ const SETTINGS = {
   NO_MODS: "no-modules-message",
   TOKEN_RULER: {
     ENABLED: "enable-token-ruler",
+    HIDE_GM: "hide-gm-ruler",
     ROUND_TO_MULTIPLE: "round-to-multiple",
     TOKEN_MULTIPLIER: "token-terrain-multiplier"
   },
@@ -70,6 +71,8 @@ const SETTINGS = {
 const KEYBINDINGS = {
   INCREMENT: "incrementElevation",
   DECREMENT: "decrementElevation",
+  ADD_WAYPOINT: "addWaypoint",
+  REMOVE_WAYPOINT: "removeWaypoint",
   TOKEN_RULER: {
     ADD_WAYPOINT: "addWaypointTokenRuler",
     REMOVE_WAYPOINT: "removeWaypointTokenRuler"
@@ -154,6 +157,16 @@ export class Settings extends ModuleSettingsAbstract {
       name: localize(`${KEYS.TOKEN_RULER.ENABLED}.name`),
       hint: localize(`${KEYS.TOKEN_RULER.ENABLED}.hint`),
       scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.TOKEN_RULER.HIDE_GM, {
+      name: localize(`${KEYS.TOKEN_RULER.HIDE_GM}.name`),
+      hint: localize(`${KEYS.TOKEN_RULER.HIDE_GM}.hint`),
+      scope: "world",
       config: true,
       default: false,
       type: Boolean,
@@ -274,13 +287,39 @@ export class Settings extends ModuleSettingsAbstract {
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
 
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.ADD_WAYPOINT, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.ADD_WAYPOINT}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.ADD_WAYPOINT}.hint`),
+      editable: [
+        { key: "Equal" }
+      ],
+      onDown: context => {
+        if ( canvas.controls?.ruler && !canvas.controls.ruler._isTokenRuler ) toggleTokenRulerWaypoint(context, true);
+      },
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
+
+    game.keybindings.register(MODULE_ID, KEYBINDINGS.REMOVE_WAYPOINT, {
+      name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.REMOVE_WAYPOINT}.name`),
+      hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.REMOVE_WAYPOINT}.hint`),
+      editable: [
+        { key: "Minus" }
+      ],
+      onDown: context => {
+        if ( canvas.controls?.ruler && !canvas.controls.ruler._isTokenRuler ) toggleTokenRulerWaypoint(context, false);
+      },
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
+    });
+
     game.keybindings.register(MODULE_ID, KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT, {
       name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT}.name`),
       hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.TOKEN_RULER.ADD_WAYPOINT}.hint`),
       editable: [
         { key: "Equal" }
       ],
-      onDown: context => toggleTokenRulerWaypoint(context, true),
+      onDown: context => {
+         if ( canvas.controls?.ruler._isTokenRuler ) toggleTokenRulerWaypoint(context, true);
+      },
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
 
@@ -290,7 +329,9 @@ export class Settings extends ModuleSettingsAbstract {
       editable: [
         { key: "Minus" }
       ],
-      onDown: context => toggleTokenRulerWaypoint(context, false),
+      onDown: context => {
+        if ( canvas.controls?.ruler._isTokenRuler ) toggleTokenRulerWaypoint(context, false);
+      },
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
 
@@ -323,6 +364,8 @@ export class Settings extends ModuleSettingsAbstract {
         const ruler = canvas.controls.ruler;
         if ( !ruler.active ) return;
         this.FORCE_TO_GROUND = !this.FORCE_TO_GROUND;
+        ruler.waypoints.at(-1)._forceToGround = this.FORCE_TO_GROUND;
+
         ruler.measure(ruler.destination, { force: true });
         ui.notifications.info(`Ruler measure to ground ${this.FORCE_TO_GROUND ? "enabled" : "disabled"}.`);
       },
