@@ -37,7 +37,6 @@ To enable/disable pathfinding, toggle the pathfinding icon in the token controls
 ## Module history
 As of v0.7, Elevation Ruler adds a setting to display the Foundry ruler when dragging tokens.
 As of v0.8, Elevation Ruler adds a toggle to enable pathfinding when using the ruler or dragging tokens with the Token Ruler enabled.
-Version v0.9 requires Foundry v12.
 
 # Installation
 Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json) in Foundry to install.
@@ -49,10 +48,12 @@ Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/
 (Elevation Ruler 0.4+ requires Foundry v9 because it replaces the DF Hotkeys dependency with the Foundry keybindings introduced in v9.)
 (Elevation Ruler 0.5+ requires Foundry v10 due to improvements in the Foundry Ruler API.)
 (Elevation Ruler 0.7+ requires Foundry v11.)
+(Elevation Ruler 0.9+ requires Foundry v12.)
 
 ## Modules that add functionality
-- [Elevated Vision](https://github.com/caewok/fvtt-elevated-vision)
-- [Wall Height](https://github.com/erithtotl/FVTT-Wall-Height)
+- [Wall Height](https://github.com/erithtotl/FVTT-Wall-Height). For defining limited-height walls.
+- [Terrain Mapper](https://github.com/caewok/fvtt-terrain-mapper). In v12, use Terrain Mapper to define elevation for regions.
+- [PF2E Elevation Ruler]([https://github.com/](https://github.com/7H3LaughingMan/pf2e-elevation-ruler). Defines token speed colors for the PF2e system.
 
 ## Known conflicts
 - [Terrain Ruler](https://github.com/manuelVo/foundryvtt-terrain-ruler)
@@ -114,7 +115,7 @@ This is particularly useful where you have an elevated character at the origin, 
 
 ## Elevation changes when moving the token with spacebar
 
-As with the normal Foundry ruler, if you begin a measurement at your token, you can hit spacebar to move the token. Elevation is modified at the end of each waypoint segment move. This may allow you, for example, to jump over a wall if that wall has a maximum height under your current elevation as can be set up using the Wall Height module (or Levels + Wall Height).
+As with the normal Foundry ruler, if you begin a measurement at your token, you can hit spacebar to move the token. Elevation is modified at the beginning of each waypoint segment move. (As of v0.9.5. Previously, it would be modified at the end of the waypoint segment move.) This may allow you, for example, to jump over a wall if that wall has a maximum height under your current elevation as can be set up using the Wall Height module (or Levels + Wall Height). Or avoid a region with a defined height.
 
 # Token controls
 
