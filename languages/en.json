@@ -91,6 +91,9 @@
     "elevationruler.settings.grid-terrain-area-threshold.name": "Percent Area Threshold",
     "elevationruler.settings.grid-terrain-area-threshold.hint": "If 'Percent Area' is selected for Terrain Grid Measurement, this determines the percent overlap required for the terrain/token to count when measuring on grids.",
 
+    "elevationruler.settings.automatic-movement-type.name": "Autodetect Movement Type",
+    "elevationruler.settings.automatic-movement-type.hint": "Automatically detect the movement type based on token position. Set the token status effect to 'fly' or 'burrowing' to override.",
+
     "elevationruler.controls.prefer-token-elevation.name": "Prefer Token Elevation",
     "elevationruler.controls.pathfinding-control.name": "Use Pathfinding",
 
