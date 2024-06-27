@@ -65,7 +65,9 @@ const SETTINGS = {
       EUCLIDEAN: "grid-terrain-choice-euclidean"
     },
     AREA_THRESHOLD: "grid-terrain-area-threshold"
-  }
+  },
+
+  AUTO_MOVEMENT_TYPE: "automatic-movement-type"
 };
 
 const KEYBINDINGS = {
@@ -212,6 +214,19 @@ export class Settings extends ModuleSettingsAbstract {
       type: Boolean,
       requiresReload: false
     });
+
+    if ( game.system.id === "dnd5e" ) {
+      register(KEYS.AUTO_MOVEMENT_TYPE, {
+        name: localize(`${KEYS.AUTO_MOVEMENT_TYPE}.name`),
+        hint: localize(`${KEYS.AUTO_MOVEMENT_TYPE}.hint`),
+        scope: "user",
+        config: true,
+        default: true,
+        type: Boolean,
+        requiresReload: false
+      });
+    }
+
 
     register(KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE, {
       name: localize(`${KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE}.name`),
