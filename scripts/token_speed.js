@@ -94,6 +94,7 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
       }
 
       // Increment totals.
+      processed.push(segment);
       totalCombatMoveDistance += segment.moveDistance;
       numPrevDiagonal = newPrevDiagonal;
     }
