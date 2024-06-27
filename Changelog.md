@@ -1,3 +1,8 @@
+# 0.9.6
+Move calculation of speed colors to `Ruler#_highlightMeasurementSegment`. As a result, Ruler segments are not split at movement speed category changes, so there are no longer extra waypoints added.
+Remove settings related to determining when a terrain affects a token. Currently, Foundry regions only checks the center point.
+For dnd5e, remove the Token HUD control to select movement, because dnd5e now uses status effects to signify when tokens are flying or burrowing. Added a setting to automatically determine token movement for dnd5e.
+
 # 0.9.5
 Added Brazilian translation. Thanks @Kharmans!
 Added Russian translation. Thanks @VirusNik21! Closes #96.
