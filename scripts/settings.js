@@ -57,15 +57,15 @@ const SETTINGS = {
     }
   },
 
-  GRID_TERRAIN: {
-    ALGORITHM: "grid-terrain-algorithm",
-    CHOICES: {
-      CENTER: "grid-terrain-choice-center-point",
-      PERCENT: "grid-terrain-choice-percent-area",
-      EUCLIDEAN: "grid-terrain-choice-euclidean"
-    },
-    AREA_THRESHOLD: "grid-terrain-area-threshold"
-  },
+//   GRID_TERRAIN: {
+//     ALGORITHM: "grid-terrain-algorithm",
+//     CHOICES: {
+//       CENTER: "grid-terrain-choice-center-point",
+//       PERCENT: "grid-terrain-choice-percent-area",
+//       EUCLIDEAN: "grid-terrain-choice-euclidean"
+//     },
+//     AREA_THRESHOLD: "grid-terrain-area-threshold"
+//   },
 
   AUTO_MOVEMENT_TYPE: "automatic-movement-type"
 };
@@ -252,33 +252,33 @@ export class Settings extends ModuleSettingsAbstract {
     });
 
     // ----- NOTE: Grid Terrain Measurement ----- //
-    register(KEYS.GRID_TERRAIN.ALGORITHM, {
-      name: localize(`${KEYS.GRID_TERRAIN.ALGORITHM}.name`),
-      hint: localize(`${KEYS.GRID_TERRAIN.ALGORITHM}.hint`),
-      scope: "world",
-      config: true,
-      default: KEYS.GRID_TERRAIN.CHOICES.CENTER,
-      type: String,
-      choices: {
-        [KEYS.GRID_TERRAIN.CHOICES.CENTER]: localize(`${KEYS.GRID_TERRAIN.CHOICES.CENTER}`),
-        [KEYS.GRID_TERRAIN.CHOICES.PERCENT]: localize(`${KEYS.GRID_TERRAIN.CHOICES.PERCENT}`),
-        [KEYS.GRID_TERRAIN.CHOICES.EUCLIDEAN]: localize(`${KEYS.GRID_TERRAIN.CHOICES.EUCLIDEAN}`)
-      }
-    });
-
-    register(KEYS.GRID_TERRAIN.AREA_THRESHOLD, {
-      name: localize(`${KEYS.GRID_TERRAIN.AREA_THRESHOLD}.name`),
-      hint: localize(`${KEYS.GRID_TERRAIN.AREA_THRESHOLD}.hint`),
-      scope: "world",
-      config: true,
-      default: 0.5,
-      type: Number,
-      range: {
-        min: 0.1,
-        max: 1,
-        step: 0.1
-      }
-    });
+//     register(KEYS.GRID_TERRAIN.ALGORITHM, {
+//       name: localize(`${KEYS.GRID_TERRAIN.ALGORITHM}.name`),
+//       hint: localize(`${KEYS.GRID_TERRAIN.ALGORITHM}.hint`),
+//       scope: "world",
+//       config: true,
+//       default: KEYS.GRID_TERRAIN.CHOICES.CENTER,
+//       type: String,
+//       choices: {
+//         [KEYS.GRID_TERRAIN.CHOICES.CENTER]: localize(`${KEYS.GRID_TERRAIN.CHOICES.CENTER}`),
+//         [KEYS.GRID_TERRAIN.CHOICES.PERCENT]: localize(`${KEYS.GRID_TERRAIN.CHOICES.PERCENT}`),
+//         [KEYS.GRID_TERRAIN.CHOICES.EUCLIDEAN]: localize(`${KEYS.GRID_TERRAIN.CHOICES.EUCLIDEAN}`)
+//       }
+//     });
+//
+//     register(KEYS.GRID_TERRAIN.AREA_THRESHOLD, {
+//       name: localize(`${KEYS.GRID_TERRAIN.AREA_THRESHOLD}.name`),
+//       hint: localize(`${KEYS.GRID_TERRAIN.AREA_THRESHOLD}.hint`),
+//       scope: "world",
+//       config: true,
+//       default: 0.5,
+//       type: Number,
+//       range: {
+//         min: 0.1,
+//         max: 1,
+//         step: 0.1
+//       }
+//     });
   }
 
   static registerKeybindings() {

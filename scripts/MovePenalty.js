@@ -466,10 +466,10 @@ export class TerrainMovePenaltyGridless extends MovePenaltyGridless {
 
 export class MovePenaltyGridded extends MovePenalty {
   /** @type {Settings.KEYS.GRID_TERRAIN.CHOICES} */
-  static get griddedAlgorithm() { return Settings.get(Settings.KEYS.GRID_TERRAIN.ALGORITHM); }
+  static get griddedAlgorithm() { return "grid-terrain-choice-center-point"; } // return Settings.get(Settings.KEYS.GRID_TERRAIN.ALGORITHM); }
 
   /** @type {number} */
-  static get percentAreaThreshold() { return Settings.get(Settings.KEYS.GRID_TERRAIN.AREA_THRESHOLD); }
+  static get percentAreaThreshold() { return 0.5; } // return Settings.get(Settings.KEYS.GRID_TERRAIN.AREA_THRESHOLD); }
 
   /**
    * Returns a penalty function for gridded moves.
