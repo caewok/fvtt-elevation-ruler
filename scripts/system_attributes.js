@@ -44,6 +44,10 @@ Hooks.once("init", function() {
   SPEED.ATTRIBUTES.FLY = defaultFlyAttribute();
   DashSpeedCategory.multiplier = defaultDashMultiplier();
   SPEED.CATEGORIES = [WalkSpeedCategory, DashSpeedCategory, MaximumSpeedCategory];
+
+  // Add specialized system categories
+  const moveCategoryFn = SPECIALIZED_MOVE_CATEGORIES[game.system.id];
+  if ( moveCategoryFn ) moveCategoryFn();
 });
 
 // ----- NOTE: Attributes ----- //
@@ -85,6 +89,7 @@ export function defaultHPAttribute() {
     case "dragonbane":    return "actor.system.hitpoints.value";
     case "twodsix":       return "actor.system.hits.value";
     case "ars":           return "actor.system.attributes.hp.value";
+    case "a5e":           return "actor.system.attributes.hp.value";
     default:              return "actor.system.attributes.hp.value";
   }
 }
@@ -95,6 +100,7 @@ export function defaultHPAttribute() {
  */
 export function defaultWalkAttribute() {
   switch ( game.system.id ) {
+    case "a5e":           return "actor.system.attributes.movement.walk.distance";
     case "ars":           return "actor.movement";
     case "CoC7":          return "actor.system.attribs.mov.value";
     case "dcc":           return "actor.system.attributes.speed.value";
@@ -124,21 +130,11 @@ export function defaultWalkAttribute() {
  */
 export function defaultFlyAttribute() {
   switch ( game.system.id ) {
-    // Missing attribute case "CoC7":
-    // Missing attribute case "dcc":
+    case "a5e":           return "actor.system.attributes.movement.fly.distance";
     case "sfrpg":         return "actor.system.attributes.flying.value";
-    // Missing attribute case "dnd4e":
     case "dnd5e":         return "actor.system.attributes.movement.fly";
-    // Missing attribute case "lancer":
     case "pf1":
     case "D35E":          return "actor.system.attributes.speed.fly.total";
-    // Missing attribute case "shadowrun5e":
-    // Missing attribute case "swade":
-    // Missing attribute case "ds4":
-    // Missing attribute case "splittermond":
-    // Missing attribute case "wfrp4e":
-    // Missing attribute case "crucible":
-    // Missing attribute case "dragonbane":
     case "twodsix":       return "actor.system.movement.fly";
     case "worldofdarkness": return "actor.system.movement.fly";
     default:              return "";
@@ -151,21 +147,11 @@ export function defaultFlyAttribute() {
  */
 export function defaultBurrowAttribute() {
   switch ( game.system.id ) {
-    // Missing attribute case "CoC7":
-    // Missing attribute case "dcc":
+    case "a5e":           return "actor.system.attributes.movement.burrow.distance";
     case "sfrpg":         return "actor.system.attributes.burrowing.value";
-    // Missing attribute case "dnd4e":
     case "dnd5e":         return "actor.system.attributes.movement.burrow";
-    // Missing attribute case "lancer":
     case "pf1":
     case "D35E":          return "actor.system.attributes.speed.burrow.total";
-    // Missing attribute case "shadowrun5e":
-    // Missing attribute case "swade":
-    // Missing attribute case "ds4":
-    // Missing attribute case "splittermond":
-    // Missing attribute case "wfrp4e":
-    // Missing attribute case "crucible":
-    // Missing attribute case "dragonbane":
     case "twodsix":       return "actor.system.movement.burrow";
     default:              return "";
   }
@@ -187,6 +173,7 @@ export function defaultDashMultiplier() {
     case "shadowrun5e":
     case "dragonbane":
     case "twodsix":
+    case "a5e":
     case "ds4":           return 2;
 
     case "CoC7":          return 5;
@@ -198,3 +185,22 @@ export function defaultDashMultiplier() {
     default:              return 0;
   }
 }
+
+// ----- Specialized move categories by system ----- //
+/**
+ * Dnd5e Level Up (a5e)
+ */
+function a5eMoveCategories() {
+  DashSpeedCategory.name = "Action Dash";
+  const BonusDashCategory = {
+    name: "Bonus Dash",
+    color: Color.from(0xf77926),
+    multiplier: 4
+  }
+  SPEED.CATEGORIES = [WalkSpeedCategory, DashSpeedCategory, BonusDashCategory, MaximumSpeedCategory];
+}
+
+const SPECIALIZED_MOVE_CATEGORIES = {
+  a5e: a5eMoveCategories
+};
+
