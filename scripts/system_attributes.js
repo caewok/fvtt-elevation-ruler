@@ -84,6 +84,7 @@ export function defaultHPAttribute() {
     case "dnd5e":         return "actor.system.attributes.hp.value";
     case "dragonbane":    return "actor.system.hitpoints.value";
     case "twodsix":       return "actor.system.hits.value";
+    case "ars":           return "actor.system.attributes.hp.value";
     default:              return "actor.system.attributes.hp.value";
   }
 }
@@ -94,6 +95,7 @@ export function defaultHPAttribute() {
  */
 export function defaultWalkAttribute() {
   switch ( game.system.id ) {
+    case "ars":           return "actor.movement";
     case "CoC7":          return "actor.system.attribs.mov.value";
     case "dcc":           return "actor.system.attributes.speed.value";
     case "sfrpg":         return "actor.system.attributes.speed.value";
