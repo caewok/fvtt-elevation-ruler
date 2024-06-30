@@ -1,5 +1,6 @@
 /* globals
 Color,
+foundry,
 game,
 Hooks
 */
@@ -44,6 +45,18 @@ Hooks.once("init", function() {
   SPEED.ATTRIBUTES.FLY = defaultFlyAttribute();
   DashSpeedCategory.multiplier = defaultDashMultiplier();
   SPEED.CATEGORIES = [WalkSpeedCategory, DashSpeedCategory, MaximumSpeedCategory];
+
+  // Add specialized system categories
+  const moveCategoryFn = SPECIALIZED_MOVE_CATEGORIES[game.system.id];
+  if ( moveCategoryFn ) moveCategoryFn();
+
+  // Add specialized category distance function
+  const categoryDistanceFn = SPECIALIZED_CATEGORY_DISTANCE[game.system.id];
+  if ( categoryDistanceFn ) SPEED.maximumCategoryDistance = categoryDistanceFn;
+
+  // Add specialized token speed function
+  const tokenSpeedFn = SPECIALIZED_TOKEN_SPEED[game.system.id];
+  if ( tokenSpeedFn ) SPEED.tokenSpeed = tokenSpeedFn;
 });
 
 // ----- NOTE: Attributes ----- //
@@ -51,29 +64,6 @@ Hooks.once("init", function() {
 /**
  * Some of below taken from Drag Ruler
  */
-/*
-MIT License
-
-Copyright (c) 2021 Manuel Vögele
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
 
 /**
  * Location of the HP attribute for a given system's actor.
@@ -85,6 +75,7 @@ export function defaultHPAttribute() {
     case "dragonbane":    return "actor.system.hitpoints.value";
     case "twodsix":       return "actor.system.hits.value";
     case "ars":           return "actor.system.attributes.hp.value";
+    case "a5e":           return "actor.system.attributes.hp.value";
     default:              return "actor.system.attributes.hp.value";
   }
 }
@@ -95,6 +86,7 @@ export function defaultHPAttribute() {
  */
 export function defaultWalkAttribute() {
   switch ( game.system.id ) {
+    case "a5e":           return "actor.system.attributes.movement.walk.distance";
     case "ars":           return "actor.movement";
     case "CoC7":          return "actor.system.attribs.mov.value";
     case "dcc":           return "actor.system.attributes.speed.value";
@@ -124,21 +116,11 @@ export function defaultWalkAttribute() {
  */
 export function defaultFlyAttribute() {
   switch ( game.system.id ) {
-    // Missing attribute case "CoC7":
-    // Missing attribute case "dcc":
+    case "a5e":           return "actor.system.attributes.movement.fly.distance";
     case "sfrpg":         return "actor.system.attributes.flying.value";
-    // Missing attribute case "dnd4e":
     case "dnd5e":         return "actor.system.attributes.movement.fly";
-    // Missing attribute case "lancer":
     case "pf1":
     case "D35E":          return "actor.system.attributes.speed.fly.total";
-    // Missing attribute case "shadowrun5e":
-    // Missing attribute case "swade":
-    // Missing attribute case "ds4":
-    // Missing attribute case "splittermond":
-    // Missing attribute case "wfrp4e":
-    // Missing attribute case "crucible":
-    // Missing attribute case "dragonbane":
     case "twodsix":       return "actor.system.movement.fly";
     case "worldofdarkness": return "actor.system.movement.fly";
     default:              return "";
@@ -151,21 +133,11 @@ export function defaultFlyAttribute() {
  */
 export function defaultBurrowAttribute() {
   switch ( game.system.id ) {
-    // Missing attribute case "CoC7":
-    // Missing attribute case "dcc":
+    case "a5e":           return "actor.system.attributes.movement.burrow.distance";
     case "sfrpg":         return "actor.system.attributes.burrowing.value";
-    // Missing attribute case "dnd4e":
     case "dnd5e":         return "actor.system.attributes.movement.burrow";
-    // Missing attribute case "lancer":
     case "pf1":
     case "D35E":          return "actor.system.attributes.speed.burrow.total";
-    // Missing attribute case "shadowrun5e":
-    // Missing attribute case "swade":
-    // Missing attribute case "ds4":
-    // Missing attribute case "splittermond":
-    // Missing attribute case "wfrp4e":
-    // Missing attribute case "crucible":
-    // Missing attribute case "dragonbane":
     case "twodsix":       return "actor.system.movement.burrow";
     default:              return "";
   }
@@ -187,6 +159,7 @@ export function defaultDashMultiplier() {
     case "shadowrun5e":
     case "dragonbane":
     case "twodsix":
+    case "a5e":
     case "ds4":           return 2;
 
     case "CoC7":          return 5;
@@ -198,3 +171,153 @@ export function defaultDashMultiplier() {
     default:              return 0;
   }
 }
+
+// ----- Specialized move categories by system ----- //
+/**
+ * Dnd5e Level Up (a5e)
+ */
+function a5eMoveCategories() {
+  DashSpeedCategory.name = "Action Dash";
+  const BonusDashCategory = {
+    name: "Bonus Dash",
+    color: Color.from(0xf77926),
+    multiplier: 4
+  }
+  SPEED.CATEGORIES = [WalkSpeedCategory, DashSpeedCategory, BonusDashCategory, MaximumSpeedCategory];
+}
+
+/**
+ * sfrpg
+ */
+function sfrpgMoveCategories() {
+  WalkSpeedCategory.name = "sfrpg.speeds.walk";
+  DashSpeedCategory.name = "sfrpg.speeds.dash";
+  const RunSpeedCategory = {
+    name: "sfrpg.speeds.run",
+    color: Color.from(0xff8000),
+    multiplier: 4
+  }
+  SPEED.CATEGORIES = [WalkSpeedCategory, DashSpeedCategory, RunSpeedCategory, MaximumSpeedCategory];
+}
+
+const SPECIALIZED_MOVE_CATEGORIES = {
+  a5e: a5eMoveCategories,
+  sfrpg: sfrpgMoveCategories
+};
+
+// ----- Specialized token speed by system ----- //
+
+/**
+ * Given a token, retrieve its base speed.
+ * @param {Token} token                   Token whose speed is required
+ * @returns {number|null} Distance, in grid units. Null if no speed provided for that category.
+ *   (Null will disable speed highlighting.)
+ */
+function sfrpgTokenSpeed(token) {
+  let speed = foundry.utils.getProperty(token, SPEED.ATTRIBUTES[token.movementType]);
+  switch ( token.actor?.type ) {
+    case "starship": speed = foundry.utils.getProperty(token, "actor.system.attributes.speed.value"); break;
+    case "vehicle": speed = foundry.utils.getProperty(token, "actor.system.attributes.speed.drive"); break;
+  }
+  if ( speed == null ) return null;
+  return Number(speed);
+}
+
+const SPECIALIZED_TOKEN_SPEED = {
+  sfrpg: sfrpgTokenSpeed
+};
+
+// ----- Specialized category distances by system ----- //
+
+/**
+ * Starfinder (sfrpg)
+ * Player Characters, Drones, and Non-player Characters:
+ * There are three speed thresholds: single move (speed * 1), double move (speed *2), and run (speed *4)
+ * Vehicles: There are three speed thresholds: drive speed, run over speed (drive speed *2), and full speed
+ * Starships: There are two speed thresholds: normal speed, and full power (speed * 1.5)
+
+ *
+ * @param {Token} token                   Token whose speed should be used
+ * @param {SpeedCategory} speedCategory   Category for which the maximum distance is desired
+ * @param {number} [tokenSpeed]           Optional token speed to avoid repeated lookups
+ * @returns {number}
+ */
+function sfrpgCategoryDistance(token, speedCategory, tokenSpeed) {
+  // Set default speed.
+  tokenSpeed ??= SPEED.tokenSpeed(token);
+  const type = token.actor?.type;
+  let speed = speedCategory.multiplier * tokenSpeed;
+
+  // Override default speed for certain vehicles.
+  switch ( speedCategory.name ) {
+    case "sfrpg.speeds.dash": {
+      if ( type === "starship" ) speed = tokenSpeed * 1.5;
+      break;
+    }
+
+    case "sfrpg.speeds.run": {
+      if ( type === "starship" ) speed = 0;
+      if ( type === "vehicle" ) speed = foundry.utils.getProperty(token, "actor.system.attributes.speed.full");
+      break;
+    }
+  }
+  return speed;
+}
+
+const SPECIALIZED_CATEGORY_DISTANCE = {
+  sfrpg: sfrpgCategoryDistance
+};
+
+
+
+// ----- Note: Licenses / Credits ----- //
+
+/* Drag Ruler
+https://github.com/manuelVo/foundryvtt-drag-ruler
+MIT License
+
+Copyright (c) 2021 Manuel Vögele
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+/* sfrpg
+https://github.com/J-Dawe/starfinder-drag-ruler/blob/main/scripts/main.js
+MIT License
+
+Copyright (c) 2021 J-Dawe
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
