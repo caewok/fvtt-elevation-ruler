@@ -6,11 +6,17 @@
     "elevationruler.keybindings.incrementElevation.name": "Zwiększenie wysokości linijki",
     "elevationruler.keybindings.incrementElevation.hint": "Zwiększa wysokość w odstępach siatki podczas korzystania z linijki.",
 
+    "elevationruler.keybindings.addWaypoint.name": "Dodanie punktu trasy zwykłej linijki",
+    "elevationruler.keybindings.addWaypoint.hint": "Podczas korzystania z linijki na płótnie dodaj punkt trasy.",
+
+    "elevationruler.keybindings.removeWaypoint.name": "Usunięcie punktu trasy zwykłej linijki",
+    "elevationruler.keybindings.removeWaypoint.hint": "Podczas korzystania z linijki na płótnie usuń punkt trasy.",
+
     "elevationruler.keybindings.addWaypointTokenRuler.name": "Dodanie punktu trasy dla tokena",
-    "elevationruler.keybindings.addWaypointTokenRuler.hint": "Gdy linijka tokena jest włączona, dodaje punkt trasy podczas przeciągania tokena.",
+    "elevationruler.keybindings.addWaypointTokenRuler.hint": "Gdy linijka tokenów jest włączona i przeciągasz token, dodaj punkt trasy.",
 
     "elevationruler.keybindings.removeWaypointTokenRuler.name": "Usunięcie punktu trasy tokena",
-    "elevationruler.keybindings.removeWaypointTokenRuler.hint": "Gdy linijka tokena jest włączona, usuwa punkt trasy podczas przeciągania tokena.",
+    "elevationruler.keybindings.removeWaypointTokenRuler.hint": "Gdy linijka tokenów jest włączona i przeciągasz token, usuń punkt trasy.",
 
     "elevationruler.keybindings.togglePathfinding.name": "Tymczasowe wyłączenie wyszukiwania ścieżek",
     "elevationruler.keybindings.togglePathfinding.hint": "Jeśli przycisk wyszukiwania ścieżki jest włączony, przytrzymanie tego przycisku spowoduje tymczasowe wyłączenie wyszukiwania ścieżki. Jeśli przycisk odnajdywania ścieżek nie jest włączony, przytrzymanie tego klawisza tymczasowo włączy odnajdywanie ścieżek.",
@@ -32,6 +38,9 @@
 
     "elevationruler.settings.enable-token-ruler.name": "Używanie linijki tokenów",
     "elevationruler.settings.enable-token-ruler.hint": "Wyświetlanie linijki podczas przeciągania tokenów.",
+
+    "elevationruler.settings.hide-gm-ruler.name": "Ukryj linijkę MG",
+    "elevationruler.settings.hide-gm-ruler.hint": "Nie wyświetlaj linijki tokena MG innym użytkownikom niebędącym MG.",
 
    "elevationruler.settings.speed-highlighting-choice.name": "Używanie podświetlenia prędkości tokenów",
     "elevationruler.settings.speed-highlighting-choice.hint": "Podczas korzystania z linijki, używaj różnych kolorów dla tokenów chodu/dystansu/maksymalnego dystansu.",
