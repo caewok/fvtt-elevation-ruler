@@ -6,6 +6,10 @@ For dnd5e, remove the Token HUD control to select movement, because dnd5e now us
 Updated Polish translation. Thanks @Lioheart! Closes #105.
 Added `SCENE.BACKGROUND` to flags (imported from Terrain Mapper). Closes #107.
 Don't broadcast the Token Ruler if the token being dragged is secret, invisible, or hidden. Closes #112.
+Consolidate speed attributes to a single file.
+Add ARS speed definitions. Closes #111.
+Add sfrpg speed definitions.
+Add a5e speed definitions.
 
 # 0.9.5
 Added Brazilian translation. Thanks @Kharmans!
