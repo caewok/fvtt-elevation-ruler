@@ -3,6 +3,7 @@ Move calculation of speed colors to `Ruler#_highlightMeasurementSegment`. As a r
 Remove settings related to determining when a terrain affects a token. Currently, Foundry regions only checks the center point.
 For dnd5e, remove the Token HUD control to select movement, because dnd5e now uses status effects to signify when tokens are flying or burrowing. Added a setting to automatically determine token movement for dnd5e.
 Updated Polish translation. Thanks @Lioheart! Closes #105.
+Added `FLAGS.SCENE.BACKGROUND`. Closes #107.
 
 
 # 0.9.5

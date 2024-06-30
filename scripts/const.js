@@ -15,7 +15,10 @@ export const TEMPLATES = {
 
 export const FLAGS = {
   MOVEMENT_SELECTION: "selectedMovementType",
-  MOVEMENT_PENALTY: "movementPenalty"
+  MOVEMENT_PENALTY: "movementPenalty",
+  SCENE: {
+    BACKGROUND_ELEVATION: "backgroundElevation"
+  }
 };
 
 export const MODULES_ACTIVE = { API: {} };
