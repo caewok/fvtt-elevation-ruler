@@ -367,6 +367,20 @@ export function measureSegment(segment, token, numPrevDiagonal = 0) {
 
 
 
+/**
+ * Mixed wrap Ruler#_broadcastMeasurement
+ * For token ruler, don't broadcast the ruler if the token is invisible or disposition secret.
+ */
+function _broadcastMeasurement(wrapped) {
+  // Don't broadcast invisible, hidden, or secret token movement when dragging.
+  if ( this._isTokenRuler
+    && (this.token.document.disposition === CONST.TOKEN_DISPOSITIONS.SECRET
+     || this.token.document.hasStatusEffect(CONFIG.specialStatusEffects.INVISIBLE)
+     || this.token.document.isHidden) ) return;
+
+  wrapped();
+}
+
 // ----- NOTE: Event handling ----- //
 
 /**
@@ -410,7 +424,7 @@ PATCHES.BASIC.WRAPS = {
   _onMoveKeyDown
 };
 
-PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments };
+PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments, _broadcastMeasurement };
 
 PATCHES.BASIC.OVERRIDES = { _computeDistance, _animateSegment, _addWaypoint };
 

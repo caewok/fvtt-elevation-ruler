@@ -5,6 +5,7 @@ Remove settings related to determining when a terrain affects a token. Currently
 For dnd5e, remove the Token HUD control to select movement, because dnd5e now uses status effects to signify when tokens are flying or burrowing. Added a setting to automatically determine token movement for dnd5e.
 Updated Polish translation. Thanks @Lioheart! Closes #105.
 Added `SCENE.BACKGROUND` to flags (imported from Terrain Mapper). Closes #107.
+Don't broadcast the Token Ruler if the token being dragged is secret, invisible, or hidden. Closes #112.
 
 # 0.9.5
 Added Brazilian translation. Thanks @Kharmans!
