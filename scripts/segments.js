@@ -17,6 +17,7 @@ import { perpendicularPoints, log  } from "./util.js";
 import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
 import { userElevationChangeAtWaypoint, elevationFromWaypoint, groundElevationAtWaypoint } from "./terrain_elevation.js";
 import { MovePenalty } from "./MovePenalty.js";
+import { tokenSpeedSegmentSplitter } from "./token_speed.js";
 
 /**
  * Mixed wrap of  Ruler.prototype._getMeasurementSegments
@@ -263,44 +264,66 @@ export async function _animateSegment(token, segment, destination) {
 }
 
 // ----- NOTE: Segment highlighting ----- //
+
+const TOKEN_SPEED_SPLITTER = new WeakMap();
+
 /**
  * Wrap Ruler.prototype._highlightMeasurementSegment
+ * @param {RulerMeasurementSegment} segment
  */
 export function _highlightMeasurementSegment(wrapped, segment) {
-  // Temporarily ensure the ray distance is two-dimensional, so highlighting selects correct squares.
+  // Temporarily override cached ray.distance such that the ray distance is two-dimensional,
+  // so highlighting selects correct squares.
   // Otherwise the highlighting algorithm can get confused for high-elevation segments.
   segment.ray._distance = PIXI.Point.distanceBetween(segment.ray.A, segment.ray.B);
 
   // Adjust the color if this user has selected speed highlighting.
-  const priorColor = this.color;
-  const doSpeedHighlighting = segment.speed?.color && Settings.useSpeedHighlighting(this.token);
-
-
   // Highlight each split in turn, changing highlight color each time.
-  if ( doSpeedHighlighting ) this.color = segment.speed.color;
+  if ( Settings.useSpeedHighlighting(this.token) ) {
+    if ( segment.first ) TOKEN_SPEED_SPLITTER.set(this.token, tokenSpeedSegmentSplitter(this, this.token))
+    const splitterFn = TOKEN_SPEED_SPLITTER.get(this.token);
+    if ( splitterFn ) {
+      const priorColor = this.color;
+      const segments = splitterFn(segment);
+      if ( segments.length ) {
+        for ( const segment of segments ) {
+          this.color = segment.speed.color;
+          segment.ray._distance = PIXI.Point.distanceBetween(segment.ray.A, segment.ray.B);
+          wrapped(segment);
 
-  // Call Foundry version and return if not speed highlighting.
-  const res = wrapped(segment);
-  segment.ray._distance = undefined; // Reset the distance measurement.
-  if ( !doSpeedHighlighting ) return res;
-
-  // If gridless, highlight a rectangular shaped portion of the line.
-  if ( canvas.grid.type === CONST.GRID_TYPES.GRIDLESS ) {
-    const { A, B } = segment.ray;
-    const width = Math.floor(canvas.scene.dimensions.size * (CONFIG[MODULE_ID].gridlessHighlightWidthMultiplier ?? 0.2));
-    const ptsA = perpendicularPoints(A, B, width * 0.5);
-    const ptsB = perpendicularPoints(B, A, width * 0.5);
-    const shape = new PIXI.Polygon([
-      ptsA[0],
-      ptsA[1],
-      ptsB[0],
-      ptsB[1]
-    ]);
-    canvas.interface.grid.highlightPosition(this.name, { x: A.x, y: A.y, color: this.color, shape});
+          // If gridless, highlight a rectangular shaped portion of the line.
+          if ( canvas.grid.isGridless ) highlightLineRectangle(segment, this.color, this.name);
+        }
+        // Reset to the default color.
+        this.color = priorColor;
+        return;
+      }
+    }
   }
 
-  // Reset to the default color.
-  this.color = priorColor;
+  wrapped(segment);
+  segment.ray._distance = undefined; // Reset the distance measurement.
+}
+
+/**
+ * Highlight a rectangular shaped portion of the line.
+ * For use on gridless maps where ruler does not highlight.
+ * @param {RulerMeasurementSegment} segment
+ * @param {Color} color   Color to use
+ * @param {string} name   Name of the ruler for tracking the highlight graphics
+ */
+function highlightLineRectangle(segment, color, name) {
+  const { A, B } = segment.ray;
+  const width = Math.floor(canvas.scene.dimensions.size * (CONFIG[MODULE_ID].gridlessHighlightWidthMultiplier ?? 0.2));
+  const ptsA = perpendicularPoints(A, B, width * 0.5);
+  const ptsB = perpendicularPoints(B, A, width * 0.5);
+  const shape = new PIXI.Polygon([
+    ptsA[0],
+    ptsA[1],
+    ptsB[0],
+    ptsB[1]
+  ]);
+  canvas.interface.grid.highlightPosition(name, { x: A.x, y: A.y, color, shape});
 }
 
 /**
@@ -324,7 +347,6 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
   const waypoints = [...ruler.waypoints, destWaypoint];
 
   // Add the waypoint elevations to the corresponding segment endpoints.
-  let currWaypoint;
   for ( const segment of segments ) {
     const ray = segment.ray;
     const startWaypoint = waypoints.find(w => w.x === ray.A.x && w.y === ray.A.y);
@@ -378,7 +400,6 @@ function segmentElevationLabel(s) {
   const increment = s.waypointElevationIncrement;
   const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
   const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(s.ray.B.z).toNearest(multiple);
-  const Bz = s.ray.B.z.toNearest(multiple);
 
   const segmentArrow = (increment > 0) ? "↑"
     : (increment < 0) ? "↓" : "↕";

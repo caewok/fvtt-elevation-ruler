@@ -25,37 +25,6 @@ function createToken(document, _options, _userId) {
 }
 
 /**
- * Hook updateToken to update the scene graph and triangulation.
- * @param {Document} document                       The existing Document which was updated
- * @param {object} change                           Differential data that was used to update the document
- * @param {DocumentModificationContext} options     Additional options which modified the update request
- * @param {string} userId                           The ID of the User who triggered the update workflow
- */
-function updateToken(document, changes, _options, _userId) {
-  // Only update the edges if the coordinates have changed.
-  if ( !(Object.hasOwn(changes, "x") || Object.hasOwn(changes, "y")) ) return;
-
-  log(`updateToken hook|token moved.`);
-
-//   // Easiest approach is to trash the edges for the wall and re-create them.
-//   SCENE_GRAPH.removeToken(document.id);
-//
-//   /* Debugging: None of the edges should have this token.
-//   if ( CONFIG[MODULE_ID].debug ) {
-//     const token = document.object;
-//     SCENE_GRAPH.edges.forEach((edge, key) => {
-//       if ( edge.objects.has(token) ) console.debug(`Edge ${key} has ${token.name} ${token.id} after deletion.`);
-//     })
-//   }
-//   */
-//
-//   SCENE_GRAPH.addToken(document.object);
-//
-//   // Need to re-do the triangulation because the change to the wall could have added edges if intersected.
-//   Pathfinder.dirty = true;
-}
-
-/**
  * Hook refresh token to update the scene graph and triangulation.
  * Cannot use updateToken hook b/c the token position is not correctly updated by that point.
  * @param {PlaceableObject} object    The object instance being refreshed
@@ -94,4 +63,4 @@ function deleteToken(document, _options, _userId) {
   Pathfinder.dirty = true;
 }
 
-PATCHES.PATHFINDING_TOKENS.HOOKS = { createToken, updateToken, deleteToken, refreshToken };
+PATCHES.PATHFINDING_TOKENS.HOOKS = { createToken, deleteToken, refreshToken };

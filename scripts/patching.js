@@ -42,6 +42,7 @@ export function initializePatching() {
   PATCHER.registerGroup("TOKEN_RULER");
   PATCHER.registerGroup("SPEED_HIGHLIGHTING");
   PATCHER.registerGroup("MOVEMENT_TRACKING");
-  PATCHER.registerGroup("MOVEMENT_SELECTION");
+
+  if ( game.system.id !== "dnd5e" ) PATCHER.registerGroup("MOVEMENT_SELECTION");
 }
 

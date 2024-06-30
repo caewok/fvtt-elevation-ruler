@@ -1,3 +1,16 @@
+# 0.9.6
+Added `CONFIG.elevationruler.tokenPathfindingBuffer`. This defaults to -1, allowing movement diagonally when at the corner of a large token and "Tokens Block" is set. For pathfinding, more negative numbers shrink the token border; positive numbers increase it. Note that if you change this, you will need to reload the scene or at least move the tokens before their pathfinding borders will be changed. Closes #88.
+Move calculation of speed colors to `Ruler#_highlightMeasurementSegment`. As a result, Ruler segments are not split at movement speed category changes, so there are no longer extra waypoints added.
+Remove settings related to determining when a terrain affects a token. Currently, Foundry regions only checks the center point.
+For dnd5e, remove the Token HUD control to select movement, because dnd5e now uses status effects to signify when tokens are flying or burrowing. Added a setting to automatically determine token movement for dnd5e.
+Updated Polish translation. Thanks @Lioheart! Closes #105.
+Added `SCENE.BACKGROUND` to flags (imported from Terrain Mapper). Closes #107.
+Don't broadcast the Token Ruler if the token being dragged is secret, invisible, or hidden. Closes #112.
+Consolidate speed attributes to a single file.
+Add ARS speed definitions. Closes #111.
+Add sfrpg speed definitions.
+Add a5e speed definitions.
+
 # 0.9.5
 Added Brazilian translation. Thanks @Kharmans!
 Added Russian translation. Thanks @VirusNik21! Closes #96.

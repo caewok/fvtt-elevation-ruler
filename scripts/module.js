@@ -10,7 +10,8 @@ ui
 
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
-import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS, defaultHPAttribute } from "./const.js";
+import { MODULE_ID, MOVEMENT_TYPES, MOVEMENT_BUTTONS, SPEED } from "./const.js";
+import { defaultHPAttribute } from "./system_attributes.js";
 import { registerGeometry } from "./geometry/registration.js";
 
 // Grid coordinates
@@ -108,6 +109,14 @@ Hooks.once("init", function() {
      * @type {number}
      */
     gridlessHighlightWidthMultiplier: 0.2,
+
+    /**
+     * Amount, in pixels, to pad the token shape that is used when pathfinding around tokens.
+     * Negative amounts allow the pathfinding to move through outer border of the token.
+     * Positive amounts make tokens larger than they appear, creating a buffer.
+     * @type {number}
+     */
+    tokenPathfindingBuffer: -1,
 
     /**
      * Enable certain debug console logging and tests.

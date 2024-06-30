@@ -1,7 +1,6 @@
 /* globals
 canvas,
 CONFIG,
-CONST,
 game,
 PIXI,
 Ruler,
@@ -17,7 +16,6 @@ PATCHES.SPEED_HIGHLIGHTING = {};
 import { SPEED, MODULE_ID, FLAGS } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
-import { Point3d } from "./geometry/3d/Point3d.js";
 import {
   elevationFromWaypoint,
   elevationAtWaypoint,
@@ -39,8 +37,6 @@ import { log } from "./util.js";
 import { PhysicalDistance } from "./PhysicalDistance.js";
 
 import { MoveDistance } from "./MoveDistance.js";
-
-import { gridShape, pointFromGridCoordinates, canvasElevationFromCoordinates } from "./grid_coordinates.js";
 
 /**
  * Modified Ruler
@@ -159,7 +155,7 @@ function _addWaypoint(point, {snap=true}={}) {
   // Determine the elevation up until this point
   if ( !this.waypoints.length ) {
     waypoint._prevElevation = this.token?.elevationE ?? canvas.scene.getFlag("terrainmapper", FLAGS.SCENE.BACKGROUND_ELEVATION) ?? 0;
-    waypoint._forceToGround ||= this.token.movementType === "WALK"
+    waypoint._forceToGround ||= this.token ? this.token.movementType === "WALK" : false;
   } else waypoint._prevElevation = elevationFromWaypoint(this.waypoints.at(-1), waypoint, this.token);
 
   this.waypoints.push(waypoint);
@@ -274,7 +270,6 @@ function _computeDistance() {
 
   // Determine the distance of each segment.
   _computeSegmentDistances.call(this);
-  _computeTokenSpeed.call(this); // Always compute speed if there is a token b/c other users may get to see the speed.
 
   if ( debug ) {
     switch ( this.segments.length ) {
@@ -334,7 +329,7 @@ function _computeSegmentDistances() {
     this.segments.at(-1).last = true;
   }
   for ( const segment of this.segments ) {
-    numPrevDiagonal = _measureSegment(segment, token, numPrevDiagonal);
+    numPrevDiagonal = measureSegment(segment, token, numPrevDiagonal);
     totalDistance += segment.distance;
     totalMoveDistance += segment.moveDistance;
   }
@@ -351,7 +346,7 @@ function _computeSegmentDistances() {
  * @param {number} [numPrevDiagonal=0]    Number of previous diagonals for the segment
  * @returns {number} numPrevDiagonal
  */
-function _measureSegment(segment, token, numPrevDiagonal = 0) {
+export function measureSegment(segment, token, numPrevDiagonal = 0) {
   segment.numPrevDiagonal = numPrevDiagonal;
   const res = MoveDistance.measure(
     segment.ray.A,
@@ -370,180 +365,22 @@ function _measureSegment(segment, token, numPrevDiagonal = 0) {
 // Also need to handle array of speed points.
 //   Need CONFIG function that takes a token and gives array of speeds with colors.
 
-/**
- * Incrementally add together all segments. Split segment(s) at SpeedCategory maximum distances.
- * Mark each segment with the distance, move distance, and SpeedCategory name.
- * Does not assume segments have measurements, and modifies existing measurements.
- * Segments modified in place.
- */
-function _computeTokenSpeed() {
-  // Requires a movement token and a defined token speed.
-  const token = this.token;
-  if ( !token ) return;
 
-  // Precalculate the token speed.
-  const tokenSpeed = SPEED.tokenSpeed(token);
-  if ( !tokenSpeed ) return;
-
-  // Other constants
-  const gridless = canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
-
-  // Variables changed in the loop
-  let totalDistance = 0;
-  let totalMoveDistance = 0;
-  let totalCombatMoveDistance = 0;
-  let minDistance = 0;
-  let numPrevDiagonal = 0;
-  let s = 0;
-  let segment;
-
-  // Debugging
-  if ( CONFIG[MODULE_ID].debug ) {
-    if ( this.segments[0].moveDistance > 25 ) log(`${this.segments[0].moveDistance}`);
-    if ( this.segments[0].moveDistance > 30 ) log(`${this.segments[0].moveDistance}`);
-    if ( this.segments[0].moveDistance > 50 ) log(`${this.segments[0].moveDistance}`);
-    if ( this.segments[0].moveDistance > 60 ) log(`${this.segments[0].moveDistance}`);
-  }
-
-  // Progress through each speed attribute in turn.
-  const categoryIter = [...SPEED.CATEGORIES].values();
-  let speedCategory = categoryIter.next().value;
-  let maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
-
-  // Determine which speed category we are starting with
-  // Add in already moved combat distance and determine the starting category
-  if ( game.combat?.started
-    && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
-
-    totalCombatMoveDistance = token.lastMoveDistance;
-    minDistance = totalCombatMoveDistance;
-  }
-
-  while ( (segment = this.segments[s]) ) {
-    // Skip speed categories that do not provide a distance larger than the last.
-    while ( speedCategory && maxDistance <= minDistance ) {
-      speedCategory = categoryIter.next().value;
-      maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
-    }
-    if ( !speedCategory ) speedCategory = SPEED.CATEGORIES.at(-1);
-
-    segment.speed = speedCategory;
-    let newPrevDiagonal = _measureSegment(segment, token, numPrevDiagonal);
-
-    // If we have exceeded maxDistance, determine if a split is required.
-    const newDistance = totalCombatMoveDistance + segment.moveDistance;
-
-    if ( newDistance > maxDistance || newDistance.almostEqual(maxDistance ) ) {
-      if ( newDistance > maxDistance ) {
-        // Split the segment, inserting the latter portion in the queue for future iteration.
-        const splitDistance = maxDistance - totalCombatMoveDistance;
-        const breakpoint = locateSegmentBreakpoint(segment, splitDistance, token, gridless);
-        if ( breakpoint ) {
-          const segments = _splitSegmentAt(segment, breakpoint);
-          this.segments.splice(s, 1, segments[0]); // Delete the old segment, replace.
-          this.segments.splice(s + 1, 0, segments[1]); // Add the split.
-          segment = segments[0];
-          newPrevDiagonal = _measureSegment(segment, token, numPrevDiagonal);
-        }
-      }
-
-      // Increment to the next speed category.
-      // Next category will be selected in the while loop above: first category to exceed minDistance.
-      minDistance = maxDistance;
-    }
-
-    // Increment totals.
-    s += 1;
-    totalDistance += segment.distance;
-    totalMoveDistance += segment.moveDistance;
-    totalCombatMoveDistance += segment.moveDistance;
-    numPrevDiagonal = newPrevDiagonal;
-  }
-
-  this.totalDistance = totalDistance;
-  this.totalMoveDistance = totalMoveDistance;
-}
 
 /**
- * Determine the specific point at which to cut a ruler segment such that the first subsegment
- * measures a specific incremental move distance.
- * @param {RulerMeasurementSegment} segment       Segment, with ray property, to split
- * @param {number} incrementalMoveDistance        Distance, in grid units, of the desired first subsegment move distance
- * @param {Token} token                           Token to use when measuring move distance
- * @returns {Point3d|null}
- *   If the incrementalMoveDistance is less than 0, returns null.
- *   If the incrementalMoveDistance is greater than segment move distance, returns null
- *   Otherwise returns the point at which to break the segment.
+ * Mixed wrap Ruler#_broadcastMeasurement
+ * For token ruler, don't broadcast the ruler if the token is invisible or disposition secret.
  */
-function locateSegmentBreakpoint(segment, splitMoveDistance, token, gridless) {
-  if ( splitMoveDistance <= 0 ) return null;
-  if ( !segment.moveDistance || splitMoveDistance > segment.moveDistance ) return null;
+function _broadcastMeasurement(wrapped) {
+  // Don't broadcast invisible, hidden, or secret token movement when dragging.
+  if ( this._isTokenRuler && !this.token ) return;
+  if ( this._isTokenRuler
+    && (this.token.document.disposition === CONST.TOKEN_DISPOSITIONS.SECRET
+     || this.token.document.hasStatusEffect(CONFIG.specialStatusEffects.INVISIBLE)
+     || this.token.document.isHidden) ) return;
 
-  // Attempt to move the split distance and determine the split location.
-  const { A, B } = segment.ray;
-  const res = Ruler.measureMoveDistance(A, B,
-    { token, gridless, useAllElevation: false, stopTarget: splitMoveDistance });
-
-  let breakpoint = pointFromGridCoordinates(res.endGridCoords); // We can get the exact split point.
-  if ( !gridless ) {
-    // We can get the end grid.
-    // Use halfway between the intersection points for this grid shape.
-    breakpoint = Point3d.fromObject(segmentGridHalfIntersection(breakpoint, A, B) ?? A);
-    if ( breakpoint === A ) breakpoint.z = A.z;
-    else breakpoint.z = canvasElevationFromCoordinates(res.endGridCoords);
-  }
-
-  if ( breakpoint.almostEqual(B) || breakpoint.almostEqual(A) ) return null;
-  return breakpoint;
+  wrapped();
 }
-
-/**
- * Cut a ruler segment at a specified point. Does not remeasure the resulting segments.
- * Assumes without testing that the breakpoint lies on the segment between A and B.
- * @param {RulerMeasurementSegment} segment       Segment, with ray property, to split
- * @param {Point3d} breakpoint                    Point to use when splitting the segments
- * @returns [RulerMeasurementSegment, RulerMeasurementSegment]
- */
-function _splitSegmentAt(segment, breakpoint) {
-  const { A, B } = segment.ray;
-
-  // Split the segment into two at the break point.
-  const s0 = {...segment};
-  s0.ray = new Ray3d(A, breakpoint);
-  s0.distance = null;
-  s0.moveDistance = null;
-  s0.numDiagonal = null;
-
-  const s1 = {...segment};
-  s1.ray = new Ray3d(breakpoint, B);
-  s1.distance = null;
-  s1.moveDistance = null;
-  s1.numPrevDiagonal = null;
-  s1.numDiagonal = null;
-  s1.speed = null;
-
-  if ( segment.first ) { s1.first = false; }
-  if ( segment.last ) { s0.last = false; }
-  return [s0, s1];
-}
-
-/**
- * For a given segment, locate its intersection at a grid shape.
- * The intersection point is on the segment, halfway between the two intersections for the shape.
- * @param {number[]} gridCoords
- * @param {PIXI.Point} a
- * @param {PIXI.Point} b
- * @returns {PIXI.Point|undefined} Undefined if no intersection. If only one intersection, the
- *   endpoint contained within the shape.
- */
-function segmentGridHalfIntersection(gridCoords, a, b) {
-  const shape = gridShape(gridCoords);
-  const ixs = shape.segmentIntersections(a, b);
-  if ( !ixs || ixs.length === 0 ) return null;
-  if ( ixs.length === 1 ) return shape.contains(a.x, a.y) ? a : b;
-  return PIXI.Point.midPoint(ixs[0], ixs[1]);
-}
-
 
 // ----- NOTE: Event handling ----- //
 
@@ -588,7 +425,7 @@ PATCHES.BASIC.WRAPS = {
   _onMoveKeyDown
 };
 
-PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments };
+PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments, _broadcastMeasurement };
 
 PATCHES.BASIC.OVERRIDES = { _computeDistance, _animateSegment, _addWaypoint };
 
@@ -656,7 +493,6 @@ async function teleport(_context) {
 PATCHES.BASIC.METHODS = {
   incrementElevation,
   decrementElevation,
-  _computeTokenSpeed,
   teleport
 };
 

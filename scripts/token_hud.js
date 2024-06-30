@@ -1,5 +1,6 @@
 /* globals
-canvas
+game,
+Ruler
 */
 "use strict";
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -29,11 +30,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-import { MODULE_ID, FLAGS, MOVEMENT_TYPES, MOVEMENT_BUTTONS, MODULES_ACTIVE } from "./const.js";
-import { LevelsElevationAtPoint } from "./terrain_elevation.js";
+import { MODULE_ID, FLAGS, MOVEMENT_TYPES, MOVEMENT_BUTTONS } from "./const.js";
+import { Settings } from "./settings.js";
 import { keyForValue } from "./util.js";
 
 export const PATCHES = {};
+PATCHES.BASIC = {};
 PATCHES.MOVEMENT_SELECTION = {};
 
 /**
@@ -55,26 +57,29 @@ PATCHES.MOVEMENT_SELECTION.HOOKS = { renderTokenHUD };
  * @type {MOVEMENT_TYPE}
  */
 function movementType() {
-  let selectedMovement = this.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_SELECTION) ?? MOVEMENT_TYPES.AUTO;
+  // For dnd5e, use status types
+  if ( game.system.id === "dnd5e" ) {
+    if ( !this.actor?.statuses ) return "WALK";
+    if ( this.actor.statuses.has("flying") ) return "FLY";
+    if ( this.actor.statuses.has("burrow") ) return "BURROW";
+    if ( Settings.get(Settings.KEYS.AUTO_MOVEMENT_TYPE) ) return determineMovementType(this);
+    return "WALK";
+  }
+
+  // Otherwise, use the Token HUD.
+  const selectedMovement = this.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_SELECTION) ?? MOVEMENT_TYPES.AUTO;
   if ( selectedMovement === MOVEMENT_TYPES.AUTO ) return determineMovementType(this);
   return keyForValue(MOVEMENT_TYPES, selectedMovement);
 }
 
-PATCHES.MOVEMENT_SELECTION.GETTERS = { movementType };
+PATCHES.BASIC.GETTERS = { movementType };
 
 /**
  * Determine movement type based on this token's elevation.
  * @returns {MOVEMENT_TYPE}
  */
 function determineMovementType(token) {
-  let groundElevation;
-  if ( MODULES_ACTIVE.ELEVATED_VISION ) {
-    const calc = new canvas.elevation.TokenElevationCalculator(token);
-    groundElevation = calc.groundElevation();
-  } else if ( MODULES_ACTIVE.LEVELS ) {
-    groundElevation = LevelsElevationAtPoint(token.center, { startingElevation: token.elevationE }) ?? 0;
-  } else groundElevation = 0;
-
+  const groundElevation = Ruler.terrainElevationAtLocation(token.center);
   return keyForValue(MOVEMENT_TYPES, Math.sign(token.elevationE - groundElevation) + 1);
 }
 
