@@ -10,7 +10,8 @@ ui
 
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
-import { MODULE_ID, MOVEMENT_TYPES, SPEED, MOVEMENT_BUTTONS, defaultHPAttribute } from "./const.js";
+import { MODULE_ID, MOVEMENT_TYPES, MOVEMENT_BUTTONS, SPEED } from "./const.js";
+import { defaultHPAttribute } from "./system_attributes.js";
 import { registerGeometry } from "./geometry/registration.js";
 
 // Grid coordinates
