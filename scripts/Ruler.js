@@ -155,7 +155,7 @@ function _addWaypoint(point, {snap=true}={}) {
   // Determine the elevation up until this point
   if ( !this.waypoints.length ) {
     waypoint._prevElevation = this.token?.elevationE ?? canvas.scene.getFlag("terrainmapper", FLAGS.SCENE.BACKGROUND_ELEVATION) ?? 0;
-    waypoint._forceToGround ||= this.token.movementType === "WALK"
+    waypoint._forceToGround ||= this.token ? this.token.movementType === "WALK" : false;
   } else waypoint._prevElevation = elevationFromWaypoint(this.waypoints.at(-1), waypoint, this.token);
 
   this.waypoints.push(waypoint);
@@ -373,6 +373,7 @@ export function measureSegment(segment, token, numPrevDiagonal = 0) {
  */
 function _broadcastMeasurement(wrapped) {
   // Don't broadcast invisible, hidden, or secret token movement when dragging.
+  if ( this._isTokenRuler && !this.token ) return;
   if ( this._isTokenRuler
     && (this.token.document.disposition === CONST.TOKEN_DISPOSITIONS.SECRET
      || this.token.document.hasStatusEffect(CONFIG.specialStatusEffects.INVISIBLE)
