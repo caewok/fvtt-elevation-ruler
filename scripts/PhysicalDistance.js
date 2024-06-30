@@ -178,7 +178,8 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
    * @returns {number}
    */
   static #diagonalDistanceMultiplier() {
-    if ( canvas.grid.isHexagonal || canvas.grid.isGridless ) return Math.SQRT2;
+    if ( canvas.grid.isHexagonal ) return 1;
+    if ( canvas.grid.isGridless ) return Math.SQRT2;
     const D = GRID_DIAGONALS;
     switch ( diagonalRule() ) {
       case D.EQUIDISTANT: return 1;
