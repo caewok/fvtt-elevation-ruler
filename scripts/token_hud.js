@@ -59,6 +59,7 @@ PATCHES.MOVEMENT_SELECTION.HOOKS = { renderTokenHUD };
 function movementType() {
   // For dnd5e, use status types
   if ( game.system.id === "dnd5e" ) {
+    if ( !this.actor?.statuses ) return "WALK";
     if ( this.actor.statuses.has("flying") ) return "FLY";
     if ( this.actor.statuses.has("burrow") ) return "BURROW";
     if ( Settings.get(Settings.KEYS.AUTO_MOVEMENT_TYPE) ) return determineMovementType(this);
