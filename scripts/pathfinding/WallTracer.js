@@ -658,8 +658,13 @@ export class WallTracer extends Graph {
     const tokenId = token.id;
     if ( this.edges.has(tokenId) ) return;
 
+    // Pad the constrained token border as necessary.
+    const borderShape = token.constrainedTokenBorder;
+    const buffer = CONFIG[MODULE_ID].tokenPathfindingBuffer ?? 0;
+    if ( buffer ) borderShape.pad(buffer);
+
     // Construct a new token edge set.
-    const edgeIter = token.constrainedTokenBorder.iterateEdges();
+    const edgeIter = borderShape.iterateEdges();
     for ( const edge of edgeIter ) this.addObjectEdge(edge.A, edge.B, token);
     this.tokenIds.add(tokenId);
   }

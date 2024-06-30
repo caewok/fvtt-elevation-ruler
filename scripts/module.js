@@ -110,6 +110,14 @@ Hooks.once("init", function() {
     gridlessHighlightWidthMultiplier: 0.2,
 
     /**
+     * Amount, in pixels, to pad the token shape that is used when pathfinding around tokens.
+     * Negative amounts allow the pathfinding to move through outer border of the token.
+     * Positive amounts make tokens larger than they appear, creating a buffer.
+     * @type {number}
+     */
+    tokenPathfindingBuffer: -1,
+
+    /**
      * Enable certain debug console logging and tests.
      * @type {boolean}
      */
