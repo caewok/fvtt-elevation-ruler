@@ -6,6 +6,12 @@
     "elevationruler.keybindings.incrementElevation.name": "Aumentar Elevação da Régua",
     "elevationruler.keybindings.incrementElevation.hint": "Aumenta a elevação em incrementos da grade ao usar a régua.",
 
+    "elevationruler.keybindings.addWaypoint.name": "Adicionar Parada da Régua Normal",
+    "elevationruler.keybindings.addWaypoint.hint": "Ao usar a régua de medição, adiciona uma parada.",
+    
+    "elevationruler.keybindings.removeWaypoint.name": "Remover Parada da Régua Normal",
+    "elevationruler.keybindings.removeWaypoint.hint": "Ao usar a régua de medição, remove uma parada.",
+    
     "elevationruler.keybindings.addWaypointTokenRuler.name": "Adicionar Parada na Régua do Token",
     "elevationruler.keybindings.addWaypointTokenRuler.hint": "Quando a Régua de Token estiver habilitada, adiciona uma parada enquanto arrasta o token.",
 
@@ -33,7 +39,10 @@
     "elevationruler.settings.enable-token-ruler.name": "Usar Régua de Token",
     "elevationruler.settings.enable-token-ruler.hint": "Exibir a régua ao arrastar tokens.",
 
-   "elevationruler.settings.speed-highlighting-choice.name": "Usar Destaque de Velocidade do Token",
+    "elevationruler.settings.hide-gm-ruler.name": "Esconder Régua de Token do MJ",
+    "elevationruler.settings.hide-gm-ruler.hint": "Não exibe a régua de token do MJ para outros usuários que não forem MJ.",
+    
+    "elevationruler.settings.speed-highlighting-choice.name": "Usar Destaque de Velocidade do Token",
     "elevationruler.settings.speed-highlighting-choice.hint": "Ao usar a régua, use cores diferentes para caminhada/disparada/distância máxima do token.",
 
     "elevationruler.settings.speed-highlighting-choice-never": "Nunca",

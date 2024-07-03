@@ -1,3 +1,15 @@
+# 0.9.7
+Added Italian translation. Thanks @GregoryWarn!
+Added TheWitcherTRPG integration. Thanks @pedroaugustobt!
+Updates to Brazilian Portugese and Italian translations.
+Add support for Warhammer 4e run speed calculation. Closes #113.
+
+Fix for calculating distance on a hex grid. Thanks @InjustFr!
+Address error blocking the ruler from working when Terrain Mapper module was not present. Closes #120, #115.
+Address elevation calculation not accounting for user elevation changes. Closes #119.
+Address elevation calculation for standard ruler not accounting for token elevation when hovering over a token. Closes #118.
+
+
 # 0.9.6
 Added `CONFIG.elevationruler.tokenPathfindingBuffer`. This defaults to -1, allowing movement diagonally when at the corner of a large token and "Tokens Block" is set. For pathfinding, more negative numbers shrink the token border; positive numbers increase it. Note that if you change this, you will need to reload the scene or at least move the tokens before their pathfinding borders will be changed. Closes #88.
 Move calculation of speed colors to `Ruler#_highlightMeasurementSegment`. As a result, Ruler segments are not split at movement speed category changes, so there are no longer extra waypoints added.

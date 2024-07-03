@@ -154,7 +154,7 @@ function _addWaypoint(point, {snap=true}={}) {
 
   // Determine the elevation up until this point
   if ( !this.waypoints.length ) {
-    waypoint._prevElevation = this.token?.elevationE ?? canvas.scene.getFlag("terrainmapper", FLAGS.SCENE.BACKGROUND_ELEVATION) ?? 0;
+    waypoint._prevElevation = this.token?.elevationE ?? canvas.scene?.flags?.terrainmapper?.[FLAGS.SCENE.BACKGROUND_ELEVATION] ?? 0;
     waypoint._forceToGround ||= this.token ? this.token.movementType === "WALK" : false;
   } else waypoint._prevElevation = elevationFromWaypoint(this.waypoints.at(-1), waypoint, this.token);
 
@@ -503,6 +503,7 @@ PATCHES.BASIC.GETTERS = {
 
 PATCHES.BASIC.STATIC_METHODS = {
   elevationAtWaypoint,
+  userElevationChangeAtWaypoint,
   terrainElevationAtLocation,
   measureDistance: PhysicalDistance.measure.bind(PhysicalDistance),
   measureMoveDistance: MoveDistance.measure.bind(MoveDistance)
