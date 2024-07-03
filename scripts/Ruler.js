@@ -503,6 +503,7 @@ PATCHES.BASIC.GETTERS = {
 
 PATCHES.BASIC.STATIC_METHODS = {
   elevationAtWaypoint,
+  userElevationChangeAtWaypoint,
   terrainElevationAtLocation,
   measureDistance: PhysicalDistance.measure.bind(PhysicalDistance),
   measureMoveDistance: MoveDistance.measure.bind(MoveDistance)
