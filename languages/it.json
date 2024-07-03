@@ -1,0 +1,99 @@
+{
+    "elevationruler.name": "Misura Elevazione",
+    "elevationruler.keybindings.decrementElevation.name": "Diminuzione Elevazione",
+    "elevationruler.keybindings.decrementElevation.hint": "Diminuisce l'elevazione sulla griglia mentre si misura.",
+
+    "elevationruler.keybindings.incrementElevation.name": "Aumento Elevazione",
+    "elevationruler.keybindings.incrementElevation.hint": "Aumenta l'elevazione sulla griglia mentre si misura.",
+
+    "elevationruler.keybindings.addWaypoint.name": "Aggiungi waypoint col normale righello",
+    "elevationruler.keybindings.addWaypoint.hint": "Mentre si usa il righello, aggiungi waypoint.",
+
+    "elevationruler.keybindings.removeWaypoint.name": "Rimuovi waypoint col normale righello",
+    "elevationruler.keybindings.removeWaypoint.hint": "Mentre si usa il righello, rimuovi waypoint.",
+
+    "elevationruler.keybindings.addWaypointTokenRuler.name": "Aggiungi waypoint col righello del Token",
+    "elevationruler.keybindings.addWaypointTokenRuler.hint": "Quando è abilitato il righello del Token e lo stai trascinando, aggiungi waypoint.",
+
+    "elevationruler.keybindings.removeWaypointTokenRuler.name": "Rimuovi waypoint col righello del Token",
+    "elevationruler.keybindings.removeWaypointTokenRuler.hint": "Quando è abilitato il righello del Token e lo stai trascinando, rimuovi waypoint.",
+
+    "elevationruler.keybindings.togglePathfinding.name": "Attiva/disattiva temporaneamente Trova Percorso",
+    "elevationruler.keybindings.togglePathfinding.hint": "Se il tasto del Trova Percorso è attivato, tenendolo premuto si disattiverà temporaneamente Trova Percorso. Se il tasto del Trova Percorso è disattivato, tenendolo premuto si attiverà temporaneamente Trova Percorso.",
+
+    "elevationruler.keybindings.forceToGround.name": "Forza l'elevazione del righello al suolo",
+    "elevationruler.keybindings.forceToGround.hint": "Durante la misurazione, premere questo tasto per ottenere la distanza dal suolo. Premere di nuovo per ripristinare.",
+
+    "elevationruler.keybindings.teleport.name": "Teletrasportarsi lungo il righello",
+    "elevationruler.keybindings.teleport.hint": "Durante la misurazione, tieni premuto questo tasto quando rilasci il token trascinato o premi la barra spaziatrice per spostare il token nella destinazione del righello senza animazione.",
+
+    "elevationruler.settings.levels-use-floor-label.name": "Etichetta Livelli del piano",
+    "elevationruler.settings.levels-use-floor-label.hint": "Se il modulo Livelli è attivo, etichetta il righello con il piano attuale, se i piani dell'interfaccia utente dei Livelli hanno un nome.",
+    "elevationruler.settings.levels-labels-never": "Mai",
+    "elevationruler.settings.levels-labels-ui": "Solo quando l'interfaccia utente dei Livelli è attiva",
+    "elevationruler.settings.levels-labels-always": "Sempre",
+
+    "elevationruler.settings.prefer-token-elevation.name": "Aggiungi Controllo di Elevazione Token",
+    "elevationruler.settings.prefer-token-elevation.hint": "Aggiungi un controllo alla toolbar del token. Quando è attivato, il controllo manterrà il righello all'elevazione del token di misurazione. Altrimenti, la destinazione del righello assumerà l'elevazione dello spazio della griglia o del token incontrato nel punto di destinazione del righello.",
+
+    "elevationruler.settings.enable-token-ruler.name": "Usa Righello Token",
+    "elevationruler.settings.enable-token-ruler.hint": "Visualizza il righello durante il trascinamento dei token.",
+
+    "elevationruler.settings.hide-gm-ruler.name": "Nascondi Usa Righello Token del DM",
+    "elevationruler.settings.hide-gm-ruler.hint": "Non mostrare il Righello Token del DM per gli altri utenti non DM.",
+
+   "elevationruler.settings.speed-highlighting-choice.name": "Evidenzia Velocità Token",
+    "elevationruler.settings.speed-highlighting-choice.hint": "Quando usi il righello, usa colori diversi per camminata/scatto/distanza massima del token.",
+
+    "elevationruler.settings.speed-highlighting-choice-never": "Mai",
+    "elevationruler.settings.speed-highlighting-choice-combat": "Solo Combattimento",
+    "elevationruler.settings.speed-highlighting-choice-always": "Sempre",
+
+     "elevationruler.settings.speed-highlighting-no-hostiles.name": "Non evidenziare velocità degli ostili",
+    "elevationruler.settings.speed-highlighting-no-hostiles.hint": "Se abilitato, l'utente non può vedere la velocità di un token ostile o segreto a meno che l'utente non disponga delle autorizzazioni di osservatore o proprietario.",
+
+    "elevationruler.settings.token-ruler-combat-history.name": "Traccia movimenti di combattimento",
+    "elevationruler.settings.token-ruler-combat-history.hint": "Per l'evidenziare la velocità dei token, somma tutte le mosse dei token durante il round quando abilitato.",
+
+    "elevationruler.settings.token-speed-property.name": "Proprietà Camminare Token",
+    "elevationruler.settings.token-speed-property.hint": "Per l'evidenziazione della velocità del token, questa è la proprietà che rappresenta la velocità di camminata del token.",
+
+    "elevationruler.settings.token-fly-property.name": "Proprietà Volare Token",
+    "elevationruler.settings.token-fly-property.hint": "Per l'evidenziazione della velocità del token, questa è la proprietà che rappresenta la velocità di volo del token",
+
+    "elevationruler.settings.token-burrow-property.name": "Proprietà Scavare Token",
+    "elevationruler.settings.token-burrow-property.hint": "Per l'evidenziazione della velocità del token, questa è la proprietà che rappresenta la velocità di scavo del token",
+
+    "elevationruler.settings.token-speed-multiplier.name": "Moltiplicatore Velocità Token",
+    "elevationruler.settings.token-speed-multiplier.hint": "Per l'evidenziazione della velocità dei token, questo è il moltiplicatore utilizzato per passare dalla camminata alla corsa (scatto) al massimo. Ad esempio, con un moltiplicatore di 2, un Token con una velocità di camminata di 25 avrà il suo righello evidenziato in arancione dopo le prime 25 unità di distanza e in rosso dopo le prime 50.",
+
+    "elevationruler.settings.round-to-multiple.name": "Arrotonda Distanza ad un multiplo",
+    "elevationruler.settings.round-to-multiple.hint": "Per la misurazione della distanza senza griglia, arrotondare la distanza visualizzata al multiplo più vicino del numero immesso. Impostare su 0 per disabilitare l'arrotondamento.",
+
+    "elevationruler.settings.token-terrain-multiplier.name": "Token come moltiplicatore terreno",
+    "elevationruler.settings.token-terrain-multiplier.hint": "Moltiplicatore da utilizzare per calcolare la velocità di movimento quando ci si sposta attraverso altri token. Impostato su 1 per ignorare. I valori inferiori a 1 trattano gli spazi dei segnalini come più veloci del normale; valori maggiori di 1 penalizzano il movimento attraverso gli spazi dei token.",
+
+    "elevationruler.settings.pathfinding_tokens_block.name": "Blocco dei Token",
+    "elevationruler.settings.pathfinding_tokens_block.hint": "Per Trova Percorso, i Token bloccano il percorso?",
+    "elevationruler.settings.pathfinding_tokens_block_no": "No",
+    "elevationruler.settings.pathfinding_tokens_block_hostile": "Solo Ostili",
+    "elevationruler.settings.pathfinding_tokens_block_all": "Tutti",
+
+    "elevationruler.settings.pathfinding_limit_token_los.name": "Limita Trova Percorso alle Aree Esplorate",
+    "elevationruler.settings.pathfinding_limit_token_los.hint": "Usando Trova Percorso, limita il raggio d'azione del percorso alle aree esplorate a meno che l'utente non sia il DM",
+
+    "elevationruler.settings.grid-terrain-algorithm.name": "Misurazione Griglia Terreno",
+    "elevationruler.settings.grid-terrain-algorithm.hint": "Quando sei su una griglia, come tenere conto delle penalità di movimento o dei bonus derivanti dal terreno e dai token? Centro: si applica se il terreno/token si sovrappone al centro della griglia; Area percentuale: si applica se il terreno/token copre almeno questa parte del quadrato/esagono della griglia; Euclideo: ripartizione proporzionale in base alla percentuale del segmento di linea all'interno del terreno/token tra questo quadrato/esagono della griglia e il precedente.",
+    "elevationruler.settings.grid-terrain-choice-center-point": "Centro",
+    "elevationruler.settings.grid-terrain-choice-percent-area": "Area Percentuale",
+    "elevationruler.settings.grid-terrain-choice-euclidean": "Euclideo",
+
+    "elevationruler.settings.grid-terrain-area-threshold.name": "Soglia Area Percentuale",
+    "elevationruler.settings.grid-terrain-area-threshold.hint": "Se 'Area Percentuale' è selezionata per Misurazione Griglia Terreno, determina la sovrapposizione percentuale richiesta affinché il terreno/token venga conteggiato durante la misurazione su griglie.",
+
+    "elevationruler.controls.prefer-token-elevation.name": "Preferisci elevazione token",
+    "elevationruler.controls.pathfinding-control.name": "Trova Percorso",
+
+    "elevationruler.drawingconfig.movementPenalty.name": "Bonus/Penalità Movimento",
+    "elevationruler.drawingconfig.movementPenalty.hint": "Impostato a 1 senza penalità. Valori maggiori di uno penalizzano il movimento di quella percentuale; valori inferiori a uno garantiscono effettivamente un bonus al movimento. Ad esempio, impostalo su 2 per raddoppiare il movimento in quest'area."
+}
