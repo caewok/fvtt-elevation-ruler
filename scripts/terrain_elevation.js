@@ -148,7 +148,7 @@ export function elevationFromWaypoint(waypoint, location, token) {
   }
 
   // For normal ruler, if hovering over a token, use that token's elevation.
-  if ( !isTokenRuler && !waypoint._forceToGround ) {
+  if ( !isTokenRuler && !Settings.FORCE_TO_GROUND ) {
     // Check for other tokens at destination and use that elevation.
     const maxTokenE = retrieveVisibleTokens()
       .filter(t => t.constrainedTokenBorder.contains(location.x, location.y))
