@@ -60,11 +60,6 @@
       "lang": "pl",
       "name": "Polski",
       "path": "languages/pl.json"
-    },
-
-    { "lang": "it",
-       "name": "Italiana",
-       "path": "languages/it.json"
     }
   ],
   "url": "#{URL}#",
