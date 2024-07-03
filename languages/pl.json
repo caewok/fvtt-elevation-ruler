@@ -91,6 +91,9 @@
     "elevationruler.settings.grid-terrain-area-threshold.name": "Próg procentowy obszaru",
     "elevationruler.settings.grid-terrain-area-threshold.hint": "Jeśli dla opcji Pomiar siatki terenu wybrano opcję \"Procent powierzchni\", określa ona procent nakładania się wymagany do zliczenia terenu/tokenu podczas pomiaru na siatkach.",
 
+    "elevationruler.settings.automatic-movement-type.name": "Autowykrywanie typu ruchu",
+    "elevationruler.settings.automatic-movement-type.hint": "Automatycznie wykrywa typ ruchu na podstawie pozycji tokena. Ustaw efekt statusu tokena na \"latanie\" lub \"kopanie\", aby go zastąpić.",
+
     "elevationruler.controls.prefer-token-elevation.name": "Preferuj wysokość tokena",
     "elevationruler.controls.pathfinding-control.name": "Użyj wyszukiwania ścieżek",
 
