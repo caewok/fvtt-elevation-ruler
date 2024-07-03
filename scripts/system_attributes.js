@@ -47,7 +47,7 @@ Hooks.once("init", function() {
   SPEED.CATEGORIES = [WalkSpeedCategory, DashSpeedCategory, MaximumSpeedCategory];
 
   // Add specialized system categories
-  const moveCategoryFn = SPECIALIZED_MOVE_CATEGORIES[game.system.id];
+  const moveCategoryFn = SPECIALIZED_SPEED_CATEGORIES[game.system.id];
   if ( moveCategoryFn ) moveCategoryFn();
 
   // Add specialized category distance function
@@ -176,7 +176,7 @@ export function defaultDashMultiplier() {
 /**
  * Dnd5e Level Up (a5e)
  */
-function a5eMoveCategories() {
+function a5eSpeedCategories() {
   DashSpeedCategory.name = "Action Dash";
   const BonusDashCategory = {
     name: "Bonus Dash",
@@ -189,7 +189,7 @@ function a5eMoveCategories() {
 /**
  * sfrpg
  */
-function sfrpgMoveCategories() {
+function sfrpgSpeedCategories() {
   WalkSpeedCategory.name = "sfrpg.speeds.walk";
   DashSpeedCategory.name = "sfrpg.speeds.dash";
   const RunSpeedCategory = {
@@ -200,9 +200,10 @@ function sfrpgMoveCategories() {
   SPEED.CATEGORIES = [WalkSpeedCategory, DashSpeedCategory, RunSpeedCategory, MaximumSpeedCategory];
 }
 
-const SPECIALIZED_MOVE_CATEGORIES = {
-  a5e: a5eMoveCategories,
-  sfrpg: sfrpgMoveCategories
+
+const SPECIALIZED_SPEED_CATEGORIES = {
+  a5e: a5eSpeedCategories,
+  sfrpg: sfrpgSpeedCategories
 };
 
 // ----- Specialized token speed by system ----- //
@@ -235,7 +236,6 @@ const SPECIALIZED_TOKEN_SPEED = {
  * There are three speed thresholds: single move (speed * 1), double move (speed *2), and run (speed *4)
  * Vehicles: There are three speed thresholds: drive speed, run over speed (drive speed *2), and full speed
  * Starships: There are two speed thresholds: normal speed, and full power (speed * 1.5)
-
  *
  * @param {Token} token                   Token whose speed should be used
  * @param {SpeedCategory} speedCategory   Category for which the maximum distance is desired
@@ -264,10 +264,24 @@ function sfrpgCategoryDistance(token, speedCategory, tokenSpeed) {
   return speed;
 }
 
-const SPECIALIZED_CATEGORY_DISTANCE = {
-  sfrpg: sfrpgCategoryDistance
-};
+/**
+ * Warhammer 4e (wfrpg43)
+ * See https://github.com/caewok/fvtt-elevation-ruler/issues/113
+ * Use the system-calculated run value.
+ * @param {Token} token                   Token whose speed should be used
+ * @param {SpeedCategory} speedCategory   Category for which the maximum distance is desired
+ * @param {number} [tokenSpeed]           Optional token speed to avoid repeated lookups
+ * @returns {number}
+ */
+function wfrp4eCategoryDistance(token, speedCategory, tokenSpeed) {
+  if ( speedCategory.name === "Dash" ) return foundry.utils.getProperty(token, "actor.system.details.move.run");
+  return tokenSpeed;
+}
 
+const SPECIALIZED_CATEGORY_DISTANCE = {
+  sfrpg: sfrpgCategoryDistance,
+  wfrp4e: wfrp4eCategoryDistance
+};
 
 
 // ----- Note: Licenses / Credits ----- //
