@@ -76,7 +76,6 @@ export function defaultHPAttribute() {
     case "twodsix":       return "actor.system.hits.value";
     case "ars":           return "actor.system.attributes.hp.value";
     case "a5e":           return "actor.system.attributes.hp.value";
-    case "TheWitcherTRPG": return "actor.system.derivedStats.hp.value";
     default:              return "actor.system.attributes.hp.value";
   }
 }
@@ -107,7 +106,6 @@ export function defaultWalkAttribute() {
     case "dragonbane":    return "actor.system.movement";
     case "twodsix":       return "actor.system.movement.walk";
     case "worldofdarkness": return "actor.system.movement.walk";
-    case "TheWitcherTRPG": return "actor.system.stats.spd.current";
     default:              return "";
   }
 }
@@ -170,7 +168,6 @@ export function defaultDashMultiplier() {
 
     case "crucible":
     case "swade":         return 0;
-    case "TheWitcherTRPG": return 3;
     default:              return 0;
   }
 }
