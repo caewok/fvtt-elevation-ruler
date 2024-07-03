@@ -91,6 +91,9 @@
     "elevationruler.settings.grid-terrain-area-threshold.name": "Limite do Percentual de Área",
     "elevationruler.settings.grid-terrain-area-threshold.hint": "Se 'Percentual de Área' for selecionado para Medição de Grade de Terreno, isso determinará a porcentagem de sobreposição necessária para o terreno/token contar ao medir em grades.",
 
+    "elevationruler.settings.automatic-movement-type.name": "Detectar Tipo de Deslocamento",
+    "elevationruler.settings.automatic-movement-type.hint": "Detecte automaticamente o tipo de deslocamento com base na posição do token. Defina o efeito de status do token como 'Voar' ou 'Escavar' para substituir.",
+    
     "elevationruler.controls.prefer-token-elevation.name": "Prefira Elevação do Token",
     "elevationruler.controls.pathfinding-control.name": "Usar Descoberta de Rota",
 
