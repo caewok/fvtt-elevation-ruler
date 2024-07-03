@@ -192,7 +192,7 @@ function TMElevationAtPoint(location, opts) {
   if ( !api || !api.regionElevationAtPoint ) return undefined;
   const res = api.regionElevationAtPoint(location, opts);
   if ( isFinite(res) ) return res;
-  return canvas.scene.flags?.terrainmapper?.backgroundElevation;
+  return canvas.scene?.flags?.terrainmapper?.[FLAGS.SCENE.BACKGROUND_ELEVATION] ?? 0;
 }
 
 // ----- NOTE: LEVELS ELEVATION ----- //
