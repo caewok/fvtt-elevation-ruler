@@ -91,6 +91,9 @@
     "elevationruler.settings.grid-terrain-area-threshold.name": "Soglia Area Percentuale",
     "elevationruler.settings.grid-terrain-area-threshold.hint": "Se 'Area Percentuale' è selezionata per Misurazione Griglia Terreno, determina la sovrapposizione percentuale richiesta affinché il terreno/token venga conteggiato durante la misurazione su griglie.",
 
+    "elevationruler.settings.automatic-movement-type.name": "Rilevamento automatico del tipo di movimento",
+    "elevationruler.settings.automatic-movement-type.hint": "Rileva automaticamente il tipo di movimento in base alla posizione del token. Imposta l'effetto dello stato del token su "volare" o "scavare" per sovrascrivere.",
+
     "elevationruler.controls.prefer-token-elevation.name": "Preferisci elevazione token",
     "elevationruler.controls.pathfinding-control.name": "Trova Percorso",
 
