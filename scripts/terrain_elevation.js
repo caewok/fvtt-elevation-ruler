@@ -1,5 +1,6 @@
 /* globals
 canvas,
+CONFIG,
 PIXI,
 Ruler,
 ui
@@ -42,7 +43,7 @@ elevationAtLocation -- all ruler types
 Used by ruler to get elevation at waypoints and at the end of the ruler.
 */
 
-import { MODULES_ACTIVE, MODULE_ID } from "./const.js";
+import { MODULES_ACTIVE, MODULE_ID, FLAGS } from "./const.js";
 import { Settings } from "./settings.js";
 
 

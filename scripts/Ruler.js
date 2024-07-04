@@ -1,6 +1,7 @@
 /* globals
 canvas,
 CONFIG,
+CONST,
 game,
 PIXI,
 Ruler,
