@@ -375,7 +375,7 @@ export class Settings extends ModuleSettingsAbstract {
       editable: [
         { key: "KeyG" }
       ],
-      onDown: _context => {
+      onDown: _context => { // eslint-disable-line no-unused-vars
         const ruler = canvas.controls.ruler;
         if ( !ruler.active ) return;
         this.FORCE_TO_GROUND = !this.FORCE_TO_GROUND;

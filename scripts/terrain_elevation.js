@@ -1,5 +1,6 @@
 /* globals
 canvas,
+CONFIG,
 PIXI,
 Ruler,
 ui

@@ -132,7 +132,7 @@ export class Patcher {
             switch ( typeName ) {
               case "HOOKS": patchCl = HookPatch; break;
 
-              case "STATIC_OVERRIDES": // eslint-disable-line no-fallthrough
+              case "STATIC_OVERRIDES":
               case "OVERRIDES":
               case "STATIC_MIXES":
               case "MIXES":
@@ -144,13 +144,13 @@ export class Patcher {
                     ? libWrapper.MIXED : libWrapper.WRAPPER;
                 break;
 
-              case "STATIC_GETTERS": // eslint-disable-line no-fallthrough
+              case "STATIC_GETTERS":
               case "GETTERS":
                 cfg.isGetter = true;
                 patchCl = MethodPatch;
                 break;
 
-              case "STATIC_SETTERS": // eslint-disable-line no-fallthrough
+              case "STATIC_SETTERS":
               case "SETTERS":
                 cfg.isSetter = true;
                 patchCl = MethodPatch;
@@ -197,7 +197,7 @@ export class Patcher {
     Object.defineProperty(cl, name, descriptor);
 
     const prototypeName = cl.constructor?.name;
-    const id = `${prototypeName ?? cl.name }.${prototypeName ? "prototype." : ""}${name}`; // eslint-disable-line template-curly-spacing
+    const id = `${prototypeName ?? cl.name }.${prototypeName ? "prototype." : ""}${name}`;
     return { id, args: { cl, name } };
   }
 

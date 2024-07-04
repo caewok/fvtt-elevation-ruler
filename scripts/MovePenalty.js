@@ -16,7 +16,7 @@ Type of penalties:
 - Moving through Drawings with Terrain Layer terrain (DrawingMovePenalty)
 */
 
-import { MODULES_ACTIVE, MODULE_ID, FLAGS, SPEED } from "./const.js";
+import { MODULE_ID, FLAGS, SPEED } from "./const.js";
 import { Settings } from "./settings.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { CenteredRectangle } from "./geometry/CenteredPolygon/CenteredRectangle.js";
