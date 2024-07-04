@@ -8,12 +8,11 @@ renderTemplate
 "use strict";
 
 import { MODULE_ID } from "./const.js";
-import { getTopLeftPoint } from "./grid_coordinates.js";
 
 export function log(...args) {
   try {
     if ( CONFIG[MODULE_ID].debug ) console.debug(MODULE_ID, "|", ...args);
-  } catch(e) {
+  } catch(e) { // eslint-disable-line no-unused-vars
     // Empty
   }
 }

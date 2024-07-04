@@ -1,3 +1,6 @@
+# 0.9.8
+Fix for `FLAGS` not defined error.
+
 # 0.9.7
 Added Italian translation. Thanks @GregoryWarn!
 Added TheWitcherTRPG integration. Thanks @pedroaugustobt!
