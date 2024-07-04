@@ -1,5 +1,6 @@
 # 0.9.8
 Fix for `FLAGS` not defined error.
+Round prior movement label.
 
 # 0.9.7
 Added Italian translation. Thanks @GregoryWarn!
