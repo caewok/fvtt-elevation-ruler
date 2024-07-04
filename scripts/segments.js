@@ -191,8 +191,9 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
 
   let combatLabel = "";
   if ( game.combat?.started && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
+    const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
     const pastMoveDistance = this.token?.lastMoveDistance;
-    if ( pastMoveDistance ) combatLabel = `\nPrior: ${pastMoveDistance}${units}`;
+    if ( pastMoveDistance ) combatLabel = `\nPrior: ${pastMoveDistance.toNearest(multiple)}${units}`;
   }
 
   return `${origLabel}\n${elevLabel}${moveLabel}${combatLabel}`;
@@ -207,7 +208,7 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
  */
 export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance) {
   const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-  if (canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS || !multiple) return {
+  if ( canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS ) return {
     newSegmentDistance: segmentDistance,
     newMoveDistance: Number(moveDistance.toFixed(2)),
     newTotalDistance: totalDistance
