@@ -9,7 +9,8 @@ export const MODULE_ID = "elevationruler";
 export const EPSILON = 1e-08;
 
 export const TEMPLATES = {
-  DRAWING_CONFIG: `modules/${MODULE_ID}/templates/drawing-config.html`
+  DRAWING_CONFIG: `modules/${MODULE_ID}/templates/drawing-config.html`,
+  COMBAT_TRACKER: `modules/${MODULE_ID}/templates/combat-tracker.html`
 };
 
 export const FLAGS = {
