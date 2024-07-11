@@ -17,7 +17,8 @@ export const FLAGS = {
   MOVEMENT_PENALTY: "movementPenalty",
   SCENE: {
     BACKGROUND_ELEVATION: "backgroundElevation"
-  }
+  },
+  MOVEMENT_HISTORY: "movementHistory"
 };
 
 export const MODULES_ACTIVE = { API: {} };

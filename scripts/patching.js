@@ -18,7 +18,6 @@ import { PATCHES as PATCHES_TokenPF } from "./pathfinding/Token.js";
 
 // Movement tracking
 import { PATCHES as PATCHES_TokenHUD } from "./token_hud.js";
-import { PATCHES as PATCHES_TokenLayer } from "./TokenLayer.js";
 
 // Settings
 import { PATCHES as PATCHES_ClientSettings } from "./ModuleSettingsAbstract.js";
@@ -32,7 +31,6 @@ const PATCHES = {
   DrawingConfig: PATCHES_DrawingConfig,
   Ruler: PATCHES_Ruler,
   Token: mergeObject(mergeObject(PATCHES_Token, PATCHES_TokenPF), PATCHES_TokenHUD),
-  TokenLayer: PATCHES_TokenLayer,
   Wall: PATCHES_Wall
 };
 
