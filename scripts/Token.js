@@ -1,11 +1,13 @@
 /* globals
 canvas,
 CanvasAnimation,
+foundry,
 game,
 Ruler
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
+import { MODULE_ID, FLAGS } from "./const.js";
 import { Settings } from "./settings.js";
 import { log } from "./util.js";
 
@@ -14,6 +16,51 @@ export const PATCHES = {};
 PATCHES.TOKEN_RULER = {}; // Assume this patch is only present if the token ruler setting is enabled.
 PATCHES.MOVEMENT_TRACKING = {};
 PATCHES.PATHFINDING = {};
+
+// ----- NOTE: Hooks ----- //
+
+/**
+ * Hook preUpdateToken to track token movement
+ * @param {Document} document                       The Document instance being updated
+ * @param {object} changed                          Differential data that will be used to update the document
+ * @param {Partial<DatabaseUpdateOperation>} options Additional options which modify the update request
+ * @param {string} userId                           The ID of the requesting user, always game.user.id
+ * @returns {boolean|void}                          Explicitly return false to prevent update of this Document
+ */
+function preUpdateToken(document, changes, _options, _userId) {
+  const token = document.object;
+  if ( token.isPreview
+    || !(Object.hasOwn(changes, "x") || Object.hasOwn(changes, "y") || Object.hasOwn(changes, "elevation")) ) return;
+
+  // Don't update move data if the move flag is being updated (likely due to control-z undo).
+  if ( foundry.utils.hasProperty(changes, `flags.${MODULE_ID}.${FLAGS.MOVEMENT_HISTORY}`) ) return;
+
+  // Store the move data in a token flag so it survives reloads and can be updated on control-z undo by another user.
+  // First determine the current move data.
+  let lastMoveDistance = 0;
+  let combatMoveData = {};
+  const ruler = canvas.controls.ruler;
+  if ( ruler.active && ruler.token === token ) lastMoveDistance = ruler.totalMoveDistance;
+  else lastMoveDistance = Ruler.measureMoveDistance(token.position, token.document._source, { token }).moveDistance;
+  if ( game.combat?.started ) {
+    // Store the combat move distance and the last round for which the combat move occurred.
+    // Map to each unique combat.
+    const combatData = {...token._combatMoveData};
+    if ( combatData.lastRound < game.combat.round ) combatData.lastMoveDistance = lastMoveDistance;
+    else combatData.lastMoveDistance += lastMoveDistance;
+    combatData.lastRound = game.combat.round;
+    combatMoveData = { [game.combat.id]: combatData };
+  }
+
+  // Combine with existing move data in the token flag.
+  const flagData = document.getFlag(MODULE_ID, FLAGS.MOVEMENT_HISTORY) ?? {};
+  foundry.utils.mergeObject(flagData, { lastMoveDistance, combatMoveData });
+
+  // Update the flag with the new data.
+  foundry.utils.setProperty(changes, `flags.${MODULE_ID}.${FLAGS.MOVEMENT_HISTORY}`, flagData);
+}
+
+// ----- NOTE: Wraps ----- //
 
 /**
  * Wrap Token.prototype._onDragLeftStart
@@ -68,6 +115,18 @@ function _onDragLeftMove(wrapped, event) {
 }
 
 /**
+ * Wrap Token.prototype._onUpdate to remove easing for pathfinding segments.
+ */
+function _onUpdate(wrapped, data, options, userId) {
+  if ( options?.rulerSegment && options?.animation?.easing ) {
+    options.animation.easing = options.firstRulerSegment ? noEndEase(options.animation.easing)
+      : options.lastRulerSegment ? noStartEase(options.animation.easing)
+        : undefined;
+  }
+  return wrapped(data, options, userId);
+}
+
+/**
  * Mix Token.prototype._onDragLeftDrop
  * End the ruler measurement.
  */
@@ -87,73 +146,40 @@ async function _onDragLeftDrop(wrapped, event) {
   ruler._onMoveKeyDown(event); // Movement is async here but not awaited in _onMoveKeyDown.
 }
 
+// ----- NOTE: New getters ----- //
+
 /**
  * Token.prototype.lastMoveDistance
  * Return the last move distance. If combat is active, return the last move since this token
  * started its turn.
- * @returns {number}
+ * @type {number}
  */
 function lastMoveDistance() {
   if ( game.combat?.started ) {
-    if ( !this._combatMoveData ) return 0;
-    const combatData = this._combatMoveData.get(game.combat.id);
-    if ( !combatData || combatData.lastRound < game.combat.round ) return 0;
+    const combatData = this._combatMoveData;
+    if ( combatData.lastRound < game.combat.round ) return 0;
     return combatData.lastMoveDistance;
   }
-  return this._lastMoveDistance || 0;
+  return this.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_HISTORY)?.lastMoveDistance || 0;
 }
 
 /**
- * Hook updateToken to track token movement.
- * @param {Document} document                       The existing Document which was updated
- * @param {object} change                           Differential data that was used to update the document
- * @param {DocumentModificationContext} options     Additional options which modified the update request
- * @param {string} userId                           The ID of the User who triggered the update workflow
+ * Token.prototype._combatData
+ * Map that stores the combat move data.
+ * Constructed from the relevant flag.
+ * @type {object}
+ * - @prop {number} lastMoveDistance    Distance of last move during combat round
+ * - @prop {number} lastRound           The combat round in which the last move occurred
  */
-function updateToken(document, changes, _options, _userId) {
-  const token = document.object;
-  if ( token.isPreview
-    || !(Object.hasOwn(changes, "x")|| Object.hasOwn(changes, "y") || Object.hasOwn(changes, "elevation")) ) return;
-
-  const ruler = canvas.controls.ruler;
-  if ( ruler.active && ruler.token === token ) token._lastMoveDistance = ruler.totalMoveDistance;
-  else token._lastMoveDistance = Ruler.measureMoveDistance(token.position, token.document._source, { token }).moveDistance;
-  if ( game.combat?.started ) {
-    // Store the combat move distance and the last round for which the combat move occurred.
-    // Map to each unique combat.
-    const combatId = game.combat.id;
-    token._combatMoveData ??= new Map();
-    if ( !token._combatMoveData.has(combatId) ) {
-      token._combatMoveData.set(combatId, { lastMoveDistance: 0, lastRound: -1 });
-    }
-    const combatData = token._combatMoveData.get(combatId);
-    if ( combatData.lastRound < game.combat.round ) combatData.lastMoveDistance = token._lastMoveDistance;
-    else combatData.lastMoveDistance += token._lastMoveDistance;
-    combatData.lastRound = game.combat.round;
-  }
+function _combatMoveData() {
+  const combatId = game.combat?.id;
+  const defaultData = { lastMoveDistance: 0, lastRound: -1 };
+  if ( typeof combatId === "undefined" ) return defaultData;
+  const combatMoveData = this.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_HISTORY)?.combatMoveData ?? { };
+  return combatMoveData[combatId] ?? defaultData;
 }
 
-/**
- * Wrap Token.prototype._onUpdate to remove easing for pathfinding segments.
- */
-function _onUpdate(wrapped, data, options, userId) {
-  if ( options?.rulerSegment && options?.animation?.easing ) {
-    options.animation.easing = options.firstRulerSegment ? noEndEase(options.animation.easing)
-      : options.lastRulerSegment ? noStartEase(options.animation.easing)
-        : undefined;
-  }
-  return wrapped(data, options, userId);
-}
-
-function noStartEase(easing) {
-  if ( typeof easing === "string" ) easing = CanvasAnimation[easing];
-  return pt => (pt < 0.5) ? pt : easing(pt);
-}
-
-function noEndEase(easing) {
-  if ( typeof easing === "string" ) easing = CanvasAnimation[easing];
-  return pt => (pt > 0.5) ? pt : easing(pt);
-}
+// ----- NOTE: Patches ----- //
 
 PATCHES.TOKEN_RULER.WRAPS = {
   _onDragLeftStart,
@@ -164,6 +190,27 @@ PATCHES.PATHFINDING.WRAPS = { _onUpdate };
 
 PATCHES.TOKEN_RULER.MIXES = { _onDragLeftDrop, _onDragLeftCancel };
 
-PATCHES.MOVEMENT_TRACKING.HOOKS = { updateToken };
-PATCHES.MOVEMENT_TRACKING.GETTERS = { lastMoveDistance };
+PATCHES.MOVEMENT_TRACKING.HOOKS = { preUpdateToken };
+PATCHES.MOVEMENT_TRACKING.GETTERS = { lastMoveDistance, _combatMoveData };
 
+// ----- NOTE: Helper functions ----- //
+
+/**
+ * For given easing function, modify it so it does not ease for the first half of the move.
+ * @param {function} easing
+ * @returns {function}
+ */
+function noStartEase(easing) {
+  if ( typeof easing === "string" ) easing = CanvasAnimation[easing];
+  return pt => (pt < 0.5) ? pt : easing(pt);
+}
+
+/**
+ * For given easing function, modify it so it does not ease for the second half of the move.
+ * @param {function} easing
+ * @returns {function}
+ */
+function noEndEase(easing) {
+  if ( typeof easing === "string" ) easing = CanvasAnimation[easing];
+  return pt => (pt > 0.5) ? pt : easing(pt);
+}
