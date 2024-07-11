@@ -179,6 +179,11 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
   const levelName = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
   if ( levelName ) elevLabel += `\n${levelName}`;
 
+  if ( CONFIG[MODULE_ID].debug ) {
+    if ( totalDistance > 30 ) { console.debug("_getSegmentLabel: 30", segment, this); }
+    else if ( totalDistance > 60 ) { console.debug("_getSegmentLabel: 30", segment, this); }
+  }
+
   let moveLabel = "";
   const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
   if ( segment.waypointDistance !== segment.waypointMoveDistance ) {
@@ -401,7 +406,7 @@ function segmentElevationLabel(s) {
   const units = canvas.scene.grid.units;
   const increment = s.waypointElevationIncrement;
   const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-  const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(s.ray.B.z).toNearest(multiple);
+  const elevation = (CONFIG.GeometryLib.utils.pixelsToGridUnits(s.ray.A.z) + s.waypointElevationIncrement).toNearest(multiple);
 
   const segmentArrow = (increment > 0) ? "↑"
     : (increment < 0) ? "↓" : "↕";
