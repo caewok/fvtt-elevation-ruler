@@ -18,6 +18,7 @@ import { PATCHES as PATCHES_TokenPF } from "./pathfinding/Token.js";
 
 // Movement tracking
 import { PATCHES as PATCHES_TokenHUD } from "./token_hud.js";
+import { PATCHES as PATCHES_CombatTracker } from "./CombatTracker.js";
 
 // Settings
 import { PATCHES as PATCHES_ClientSettings } from "./ModuleSettingsAbstract.js";
@@ -27,6 +28,7 @@ const mergeObject = foundry.utils.mergeObject;
 const PATCHES = {
   ClientKeybindings: PATCHES_ClientKeybindings,
   ClientSettings: PATCHES_ClientSettings,
+  CombatTracker: PATCHES_CombatTracker,
   ["foundry.canvas.edges.CanvasEdges"]: PATCHES_CanvasEdges,
   DrawingConfig: PATCHES_DrawingConfig,
   Ruler: PATCHES_Ruler,

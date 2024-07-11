@@ -10,7 +10,7 @@ ui
 
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
-import { MODULE_ID, MOVEMENT_TYPES, MOVEMENT_BUTTONS, SPEED } from "./const.js";
+import { MODULE_ID, MOVEMENT_TYPES, MOVEMENT_BUTTONS, SPEED, TEMPLATES } from "./const.js";
 import { defaultHPAttribute } from "./system_attributes.js";
 import { registerGeometry } from "./geometry/registration.js";
 
@@ -185,6 +185,8 @@ Hooks.once("init", function() {
 
     Settings
   };
+
+  loadTemplates(Object.values(TEMPLATES)).then(_value => log(`Templates loaded.`)); // eslint-disable-line no-unused-vars
 });
 
 // Setup is after init; before ready.
