@@ -98,5 +98,7 @@
     "elevationruler.controls.pathfinding-control.name": "Usar Descoberta de Rota",
 
     "elevationruler.drawingconfig.movementPenalty.name": "Bônus/Penalidade de Movimento",
-    "elevationruler.drawingconfig.movementPenalty.hint": "Defina como 1 para nenhuma penalidade. Valores superiores a um penalizam o movimento nessa percentagem; valores menores que um concedem efetivamente um bônus ao movimento. Por exemplo, defina como 2 para duplicar o movimento nesta área."
+    "elevationruler.drawingconfig.movementPenalty.hint": "Defina como 1 para nenhuma penalidade. Valores superiores a um penalizam o movimento nessa percentagem; valores menores que um concedem efetivamente um bônus ao movimento. Por exemplo, defina como 2 para duplicar o movimento nesta área.",
+
+    "elevationruler.clearMovement": "Limpar Deslocamento do Combatente"
 }
