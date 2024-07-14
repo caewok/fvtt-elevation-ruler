@@ -203,7 +203,7 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
 
   let label = `${origLabel}`;
   if ( !Settings.get(Settings.KEYS.HIDE_ELEVATION) ) {
-    label += `${elevLabel}`;
+    label += `\n${elevLabel}`;
   }
   label += `${moveLabel}${combatLabel}`;
 
