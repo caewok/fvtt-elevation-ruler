@@ -39,6 +39,9 @@
     "elevationruler.settings.enable-token-ruler.name": "Use Token Ruler",
     "elevationruler.settings.enable-token-ruler.hint": "Display the ruler when dragging tokens.",
 
+    "elevationruler.settings.hide-elevation-ruler.name": "Hide Elevation from Ruler",
+    "elevationruler.settings.hide-elevation-ruler.hint": "Hide the Elevation from the Label when using a Ruler.",
+
     "elevationruler.settings.hide-gm-ruler.name": "Hide GM Token Ruler",
     "elevationruler.settings.hide-gm-ruler.hint": "Do not display the GM's token ruler for other non-GM users.",
 

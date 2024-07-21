@@ -30,6 +30,8 @@ const SETTINGS = {
     LIMIT_TOKEN_LOS: "pathfinding_limit_token_los"
   },
 
+  HIDE_ELEVATION: "hide-elevation-ruler",
+
   USE_LEVELS_LABEL: "levels-use-floor-label",
   LEVELS_LABELS: {
     NEVER: "levels-labels-never",
@@ -148,6 +150,16 @@ export class Settings extends ModuleSettingsAbstract {
       name: localize(`${KEYS.PATHFINDING.LIMIT_TOKEN_LOS}.name`),
       hint: localize(`${KEYS.PATHFINDING.LIMIT_TOKEN_LOS}.hint`),
       scope: "world",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.HIDE_ELEVATION, {
+      name: localize(`${KEYS.HIDE_ELEVATION}.name`),
+      hint: localize(`${KEYS.HIDE_ELEVATION}.hint`),
+      scope: "user",
       config: true,
       default: false,
       type: Boolean,

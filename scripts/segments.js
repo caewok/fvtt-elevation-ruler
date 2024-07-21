@@ -201,7 +201,13 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
     if ( pastMoveDistance ) combatLabel = `\nPrior: ${pastMoveDistance.toNearest(multiple)}${units}`;
   }
 
-  return `${origLabel}\n${elevLabel}${moveLabel}${combatLabel}`;
+  let label = `${origLabel}`;
+  if ( !Settings.get(Settings.KEYS.HIDE_ELEVATION) ) {
+    label += `\n${elevLabel}`;
+  }
+  label += `${moveLabel}${combatLabel}`;
+
+  return label;
 }
 
 /**
