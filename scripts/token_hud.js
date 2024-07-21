@@ -79,7 +79,7 @@ PATCHES.BASIC.GETTERS = { movementType };
  * @returns {MOVEMENT_TYPE}
  */
 function determineMovementType(token) {
-  const groundElevation = Ruler.terrainElevationAtLocation(token.center);
+  const groundElevation = CONFIG.Canvas.rulerClass.terrainElevationAtLocation(token.center);
   return keyForValue(MOVEMENT_TYPES, Math.sign(token.elevationE - groundElevation) + 1);
 }
 

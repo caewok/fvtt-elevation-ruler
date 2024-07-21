@@ -119,7 +119,7 @@ function locateSegmentBreakpoint(segment, splitMoveDistance, token, gridless) {
 
   // Attempt to move the split distance and determine the split location.
   const { A, B } = segment.ray;
-  const res = Ruler.measureMoveDistance(A, B,
+  const res = CONFIG.Canvas.rulerClass.measureMoveDistance(A, B,
     { token, gridless, useAllElevation: false, stopTarget: splitMoveDistance });
 
   let breakpoint = pointFromGridCoordinates(res.endGridCoords); // We can get the exact split point.

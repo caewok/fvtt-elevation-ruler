@@ -41,7 +41,7 @@ function preUpdateToken(document, changes, _options, _userId) {
   let combatMoveData = {};
   const ruler = canvas.controls.ruler;
   if ( ruler.active && ruler.token === token ) lastMoveDistance = ruler.totalMoveDistance;
-  else lastMoveDistance = Ruler.measureMoveDistance(token.position, token.document._source, { token }).moveDistance;
+  else lastMoveDistance = CONFIG.Canvas.rulerClass.measureMoveDistance(token.position, token.document._source, { token }).moveDistance;
   if ( game.combat?.started ) {
     // Store the combat move distance and the last round for which the combat move occurred.
     // Map to each unique combat.
