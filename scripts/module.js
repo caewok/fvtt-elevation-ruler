@@ -11,6 +11,7 @@ ui
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID, MOVEMENT_TYPES, MOVEMENT_BUTTONS, SPEED, TEMPLATES } from "./const.js";
+import { log } from "./util.js";
 import { defaultHPAttribute } from "./system_attributes.js";
 import { registerGeometry } from "./geometry/registration.js";
 
