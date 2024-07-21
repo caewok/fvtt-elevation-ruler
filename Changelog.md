@@ -1,3 +1,9 @@
+# 0.9.10
+Fix for "log not defined" error on load.
+Merge PR from @SyraLessThanThree to hide elevation display in ruler.
+Italian, Spanish, and Polish language updates. Thanks @GregoryWarn, @Kharmans, and @Lioheart!
+Update readme re Das Schwarze Auge 5 (The Dark Eye 5) support. Thanks @Rapunzel77!
+
 # 0.9.9
 Moved token movement history to a flag, which now takes advantage of the Foundry undo system so that when undoing token movement during combat, the token's movement history is reset accordingly.
 Added a button in the Combat Tracker that GMs can use to reset the current combatant movement history during combat. Closes #89.
