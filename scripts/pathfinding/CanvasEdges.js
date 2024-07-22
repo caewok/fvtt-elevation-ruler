@@ -24,16 +24,7 @@ PATCHES.PATHFINDING = {};
  */
 function initializeEdges() {
   const t0 = performance.now();
-  SCENE_GRAPH.clear();
-  let numWalls = 0;
-  for ( const edge of canvas.edges.values() ) {
-    if ( edge.object instanceof Wall ) {
-      SCENE_GRAPH.addWall(edge.object);
-      numWalls += 1;
-    } else if ( edge.type === "outerBounds"
-             || edge.type === "innerBounds" ) SCENE_GRAPH.addCanvasEdge(edge);
-  }
-
+  SCENE_GRAPH._reset();
   Settings.setTokenBlocksPathfinding();
   const t1 = performance.now();
 
@@ -41,8 +32,13 @@ function initializeEdges() {
   Pathfinder.initialize();
   const t2 = performance.now();
 
-  console.debug(`${MODULE_ID}|Tracked ${numWalls} walls in ${t1 - t0} ms.`);
+  console.group(`${MODULE_ID}|Initialized scene graph and pathfinding.`);
+  console.debug(`${MODULE_ID}|Constructed scene graph in ${t1 - t0} ms.`)
+  console.debug(`${MODULE_ID}|Tracked ${SCENE_GRAPH.wallIds.size} walls.`);
+  console.debug(`Tracked ${SCENE_GRAPH.tokenIds.size} tokens.`);
+  console.debug(`Located ${SCENE_GRAPH.edges.size} distinct edges.`);
   console.debug(`${MODULE_ID}|Initialized pathfinding in ${t2 - t1} ms.`);
+  console.groupEnd();
 }
 
 PATCHES.PATHFINDING.HOOKS = { initializeEdges };

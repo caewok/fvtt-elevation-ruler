@@ -23,9 +23,10 @@ PATCHES.PATHFINDING_TOKENS = {};
 function createToken(document, _options, _userId) {
   SCENE_GRAPH.addToken(document.object);
   Pathfinder.dirty = true;
-  if ( CONFIG[MODULE_ID].debug ) {
-    const res = SCENE_GRAPH._checkInternalConsistency();
-    if ( !res.allConsistent ) console.warn(`WallTracer|createToken ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+  const res = SCENE_GRAPH._checkInternalConsistency();
+  if ( !res.allConsistent ) {
+    log(`WallTracer|createToken ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+    SCENE_GRAPH.reset();
   }
 }
 
@@ -54,9 +55,10 @@ function updateToken(document, changed, options, userId) {
   SCENE_GRAPH.removeToken(document.id);
   SCENE_GRAPH.addToken(document.object);
   Pathfinder.dirty = true;
-  if ( CONFIG[MODULE_ID].debug ) {
-    const res = SCENE_GRAPH._checkInternalConsistency();
-    if ( !res.allConsistent ) console.warn(`WallTracer|updateToken ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+  const res = SCENE_GRAPH._checkInternalConsistency();
+  if ( !res.allConsistent ) {
+    log(`WallTracer|updateToken ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+    SCENE_GRAPH.reset();
   }
 
   // Restore original token doc values.
@@ -74,9 +76,10 @@ function updateToken(document, changed, options, userId) {
 function deleteToken(document, _options, _userId) {
   SCENE_GRAPH.removeToken(document.id); // The document.object is now null; use the id to remove the wall.
   Pathfinder.dirty = true;
-  if ( CONFIG[MODULE_ID].debug ) {
-    const res = SCENE_GRAPH._checkInternalConsistency();
-    if ( !res.allConsistent ) console.warn(`WallTracer|deleteToken ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+  const res = SCENE_GRAPH._checkInternalConsistency();
+  if ( !res.allConsistent ) {
+    log(`WallTracer|deleteToken ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+    SCENE_GRAPH.reset();
   }
 }
 

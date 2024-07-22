@@ -871,6 +871,15 @@ export class WallTracer extends Graph {
   }
 
   /**
+   * Reset this scene graph to the current objects in the scene.
+   */
+  _reset() {
+    this.clear();
+    const modelGraph = this.constructor.fromCurrentScene();
+    for ( const prop of Object.keys(modelGraph) ) this[prop] = modelGraph[prop];
+  }
+
+  /**
    * For debugging.
    * Test for inconsistencies by constructing the graph from scratch.
    * Should be equivalent to the current graph for the scene.
