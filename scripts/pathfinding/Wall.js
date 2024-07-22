@@ -25,7 +25,7 @@ function createWall(document, _options, _userId) {
   const res = SCENE_GRAPH._checkInternalConsistency();
   if ( !res.allConsistent ) {
     log(`WallTracer|createWall ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
-    SCENE_GRAPH.reset();
+    SCENE_GRAPH._reset();
   }
 }
 
@@ -47,7 +47,7 @@ function updateWall(document, changes, _options, _userId) {
   const res = SCENE_GRAPH._checkInternalConsistency();
   if ( !res.allConsistent ) {
     log(`WallTracer|updateWall ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
-    SCENE_GRAPH.reset();
+    SCENE_GRAPH._reset();
   }
 }
 
@@ -63,7 +63,7 @@ function deleteWall(document, _options, _userId) {
   const res = SCENE_GRAPH._checkInternalConsistency();
   if ( !res.allConsistent ) {
     log(`WallTracer|deleteWall ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
-    SCENE_GRAPH.reset();
+    SCENE_GRAPH._reset();
   }
 }
 
