@@ -26,7 +26,7 @@ function createToken(document, _options, _userId) {
   const res = SCENE_GRAPH._checkInternalConsistency();
   if ( !res.allConsistent ) {
     log(`WallTracer|createToken ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
-    SCENE_GRAPH.reset();
+    SCENE_GRAPH._reset();
   }
 }
 
@@ -58,7 +58,7 @@ function updateToken(document, changed, options, userId) {
   const res = SCENE_GRAPH._checkInternalConsistency();
   if ( !res.allConsistent ) {
     log(`WallTracer|updateToken ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
-    SCENE_GRAPH.reset();
+    SCENE_GRAPH._reset();
   }
 
   // Restore original token doc values.

@@ -91,9 +91,14 @@
     "elevationruler.settings.grid-terrain-area-threshold.name": "Soglia Area Percentuale",
     "elevationruler.settings.grid-terrain-area-threshold.hint": "Se 'Area Percentuale' è selezionata per Misurazione Griglia Terreno, determina la sovrapposizione percentuale richiesta affinché il terreno/token venga conteggiato durante la misurazione su griglie.",
 
+    "elevationruler.settings.automatic-movement-type.name": "Rilevamento automatico del tipo di movimento",
+    "elevationruler.settings.automatic-movement-type.hint": "Rileva automaticamente il tipo di movimento in base alla posizione del token. Imposta l'effetto dello stato del token su 'volare' o 'scavare' per sovrascrivere.",
+
     "elevationruler.controls.prefer-token-elevation.name": "Preferisci elevazione token",
     "elevationruler.controls.pathfinding-control.name": "Trova Percorso",
 
     "elevationruler.drawingconfig.movementPenalty.name": "Bonus/Penalità Movimento",
-    "elevationruler.drawingconfig.movementPenalty.hint": "Impostato a 1 senza penalità. Valori maggiori di uno penalizzano il movimento di quella percentuale; valori inferiori a uno garantiscono effettivamente un bonus al movimento. Ad esempio, impostalo su 2 per raddoppiare il movimento in quest'area."
+    "elevationruler.drawingconfig.movementPenalty.hint": "Impostato a 1 senza penalità. Valori maggiori di uno penalizzano il movimento di quella percentuale; valori inferiori a uno garantiscono effettivamente un bonus al movimento. Ad esempio, impostalo su 2 per raddoppiare il movimento in quest'area.",
+    
+    "elevationruler.clearMovement": "Cancella Movimento Combattente"
 }
