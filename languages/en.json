@@ -76,6 +76,9 @@
     "elevationruler.settings.token-terrain-multiplier.name": "Token as Terrain Multiplier",
     "elevationruler.settings.token-terrain-multiplier.hint": "Multiplier to use to calculate movement speed when moving through other tokens. Set to 1 to ignore. Values less than 1 treat token spaces as faster than normal; values greater than 1 penalize movement through token spaces.",
 
+    "elevationruler.settings.pathfinding_enable.name": "Use Pathfinding",
+    "elevationruler.settings.pathfinding_enable.hint": "When enabled, adds a pathfinding togglee to the Token controls that will cause the ruler to map a path around walls and tokens, depending on settings. Disable this if pathfinding is causing compatibility issues. Disabling may also result in a small performance increase.",
+
     "elevationruler.settings.pathfinding_tokens_block.name": "Tokens Block",
     "elevationruler.settings.pathfinding_tokens_block.hint": "For pathfinding, do tokens block the path?",
     "elevationruler.settings.pathfinding_tokens_block_no": "No",
