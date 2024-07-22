@@ -21,6 +21,7 @@ const SETTINGS = {
   },
 
   PATHFINDING: {
+    ENABLE: "pathfinding_enable",
     TOKENS_BLOCK: "pathfinding_tokens_block",
     TOKENS_BLOCK_CHOICES: {
       NO: "pathfinding_tokens_block_no",
@@ -29,6 +30,8 @@ const SETTINGS = {
     },
     LIMIT_TOKEN_LOS: "pathfinding_limit_token_los"
   },
+
+  HIDE_ELEVATION: "hide-elevation-ruler",
 
   USE_LEVELS_LABEL: "levels-use-floor-label",
   LEVELS_LABELS: {
@@ -128,6 +131,17 @@ export class Settings extends ModuleSettingsAbstract {
       requiresReload: false
     });
 
+    register(KEYS.PATHFINDING.ENABLE, {
+      name: localize(`${KEYS.PATHFINDING.ENABLE}.name`),
+      hint: localize(`${KEYS.PATHFINDING.ENABLE}.hint`),
+      scope: "user",
+      config: true,
+      default: true,
+      type: Boolean,
+      requiresReload: false,
+      onChange: value => this.togglePathfinding(value)
+    });
+
     register(KEYS.PATHFINDING.TOKENS_BLOCK, {
       name: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK}.name`),
       hint: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK}.hint`),
@@ -148,6 +162,16 @@ export class Settings extends ModuleSettingsAbstract {
       name: localize(`${KEYS.PATHFINDING.LIMIT_TOKEN_LOS}.name`),
       hint: localize(`${KEYS.PATHFINDING.LIMIT_TOKEN_LOS}.hint`),
       scope: "world",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.HIDE_ELEVATION, {
+      name: localize(`${KEYS.HIDE_ELEVATION}.name`),
+      hint: localize(`${KEYS.HIDE_ELEVATION}.hint`),
+      scope: "user",
       config: true,
       default: false,
       type: Boolean,
@@ -226,7 +250,6 @@ export class Settings extends ModuleSettingsAbstract {
         requiresReload: false
       });
     }
-
 
     register(KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE, {
       name: localize(`${KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE}.name`),
@@ -397,18 +420,65 @@ export class Settings extends ModuleSettingsAbstract {
     });
   }
 
+  static togglePathfinding(enable) {
+    enable ??= Settings.get(Settings.KEYS.PATHFINDING.ENABLE);
+    if ( enable ) this.#enablePathfinding();
+    else this.#disablePathfinding();
+  }
+
+  static #enablePathfinding() {
+    PATCHER.registerGroup("PATHFINDING");
+
+    const t0 = performance.now();
+    SCENE_GRAPH._reset();
+    this.setTokenBlocksPathfinding();
+    const t1 = performance.now();
+
+    // Use the scene graph to initialize Pathfinder triangulation.
+    Pathfinder.dirty = true;
+    Pathfinder.initialize();
+    const t2 = performance.now();
+
+    console.group(`${MODULE_ID}|Initialized scene graph and pathfinding.`);
+    console.debug(`${MODULE_ID}|Constructed scene graph in ${t1 - t0} ms.`)
+    console.debug(`${MODULE_ID}|Tracked ${SCENE_GRAPH.wallIds.size} walls.`);
+    console.debug(`Tracked ${SCENE_GRAPH.tokenIds.size} tokens.`);
+    console.debug(`Located ${SCENE_GRAPH.edges.size} distinct edges.`);
+    console.debug(`${MODULE_ID}|Initialized pathfinding in ${t2 - t1} ms.`);
+    console.groupEnd();
+  }
+
+  static #disablePathfinding() {
+    PATCHER.deregisterGroup("PATHFINDING_TOKENS");
+    PATCHER.deregisterGroup("PATHFINDING");
+    SCENE_GRAPH.clear();
+    Pathfinder.dirty = true;
+  }
+
+
   static setTokenBlocksPathfinding(blockSetting) {
-    const C = this.KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES;
     blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
-    if ( blockSetting === C.NO ) { // Disable
-      PATCHER.deregisterGroup("PATHFINDING_TOKENS");
-      SCENE_GRAPH.tokenIds.forEach(id => SCENE_GRAPH.removeToken(id));
-    } else { // Enable
+    BorderEdge.tokenBlockType = this._tokenBlockType(blockSetting);
+    if ( !Settings.get(Settings.KEYS.PATHFINDING.ENABLE) ) return;
+
+    if ( this.useTokensInPathfinding ) {
       PATCHER.registerGroup("PATHFINDING_TOKENS");
       for ( const token of canvas.tokens.placeables ) SCENE_GRAPH.addToken(token);
+    } else {
+      PATCHER.deregisterGroup("PATHFINDING_TOKENS");
+      SCENE_GRAPH.tokenIds.forEach(id => SCENE_GRAPH.removeToken(id));
     }
-    BorderEdge.tokenBlockType = this._tokenBlockType(blockSetting);
+
     Pathfinder.dirty = true;
+    const res = SCENE_GRAPH._checkInternalConsistency();
+    if ( !res.allConsistent ) {
+      log(`WallTracer|setTokenBlocksPathfinding ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+      SCENE_GRAPH.reset();
+    }
+  }
+
+  static get useTokensInPathfinding() {
+    return Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK) !== this.KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO;
   }
 
   static _tokenBlockType(blockSetting) {

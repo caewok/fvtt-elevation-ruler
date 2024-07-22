@@ -53,7 +53,8 @@ Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/
 ## Modules that add functionality
 - [Wall Height](https://github.com/erithtotl/FVTT-Wall-Height). For defining limited-height walls.
 - [Terrain Mapper](https://github.com/caewok/fvtt-terrain-mapper). In v12, use Terrain Mapper to define elevation for regions.
-- [PF2E Elevation Ruler]([https://github.com/](https://github.com/7H3LaughingMan/pf2e-elevation-ruler). Defines token speed colors for the PF2e system.
+- [PF2E Elevation Ruler](https://github.com/7H3LaughingMan/pf2e-elevation-ruler). Defines token speed colors for the PF2e system.
+- [TDE5/DSA5 Elevation Ruler](https://github.com/Rapunzel77/dsa5-elevation-ruler-integration). Defines token speeds and colors for Das Schwarze Auge (TDE/DSA)
 
 ## Known conflicts
 - [Terrain Ruler](https://github.com/manuelVo/foundryvtt-terrain-ruler)

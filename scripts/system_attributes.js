@@ -203,15 +203,55 @@ function sfrpgSpeedCategories() {
   SPEED.CATEGORIES = [WalkSpeedCategory, DashSpeedCategory, RunSpeedCategory, MaximumSpeedCategory];
 }
 
+/**
+ * pf2e
+ * See https://github.com/7H3LaughingMan/pf2e-elevation-ruler/blob/main/scripts/module.js
+ */
+function pf2eSpeedCategories() {
+  const SingleAction = {
+      name: "Single Action",
+      color: Color.from("#3222C7"),
+      multiplier: 1
+  }
+
+  const DoubleAction = {
+      name: "Double Action",
+      color: Color.from("#FFEC07"),
+      multiplier: 2
+  }
+
+  const TripleAction = {
+      name: "Triple Action",
+      color: Color.from("#C033E0"),
+      multiplier: 3
+  }
+
+  const QuadrupleAction = {
+      name: "Quadruple Action",
+      color: Color.from("#1BCAD8"),
+      multiplier: 4
+  }
+
+  const Unreachable = {
+      name: "Unreachable",
+      color: Color.from("#FF0000"),
+      multiplier: Number.POSITIVE_INFINITY
+  }
+
+  SPEED.CATEGORIES = [SingleAction, DoubleAction, TripleAction, QuadrupleAction, Unreachable];
+}
+
 
 const SPECIALIZED_SPEED_CATEGORIES = {
   a5e: a5eSpeedCategories,
-  sfrpg: sfrpgSpeedCategories
+  sfrpg: sfrpgSpeedCategories,
+  pf2e: pf2eSpeedCategories
 };
 
 // ----- Specialized token speed by system ----- //
 
 /**
+ * sfrpg
  * Given a token, retrieve its base speed.
  * @param {Token} token                   Token whose speed is required
  * @returns {number|null} Distance, in grid units. Null if no speed provided for that category.
@@ -227,8 +267,36 @@ function sfrpgTokenSpeed(token) {
   return Number(speed);
 }
 
+/**
+ * pf2e
+ * See https://github.com/7H3LaughingMan/pf2e-elevation-ruler/blob/main/scripts/module.js
+ * Finds walk, fly, burrow values.
+ * @param {Token} token                   Token whose speed is required
+ * @returns {number|null} Distance, in grid units. Null if no speed provided for that category.
+ */
+function pf2eTokenSpeed(token) {
+  const tokenSpeed = token.actor.system.attributes.speed;
+  let speed = null;
+  switch (token.movementType) {
+    case 'WALK': speed = tokenSpeed.total; break;
+    case 'FLY': {
+      const flySpeed = tokenSpeed.otherSpeeds.find(x => x.type == "fly");
+      if ( typeof flySpeed !== "undefined" ) speed = flySpeed.total;
+      break;
+    }
+    case 'BURROW': {
+      const burrowSpeed = tokenSpeed.otherSpeeds.find(x => x.type == "burrow");
+      if ( typeof burrowSpeed !== "undefined" ) speed = burrowSpeed.total;
+      break;
+    }
+  };
+  if (speed === null) return null;
+  return Number(speed);
+}
+
 const SPECIALIZED_TOKEN_SPEED = {
-  sfrpg: sfrpgTokenSpeed
+  sfrpg: sfrpgTokenSpeed,
+  pf2e: pf2eTokenSpeed
 };
 
 // ----- Specialized category distances by system ----- //
@@ -281,13 +349,83 @@ function wfrp4eCategoryDistance(token, speedCategory, tokenSpeed) {
   return tokenSpeed;
 }
 
+/**
+ * Pathfinder 2e (pf2e)
+ * See https://github.com/7H3LaughingMan/pf2e-elevation-ruler/blob/main/scripts/module.js
+ * Speed is based on action count in pf2e.
+ * @param {Token} token                   Token whose speed should be used
+ * @param {SpeedCategory} speedCategory   Category for which the maximum distance is desired
+ * @param {number} [tokenSpeed]           Optional token speed to avoid repeated lookups
+ * @returns {number}
+ */
+function pf2eCategoryDistance(token, speedCategory, tokenSpeed) {
+  tokenSpeed ??= SPEED.tokenSpeed(token);
+  const actionCount = getActionCount(token);
+  switch (speedCategory.name) {
+    case "Single Action": return ((actionCount >= 1) ? speedCategory.multiplier * tokenSpeed : 0);
+    case "Double Action": return ((actionCount >= 2) ? speedCategory.multiplier * tokenSpeed : 0);
+    case "Triple Action": return ((actionCount >= 3) ? speedCategory.multiplier * tokenSpeed : 0);
+    case "Quadruple Action": return ((actionCount >= 4) ? speedCategory.multiplier * tokenSpeed : 0);
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
 const SPECIALIZED_CATEGORY_DISTANCE = {
   sfrpg: sfrpgCategoryDistance,
-  wfrp4e: wfrp4eCategoryDistance
+  wfrp4e: wfrp4eCategoryDistance,
+  pf2e: pf2eCategoryDistance
 };
 
 
-// ----- Note: Licenses / Credits ----- //
+// ----- NOTE: Helper functions ----- //
+/**
+ * Pathfinder 2e (pf2e)
+ * See https://github.com/7H3LaughingMan/pf2e-elevation-ruler/blob/main/scripts/action.js
+ * Determine how many actions the token has remaining.
+ * @param {Token} token
+ * @returns {number}
+ */
+function getActionCount(token) {
+  // Get the token's actor
+  const actor = token.actor;
+  if ( !actor ) return 0;
+
+  // Check to see if the actor is immobilized, paralyzed, petrified, or unconscious. If so they have 0 actions.
+  if ( actor.hasCondition("immobilized", "paralyzed", "petrified", "unconscious") ) return 0;
+
+  // Determine the actor's maximum number of actions.
+  const maxActions = (actor.traits?.has("minion") ? 2 : 3) + (actor.hasCondition("quickened") ? 1 : 0);
+
+  // Check to see if there is an encounter, if that encounter is active, and if the token is in that encounter
+  if ( game.combat == null
+    || !game.combat.active
+    || (game.combat.turns.find(x => x.tokenId == token.id) == null) ) return maxActions;
+
+  // Check to see if the actor is stunned or slowed, and if so the value
+  const stunned = actor.getCondition("stunned")?.value ?? 0;
+  const slowed = actor.getCondition("slowed")?.value ?? 0;
+
+  // This is for PF2e Workbench, used to store how much stun is auto reduced by
+  // Check to see if PF2e Workbench is active and if Auto Reduce Stunned is enabled
+  let reduction = 0;
+  if ( game.modules.get("xdy-pf2e-workbench")?.active && game.settings.get("xdy-pf2e-workbench", "autoReduceStunned") ) {
+      const stunReduction = actor.getFlag("xdy-pf2e-workbench", "stunReduction");
+
+      // Make sure we actually got something and the combat matches.
+      if ( stunReduction &&  stunReduction.combat == game.combat.id ) {
+        // We are going to check to see if the combatant's last round matches the stun reduction round
+        // Note - A combatant's last round is updated at the start of their turn
+        const combatant = game.combat.turns.find(x => x.tokenId == token.id);
+        if ( combatant && combatant.roundOfLastTurn == stunReduction.round ) reduction = stunReduction.reducedBy;
+      }
+  }
+
+  // Return the token's maximum number of actions minus the greater of their stunned, slowed, or stun reduction.
+  // If it's below 0 we will return 0
+  return Math.max(maxActions - Math.max(stunned, slowed, reduction), 0);
+}
+
+// ----- NOTE: Licenses / Credits ----- //
 
 /* Drag Ruler
 https://github.com/manuelVo/foundryvtt-drag-ruler
@@ -319,6 +457,30 @@ https://github.com/J-Dawe/starfinder-drag-ruler/blob/main/scripts/main.js
 MIT License
 
 Copyright (c) 2021 J-Dawe
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+/* PF2e Elevation Ruler
+MIT License
+
+Copyright (c) 2024 7H3LaughingMan
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

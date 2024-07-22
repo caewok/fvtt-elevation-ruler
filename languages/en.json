@@ -39,6 +39,9 @@
     "elevationruler.settings.enable-token-ruler.name": "Use Token Ruler",
     "elevationruler.settings.enable-token-ruler.hint": "Display the ruler when dragging tokens.",
 
+    "elevationruler.settings.hide-elevation-ruler.name": "Hide Elevation from Ruler",
+    "elevationruler.settings.hide-elevation-ruler.hint": "Hide the Elevation from the Label when using a Ruler.",
+
     "elevationruler.settings.hide-gm-ruler.name": "Hide GM Token Ruler",
     "elevationruler.settings.hide-gm-ruler.hint": "Do not display the GM's token ruler for other non-GM users.",
 
@@ -72,6 +75,9 @@
 
     "elevationruler.settings.token-terrain-multiplier.name": "Token as Terrain Multiplier",
     "elevationruler.settings.token-terrain-multiplier.hint": "Multiplier to use to calculate movement speed when moving through other tokens. Set to 1 to ignore. Values less than 1 treat token spaces as faster than normal; values greater than 1 penalize movement through token spaces.",
+
+    "elevationruler.settings.pathfinding_enable.name": "Use Pathfinding",
+    "elevationruler.settings.pathfinding_enable.hint": "When enabled, adds a pathfinding togglee to the Token controls that will cause the ruler to map a path around walls and tokens, depending on settings. Disable this if pathfinding is causing compatibility issues. Disabling may also result in a small performance increase.",
 
     "elevationruler.settings.pathfinding_tokens_block.name": "Tokens Block",
     "elevationruler.settings.pathfinding_tokens_block.hint": "For pathfinding, do tokens block the path?",

@@ -201,7 +201,13 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
     if ( pastMoveDistance ) combatLabel = `\nPrior: ${pastMoveDistance.toNearest(multiple)}${units}`;
   }
 
-  return `${origLabel}\n${elevLabel}${moveLabel}${combatLabel}`;
+  let label = `${origLabel}`;
+  if ( !Settings.get(Settings.KEYS.HIDE_ELEVATION) ) {
+    label += `\n${elevLabel}`;
+  }
+  label += `${moveLabel}${combatLabel}`;
+
+  return label;
 }
 
 /**
@@ -339,6 +345,7 @@ function highlightLineRectangle(segment, color, name) {
  */
 function elevateSegments(ruler, segments) {  // Add destination as the final waypoint
   const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
+  const Ruler = CONFIG.Canvas.rulerClass;
 
   // Add destination as the final waypoint
   ruler.destination._terrainElevation = Ruler.terrainElevationAtLocation(ruler.destination);

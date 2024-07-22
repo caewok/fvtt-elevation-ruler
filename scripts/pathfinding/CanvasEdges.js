@@ -23,26 +23,7 @@ PATCHES.PATHFINDING = {};
  * Set up the SCENE GRAPH with all wall edges.
  */
 function initializeEdges() {
-  const t0 = performance.now();
-  SCENE_GRAPH.clear();
-  let numWalls = 0;
-  for ( const edge of canvas.edges.values() ) {
-    if ( edge.object instanceof Wall ) {
-      SCENE_GRAPH.addWall(edge.object);
-      numWalls += 1;
-    } else if ( edge.type === "outerBounds"
-             || edge.type === "innerBounds" ) SCENE_GRAPH.addCanvasEdge(edge);
-  }
-
-  Settings.setTokenBlocksPathfinding();
-  const t1 = performance.now();
-
-  // Use the scene graph to initialize Pathfinder triangulation.
-  Pathfinder.initialize();
-  const t2 = performance.now();
-
-  console.debug(`${MODULE_ID}|Tracked ${numWalls} walls in ${t1 - t0} ms.`);
-  console.debug(`${MODULE_ID}|Initialized pathfinding in ${t2 - t1} ms.`);
+  Settings.togglePathfinding();
 }
 
 PATCHES.PATHFINDING.HOOKS = { initializeEdges };

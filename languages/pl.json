@@ -98,5 +98,7 @@
     "elevationruler.controls.pathfinding-control.name": "Użyj wyszukiwania ścieżek",
 
     "elevationruler.drawingconfig.movementPenalty.name": "Premia/kara za ruch",
-    "elevationruler.drawingconfig.movementPenalty.hint": "Wartość 1 oznacza brak kary. Wartości większe niż jeden powodują karę za ruch o ten procent; wartości mniejsze niż jeden zapewniają premię do ruchu. Na przykład, ustawienie wartości 2 podwaja ruch na tym obszarze."
+    "elevationruler.drawingconfig.movementPenalty.hint": "Wartość 1 oznacza brak kary. Wartości większe niż jeden powodują karę za ruch o ten procent; wartości mniejsze niż jeden zapewniają premię do ruchu. Na przykład, ustawienie wartości 2 podwaja ruch na tym obszarze.",
+
+    "elevationruler.clearMovement": "Wyczyść ruch bojowy"
 }

@@ -31,15 +31,16 @@ const PATCHES = {
   CombatTracker: PATCHES_CombatTracker,
   ["foundry.canvas.edges.CanvasEdges"]: PATCHES_CanvasEdges,
   DrawingConfig: PATCHES_DrawingConfig,
-  Ruler: PATCHES_Ruler,
+  ["CONFIG.Canvas.rulerClass"]: PATCHES_Ruler,
   Token: mergeObject(mergeObject(PATCHES_Token, PATCHES_TokenPF), PATCHES_TokenHUD),
   Wall: PATCHES_Wall
 };
 
 export const PATCHER = new Patcher();
-PATCHER.addPatchesFromRegistrationObject(PATCHES);
+
 
 export function initializePatching() {
+  PATCHER.addPatchesFromRegistrationObject(PATCHES);
   PATCHER.registerGroup("BASIC");
   PATCHER.registerGroup("PATHFINDING");
   PATCHER.registerGroup("TOKEN_RULER");

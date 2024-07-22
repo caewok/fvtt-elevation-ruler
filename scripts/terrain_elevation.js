@@ -75,7 +75,7 @@ export function userElevationChangeAtWaypoint(waypoint) {
  * @param {Point} waypoint
  * @returns {number} Elevation in grid units
  */
-export function groundElevationAtWaypoint(waypoint) { return waypoint._terrainElevation ?? (waypoint._terrainElevation = Ruler.terrainElevationAtLocation(waypoint)); }
+export function groundElevationAtWaypoint(waypoint) { return waypoint._terrainElevation ?? (waypoint._terrainElevation = CONFIG.Canvas.rulerClass.terrainElevationAtLocation(waypoint)); }
 
 /**
  * Add getter Ruler.prototype.originElevation
