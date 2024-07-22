@@ -499,11 +499,12 @@ export class WallTracer extends Graph {
    * @param {GraphEdge} edge
    */
   deleteEdge(edge) {
+    if ( !this.edges.has(edge.key) ) return;
+    super.deleteEdge(edge);
     this.edgesQuadtree.remove(edge);
 
-    // Track the edge objects.
+    // Stop tracking the edge objects.
     edge.objects.forEach(obj => this._removeEdgeFromObjectSet(obj.id, edge));
-    super.deleteEdge(edge);
   }
 
   /**
@@ -524,12 +525,18 @@ export class WallTracer extends Graph {
    */
   _removeEdgeFromObjectSet(id, edge) {
     const edgeSet = this.objectEdges.get(id);
-    // Debug: if ( edgeSet ) edgeSet.delete(edge);
-    if ( !edgeSet ) {
-      console.warn("_removeEdgeFromObjectSet|edgeSet undefined");
-      return;
-    }
+    if ( !edgeSet ) return;
+
+    // Stop tracking this edge.
     edgeSet.delete(edge);
+    const obj = [...edge.objects].find(obj => obj.id === id);
+    edge.objects.delete(obj); // Delink the object from the edge.
+
+    // If the object has no edges remaining, stop tracking the object.
+    if ( !edgeSet.size ) this.objectEdges.delete(id);
+
+    // If this edge has no associated objects, delete the edge.
+    if ( !edge.objects.size ) this.deleteEdge(edge);
   }
 
   /**
@@ -701,29 +708,14 @@ export class WallTracer extends Graph {
    * @param {Map<string, Set<TokenTracerEdge>>} Map of edges to remove from
    */
   removeObject(id, _recurse = true) {
-    const edges = this.objectEdges.get(id);
-    if ( !edges || !edges.size ) return;
-
-    // Shallow copy the edges b/c they will be removed from the set with destroy.
-    const edgesArr = [...edges];
-    for ( const edge of edgesArr ) {
-      // Remove any object with this id; if no objects left for the edge, remove the edge.
-      edge.objects
-        .filter(obj => obj.id === id)
-        .forEach(obj => {
-          edge.objects.delete(obj);
-          this._removeEdgeFromObjectSet(id, edge);
-        });
-      // Works but not clear why edges sometimes exist but are not in the edge set.
-      // Removing the test for if the edge is in the edges set results in occasional warnings.
-      if ( !edge.objects.size && this.edges.has(edge.key) ) this.deleteEdge(edge);
-    }
-    this.objectEdges.delete(id);
+    const edges = [...this.objectEdges.get(id)]; // Shallow copy the edges b/c they will be removed from the set.
+    if ( !edges.length ) return;
+    edges.forEach(edge => this._removeEdgeFromObjectSet(id, edge));
 
     // For each remaining object in the object set, remove it temporarily and re-add it.
     // This will remove unnecessary vertices and recombine edges.
     if ( _recurse ) {
-      const remainingObjects = edgesArr.reduce((acc, curr) => acc = acc.union(curr.objects), new Set());
+      const remainingObjects = edges.reduce((acc, curr) => acc = acc.union(curr.objects), new Set());
       remainingObjects.forEach(obj => obj instanceof Wall
         ? this.removeWall(obj.id, false) : this.removeToken(obj.id, false));
       remainingObjects.forEach(obj => obj instanceof Wall
@@ -737,6 +729,7 @@ export class WallTracer extends Graph {
    */
   removeWall(wallId, _recurse = true) {
     if ( wallId instanceof Wall ) wallId = wallId.id;
+    if ( !this.wallIds.has(wallId) ) return;
     this.wallIds.delete(wallId);
     return this.removeObject(wallId, _recurse);
   }
@@ -747,6 +740,7 @@ export class WallTracer extends Graph {
    */
   removeToken(tokenId, _recurse = true) {
     if ( tokenId instanceof Token ) tokenId = tokenId.id;
+    if ( !this.tokenIds.has(tokenId) ) return;
     this.tokenIds.delete(tokenId);
     return this.removeObject(tokenId, _recurse);
   }
@@ -757,6 +751,7 @@ export class WallTracer extends Graph {
    */
   removeCanvasEdge(edgeId, _recurse = true) {
     if ( edgeId instanceof foundry.canvas.edges.Edge ) edgeId = edgeId.id;
+    if ( !this.canvasEdgeIds.has(edgeId) ) return;
     this.canvasEdgeIds.delete(edgeId);
     return this.removeObject(edgeId, _recurse);
   }
