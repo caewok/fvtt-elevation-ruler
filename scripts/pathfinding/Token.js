@@ -6,6 +6,7 @@
 import { SCENE_GRAPH } from "./WallTracer.js";
 import { Pathfinder } from "./pathfinding.js";
 import { log } from "../util.js";
+import { MODULE_ID } from "../const.js";
 
 // Track wall creation, update, and deletion, constructing WallTracerEdges as we go.
 // Use to update the pathfinding triangulation.
@@ -22,6 +23,46 @@ PATCHES.PATHFINDING_TOKENS = {};
 function createToken(document, _options, _userId) {
   SCENE_GRAPH.addToken(document.object);
   Pathfinder.dirty = true;
+  if ( CONFIG[MODULE_ID].debug ) {
+    const res = SCENE_GRAPH._checkInternalConsistency();
+    if ( !res.allConsistent ) console.warn(`WallTracer|createToken ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+  }
+}
+
+/**
+ * Hook update token to update the scene graph and triangulation.
+ * @param {Document} document                       The existing Document which was updated
+ * @param {object} changed                          Differential data that was used to update the document
+ * @param {Partial<DatabaseUpdateOperation>} options Additional options which modified the update request
+ * @param {string} userId                           The ID of the User who triggered the update workflow
+ */
+function updateToken(document, changed, options, userId) {
+  if ( !(Object.hasOwn(changed, "x")
+      || Object.hasOwn(changed, "y")
+      || Object.hasOwn(changed, "elevation")
+      || Object.hasOwn(changed, "width")
+      || Object.hasOwn(changed, "height")) ) return;
+
+  // Token document source may not match token document b/c of token movement.
+  // Temporarily change to match.
+  const { x, y, elevation } = document;
+  document.x = document._source.x;
+  document.y = document._source.y;
+  document.elevation = document._source.elevation;
+
+  // Easiest approach is to trash the edges for the token and re-create them.
+  SCENE_GRAPH.removeToken(document.id);
+  SCENE_GRAPH.addToken(document.object);
+  Pathfinder.dirty = true;
+  if ( CONFIG[MODULE_ID].debug ) {
+    const res = SCENE_GRAPH._checkInternalConsistency();
+    if ( !res.allConsistent ) console.warn(`WallTracer|updateToken ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+  }
+
+  // Restore original token doc values.
+  document.x = x;
+  document.y = y;
+  document.elevation = elevation;
 }
 
 /**
@@ -37,19 +78,19 @@ function refreshToken(object, flags) {
   // Easiest approach is to trash the edges for the wall and re-create them.
   SCENE_GRAPH.removeToken(object.id);
 
-  /* Debugging: None of the edges should have this token.
+  // Debugging: None of the edges should have this token.
   if ( CONFIG[MODULE_ID].debug ) {
     const token = document.object;
     SCENE_GRAPH.edges.forEach((edge, key) => {
       if ( edge.objects.has(token) ) console.debug(`Edge ${key} has ${token.name} ${token.id} after deletion.`);
     })
   }
-  */
-
   SCENE_GRAPH.addToken(object);
-
-  // Need to re-do the triangulation because the change to the wall could have added edges if intersected.
   Pathfinder.dirty = true;
+  if ( CONFIG[MODULE_ID].debug ) {
+    const res = SCENE_GRAPH._checkInternalConsistency();
+    if ( !res.allConsistent ) console.warn(`WallTracer|refreshToken ${object.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+  }
 }
 
 /**
@@ -61,6 +102,10 @@ function refreshToken(object, flags) {
 function deleteToken(document, _options, _userId) {
   SCENE_GRAPH.removeToken(document.id); // The document.object is now null; use the id to remove the wall.
   Pathfinder.dirty = true;
+  if ( CONFIG[MODULE_ID].debug ) {
+    const res = SCENE_GRAPH._checkInternalConsistency();
+    if ( !res.allConsistent ) console.warn(`WallTracer|deleteToken ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+  }
 }
 
-PATCHES.PATHFINDING_TOKENS.HOOKS = { createToken, deleteToken, refreshToken };
+PATCHES.PATHFINDING_TOKENS.HOOKS = { createToken, updateToken, deleteToken, /*refreshToken*/ };

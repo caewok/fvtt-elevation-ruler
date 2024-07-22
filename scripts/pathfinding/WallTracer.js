@@ -1,4 +1,5 @@
 /* globals
+canvas,
 CanvasQuadtree,
 CONFIG,
 CONST,
@@ -790,6 +791,152 @@ export class WallTracer extends Graph {
             : Draw.COLORS.blue;
       edge.draw({ color });
     }
+  }
+
+  /**
+   * For debugging.
+   * Is the graph internally consistent?
+   * @returns {object}
+   */
+  _checkInternalConsistency() {
+    const objectIds = new Set([...this.canvasEdgeIds, ...this.tokenIds, ...this.wallIds]);
+    const quadtreeEdges = new Set(this.edgesQuadtree.all.map(node => node.t));
+    const out = {};
+    out.badEdges = new Set();
+
+    out.edgesDistinctVertices = true;
+    out.edgesVerticesInSet = true;
+    out.edgesInQuadtree = true;
+    out.edgesObjectsValid = true;
+    for ( const edge of this.edges.values() ) {
+      // Each edge has two distinct vertices
+      const v0 = edge.A;
+      const v1 = edge.B;
+      const distinctVertices = v0.key !== v1.key;
+
+      // Each edge has vertices contained in the vertex set.
+      const verticesInSet = this.vertices.has(v0.key) && this.vertices.has(v1.key);
+
+      // Each edge is in the quadtree.
+      const inQuadtree = quadtreeEdges.has(edge);
+
+      // Each edge object is in one of three object sets
+      const objectsValid = edge.objects.every(obj => objectIds.has(obj.id));
+
+      // Track inconsistencies.
+      if ( !(distinctVertices && verticesInSet && inQuadtree && objectsValid) ) out.badEdges.add(edge);
+      out.edgesDistinctVertices &&= distinctVertices;
+      out.edgesVerticesInSet &&= verticesInSet;
+      out.edgesInQuadtree &&= inQuadtree;
+      out.edgesObjectsValid &&= objectsValid;
+    }
+
+    // Each vertex has edges contained in the edge set.
+    out.badVertices = new Set([...this.vertices.values().filter(vertex => vertex.edges.every(edge => !this.edges.has(edge.key)))]);
+
+    // Quadtree has edges contained in the edge set.
+    out.badQuadtreeEdges = new Set([...quadtreeEdges.values().filter(edge => !this.edges.has(edge.key))]);
+
+    // Each object has a key in the objectEdges
+    out.badObjects = new Set([...objectIds.values().filter(id => !this.objectEdges.has(id))]);
+
+    // Each objectEdges key is in one of the three object sets
+    out.badObjectEdges = new Set([...this.objectEdges.keys().filter(key => !objectIds.has(key))]);
+
+    out.allConsistent = out.edgesDistinctVertices
+      && out.edgesVerticesInSet
+      && out.edgesInQuadtree
+      && out.edgesObjectsValid
+      && !out.badVertices.size
+      && !out.badQuadtreeEdges.size
+      && !out.badObjects.size
+      && !out.badObjectEdges.size;
+    return out;
+  }
+
+
+  /**
+   * Construct a new graph based on the current scene.
+   * @returns {WallTracer}
+   */
+  static fromCurrentScene() {
+    const modelGraph = new this();
+    for ( const edge of canvas.edges.values() ) {
+      if ( edge.object instanceof Wall ) modelGraph.addWall(edge.object);
+      else if ( edge.type === "outerBounds"
+             || edge.type === "innerBounds" ) modelGraph.addCanvasEdge(edge);
+    }
+    canvas.tokens.placeables.forEach(token => modelGraph.addToken(token));
+    return modelGraph;
+  }
+
+  /**
+   * For debugging.
+   * Test for inconsistencies by constructing the graph from scratch.
+   * Should be equivalent to the current graph for the scene.
+   * Won't work if the token is animating or document ≠ source.
+   * @returns {object} Newly constructed graph and list of inconsistencies.
+   */
+ _checkGraphSceneConsistency() {
+    const thisGraph = this;
+    const modelGraph = thisGraph.constructor.fromCurrentScene();
+
+    // Confirm objects are consistent and report back inconsistencies.
+    const consistencyChecks = {};
+    consistencyChecks.edgesQuadtree = {};
+    consistencyChecks.edgesQuadtree.exists = Object.hasOwn(thisGraph, "edgesQuadtree");
+    consistencyChecks.edgesQuadtree.equalSize = modelGraph.edgesQuadtree.nodes.length === thisGraph.edgesQuadtree.nodes.length;
+
+    consistencyChecks.canvasEdgeIds = {};
+    consistencyChecks.canvasEdgeIds.exists = Object.hasOwn(thisGraph, "canvasEdgeIds");
+    consistencyChecks.canvasEdgeIds.equalSize = thisGraph.canvasEdgeIds.size === modelGraph.canvasEdgeIds.size;
+    consistencyChecks.canvasEdgeIds.identical = thisGraph.canvasEdgeIds.equals(modelGraph.canvasEdgeIds);
+
+    consistencyChecks.tokenIds = {};
+    consistencyChecks.tokenIds.exists = Object.hasOwn(thisGraph, "tokenIds");
+    consistencyChecks.tokenIds.equalSize = thisGraph.tokenIds.size === modelGraph.tokenIds.size;
+    consistencyChecks.tokenIds.identical = thisGraph.tokenIds.equals(modelGraph.tokenIds);
+
+    consistencyChecks.wallIds = {};
+    consistencyChecks.wallIds.exists = Object.hasOwn(thisGraph, "wallIds");
+    consistencyChecks.wallIds.equalSize = thisGraph.wallIds.size === modelGraph.wallIds.size;
+    consistencyChecks.wallIds.identical = thisGraph.wallIds.equals(modelGraph.wallIds);
+
+    consistencyChecks.edges = {};
+    consistencyChecks.edges.exists = Object.hasOwn(thisGraph, "edges");
+    consistencyChecks.edges.equalSize = thisGraph.edges.size === modelGraph.edges.size;
+    consistencyChecks.edges.keysEqual = thisGraph.edges.keys().every(key => modelGraph.edges.has(key));
+    // consistencyChecks.edges.valuesEqual = thisGraph.edges.keys().every(key => thisGraph.edges.get(key) === modelGraph.edges.get(key));
+
+    consistencyChecks.objectEdges = {};
+    consistencyChecks.objectEdges.exists = Object.hasOwn(thisGraph, "objectEdges");
+    consistencyChecks.objectEdges.equalSize = thisGraph.objectEdges.size === modelGraph.objectEdges.size;
+    consistencyChecks.objectEdges.keysEqual = thisGraph.objectEdges.keys().every(key => modelGraph.objectEdges.has(key));
+    // consistencyChecks.objectEdges.valuesEqual = thisGraph.objectEdges.keys().every(key => thisGraph.objectEdges.get(key) === modelGraph.objectEdges.get(key));
+
+    consistencyChecks.vertices = {};
+    consistencyChecks.vertices.exists = Object.hasOwn(thisGraph, "vertices");
+    consistencyChecks.vertices.equalSize = thisGraph.vertices.size === modelGraph.vertices.size;
+    consistencyChecks.vertices.keysEqual = thisGraph.vertices.keys().every(key => modelGraph.vertices.has(key));
+    // consistencyChecks.vertices.valuesEqual = thisGraph.vertices.keys().every(key => thisGraph.vertices.get(key) === modelGraph.vertices.get(key));
+
+
+    // Do we have all the tokens?
+    consistencyChecks.allSceneTokens = canvas.tokens.placeables.filter(t => !SCENE_GRAPH.tokenIds.has(t.id)).length === 0;
+
+    // do we have all the walls?
+    consistencyChecks.allWalls = canvas.walls.placeables.filter(w => !SCENE_GRAPH.wallIds.has(w.id)).length === 0;
+
+    // Every object edge id should be in one of the three sets and vice versa.
+    const objectEdgeKeys = new Set(SCENE_GRAPH.objectEdges.keys())
+    SCENE_GRAPH.canvasEdgeIds.difference(objectEdgeKeys).size
+    SCENE_GRAPH.tokenIds.difference(objectEdgeKeys).size
+    SCENE_GRAPH.wallIds.difference(objectEdgeKeys).size
+    consistencyChecks.ids = objectEdgeKeys.equals(SCENE_GRAPH.canvasEdgeIds.union(SCENE_GRAPH.tokenIds).union(SCENE_GRAPH.wallIds));
+
+    const allConsistent = Object.values(consistencyChecks).every(category => Object.values(category).every(check => check === true))
+
+    return { modelGraph, consistencyChecks, allConsistent };
   }
 }
 

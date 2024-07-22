@@ -22,6 +22,10 @@ PATCHES.PATHFINDING = {};
 function createWall(document, _options, _userId) {
   SCENE_GRAPH.addWall(document.object);
   Pathfinder.dirty = true;
+  if ( CONFIG[MODULE_ID].debug ) {
+    const res = SCENE_GRAPH._checkInternalConsistency();
+    if ( !res.allConsistent ) console.warn(`WallTracer|createWall ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+  }
 }
 
 /**
@@ -38,9 +42,11 @@ function updateWall(document, changes, _options, _userId) {
   // Easiest approach is to trash the edges for the wall and re-create them.
   SCENE_GRAPH.removeWall(document.id);
   SCENE_GRAPH.addWall(document.object);
-
-  // Need to re-do the triangulation because the change to the wall could have added edges if intersected.
   Pathfinder.dirty = true;
+  if ( CONFIG[MODULE_ID].debug ) {
+    const res = SCENE_GRAPH._checkInternalConsistency();
+    if ( !res.allConsistent ) console.warn(`WallTracer|updateWall ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+  }
 }
 
 /**
@@ -52,6 +58,10 @@ function updateWall(document, changes, _options, _userId) {
 function deleteWall(document, _options, _userId) {
   SCENE_GRAPH.removeWall(document.id); // The document.object is now null; use the id to remove the wall.
   Pathfinder.dirty = true;
+  if ( CONFIG[MODULE_ID].debug ) {
+    const res = SCENE_GRAPH._checkInternalConsistency();
+    if ( !res.allConsistent ) console.warn(`WallTracer|deleteWall ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+  }
 }
 
 PATCHES.PATHFINDING.HOOKS = { createWall, updateWall, deleteWall };
