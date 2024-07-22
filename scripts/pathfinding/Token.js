@@ -66,34 +66,6 @@ function updateToken(document, changed, options, userId) {
 }
 
 /**
- * Hook refresh token to update the scene graph and triangulation.
- * Cannot use updateToken hook b/c the token position is not correctly updated by that point.
- * @param {PlaceableObject} object    The object instance being refreshed
- */
-function refreshToken(object, flags) {
-  if ( !flags.refreshPosition || object.isPreview ) return;
-
-  log(`refreshToken hook|original token moved.`);
-
-  // Easiest approach is to trash the edges for the wall and re-create them.
-  SCENE_GRAPH.removeToken(object.id);
-
-  // Debugging: None of the edges should have this token.
-  if ( CONFIG[MODULE_ID].debug ) {
-    const token = document.object;
-    SCENE_GRAPH.edges.forEach((edge, key) => {
-      if ( edge.objects.has(token) ) console.debug(`Edge ${key} has ${token.name} ${token.id} after deletion.`);
-    })
-  }
-  SCENE_GRAPH.addToken(object);
-  Pathfinder.dirty = true;
-  if ( CONFIG[MODULE_ID].debug ) {
-    const res = SCENE_GRAPH._checkInternalConsistency();
-    if ( !res.allConsistent ) console.warn(`WallTracer|refreshToken ${object.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
-  }
-}
-
-/**
  * Hook deleteToken to update the scene graph and triangulation.
  * @param {Document} document                       The existing Document which was deleted
  * @param {DocumentModificationContext} options     Additional options which modified the deletion request
@@ -108,4 +80,4 @@ function deleteToken(document, _options, _userId) {
   }
 }
 
-PATCHES.PATHFINDING_TOKENS.HOOKS = { createToken, updateToken, deleteToken, /*refreshToken*/ };
+PATCHES.PATHFINDING_TOKENS.HOOKS = { createToken, updateToken, deleteToken };
