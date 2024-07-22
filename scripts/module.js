@@ -234,7 +234,7 @@ Hooks.on("renderSceneControls", async function(controls, _html, _data) {
   if ( toggle ) await Settings.set(Settings.KEYS.CONTROLS.PATHFINDING, toggle.active);
 });
 
-function updatePathfindingControl(enable) {
+export function updatePathfindingControl(enable) {
   if ( !Settings.get(Settings.KEYS.PATHFINDING.ENABLE) ) return;
   enable ??= Settings.get(Settings.KEYS.CONTROLS.PATHFINDING);
   const tokenTools = ui.controls.controls.find(c => c.name === "token");
