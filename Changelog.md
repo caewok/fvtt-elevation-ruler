@@ -1,8 +1,14 @@
 # 0.9.10
-Fix for "log not defined" error on load.
-Merge PR from @SyraLessThanThree to hide elevation display in ruler.
+Fix for "log not defined" error on load. Closes #150.
+Merge PR from @SyraLessThanThree to hide elevation display in ruler. Thanks!
 Italian, Spanish, and Polish language updates. Thanks @GregoryWarn, @Kharmans, and @Lioheart!
 Update readme re Das Schwarze Auge 5 (The Dark Eye 5) support. Thanks @Rapunzel77!
+Addressed issues with the pathfinding scene graph not correctly updating on token movement. Switched to using token update instead of token refresh hook, which may improve performance during token animations. Added some internal consistency checks to the scene graph and the ability to rebuild the graph if errors are found. May address #137 and #101.
+Patching and using the Ruler class now uses `CONFIG.Canvas.rulerClass`. Addresses issues with using the ruler in pf2e and possibly other systems that extend the Ruler class. Closes #147.
+
+## New Features
+Added pf2e token speed handling, from the archived PF2E Elevation Ruler module. Thanks @7H3LaughingMan! Closes #136.
+Added toggle to disable pathfinding entirely. Closes #151.
 
 # 0.9.9
 Moved token movement history to a flag, which now takes advantage of the Foundry undo system so that when undoing token movement during combat, the token's movement history is reset accordingly.
