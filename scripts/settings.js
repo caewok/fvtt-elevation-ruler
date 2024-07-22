@@ -426,6 +426,7 @@ export class Settings extends ModuleSettingsAbstract {
     if ( enable ) this.#enablePathfinding();
     else this.#disablePathfinding();
     updatePathfindingControl();
+    ui.controls.render(true);
   }
 
   static #enablePathfinding() {
