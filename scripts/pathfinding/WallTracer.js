@@ -866,7 +866,8 @@ export class WallTracer extends Graph {
       else if ( edge.type === "outerBounds"
              || edge.type === "innerBounds" ) modelGraph.addCanvasEdge(edge);
     }
-    canvas.tokens.placeables.forEach(token => modelGraph.addToken(token));
+
+    if ( Settings.useTokensInPathfinding ) canvas.tokens.placeables.forEach(token => modelGraph.addToken(token));
     return modelGraph;
   }
 
