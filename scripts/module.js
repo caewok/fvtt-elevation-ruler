@@ -216,7 +216,7 @@ const PATHFINDING_CONTROL = {
 // Render the pathfinding control.
 // Render the prefer token control if that setting is enabled.
 Hooks.on("getSceneControlButtons", controls => {
-  if ( !canvas.scene ) return;
+  if ( !canvas.scene || !Settings.get(Settings.KEYS.PATHFINDING.ENABLE) ) return;
   const tokenTools = controls.find(c => c.name === "token");
   tokenTools.tools.push(PATHFINDING_CONTROL);
 });
@@ -234,7 +234,8 @@ Hooks.on("renderSceneControls", async function(controls, _html, _data) {
   if ( toggle ) await Settings.set(Settings.KEYS.CONTROLS.PATHFINDING, toggle.active);
 });
 
-function updatePathfindingControl(enable) {
+export function updatePathfindingControl(enable) {
+  if ( !Settings.get(Settings.KEYS.PATHFINDING.ENABLE) ) return;
   enable ??= Settings.get(Settings.KEYS.CONTROLS.PATHFINDING);
   const tokenTools = ui.controls.controls.find(c => c.name === "token");
   const index = tokenTools.tools.findIndex(b => b.name === Settings.KEYS.CONTROLS.PATHFINDING);
