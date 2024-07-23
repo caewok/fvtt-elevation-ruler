@@ -481,11 +481,12 @@ export class WallTracer extends Graph {
   /**
    * When adding an edge, make sure to add to quadtree.
    * @param {GraphEdge} edge
-   * @returns {GraphEdge}
+   * @returns {GraphEdge|null}
    * @inherited
    */
   addEdge(edge) {
     if ( this.edges.has(edge.key) ) return this.edges.get(edge.key);
+    if ( edge.A.key === edge.B.key ) return null;
 
     edge = super.addEdge(edge);
     this.edgesQuadtree.insert({ r: edge.bounds, t: edge });
@@ -514,6 +515,7 @@ export class WallTracer extends Graph {
    * @param {WallTracerEdge} edge   Edge to add
    */
   _addEdgeToObjectSet(id, edge) {
+    if ( edge.A.key === edge.B.key ) return null;
     if ( !this.objectEdges.get(id) ) this.objectEdges.set(id, new Set());
     const edgeSet = this.objectEdges.get(id);
     edgeSet.add(edge);

@@ -579,7 +579,7 @@ export function fogIsExploredFn() {
   const tex = canvas.fog.exploration?.getTexture();
   if ( !tex || !tex.valid ) return undefined;
 
-  const { width, height } = canvas.effects.visibility.textureConfiguration;
+  const { width, height } = canvas.visibility.textureConfiguration;
   const cache = CONFIG.GeometryLib.PixelCache.fromTexture(tex, { width, height });
   return (x, y) => cache.pixelAtCanvas(x, y) > 128;
 }

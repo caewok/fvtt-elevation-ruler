@@ -14,6 +14,7 @@ import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
 import { PATCHER } from "./patching.js";
 import { BorderEdge } from "./pathfinding/BorderTriangle.js";
+import { updatePathfindingControl } from "./module.js";
 
 const SETTINGS = {
   CONTROLS: {
@@ -424,6 +425,8 @@ export class Settings extends ModuleSettingsAbstract {
     enable ??= Settings.get(Settings.KEYS.PATHFINDING.ENABLE);
     if ( enable ) this.#enablePathfinding();
     else this.#disablePathfinding();
+    updatePathfindingControl();
+    ui.controls.render(true);
   }
 
   static #enablePathfinding() {
