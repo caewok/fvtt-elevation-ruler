@@ -34,7 +34,7 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
   // Variables changed in the loop
   let totalCombatMoveDistance = 0;
   let minDistance = 0;
-  let numPrevDiagonal = 0;
+  let numPrevDiagonal = game.combat?.started ? (token?._combatMoveData?.numDiagonal ?? 0) : 0;
 
   // Precalculate the token speed.
   const tokenSpeed = SPEED.tokenSpeed(token);
@@ -79,12 +79,22 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
         if ( newDistance > maxDistance ) {
           // Split the segment, inserting the latter portion in the queue for future iteration.
           const splitDistance = maxDistance - totalCombatMoveDistance;
-          const breakpoint = locateSegmentBreakpoint(segment, splitDistance, token, gridless);
+          const breakpoint = locateSegmentBreakpoint(segment, splitDistance, { token, gridless, numPrevDiagonal });
           if ( breakpoint ) {
-            const segments = _splitSegmentAt(segment, breakpoint);
-            unprocessed.push(segments[1]);
-            segment = segments[0];
-            newPrevDiagonal = measureSegment(segment, token, numPrevDiagonal);
+            if ( breakpoint.almostEqual(segment.ray.A) ) {
+              // Switch to next category.
+              minDistance = maxDistance;
+              unprocessed.push(segment);
+              continue;
+            } else if ( breakpoint.almostEqual(segment.ray.B) ) {
+              // Do nothing.
+            } else {
+              // Split the segment
+              const segments = _splitSegmentAt(segment, breakpoint);
+              unprocessed.push(segments[1]);
+              segment = segments[0];
+              newPrevDiagonal = measureSegment(segment, token, numPrevDiagonal);
+            }
           }
         }
 
@@ -113,25 +123,25 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
  *   If the incrementalMoveDistance is greater than segment move distance, returns null
  *   Otherwise returns the point at which to break the segment.
  */
-function locateSegmentBreakpoint(segment, splitMoveDistance, token, gridless) {
+function locateSegmentBreakpoint(segment, splitMoveDistance, { token, gridless, numPrevDiagonal } = {}) {
   if ( splitMoveDistance <= 0 ) return null;
   if ( !segment.moveDistance || splitMoveDistance > segment.moveDistance ) return null;
 
   // Attempt to move the split distance and determine the split location.
   const { A, B } = segment.ray;
   const res = CONFIG.Canvas.rulerClass.measureMoveDistance(A, B,
-    { token, gridless, useAllElevation: false, stopTarget: splitMoveDistance });
+    { token, gridless, useAllElevation: false, stopTarget: splitMoveDistance, numPrevDiagonal });
 
   let breakpoint = pointFromGridCoordinates(res.endGridCoords); // We can get the exact split point.
   if ( !gridless ) {
     // We can get the end grid.
     // Use halfway between the intersection points for this grid shape.
     breakpoint = Point3d.fromObject(segmentGridHalfIntersection(breakpoint, A, B) ?? A);
-    if ( breakpoint === A ) breakpoint.z = A.z;
+    if ( breakpoint.equals(A) ) breakpoint.z = A.z;
     else breakpoint.z = canvasElevationFromCoordinates(res.endGridCoords);
   }
 
-  if ( breakpoint.almostEqual(B) || breakpoint.almostEqual(A) ) return null;
+  // if ( breakpoint.almostEqual(B) || breakpoint.almostEqual(A) ) return null;
   return breakpoint;
 }
 

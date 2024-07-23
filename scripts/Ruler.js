@@ -95,6 +95,7 @@ function _getMeasurementData(wrapper) {
 
   myObj.totalDistance = this.totalDistance;
   myObj.totalMoveDistance = this.totalMoveDistance;
+  myObj.totalDiagonals = this.totalDiagonals;
   myObj._isTokenRuler = this._isTokenRuler;
   return obj;
 }
@@ -126,6 +127,7 @@ function update(wrapper, data) {
   // Add the calculated distance totals.
   this.totalDistance = myData.totalDistance;
   this.totalMoveDistance = myData.totalMoveDistance;
+  this.totalDiagonals = myData.totalDiagonals;
 
   wrapper(data);
 
@@ -323,7 +325,8 @@ function _computeSegmentDistances() {
   // Loop over each segment in turn, adding the physical distance and the move distance.
   let totalDistance = 0;
   let totalMoveDistance = 0;
-  let numPrevDiagonal = 0;
+  let totalDiagonals = 0;
+  let numPrevDiagonal = game.combat?.started ? (this.token?._combatMoveData?.numDiagonal ?? 0) : 0;
 
   if ( this.segments.length ) {
     this.segments[0].first = true;
@@ -333,10 +336,12 @@ function _computeSegmentDistances() {
     numPrevDiagonal = measureSegment(segment, token, numPrevDiagonal);
     totalDistance += segment.distance;
     totalMoveDistance += segment.moveDistance;
+    totalDiagonals = numPrevDiagonal; // Already summed in measureSegment.
   }
 
   this.totalDistance = totalDistance;
   this.totalMoveDistance = totalMoveDistance;
+  this.totalDiagonals = totalDiagonals;
 }
 
 /**

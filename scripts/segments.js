@@ -180,6 +180,7 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
   if ( levelName ) elevLabel += `\n${levelName}`;
 
   if ( CONFIG[MODULE_ID].debug ) {
+    if ( totalDistance >= 15 ) { console.debug("_getSegmentLabel: 15", segment, this); }
     if ( totalDistance > 30 ) { console.debug("_getSegmentLabel: 30", segment, this); }
     else if ( totalDistance > 60 ) { console.debug("_getSegmentLabel: 30", segment, this); }
   }
