@@ -1,6 +1,7 @@
 /* globals
 canvas,
 CanvasAnimation,
+CONFIG,
 foundry,
 game,
 Ruler
@@ -10,6 +11,7 @@ Ruler
 import { MODULE_ID, FLAGS } from "./const.js";
 import { Settings } from "./settings.js";
 import { log } from "./util.js";
+import { MoveDistance } from "./MoveDistance.js";
 
 // Patches for the Token class
 export const PATCHES = {};
@@ -38,19 +40,30 @@ function preUpdateToken(document, changes, _options, _userId) {
   // Store the move data in a token flag so it survives reloads and can be updated on control-z undo by another user.
   // First determine the current move data.
   let lastMoveDistance = 0;
+  let numDiagonal = 0;
   let combatMoveData = {};
   const ruler = canvas.controls.ruler;
-  if ( ruler.active && ruler.token === token ) lastMoveDistance = ruler.totalMoveDistance;
-  else lastMoveDistance = CONFIG.Canvas.rulerClass.measureMoveDistance(token.position, token.document._source, { token }).moveDistance;
+  if ( ruler.active && ruler.token === token ) {
+    lastMoveDistance = ruler.totalMoveDistance;
+    numDiagonal = ruler.totalDiagonals;
+  } else {
+    const numPrevDiagonal = game.combat?.started ? (token._combatMoveData?.numDiagonal ?? 0) : 0;
+    const res = MoveDistance.measure(token.position, token.document._source, { token, numPrevDiagonal });
+    lastMoveDistance = res.moveDistance;
+    numDiagonal = res.numDiagonal;
+  }
+
   if ( game.combat?.started ) {
     // Store the combat move distance and the last round for which the combat move occurred.
     // Map to each unique combat.
     const combatData = {...token._combatMoveData};
     if ( combatData.lastRound < game.combat.round ) combatData.lastMoveDistance = lastMoveDistance;
     else combatData.lastMoveDistance += lastMoveDistance;
+    combatData.numDiagonal = numDiagonal;
     combatData.lastRound = game.combat.round;
     combatMoveData = { [game.combat.id]: combatData };
   }
+
 
   // Combine with existing move data in the token flag.
   const flagData = document.getFlag(MODULE_ID, FLAGS.MOVEMENT_HISTORY) ?? {};
