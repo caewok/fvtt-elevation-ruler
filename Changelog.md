@@ -1,3 +1,11 @@
+# 0.9.11
+Prevent the scene graph from adding 0-length edges. Closes #101.
+Add check to ensure PIXI.Points are used in `CenteredRectangle#toCartesianCoords` to avoid error re rotate not being a function. Closes #108.
+Update libGeometry to v0.3.5.
+Remove the pathfinding toggle button if pathfinding is disabled. Closes #151.
+Track diagonal moves when moving in combat so that 5-10-5 does not reset during multiple moves in a single turn. Closes #87.
+Switch to using `canvas.visibility` instead of `canvas.effects.visibility`.
+
 # 0.9.10
 Fix for "log not defined" error on load. Closes #150.
 Merge PR from @SyraLessThanThree to hide elevation display in ruler. Thanks!
