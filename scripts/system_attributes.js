@@ -104,7 +104,7 @@ export function defaultWalkAttribute() {
     case "splittermond":  return "actor.derivedValues.speed.value";
     case "wfrp4e":        return "actor.system.details.move.walk";
     case "crucible":      return "actor.system.movement.stride";
-    case "dragonbane":    return "actor.system.movement";
+    case "dragonbane":    return "actor.system.movement.value";
     case "twodsix":       return "actor.system.movement.walk";
     case "worldofdarkness": return "actor.system.movement.walk";
     case "TheWitcherTRPG": return "actor.system.stats.spd.current";
