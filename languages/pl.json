@@ -39,6 +39,9 @@
     "elevationruler.settings.enable-token-ruler.name": "Używanie linijki tokenów",
     "elevationruler.settings.enable-token-ruler.hint": "Wyświetlanie linijki podczas przeciągania tokenów.",
 
+    "elevationruler.settings.hide-elevation-ruler.name": "Ukryj wysokość z poziomu linijki",
+    "elevationruler.settings.hide-elevation-ruler.hint": "Ukryj wysokość z etykiety podczas korzystania z linijki.",
+
     "elevationruler.settings.hide-gm-ruler.name": "Ukryj linijkę MG",
     "elevationruler.settings.hide-gm-ruler.hint": "Nie wyświetlaj linijki tokena MG innym użytkownikom niebędącym MG.",
 
@@ -72,6 +75,9 @@
 
     "elevationruler.settings.token-terrain-multiplier.name": "Token jako współczynnik terenu",
     "elevationruler.settings.token-terrain-multiplier.hint": "Mnożnik używany do obliczania prędkości ruchu podczas przechodzenia przez inne tokeny. Ustaw na 1, aby ignorować. Wartości mniejsze niż 1 traktują pola tokenów jako szybsze niż normalnie; wartości większe niż 1 karzą ruch przez pola tokenów.",
+
+    "elevationruler.settings.pathfinding_enable.name": "Użyj wyszukiwania ścieżek",
+    "elevationruler.settings.pathfinding_enable.hint": "Po włączeniu dodaje do elementów sterujących tokenów przełącznik wyznaczania ścieżki, który spowoduje, że linijka wyznaczy ścieżkę wokół ścian i tokenów, w zależności od ustawień. Wyłącz tę opcję, jeśli śledzenie ścieżek powoduje problemy z kompatybilnością. Wyłączenie może również spowodować niewielki wzrost wydajności.",
 
     "elevationruler.settings.pathfinding_tokens_block.name": "Blokowanie przez tokeny",
     "elevationruler.settings.pathfinding_tokens_block.hint": "Czy w przypadku wyszukiwania ścieżek tokeny blokują ścieżkę?",
