@@ -158,7 +158,7 @@ function _addWaypoint(point, {snap=true}={}) {
   // Determine the elevation up until this point
   if ( !this.waypoints.length ) {
     waypoint._prevElevation = this.token?.elevationE ?? canvas.scene?.flags?.terrainmapper?.[FLAGS.SCENE.BACKGROUND_ELEVATION] ?? 0;
-    waypoint._forceToGround ||= this.token ? this.token.movementType === "WALK" : false;
+    waypoint._forceToGround ||= this.token ? (Settings.useAutoMoveDetection && this.token.movementType === "WALK") : false;
   } else waypoint._prevElevation = elevationFromWaypoint(this.waypoints.at(-1), waypoint, this.token);
 
   this.waypoints.push(waypoint);

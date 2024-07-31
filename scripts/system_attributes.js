@@ -77,6 +77,7 @@ export function defaultHPAttribute() {
     case "ars":           return "actor.system.attributes.hp.value";
     case "a5e":           return "actor.system.attributes.hp.value";
     case "TheWitcherTRPG": return "actor.system.derivedStats.hp.value";
+    case "gurps":         return "actor.system.HP.value";
     default:              return "actor.system.attributes.hp.value";
   }
 }
@@ -95,7 +96,7 @@ export function defaultWalkAttribute() {
     case "dnd4e":         return "actor.system.movement.walk.value";
     case "dnd5e":         return "actor.system.attributes.movement.walk";
     case "lancer":        return "actor.system.derived.speed";
-
+    case "gurps":         return "actor.system.basicmove.value";
     case "pf1":
     case "D35E":          return "actor.system.attributes.speed.land.total";
     case "shadowrun5e":   return "actor.system.movement.walk.value";
@@ -104,7 +105,7 @@ export function defaultWalkAttribute() {
     case "splittermond":  return "actor.derivedValues.speed.value";
     case "wfrp4e":        return "actor.system.details.move.walk";
     case "crucible":      return "actor.system.movement.stride";
-    case "dragonbane":    return "actor.system.movement";
+    case "dragonbane":    return "actor.system.movement.value";
     case "twodsix":       return "actor.system.movement.walk";
     case "worldofdarkness": return "actor.system.movement.walk";
     case "TheWitcherTRPG": return "actor.system.stats.spd.current";
@@ -125,6 +126,7 @@ export function defaultFlyAttribute() {
     case "D35E":          return "actor.system.attributes.speed.fly.total";
     case "twodsix":       return "actor.system.movement.fly";
     case "worldofdarkness": return "actor.system.movement.fly";
+    case "gurps":         return "actor.system.currentflight";
     default:              return "";
   }
 }
@@ -167,6 +169,7 @@ export function defaultDashMultiplier() {
     case "CoC7":          return 5;
     case "splittermond":  return 3;
     case "wfrp4e":        return 2;
+    case "gurps":         return 1.2;
 
     case "crucible":
     case "swade":         return 0;

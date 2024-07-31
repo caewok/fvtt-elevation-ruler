@@ -39,6 +39,9 @@
     "elevationruler.settings.enable-token-ruler.name": "Usa Righello Token",
     "elevationruler.settings.enable-token-ruler.hint": "Visualizza il righello durante il trascinamento dei token.",
 
+    "elevationruler.settings.hide-elevation-ruler.name": "Nascondi Elevazione Righello",
+    "elevationruler.settings.hide-elevation-ruler.hint": "Nasconde Elevazione dall'etichetta quando si usa il righello.",
+
     "elevationruler.settings.hide-gm-ruler.name": "Nascondi Usa Righello Token del DM",
     "elevationruler.settings.hide-gm-ruler.hint": "Non mostrare il Righello Token del DM per gli altri utenti non DM.",
 
@@ -73,6 +76,9 @@
     "elevationruler.settings.token-terrain-multiplier.name": "Token come moltiplicatore terreno",
     "elevationruler.settings.token-terrain-multiplier.hint": "Moltiplicatore da utilizzare per calcolare la velocità di movimento quando ci si sposta attraverso altri token. Impostato su 1 per ignorare. I valori inferiori a 1 trattano gli spazi dei segnalini come più veloci del normale; valori maggiori di 1 penalizzano il movimento attraverso gli spazi dei token.",
 
+    "elevationruler.settings.pathfinding_enable.name": "Usa Trova Percorso",
+    "elevationruler.settings.pathfinding_enable.hint": "Quando abilitato, aggiunge un tasto Trova percorso al controllo Token che farà sì che il righello mappi un percorso attorno a muri e token a seconda delle impostazioni. Disabilita se Trova Percorso causa problemi di compatibilità. La disabilitazione può anche comportare un piccolo aumento delle prestazioni.",
+    
     "elevationruler.settings.pathfinding_tokens_block.name": "Blocco dei Token",
     "elevationruler.settings.pathfinding_tokens_block.hint": "Per Trova Percorso, i Token bloccano il percorso?",
     "elevationruler.settings.pathfinding_tokens_block_no": "No",

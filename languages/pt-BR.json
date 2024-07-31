@@ -39,6 +39,9 @@
     "elevationruler.settings.enable-token-ruler.name": "Usar Régua de Token",
     "elevationruler.settings.enable-token-ruler.hint": "Exibir a régua ao arrastar tokens.",
 
+    "elevationruler.settings.hide-elevation-ruler.name": "Esconder Elevação da Régua",
+    "elevationruler.settings.hide-elevation-ruler.hint": "Oculta a Elevação da etiqueta quando usar a Régua.",
+    
     "elevationruler.settings.hide-gm-ruler.name": "Esconder Régua de Token do MJ",
     "elevationruler.settings.hide-gm-ruler.hint": "Não exibe a régua de token do MJ para outros usuários que não forem MJ.",
     
@@ -73,6 +76,9 @@
     "elevationruler.settings.token-terrain-multiplier.name": "Token como Multiplicador de Terreno",
     "elevationruler.settings.token-terrain-multiplier.hint": "Multiplicador a ser usado para calcular a velocidade de movimento ao passar por outros tokens. Defina como 1 para ignorar. Valores menores que 1 tratam os espaços ocupados por tokens como mais rápidos que o normal; valores maiores que 1 penalizam o movimento através de espaços ocupados por tokens.",
 
+    "elevationruler.settings.pathfinding_enable.name": "Usar Descoberta de Rota",
+    "elevationruler.settings.pathfinding_enable.hint": "Quando ativado, adiciona um botão de descoberta de rota aos controles de Token, que fará com que a régua mapeie um caminho ao redor de paredes e tokens, dependendo das configurações. Desative isto se a descoberta de rota estiver causando problemas de compatibilidade. A desativação também pode resultar em um pequeno aumento de desempenho.",
+    
     "elevationruler.settings.pathfinding_tokens_block.name": "Tokens Bloqueiam",
     "elevationruler.settings.pathfinding_tokens_block.hint": "Para encontrar a rota, tokens bloqueiam o caminho?",
     "elevationruler.settings.pathfinding_tokens_block_no": "Não",
