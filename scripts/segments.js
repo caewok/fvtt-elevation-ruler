@@ -370,7 +370,7 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
     // Convert to 3d Rays
     // Starting elevation is before user elevation increments.
     const Az = gridUnitsToPixels(Ruler.elevationAtWaypoint(startWaypoint) - Ruler.userElevationChangeAtWaypoint(startWaypoint));
-    const Bz = gridUnitsToPixels(Ruler.elevationAtWaypoint(endWaypoint) - Ruler.userElevationChangeAtWaypoint(endWaypoint) + Ruler.userElevationChangeAtWaypoint(startWaypoint));
+    const Bz = gridUnitsToPixels(Ruler.elevationAtWaypoint(endWaypoint) - Ruler.userElevationChangeAtWaypoint(endWaypoint));
     segment.ray = Ray3d.from2d(ray, { Az, Bz });
   }
   return segments;
