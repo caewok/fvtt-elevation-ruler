@@ -4,8 +4,7 @@ CanvasAnimation,
 CONFIG,
 CONST,
 game,
-PIXI,
-Ruler
+PIXI
 */
 "use strict";
 
