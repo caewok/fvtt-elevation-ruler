@@ -2,6 +2,7 @@
 Correct counting of elevation diagonals. Closes #161.
 Don't modify elevation based on movement type if autodetect movement is disabled. Closes #155.
 Add basic GURPS token speed attributes. Closes #160.
+Correct error re undefined `values.filter` method that occurred on some browsers that do not support most recent Javascript.
 Update Polish, Italian, and Brazilian Portugese translations. Closes #153. Thanks @GregoryWarn, @Kharmans, and @Lioheart!
 Fix for dragonbane token speed. Thanks @xdy!
 
