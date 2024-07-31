@@ -1,3 +1,9 @@
+# 0.9.12
+Correct counting of elevation diagonals. Closes #161.
+Don't modify elevation based on movement type if autodetect movement is disabled. Closes #155.
+Update Polish, Italian, and Brazilian Portugese translations. Closes #153. Thanks @GregoryWarn, @Kharmans, and @Lioheart!
+Fix for dragonbane token speed. Thanks @xdy!
+
 # 0.9.11
 Prevent the scene graph from adding 0-length edges. Closes #101.
 Add check to ensure PIXI.Points are used in `CenteredRectangle#toCartesianCoords` to avoid error re rotate not being a function. Closes #108.
