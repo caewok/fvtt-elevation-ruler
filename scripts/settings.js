@@ -513,6 +513,8 @@ export class Settings extends ModuleSettingsAbstract {
     if ( token.document.disposition < 0 ) return false;
     return true;
   }
+
+  static useAutoMoveDetection() { return game.system.id === "dnd5e" && this.get(this.KEYS.AUTO_MOVEMENT_TYPE); }
 }
 
 /**
