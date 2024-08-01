@@ -407,7 +407,7 @@ function segmentElevationLabel(s) {
   const units = canvas.scene.grid.units;
   const increment = s.waypointElevationIncrement;
   const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-  const elevation = (CONFIG.GeometryLib.utils.pixelsToGridUnits(s.ray.A.z) + s.waypointElevationIncrement).toNearest(multiple);
+  const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(s.ray.B.z).toNearest(multiple);
 
   const segmentArrow = (increment > 0) ? "↑"
     : (increment < 0) ? "↓" : "↕";

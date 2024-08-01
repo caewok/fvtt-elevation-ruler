@@ -177,27 +177,24 @@ export function elevationFromWaypoint(waypoint, location, token) {
     else if ( dist > 5 ) console.debug(`elevationFromWaypoint ${dist}`);
   }
 
-
-  // For normal ruler, if hovering over a token, use that token's elevation.
-  if ( !isTokenRuler && !Settings.FORCE_TO_GROUND ) {
-    const terrainE = terrainElevationAtLocation(location, waypoint.elevation);
-
-    // Use the maximum token elevation unless terrain is above us (e.g., tile above).
-    const maxTokenE = maxTokenElevationAtLocation(location, terrainE > waypoint.elevation ? terrainE : undefined);
-    if ( maxTokenE ) return maxTokenE;
-  }
-
-  if ( !isTokenRuler ) return elevationAtLocation(location, {
-    startE: waypoint.elevation,
-    elevationIncrements: waypoint._userElevationIncrements,
-    forceToGround: Settings.FORCE_TO_GROUND
-  });
-
-  return tokenElevationForMovement(waypoint, location, {
+  let locationElevation;
+  if ( !isTokenRuler ) {
+    let maxTokenE;
+    if ( !Settings.FORCE_TO_GROUND ) {
+      // For normal ruler, if hovering over a token, use that token's elevation.
+      // Use the maximum token elevation unless terrain is above us (e.g., tile above).
+      const terrainE = terrainElevationAtLocation(location, waypoint.elevation);
+      maxTokenE = maxTokenElevationAtLocation(location, terrainE > waypoint.elevation ? terrainE : undefined);
+    }
+    locationElevation = maxTokenE ?? elevationAtLocation(location, {
+      startE: waypoint.elevation,
+      forceToGround: Settings.FORCE_TO_GROUND
+    });
+  } else locationElevation = tokenElevationForMovement(waypoint, location, {
     token,
-    elevationIncrements: waypoint._userElevationIncrements,
     forceToGround: Settings.FORCE_TO_GROUND
   });
+  return locationElevation + userElevationChangeAtWaypoint(waypoint);
 }
 
 /**
@@ -205,14 +202,12 @@ export function elevationFromWaypoint(waypoint, location, token) {
  * @param {Point} location                              Location for which elevation is desired
  * @param {number} startE                               Elevation at the starting point
  * @param {object} [opts]
- * @param {number} [opts.elevationIncrements=0]         Increments to add to the end
  * @param {boolean} [opts.forceToGround=false]          If true, override the end elevation with nearest ground to that 3d point.
  * @returns {number} The destination elevation, in grid units
  */
-function elevationAtLocation(location, { startE = 0, elevationIncrements = 0, forceToGround = false } ) {
+function elevationAtLocation(location, { startE = 0, forceToGround = false } ) {
   const terrainE = terrainElevationAtLocation(location, startE);
-  const destE = forceToGround ? terrainE : Math.max(terrainE, startE);
-  return destE + (elevationIncrements * canvas.dimensions.distance);
+  return forceToGround ? terrainE : Math.max(terrainE, startE);
 }
 
 /**
@@ -220,14 +215,12 @@ function elevationAtLocation(location, { startE = 0, elevationIncrements = 0, fo
  * @param {RegionMovementWaypoint} start                Start location with elevation property
  * @param {Point} location                              Desired end location
  * @param {object} [opts]
- * @param {number} [opts.elevationIncrements=0]         Increments to add to the end
  * @param {boolean} [opts.forceToGround=false]          If true, override the end elevation with nearest ground to that 3d point.
  * @returns {number} The destination elevation, in grid units
  */
-function tokenElevationForMovement(start, location, { token, elevationIncrements = 0, forceToGround = false }) {
+function tokenElevationForMovement(start, location, { token, forceToGround = false }) {
   const end = { ...location };
   end.elevation = forceToGround ? terrainElevationAtLocation(location, start.elevation) : start.elevation;
-  end.elevation += (elevationIncrements * canvas.dimensions.distance);
   return terrainElevationForMovement(start, end, token);
 }
 
