@@ -361,9 +361,14 @@ export function measureSegment(segment, token, numPrevDiagonal = 0) {
   segment.distance = 0;
   segment.moveDistance = 0;
   segment.numDiagonal = 0;
-  const path = terrainPathForMovement(segment.ray.A, segment.ray.B, token);
-  const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
-  path.forEach(pt => pt.z = gridUnitsToPixels(pt.elevation));
+  const path = [segment.ray.A, segment.ray.B];
+
+  // const path = terrainPathForMovement(segment.ray.A, segment.ray.B, token);
+  // const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
+  // path.forEach(pt => pt.z = gridUnitsToPixels(pt.elevation));
+
+  // At the end of the path, move up in elevation to
+
   let prevPt = path[0];
   for ( let i = 1, n = path.length; i < n; i += 1 ) {
     const currPt = path[i];
