@@ -14,7 +14,6 @@ import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { perpendicularPoints, log  } from "./util.js";
 import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
-import { userElevationChangeAtWaypoint, elevationFromWaypoint, groundElevationAtWaypoint } from "./terrain_elevation.js";
 import { MovePenalty } from "./MovePenalty.js";
 import { tokenSpeedSegmentSplitter } from "./token_speed.js";
 
@@ -253,8 +252,7 @@ export async function _animateSegment(token, segment, destination) {
   // Only update drop to ground and user increment changes.
   // Leave the rest to region elevation from Terrain Mapper or other modules.
   const waypoint = this.waypoints[segment.waypointIdx];
-  const newElevation = (waypoint._forceToGround ? groundElevationAtWaypoint(waypoint) : token.elevationE)
-    + userElevationChangeAtWaypoint(waypoint);
+  const newElevation = waypoint.elevation;
   if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
 
   let name;
@@ -345,18 +343,15 @@ function highlightLineRectangle(segment, color, name) {
  */
 function elevateSegments(ruler, segments) {  // Add destination as the final waypoint
   const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
-  const Ruler = CONFIG.Canvas.rulerClass;
 
   // Add destination as the final waypoint
-  ruler.destination._terrainElevation = Ruler.terrainElevationAtLocation(ruler.destination);
-  ruler.destination._userElevationIncrements = 0; // All increments affect previous waypoints.
   const destWaypoint = {
     x: ruler.destination.x,
     y: ruler.destination.y,
     _userElevationIncrements: 0,
     _forceToGround: Settings.FORCE_TO_GROUND,
+    elevation: ruler.destinationElevation
   }
-  destWaypoint._prevElevation = elevationFromWaypoint(ruler.waypoints.at(-1), destWaypoint, ruler.token);
   const waypoints = [...ruler.waypoints, destWaypoint];
 
   // Add the waypoint elevations to the corresponding segment endpoints.
@@ -367,9 +362,8 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
     if ( !startWaypoint || !endWaypoint ) continue;
 
     // Convert to 3d Rays
-    // Starting elevation is before user elevation increments.
-    const Az = gridUnitsToPixels(Ruler.elevationAtWaypoint(startWaypoint) - Ruler.userElevationChangeAtWaypoint(startWaypoint));
-    const Bz = gridUnitsToPixels(Ruler.elevationAtWaypoint(endWaypoint) - Ruler.userElevationChangeAtWaypoint(endWaypoint));
+    const Az = gridUnitsToPixels(startWaypoint.elevation);
+    const Bz = gridUnitsToPixels(endWaypoint.elevation);
     segment.ray = Ray3d.from2d(ray, { Az, Bz });
   }
   return segments;
