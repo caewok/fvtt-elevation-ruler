@@ -269,6 +269,8 @@ function _computeDistance() {
   // If not this ruler's user, use the segments already calculated and passed via socket.
   if ( this.user !== game.user ) return;
 
+  log("_computeDistance");
+
   // Debugging
   const debug = CONFIG[MODULE_ID].debug;
   if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
@@ -397,6 +399,20 @@ export function measureSegment(segment, token, numPrevDiagonal = 0) {
  * For token ruler, don't broadcast the ruler if the token is invisible or disposition secret.
  */
 function _broadcastMeasurement(wrapped) {
+  // Update the local token elevation if using token ruler.
+  if ( this._isTokenRuler && this.token.hasPreview ) {
+    const destination = this.segments.at(-1)?.ray.B;
+    const previewToken = this.token._preview;
+    if ( destination ) {
+      const destElevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(destination.z);
+      const elevationChanged = previewToken.document.elevation !== destElevation;
+      if ( elevationChanged && isFinite(destElevation) ) {
+        previewToken.document.elevation = destElevation;
+        previewToken.renderFlags.set({ "refreshTooltip": true })
+      }
+    }
+  }
+
   // Don't broadcast invisible, hidden, or secret token movement when dragging.
   if ( this._isTokenRuler
     && this.token
@@ -467,16 +483,13 @@ function incrementElevation() {
   if ( !ruler || !ruler.active ) return;
 
   // Increment the elevation at the last waypoint.
+  log("incrementElevation");
   const waypoint = this.waypoints.at(-1);
   waypoint._userElevationIncrements ??= 0;
   waypoint._userElevationIncrements += 1;
 
-  // Update the ruler display.
+  // Update the ruler display (will also broadcast the measurement)
   ruler.measure(this.destination, { force: true });
-
-  // Broadcast the activity (see ControlsLayer.prototype._onMouseMove)
-  this._broadcastMeasurement();
-  // game.user.broadcastActivity({ ruler: ruler.toJSON() });
 }
 
 /**
@@ -488,6 +501,7 @@ function decrementElevation() {
   if ( !ruler || !ruler.active ) return;
 
   // Decrement the elevation at the last waypoint.
+  log("decrementElevation");
   const waypoint = this.waypoints.at(-1);
   waypoint._userElevationIncrements ??= 0;
   waypoint._userElevationIncrements -= 1;
