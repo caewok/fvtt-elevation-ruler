@@ -14,15 +14,16 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
-import { SPEED, MODULE_ID, FLAGS } from "./const.js";
+import { SPEED, MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import {
   elevationFromWaypoint,
-  elevationAtWaypoint,
   originElevation,
   destinationElevation,
   terrainElevationAtLocation,
+  terrainElevationForMovement,
+  terrainPathForMovement,
   userElevationChangeAtWaypoint
 } from "./terrain_elevation.js";
 
@@ -60,12 +61,9 @@ import { MoveDistance } from "./MoveDistance.js";
 
 Each waypoint has added properties:
 - _userElevationIncrements: Elevation shifts up or down at this point due to user input
-- _terrainElevation: Ground/terrain elevation, calculated as needed
-- _prevElevation: The calculated elevation of this waypoint, which is the previous waypoint elevation
-  plus changes due to moving across regions
-- _forceToGround: This waypoint should force its elevation to the terrain ground level.
-
-When a waypoint is added, its _prevElevation is calculated. Then its elevation is further modified by its properties.
+- _terrainElevation: Ground/terrain elevation at this location, calculated as needed
+- elevation: The calculated elevation of this waypoint, which is the previous waypoint elevation
+  plus changes due to user increments, terrain
 
 */
 
@@ -154,12 +152,16 @@ function _addWaypoint(point, {snap=true}={}) {
   // Set defaults
   waypoint._userElevationIncrements = 0;
   waypoint._forceToGround = Settings.FORCE_TO_GROUND;
+  waypoint.elevation = 0;
 
   // Determine the elevation up until this point
-  if ( !this.waypoints.length ) {
-    waypoint._prevElevation = this.token?.elevationE ?? canvas.scene?.flags?.terrainmapper?.[FLAGS.SCENE.BACKGROUND_ELEVATION] ?? 0;
-    waypoint._forceToGround ||= this.token ? (Settings.useAutoMoveDetection && this.token.movementType === "WALK") : false;
-  } else waypoint._prevElevation = elevationFromWaypoint(this.waypoints.at(-1), waypoint, this.token);
+  const isOriginWaypoint = !this.waypoints.length;
+  if ( isOriginWaypoint ) {
+    waypoint._forceToGround = false;
+    waypoint.elevation = this.token?.elevationE ?? terrainElevationAtLocation(point) ?? 0;
+  } else {
+    waypoint.elevation = elevationFromWaypoint(this.waypoints.at(-1), waypoint, this.token);
+  }
 
   this.waypoints.push(waypoint);
   this._state = Ruler.STATES.MEASURING;
@@ -267,6 +269,8 @@ function _computeDistance() {
   // If not this ruler's user, use the segments already calculated and passed via socket.
   if ( this.user !== game.user ) return;
 
+  log("_computeDistance");
+
   // Debugging
   const debug = CONFIG[MODULE_ID].debug;
   if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
@@ -354,14 +358,31 @@ function _computeSegmentDistances() {
  */
 export function measureSegment(segment, token, numPrevDiagonal = 0) {
   segment.numPrevDiagonal = numPrevDiagonal;
-  const res = MoveDistance.measure(
-    segment.ray.A,
-    segment.ray.B,
-    { token, useAllElevation: segment.last, numPrevDiagonal });
-  segment.distance = res.distance;
-  segment.moveDistance = res.moveDistance;
-  segment.numDiagonal = res.numDiagonal;
-  return res.numPrevDiagonal;
+
+  // Measure the path taken if moving over terrain.
+  segment.distance = 0;
+  segment.moveDistance = 0;
+  segment.numDiagonal = 0;
+  const path = [segment.ray.A, segment.ray.B];
+
+  // const path = terrainPathForMovement(segment.ray.A, segment.ray.B, token);
+  // const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
+  // path.forEach(pt => pt.z = gridUnitsToPixels(pt.elevation));
+
+  // At the end of the path, move up in elevation to
+
+  let prevPt = path[0];
+  for ( let i = 1, n = path.length; i < n; i += 1 ) {
+    const currPt = path[i];
+    const res = MoveDistance.measure(prevPt, currPt, { token, useAllElevation: segment.last, numPrevDiagonal });
+    segment.distance += res.distance;
+    segment.moveDistance += res.moveDistance;
+    segment.numDiagonal += res.numDiagonal;
+    numPrevDiagonal += res.numPrevDiagonal;
+    prevPt = currPt;
+
+  }
+  return numPrevDiagonal;
 }
 
 // TODO:
@@ -378,6 +399,20 @@ export function measureSegment(segment, token, numPrevDiagonal = 0) {
  * For token ruler, don't broadcast the ruler if the token is invisible or disposition secret.
  */
 function _broadcastMeasurement(wrapped) {
+  // Update the local token elevation if using token ruler.
+  if ( this._isTokenRuler && this.token?.hasPreview ) {
+    const destination = this.segments.at(-1)?.ray.B;
+    const previewToken = this.token._preview;
+    if ( destination ) {
+      const destElevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(destination.z);
+      const elevationChanged = previewToken.document.elevation !== destElevation;
+      if ( elevationChanged && isFinite(destElevation) ) {
+        previewToken.document.elevation = destElevation;
+        previewToken.renderFlags.set({ "refreshTooltip": true })
+      }
+    }
+  }
+
   // Don't broadcast invisible, hidden, or secret token movement when dragging.
   if ( this._isTokenRuler
     && this.token
@@ -448,16 +483,13 @@ function incrementElevation() {
   if ( !ruler || !ruler.active ) return;
 
   // Increment the elevation at the last waypoint.
+  log("incrementElevation");
   const waypoint = this.waypoints.at(-1);
   waypoint._userElevationIncrements ??= 0;
   waypoint._userElevationIncrements += 1;
 
-  // Update the ruler display.
+  // Update the ruler display (will also broadcast the measurement)
   ruler.measure(this.destination, { force: true });
-
-  // Broadcast the activity (see ControlsLayer.prototype._onMouseMove)
-  this._broadcastMeasurement();
-  // game.user.broadcastActivity({ ruler: ruler.toJSON() });
 }
 
 /**
@@ -469,6 +501,7 @@ function decrementElevation() {
   if ( !ruler || !ruler.active ) return;
 
   // Decrement the elevation at the last waypoint.
+  log("decrementElevation");
   const waypoint = this.waypoints.at(-1);
   waypoint._userElevationIncrements ??= 0;
   waypoint._userElevationIncrements -= 1;
@@ -508,9 +541,11 @@ PATCHES.BASIC.GETTERS = {
 };
 
 PATCHES.BASIC.STATIC_METHODS = {
-  elevationAtWaypoint,
   userElevationChangeAtWaypoint,
   terrainElevationAtLocation,
+  terrainElevationForMovement,
+  terrainPathForMovement,
+  elevationFromWaypoint,
   measureDistance: PhysicalDistance.measure.bind(PhysicalDistance),
   measureMoveDistance: MoveDistance.measure.bind(MoveDistance)
 };

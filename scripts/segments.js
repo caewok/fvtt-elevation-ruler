@@ -14,7 +14,6 @@ import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { perpendicularPoints, log  } from "./util.js";
 import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
-import { userElevationChangeAtWaypoint, elevationFromWaypoint, groundElevationAtWaypoint } from "./terrain_elevation.js";
 import { MovePenalty } from "./MovePenalty.js";
 import { tokenSpeedSegmentSplitter } from "./token_speed.js";
 
@@ -174,7 +173,7 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
   segment.distance = newSegmentDistance;
   const origLabel = wrapped(segment, newTotalDistance);
   segment.distance = origSegmentDistance;
-  let elevLabel = segmentElevationLabel(segment);
+  let elevLabel = segmentElevationLabel(this, segment);
   const levelName = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
   if ( levelName ) elevLabel += `\n${levelName}`;
 
@@ -202,9 +201,7 @@ export function _getSegmentLabel(wrapped, segment, totalDistance) {
   }
 
   let label = `${origLabel}`;
-  if ( !Settings.get(Settings.KEYS.HIDE_ELEVATION) ) {
-    label += `\n${elevLabel}`;
-  }
+  if ( !Settings.get(Settings.KEYS.HIDE_ELEVATION) ) label += `\n${elevLabel}`;
   label += `${moveLabel}${combatLabel}`;
 
   return label;
@@ -252,15 +249,15 @@ export async function _animateSegment(token, segment, destination) {
   // Update elevation before the token move.
   // Only update drop to ground and user increment changes.
   // Leave the rest to region elevation from Terrain Mapper or other modules.
-  const waypoint = this.waypoints[segment.waypointIdx];
-  const newElevation = (waypoint._forceToGround ? groundElevationAtWaypoint(waypoint) : token.elevationE)
-    + userElevationChangeAtWaypoint(waypoint);
-  if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
+  // const waypoint = this.waypoints[segment.waypointIdx];
+  // const newElevation = waypoint.elevation;
+  // if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
 
   let name;
   if ( segment.animation?.name === undefined ) name = token.animationName;
   else name ||= Symbol(token.animationName);
   const updateOptions = {
+    terrainmapper: { fixedDestination: true, usePath: true },
     rulerSegment: this.segments.length > 1,
     firstRulerSegment: segment.first,
     lastRulerSegment: segment.last,
@@ -273,6 +270,9 @@ export async function _animateSegment(token, segment, destination) {
   await token.animate({x, y}, {name, duration: 0});
   await token.document.update(destination, updateOptions);
   await CanvasAnimation.getAnimation(name)?.promise;
+  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
+  const newElevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z).toNearest(multiple);
+  if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
 }
 
 // ----- NOTE: Segment highlighting ----- //
@@ -345,18 +345,15 @@ function highlightLineRectangle(segment, color, name) {
  */
 function elevateSegments(ruler, segments) {  // Add destination as the final waypoint
   const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
-  const Ruler = CONFIG.Canvas.rulerClass;
 
   // Add destination as the final waypoint
-  ruler.destination._terrainElevation = Ruler.terrainElevationAtLocation(ruler.destination);
-  ruler.destination._userElevationIncrements = 0; // All increments affect previous waypoints.
   const destWaypoint = {
     x: ruler.destination.x,
     y: ruler.destination.y,
     _userElevationIncrements: 0,
     _forceToGround: Settings.FORCE_TO_GROUND,
+    elevation: ruler.destinationElevation
   }
-  destWaypoint._prevElevation = elevationFromWaypoint(ruler.waypoints.at(-1), destWaypoint, ruler.token);
   const waypoints = [...ruler.waypoints, destWaypoint];
 
   // Add the waypoint elevations to the corresponding segment endpoints.
@@ -367,9 +364,8 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
     if ( !startWaypoint || !endWaypoint ) continue;
 
     // Convert to 3d Rays
-    // Starting elevation is before user elevation increments.
-    const Az = gridUnitsToPixels(Ruler.elevationAtWaypoint(startWaypoint) - Ruler.userElevationChangeAtWaypoint(startWaypoint));
-    const Bz = gridUnitsToPixels(Ruler.elevationAtWaypoint(endWaypoint) - Ruler.userElevationChangeAtWaypoint(endWaypoint));
+    const Az = gridUnitsToPixels(startWaypoint.elevation);
+    const Bz = gridUnitsToPixels(endWaypoint.elevation);
     segment.ray = Ray3d.from2d(ray, { Az, Bz });
   }
   return segments;
@@ -404,24 +400,51 @@ function levelNameAtElevation(e) {
 
 /*
  * Construct a label to represent elevation changes in the ruler.
- * Waypoint version: 10 ft↑ [@10 ft]
- * Total version: 10 ft↑ [@20 ft]
+ * Waypoint version: @10 ft
+ * Total version: @10 ft [↑10 ft] (Bracketed is the total elevation)
+ * Total version for Token Ruler: none
+ * Display current elevation if there was a previous change in elevation or not a token measurement
+ * and the current elevation is nonzero.
  * @param {object} s  Ruler segment
  * @return {string}
  */
-function segmentElevationLabel(s) {
+function segmentElevationLabel(ruler, s) {
+  // Arrows: ↑ ↓ ↕
+  // Token ruler uses the preview token for elevation.
+  if ( s.last && ruler.isTokenRuler ) return "";
+
+
+  // If this is the last segment, show the total elevation change if any.
+  const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(s.ray.B.z);
+  const totalE = elevation - canvas.controls.ruler.originElevation;
+  const displayTotalChange = Boolean(totalE) && s.last;
+
+  // Determine if any previous waypoint had an elevation change.
+  let elevationChanged = false;
+  let currE = elevation;
+  for ( let i = s.waypointIdx; i > -1; i -= 1 ) {
+    const prevE = ruler.waypoints[i].elevation;
+    if ( currE !== prevE ) {
+      elevationChanged = true;
+      break;
+    }
+    currE = prevE;
+  }
+
+  // For basic ruler measurements, it is not obvious what the elevation is at start.
+  // So display any nonzero elevation at that point.
+  const displayCurrentElevation = elevationChanged || (!ruler.token && elevation);
+
+  // Put together the two parts of the label: current elevation and total elevation.
+  const labelParts = [];
   const units = canvas.scene.grid.units;
-  const increment = s.waypointElevationIncrement;
   const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-  const elevation = (CONFIG.GeometryLib.utils.pixelsToGridUnits(s.ray.A.z) + s.waypointElevationIncrement).toNearest(multiple);
-
-  const segmentArrow = (increment > 0) ? "↑"
-    : (increment < 0) ? "↓" : "↕";
-
-  // Take absolute value b/c segmentArrow will represent direction
-  // Allow decimals to tenths ( Math.round(x * 10) / 10).
-  let label = `${segmentArrow}${Math.abs(Number(increment))} ${units}`;
-  label += ` [@${Number(elevation)} ${units}]`;
-
-  return label;
+  if ( displayCurrentElevation ) labelParts.push(`@${Number(elevation.toNearest(multiple))} ${units}`);
+  if ( displayTotalChange ) {
+    const segmentArrow = (totalE > 0) ? "↑" :"↓";
+    const totalChange = `[${segmentArrow}${Math.abs(Number(totalE.toNearest(multiple)))} ${units}]`;
+    labelParts.push(totalChange);
+  }
+  s.label.style.align = s.last ? "center" : "right";
+  return labelParts.join(" ");
 }
