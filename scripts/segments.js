@@ -249,9 +249,9 @@ export async function _animateSegment(token, segment, destination) {
   // Update elevation before the token move.
   // Only update drop to ground and user increment changes.
   // Leave the rest to region elevation from Terrain Mapper or other modules.
-  const waypoint = this.waypoints[segment.waypointIdx];
-  const newElevation = waypoint.elevation;
-  if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
+  // const waypoint = this.waypoints[segment.waypointIdx];
+  // const newElevation = waypoint.elevation;
+  // if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
 
   let name;
   if ( segment.animation?.name === undefined ) name = token.animationName;
@@ -269,6 +269,9 @@ export async function _animateSegment(token, segment, destination) {
   await token.animate({x, y}, {name, duration: 0});
   await token.document.update(destination, updateOptions);
   await CanvasAnimation.getAnimation(name)?.promise;
+  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
+  const newElevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z).toNearest(multiple);
+  if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
 }
 
 // ----- NOTE: Segment highlighting ----- //
