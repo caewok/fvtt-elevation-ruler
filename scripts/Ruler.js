@@ -400,7 +400,7 @@ export function measureSegment(segment, token, numPrevDiagonal = 0) {
  */
 function _broadcastMeasurement(wrapped) {
   // Update the local token elevation if using token ruler.
-  if ( this._isTokenRuler && this.token.hasPreview ) {
+  if ( this._isTokenRuler && this.token?.hasPreview ) {
     const destination = this.segments.at(-1)?.ray.B;
     const previewToken = this.token._preview;
     if ( destination ) {
