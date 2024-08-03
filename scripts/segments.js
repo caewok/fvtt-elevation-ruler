@@ -257,6 +257,7 @@ export async function _animateSegment(token, segment, destination) {
   if ( segment.animation?.name === undefined ) name = token.animationName;
   else name ||= Symbol(token.animationName);
   const updateOptions = {
+    terrainmapper: { fixedDestination: true, usePath: true },
     rulerSegment: this.segments.length > 1,
     firstRulerSegment: segment.first,
     lastRulerSegment: segment.last,
