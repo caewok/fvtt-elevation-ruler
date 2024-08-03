@@ -180,15 +180,17 @@ export function elevationFromWaypoint(waypoint, location, token) {
   let locationElevation;
   if ( !isTokenRuler ) {
     let maxTokenE;
-    if ( !Settings.FORCE_TO_GROUND ) {
-      // For normal ruler, if hovering over a token, use that token's elevation.
-      // Use the maximum token elevation unless terrain is above us (e.g., tile above).
-      const terrainE = terrainElevationAtLocation(location, waypoint.elevation);
-      maxTokenE = maxTokenElevationAtLocation(location, terrainE > waypoint.elevation ? terrainE : undefined);
-    }
-    locationElevation = maxTokenE ?? elevationAtLocation(location, {
+    const terrainE = terrainElevationAtLocation(location, waypoint.elevation);
+
+    // For normal ruler, if hovering over a token, use that token's elevation.
+    // Use the maximum token elevation unless terrain is above us (e.g., tile above).
+    if ( !Settings.FORCE_TO_GROUND ) maxTokenE = maxTokenElevationAtLocation(location, terrainE > waypoint.elevation ? terrainE : undefined);
+    if ( maxTokenE ) locationElevation = maxTokenE;
+
+    // If the starting elevation is on the ground or force-to-ground is enabled, use the ground elevation.
+    else locationElevation = elevationAtLocation(location, {
       startE: waypoint.elevation,
-      forceToGround: Settings.FORCE_TO_GROUND
+      forceToGround: Settings.FORCE_TO_GROUND || waypoint.elevation.almostEqual(terrainElevationAtLocation(waypoint, waypoint.elevation))
     });
   } else locationElevation = tokenElevationForMovement(waypoint, location, {
     token,
