@@ -233,7 +233,18 @@ function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
 async function _animateMovement(wrapped, token) {
   if ( !this.segments || !this.segments.length ) return; // Ruler._animateMovement expects at least one segment.
 
-  log(`Moving ${token.name} ${this.segments.length} segments.`, [...this.segments]);
+  if ( CONFIG[MODULE_ID].debug ) {
+    console.groupCollapsed(`${MODULE_ID}|_animateMovement`);
+    log(`Moving ${token.name} ${this.segments.length} segments.`, [...this.segments]);
+    console.table(this.segments.flatMap(s => {
+      const A = { ...s.ray.A };
+      const B = { ...s.ray.B };
+      B.distance = s.distance;
+      B.moveDistance = s.moveDistance;
+      return [A, B];
+    }));
+    console.groupEnd(`${MODULE_ID}|_animateMovement`);
+  }
 
   this.segments.forEach((s, idx) => s.idx = idx);
 

@@ -21,6 +21,7 @@ import { tokenSpeedSegmentSplitter } from "./token_speed.js";
  * Mixed wrap of  Ruler.prototype._getMeasurementSegments
  * Add elevation information to the segments.
  * Add pathfinding segments.
+ * Add segments for traversing regions.
  */
 export function _getMeasurementSegments(wrapped) {
   // If not the user's ruler, segments calculated by original user and copied via socket.
@@ -35,38 +36,87 @@ export function _getMeasurementSegments(wrapped) {
     return this.segments;
   }
 
-  // Elevate the segments
-  const segments = elevateSegments(this, wrapped());
-  const token = this.token;
-
-  // If no movement token, then no pathfinding.
-  if ( !token ) return segments;
-
-  // If no segments present, clear the path map and return.
   // No segments are present if dragging back to the origin point.
+  const segments = wrapped();
   const segmentMap = this._pathfindingSegmentMap ??= new Map();
   if ( !segments.length ) {
     segmentMap.clear();
     return segments;
   }
 
-  // If currently pathfinding, set path for the last segment, overriding any prior path.
-  // Pathfinding when: the pathfinding icon is enabled or the temporary toggle key is held.
-  const lastSegment = segments.at(-1);
-  const pathPoints = (Settings.get(Settings.KEYS.CONTROLS.PATHFINDING) ^ Settings.FORCE_TOGGLE_PATHFINDING)
-    ? calculatePathPointsForSegment(lastSegment, token)
-    : [];
+  // Add z value (elevation in pixel units) to the segments.
+  elevateSegments(this, segments);
 
-  const lastA = PIXI.Point.fromObject(lastSegment.ray.A); // Want 2d version.
-  if ( pathPoints.length > 2 ) segmentMap.set(lastA.key, pathPoints);
-  else segmentMap.delete(lastA.key);
+  // If no movement token, then no region paths or pathfinding.
+  const token = this.token;
+  if ( !token ) return segments;
 
-  // For each segment, replace with path sub-segment if pathfinding was used for that segment.
-  const t2 = performance.now();
+  const usePathfinding = Settings.get(Settings.KEYS.CONTROLS.PATHFINDING) ^ Settings.FORCE_TOGGLE_PATHFINDING;
+  if ( usePathfinding ) {
+    const t0 = performance.now();
+    // If currently pathfinding, set path for the last segment, overriding any prior path.
+    // Pathfinding when: the pathfinding icon is enabled or the temporary toggle key is held.
+    // TODO: Pathfinding should account for region elevation changes and handle flying/burrowing.
+    const lastSegment = segments.at(-1);
+    const pathPoints = calculatePathPointsForSegment(lastSegment, token);
+    const lastA = PIXI.Point.fromObject(lastSegment.ray.A); // Want 2d version.
+    if ( pathPoints.length > 2 ) segmentMap.set(lastA.key, pathPoints);
+    else segmentMap.delete(lastA.key);
+    const t1 = performance.now();
+    log(`_getMeasurementSegments|Found path with ${pathPoints.length} points in ${t1-t0} ms.`, pathPoints);
+  } else if ( MODULES_ACTIVE.TERRAIN_MAPPER ){
+    // Determine the region path.
+    const t0 = performance.now();
+    const ElevationHandler = MODULES_ACTIVE.API.TERRAIN_MAPPER.ElevationHandler;
+    const lastSegment = segments.at(-1);
+    const { gridUnitsToPixels, pixelsToGridUnits } = CONFIG.GeometryLib.utils;
+    const { A, B } = lastSegment.ray;
+    const start = { ...A, elevation: pixelsToGridUnits(A.z) };
+    const end = { ...B, elevation: pixelsToGridUnits(B.z) };
+    const flying = tokenIsFlying(token, A) || tokenIsFlying(token, B);
+    const burrowing = tokenIsBurrowing(token, A) || tokenIsBurrowing(token, B);
+    const pathPoints = ElevationHandler.constructPath(start, end, { flying, burrowing, token });
+    pathPoints.forEach(pt => pt.z = gridUnitsToPixels(pt.elevation));
+    const lastA = PIXI.Point.fromObject(lastSegment.ray.A); // Want 2d version.
+    if ( pathPoints.length > 2 ) segmentMap.set(lastA.key, pathPoints);
+    else segmentMap.delete(lastA.key);
+    const t1 = performance.now();
+    log(`_getMeasurementSegments|Found region path with ${pathPoints.length} points in ${t1-t0} ms.`, pathPoints);
+  }
+
+  // For each segment, replace with path sub-segment if pathfinding or region paths were used for that segment.
+  const t0 = performance.now();
   const newSegments = constructPathfindingSegments(segments, segmentMap);
-  const t3 = performance.now();
-  log(`${newSegments.length} segments processed in ${t3-t2} ms.`);
+  const t1 = performance.now();
+  log(`_getMeasurementSegments|${newSegments.length} segments processed in ${t1-t0} ms.`);
   return newSegments;
+}
+
+/**
+ * Determine the token movement types.
+ * @param {Token} token                     Token doing the movement
+ * @param {RegionMovementWaypoint} loc      Location to test (typically the start position of the token)
+ * @returns {boolean} True if token has flying status or implicitly is flying
+ */
+function tokenIsFlying(token, loc) {
+  if ( token.movementType === "FLY" ) return true;
+  const ElevationHandler = MODULES_ACTIVE.API?.TERRAIN_MAPPER?.ElevationHandler;
+  if ( !ElevationHandler ) return false;
+  return ElevationHandler.elevationType(loc) === ElevationHandler.ELEVATION_LOCATIONS.FLOATING;
+}
+
+/**
+ * Determine the token movement types.
+ * @param {Token} token                     Token doing the movement
+ * @param {RegionMovementWaypoint} loc      Location to test (typically the start position of the token)
+ * @param {RegionMovementWaypoint} end      Ending location
+ * @returns {boolean} True if token has flying status or implicitly is flying
+ */
+function tokenIsBurrowing(token, loc) {
+  if ( token.movementType === "BURROW" ) return true;
+  const ElevationHandler = MODULES_ACTIVE.API?.TERRAIN_MAPPER?.ElevationHandler;
+  if ( !ElevationHandler ) return false;
+  return ElevationHandler.elevationType(loc) === ElevationHandler.ELEVATION_LOCATIONS.BURROWING;
 }
 
 /**
@@ -139,10 +189,10 @@ function constructPathfindingSegments(segments, segmentMap) {
 
     const nPoints = pathPoints.length;
     let prevPt = pathPoints[0];
-    prevPt.z = segment.ray.A.z;
+    prevPt.z ??= segment.ray.A.z;
     for ( let i = 1; i < nPoints; i += 1 ) {
       const currPt = pathPoints[i];
-      currPt.z = A.z;
+      currPt.z ??= A.z;
       const newSegment = { ray: new Ray3d(prevPt, currPt) };
       newSegment.ray.pathfinding = true; // TODO: Was used by  canvas.grid.grid._getRulerDestination.
       newSegments.push(newSegment);
@@ -346,6 +396,15 @@ function highlightLineRectangle(segment, color, name) {
 function elevateSegments(ruler, segments) {  // Add destination as the final waypoint
   const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
 
+  // Index the default measurement segments to waypoints, keeping in mind that some segments could refer to history.
+  // waypointIdx refers to the segment.ray.A value.
+  const nHistory = ruler.history.length;
+  for ( let i = 0, n = segments.length; i < n; i += 1 ) {
+    const segment = segments[i];
+    segment.first = i === 0;
+    segment.waypointIdx = Math.max(i - nHistory, -1);
+  }
+
   // Add destination as the final waypoint
   const destWaypoint = {
     x: ruler.destination.x,
@@ -358,17 +417,16 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
 
   // Add the waypoint elevations to the corresponding segment endpoints.
   for ( const segment of segments ) {
-    const ray = segment.ray;
-    const startWaypoint = waypoints.find(w => w.x === ray.A.x && w.y === ray.A.y);
-    const endWaypoint = waypoints.find(w => w.x === ray.B.x && w.y === ray.B.y);
-    if ( !startWaypoint || !endWaypoint ) continue;
+    if ( !~segment.waypointIdx ) continue;
+    const startWaypoint = waypoints[segment.waypointIdx];
+    const endWaypoint = waypoints[segment.waypointIdx + 1];
+    if ( !startWaypoint || !endWaypoint ) continue; // Should not happen.
 
     // Convert to 3d Rays
     const Az = gridUnitsToPixels(startWaypoint.elevation);
     const Bz = gridUnitsToPixels(endWaypoint.elevation);
-    segment.ray = Ray3d.from2d(ray, { Az, Bz });
+    segment.ray = Ray3d.from2d(segment.ray, { Az, Bz });
   }
-  return segments;
 }
 
 
