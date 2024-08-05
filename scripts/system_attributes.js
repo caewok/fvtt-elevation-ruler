@@ -96,7 +96,7 @@ export function defaultWalkAttribute() {
     case "dnd4e":         return "actor.system.movement.walk.value";
     case "dnd5e":         return "actor.system.attributes.movement.walk";
     case "lancer":        return "actor.system.derived.speed";
-    case "gurps":         return "actor.system.basicmove.value";
+    case "gurps":         return "actor.system.currentmove";
     case "pf1":
     case "D35E":          return "actor.system.attributes.speed.land.total";
     case "shadowrun5e":   return "actor.system.movement.walk.value";
