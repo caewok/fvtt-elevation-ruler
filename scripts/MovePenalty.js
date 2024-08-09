@@ -49,6 +49,7 @@ export class MovePenalty {
   constructor(moveToken, speedFn, path = []) {
     this.moveToken = moveToken;
     this.speedFn = speedFn ?? (token => foundry.utils.getProperty(token, SPEED.ATTRIBUTES[token.movementType]));
+    this.localTokenClone = this.constructor._constructTokenClone(this.moveToken);
     const tokenMultiplier = this.constructor.tokenMultiplier;
     const terrainAPI = this.constructor.terrainAPI;
 
@@ -93,11 +94,17 @@ export class MovePenalty {
    *   - @prop {TokenDocument} document
    *   - @prop {Actor} actor
    */
-  get localTokenClone() {
-    const moveToken = this.moveToken;
-    const actor = new CONFIG.Actor.documentClass(moveToken.actor.toObject())
-    const document = new CONFIG.Token.documentClass(moveToken.document.toObject())
-    const tClone = { document, actor, _original: moveToken };
+  localTokenClone;
+
+  /**
+   * Construct the local token clone.
+   * This takes some time.
+   * @returns {object}
+   */
+  static _constructTokenClone(token) {
+    const actor = new CONFIG.Actor.documentClass(token.actor.toObject())
+    const document = new CONFIG.Token.documentClass(token.document.toObject())
+    const tClone = { document, actor, _original: token };
 
     // Add the movementType and needed properties to calculate movement type.
     Object.defineProperties(tClone, {
@@ -133,10 +140,22 @@ export class MovePenalty {
     const end = getCenterPoint3d(endCoords);
     const cutawayShapes = this._cutawayShapes(start, end);
     if ( !cutawayShapes.length ) return 1;
-    const cutawayIxs = this._intersectionsForCutawayShapes(start, end, cutawayShapes);
-    const changePts = this._penaltiesForIntersections(start, end, cutawayIxs);
     const t1 = performance.now();
-    log(`movementPenaltyForSegment| ${startCoords.x},${startCoords.y},${startCoords.z}(${startCoords.i},${startCoords.j},${startCoords.k}) --> ${endCoords.x},${endCoords.y},${endCoords.z}(${endCoords.i},${endCoords.j},${endCoords.k}) took ${(t1-t0).toNearest(0.01)} ms.`);
+    const cutawayIxs = this._intersectionsForCutawayShapes(start, end, cutawayShapes);
+    const t2 = performance.now();
+    const changePts = this._penaltiesForIntersections(start, end, cutawayIxs);
+    const t3 = performance.now();
+    if ( CONFIG[MODULE_ID].debug ) {
+      console.group(`${MODULE_ID}|movementPenaltyForSegment`);
+      console.debug(`${startCoords.x},${startCoords.y},${startCoords.z}(${startCoords.i},${startCoords.j},${startCoords.k}) --> ${endCoords.x},${endCoords.y},${endCoords.z}(${endCoords.i},${endCoords.j},${endCoords.k})`);
+      console.table({
+        cutawayShapes: (t1 - t0).toNearest(.01),
+        intersectionsForCutawayShapes: (t2 - t1).toNearest(.01),
+        penaltiesForIntersections: (t3 - t2).toNearest(.01),
+        total: (t3 - t0).toNearest(.01)
+      });
+      console.groupEnd(`${MODULE_ID}|movementPenaltyForSegment`);
+    }
     return changePts.avgMultiplier;
   }
 
@@ -231,11 +250,12 @@ export class MovePenalty {
     if ( !cutawayIxs.length ) {
       const arr = [];
       arr.totalDistance = PIXI.Point.distanceBetween(start, end);
-      arr.totalTime = this.speedFn(this.moveToken);
+      arr.totalTime = this.speedFn(this.moveToken) || 1;
       arr.avgMultiplier = 1;
       return arr;
     }
 
+    let _timeSetup = performance.now();
     const testRegions = this.constructor.terrainAPI && this.regions;
     const tokenMultiplier = this.constructor.tokenMultiplier;
     let tClone = this.moveToken;
@@ -248,7 +268,7 @@ export class MovePenalty {
         tClone.actor._initialize();
       }
     }
-    const startingSpeed = this.speedFn(tClone);
+    const startingSpeed = this.speedFn(tClone) || 1;
 
     // Traverse each intersection, determining the speed multiplier from starting speed
     // and calculating total time and distance. x meters / y meters/second = x/y seconds
@@ -263,7 +283,18 @@ export class MovePenalty {
     cutawayIxs = cutawayIxs.map(ix => convertToDistance(duplicateCutawayIntersection(ix))); // Avoid modifying the originals.
     cutawayIxs.push(end2d);
     cutawayIxs.sort((a, b) => a.x - b.x);
+    _timeSetup = performance.now() - _timeSetup;
+    let _timeToken = 0;
+    let _timeDrawing = 0;
+    let _timeRegion = 0;
+    let _timeIx = performance.now();
+    let _timeLoop = performance.now();
     for ( const ix of cutawayIxs ) {
+      if ( prevIx.shape?.token ) _timeToken += performance.now() - _timeIx;
+      if ( prevIx.shape?.drawing ) _timeDrawing += performance.now() - _timeIx;
+      if ( prevIx.shape?.region ) _timeRegion += performance.now() - _timeIx;
+      _timeIx = performance.now();
+
       // Must invert the multiplier to apply them as penalties. So a 2x penalty is 1/2 times speed.
       const multFn = ix.movingInto ? x => 1 / x : x => x;
       const terrainFn = ix.movingInto ? this.#addTerrainsToToken.bind(this) : this.#removeTerrainsFromToken.bind(this);
@@ -279,7 +310,7 @@ export class MovePenalty {
       // Now we have prevIx --> ix.
       prevIx.multiplier = currentMultiplier;
       prevIx.dist = PIXI.Point.distanceBetween(prevIx, ix);
-      prevIx.tokenSpeed = (this.speedFn(tClone) * prevIx.multiplier);
+      prevIx.tokenSpeed = (this.speedFn(tClone) || 1) * prevIx.multiplier;
       totalDistance += prevIx.dist;
       totalTime += (prevIx.dist / prevIx.tokenSpeed);
       changePts.push(prevIx);
@@ -292,12 +323,34 @@ export class MovePenalty {
       if ( ix.shape?.drawing ) currentMultiplier *= multFn(ix.shape.drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY));
       if ( ix.shape?.region ) terrainFn(tClone, ix.shape.region);
     }
+    if ( prevIx.shape?.token ) _timeToken += performance.now() - _timeIx;
+    if ( prevIx.shape?.drawing ) _timeDrawing += performance.now() - _timeIx;
+    if ( prevIx.shape?.region ) _timeRegion += performance.now() - _timeIx;
+    _timeLoop = performance.now() - _timeLoop;
 
     // Determine the ratio compared to a set speed
+    let _timeFinalize = performance.now();
     const totalDefaultTime = totalDistance / startingSpeed;
     changePts.totalDistance = totalDistance;
     changePts.totalTime = totalTime;
     changePts.avgMultiplier = (totalDefaultTime / totalTime) || 0;
+    _timeFinalize = performance.now() - _timeFinalize;
+
+    if ( CONFIG[MODULE_ID].debug ) {
+      console.group(`${MODULE_ID}|_penaltiesForIntersections`);
+      console.debug(`${start.x},${start.y},${start.z} --> ${end.x},${end.y},${end.z}`);
+      console.table({
+        setup: _timeSetup.toNearest(0.01),
+        loop: _timeLoop.toNearest(0.01),
+        token: _timeToken.toNearest(0.01),
+        drawing: _timeDrawing.toNearest(0.01),
+        region: _timeRegion.toNearest(0.01),
+        finalize: _timeFinalize.toNearest(0.01),
+        total: (_timeSetup + _timeLoop + _timeFinalize).toNearest(0.01)
+      });
+      console.groupEnd(`${MODULE_ID}|_penaltiesForIntersections`);
+    }
+
     return changePts;
   }
 
@@ -307,10 +360,9 @@ export class MovePenalty {
    * @param {Region} region         Terrain region to use
    */
   #addTerrainsToToken(token, region) {
-    const { terrains, secretTerrains } = region.terrainmapper.terrains;
-    const allTerrains = [...terrains, ...secretTerrains];
-    if ( !allTerrains.length ) return;
-    CONFIG.terrainmapper.Terrain.addToTokenLocally(token, allTerrains, { refresh: false });
+    const terrains = region.terrainmapper.terrains;
+    if ( !terrains.size ) return;
+    CONFIG.terrainmapper.Terrain.addToTokenLocally(token, [...terrains.values()], { refresh: false });
     token.actor._initialize();
   }
 
@@ -320,10 +372,9 @@ export class MovePenalty {
    * @param {Region} region         Terrain region to use
    */
   #removeTerrainsFromToken(token, region) {
-    const { terrains, secretTerrains } = region.terrainmapper.terrains;
-    const allTerrains = [...terrains, ...secretTerrains];
-    if ( !allTerrains.length ) return;
-    CONFIG.terrainmapper.Terrain.removeFromTokenLocally(token, allTerrains, { refresh: false });
+    const terrains = region.terrainmapper.terrains;
+    if ( !terrains.size ) return;
+    CONFIG.terrainmapper.Terrain.removeFromTokenLocally(token, [...terrains.values()], { refresh: false });
     token.actor._initialize();
   }
 

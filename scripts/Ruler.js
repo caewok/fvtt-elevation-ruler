@@ -35,10 +35,9 @@ import {
 } from "./segments.js";
 
 import { log } from "./util.js";
-
 import { PhysicalDistance } from "./PhysicalDistance.js";
-
 import { MoveDistance } from "./MoveDistance.js";
+import { MovePenalty } from "./MovePenalty.js";
 
 /**
  * Modified Ruler
@@ -347,8 +346,14 @@ function _computeSegmentDistances() {
     this.segments[0].first = true;
     this.segments.at(-1).last = true;
   }
+
+  // Construct a move penalty instance that covers all the segments.
+  const path = this.segments.map(s => s.ray.A);
+  path.push(this.segments.at(-1).ray.B);
+  const movePenaltyInstance = new MovePenalty(token, undefined, path)
+
   for ( const segment of this.segments ) {
-    numPrevDiagonal = measureSegment(segment, token, numPrevDiagonal);
+    numPrevDiagonal = measureSegment(segment, token, movePenaltyInstance, numPrevDiagonal);
     totalDistance += segment.distance;
     totalMoveDistance += segment.moveDistance;
     totalDiagonals = numPrevDiagonal; // Already summed in measureSegment.
@@ -367,7 +372,7 @@ function _computeSegmentDistances() {
  * @param {number} [numPrevDiagonal=0]    Number of previous diagonals for the segment
  * @returns {number} numPrevDiagonal
  */
-export function measureSegment(segment, token, numPrevDiagonal = 0) {
+export function measureSegment(segment, token, movePenaltyInstance, numPrevDiagonal = 0) {
   segment.numPrevDiagonal = numPrevDiagonal;
 
   // Measure the path taken if moving over terrain.
@@ -376,16 +381,10 @@ export function measureSegment(segment, token, numPrevDiagonal = 0) {
   segment.numDiagonal = 0;
   const path = [segment.ray.A, segment.ray.B];
 
-  // const path = terrainPathForMovement(segment.ray.A, segment.ray.B, token);
-  // const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
-  // path.forEach(pt => pt.z = gridUnitsToPixels(pt.elevation));
-
-  // At the end of the path, move up in elevation to
-
   let prevPt = path[0];
   for ( let i = 1, n = path.length; i < n; i += 1 ) {
     const currPt = path[i];
-    const res = MoveDistance.measure(prevPt, currPt, { token, useAllElevation: segment.last, numPrevDiagonal });
+    const res = MoveDistance.measure(prevPt, currPt, { token, useAllElevation: segment.last, numPrevDiagonal, movePenaltyInstance });
     segment.distance += res.distance;
     segment.moveDistance += res.moveDistance;
     segment.numDiagonal += res.numDiagonal;

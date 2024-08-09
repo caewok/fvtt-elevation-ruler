@@ -1,9 +1,9 @@
 /* globals
 canvas,
+CONFIG,
 CONST,
 game,
-PIXI,
-Ruler
+PIXI
 */
 "use strict";
 
@@ -13,6 +13,7 @@ import { measureSegment } from "./Ruler.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { gridShape, pointFromGridCoordinates, canvasElevationFromCoordinates } from "./grid_coordinates.js";
+import { MovePenalty } from "./MovePenalty.js";
 
 // Functions used to determine token speed colors.
 
@@ -53,6 +54,11 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
     minDistance = totalCombatMoveDistance;
   }
 
+  // Construct a move penalty instance that covers all the segments.
+  const path = ruler.segments.map(s => s.ray.A);
+  path.push(ruler.segments.at(-1).ray.B);
+  const movePenaltyInstance = new MovePenalty(token, undefined, path)
+
   return segment => {
     if ( !tokenSpeed ) {
       segment.speed = defaultColor;
@@ -70,7 +76,7 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
       if ( !speedCategory ) speedCategory = SPEED.CATEGORIES.at(-1);
 
       segment.speed = speedCategory;
-      let newPrevDiagonal = measureSegment(segment, token, numPrevDiagonal);
+      let newPrevDiagonal = measureSegment(segment, token, movePenaltyInstance, numPrevDiagonal);
 
       // If we have exceeded maxDistance, determine if a split is required.
       const newDistance = totalCombatMoveDistance + segment.moveDistance;
@@ -93,7 +99,7 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
               const segments = _splitSegmentAt(segment, breakpoint);
               unprocessed.push(segments[1]);
               segment = segments[0];
-              newPrevDiagonal = measureSegment(segment, token, numPrevDiagonal);
+              newPrevDiagonal = measureSegment(segment, token, movePenaltyInstance, numPrevDiagonal);
             }
           }
         }
