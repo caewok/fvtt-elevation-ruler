@@ -236,28 +236,19 @@ export class MovePenalty {
   _penaltiesForIntersections(start, end, cutawayIxs) {
     if ( !cutawayIxs.length ) return 1;
 
-    let _timeSetup = performance.now();
-    const testRegions = this.constructor.terrainAPI && this.pathRegions;
+    // Set up the token clone to add and subtract terrains.
     const tokenMultiplier = this.constructor.tokenMultiplier;
     let tClone = this.moveToken;
-    let _timeTestRegion = performance.now();
-    let _timeRemoveFromToken;
-    let _timeFirstInitialize = 0;
+    const testRegions = this.constructor.terrainAPI && this.pathRegions;
     if ( testRegions ) {
       tClone = this.localTokenClone;
       const Terrain = CONFIG.terrainmapper.Terrain;
       const tokenTerrains = Terrain.allOnToken(tClone);
-      _timeRemoveFromToken = performance.now();
       if ( tokenTerrains.length ) {
         CONFIG.terrainmapper.Terrain.removeFromTokenLocally(tClone, tokenTerrains, { refresh: false });
-
-        _timeFirstInitialize = performance.now();
         tClone.actor._initialize(); // This is slow; we really need something more specific to active effects.
-        _timeFirstInitialize = performance.now() - _timeFirstInitialize;
       }
-      _timeRemoveFromToken = performance.now() - _timeRemoveFromToken;
     }
-    _timeTestRegion = performance.now() - _timeTestRegion;
     const startingSpeed = this.speedFn(tClone) || 1;
 
     // Traverse each intersection, determining the speed multiplier from starting speed
@@ -273,25 +264,10 @@ export class MovePenalty {
     cutawayIxs = cutawayIxs.map(ix => convertToDistance(shallowCopyCutawayIntersection(ix))); // Avoid modifying the originals.
     cutawayIxs.push(end2d);
     cutawayIxs.sort((a, b) => a.x - b.x);
-    _timeSetup = performance.now() - _timeSetup;
-    let _timeToken = 0;
-    let _timeDrawing = 0;
-    let _timeRegion = 0;
-    let _timeModifyTerrains = 0;
-    let _timeIx = performance.now();
-    let _timeLoop = performance.now();
     for ( const ix of cutawayIxs ) {
-      if ( prevIx.token ) _timeToken += performance.now() - _timeIx;
-      if ( prevIx.drawing ) _timeDrawing += performance.now() - _timeIx;
-      if ( prevIx.region ) _timeRegion += performance.now() - _timeIx;
-      _timeIx = performance.now();
-
       // Must invert the multiplier to apply them as penalties. So a 2x penalty is 1/2 times speed.
       const multFn = ix.movingInto ? x => 1 / x : x => x;
-
-      const _timeModifyStart = performance.now();
       const terrainFn = ix.movingInto ? this.#addTerrainsToToken.bind(this) : this.#removeTerrainsFromToken.bind(this);
-      _timeModifyTerrains += performance.now() - _timeModifyStart;
 
       // Handle all intersections at the same point.
       if ( ix.almostEqual(prevIx) ) {
@@ -317,36 +293,10 @@ export class MovePenalty {
       if ( ix.drawing ) currentMultiplier *= multFn(ix.drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY));
       if ( ix.region ) terrainFn(tClone, ix.region);
     }
-    if ( prevIx.token ) _timeToken += performance.now() - _timeIx;
-    if ( prevIx.drawing ) _timeDrawing += performance.now() - _timeIx;
-    if ( prevIx.region ) _timeRegion += performance.now() - _timeIx;
-    _timeLoop = performance.now() - _timeLoop;
 
     // Determine the ratio compared to a set speed
-    let _timeFinalize = performance.now();
     const totalDefaultTime = totalDistance / startingSpeed;
     const avgMultiplier = (totalDefaultTime / totalTime) || 0;
-    _timeFinalize = performance.now() - _timeFinalize;
-
-    if ( CONFIG[MODULE_ID].debug ) {
-      console.group(`${MODULE_ID}|_penaltiesForIntersections`);
-      console.debug(`${start.x},${start.y},${start.z} --> ${end.x},${end.y},${end.z}`);
-      console.table({
-        setup: _timeSetup.toNearest(0.01),
-        testRegion: _timeTestRegion.toNearest(0.01),
-        removeFromToken: _timeRemoveFromToken.toNearest(0.01),
-        firstInitialize: _timeFirstInitialize.toNearest(0.01),
-        loop: _timeLoop.toNearest(0.01),
-        token: _timeToken.toNearest(0.01),
-        drawing: _timeDrawing.toNearest(0.01),
-        region: _timeRegion.toNearest(0.01),
-        modifyTerrains: _timeModifyTerrains.toNearest(0.01),
-        finalize: _timeFinalize.toNearest(0.01),
-        total: (_timeSetup + _timeLoop + _timeFinalize).toNearest(0.01)
-      });
-      console.groupEnd(`${MODULE_ID}|_penaltiesForIntersections`);
-    }
-
     return avgMultiplier;
   }
 
