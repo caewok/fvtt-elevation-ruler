@@ -55,9 +55,7 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
   }
 
   // Construct a move penalty instance that covers all the segments.
-  const path = ruler.segments.map(s => s.ray.A);
-  path.push(ruler.segments.at(-1).ray.B);
-  const movePenaltyInstance = new MovePenalty(token, undefined, path)
+  const movePenaltyInstance = ruler._movePenaltyInstance ??= new MovePenalty(token);
 
   return segment => {
     if ( !tokenSpeed ) {

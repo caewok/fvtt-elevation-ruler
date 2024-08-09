@@ -25,8 +25,7 @@ export class MoveDistance {
    *  Euclidean on a grid also uses grid squares, but measures using actual diagonal from center to center.
    */
   static measure(a, b, { token, gridless = false, movePenaltyInstance, ...opts } = {}) {
-    movePenaltyInstance ??= new MovePenalty(token, undefined, [a, b]);
-    opts.penaltyFn = movePenaltyInstance.movementPenaltyForSegment.bind(movePenaltyInstance);
+    opts.penaltyFn = movePenaltyInstance ? movePenaltyInstance.movementPenaltyForSegment.bind(movePenaltyInstance) : () => 1;
     opts.token = token;
     const cl = this._getChildClass(gridless);
     return cl.measure(a, b, opts);

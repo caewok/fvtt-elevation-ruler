@@ -69,6 +69,16 @@ Each waypoint has added properties:
 // ----- NOTE: Wrappers ----- //
 
 /**
+ * Wrap Ruler.prototype.clear
+ * Delete the move penalty instance
+ */
+function clear(wrapper) {
+  log("-----Clearing movePenaltyInstance-----");
+  delete this._movePenaltyInstance;
+  return wrapper();
+}
+
+/**
  * Wrap Ruler.prototype._getMeasurementData
  * Store the current userElevationIncrements for the destination.
  * Store segment information, possibly including pathfinding.
@@ -348,9 +358,13 @@ function _computeSegmentDistances() {
   }
 
   // Construct a move penalty instance that covers all the segments.
-  const path = this.segments.map(s => s.ray.A);
-  path.push(this.segments.at(-1).ray.B);
-  const movePenaltyInstance = new MovePenalty(token, undefined, path)
+  let movePenaltyInstance;
+  if ( token ) {
+    movePenaltyInstance = this._movePenaltyInstance ??= new MovePenalty(token);
+    const path = this.segments.map(s => s.ray.A);
+    path.push(this.segments.at(-1).ray.B);
+    movePenaltyInstance.restrictToPath(path);
+  }
 
   for ( const segment of this.segments ) {
     numPrevDiagonal = measureSegment(segment, token, movePenaltyInstance, numPrevDiagonal);
@@ -461,6 +475,7 @@ function _onMoveKeyDown(wrapped, context) {
 }
 
 PATCHES.BASIC.WRAPS = {
+  clear,
   _getMeasurementData,
   update,
   _removeWaypoint,
