@@ -10,6 +10,8 @@ PIXI
 import { MODULE_ID, FLAGS, MODULES_ACTIVE, SPEED } from "./const.js";
 import { Settings } from "./settings.js";
 import { getCenterPoint3d } from "./grid_coordinates.js";
+import { movementType } from "./token_hud.js";
+import { log } from "./util.js";
 
 /*
 Class to measure penalty, as percentage of distance, between two points.
@@ -47,8 +49,8 @@ export class MovePenalty {
   constructor(moveToken, speedFn, path = []) {
     this.moveToken = moveToken;
     this.speedFn = speedFn ?? (token => foundry.utils.getProperty(token, SPEED.ATTRIBUTES[token.movementType]));
-    const tokenMultiplier = this.tokenMultiplier;
-    const terrainAPI = this.terrainAPI;
+    const tokenMultiplier = this.constructor.tokenMultiplier;
+    const terrainAPI = this.constructor.terrainAPI;
 
     // Only regions with terrains; tokens if that setting is enabled; drawings if enabled.
     if ( tokenMultiplier !== 1 ) canvas.tokens.placeables.forEach(t => this.tokens.add(t));
@@ -92,9 +94,29 @@ export class MovePenalty {
    *   - @prop {Actor} actor
    */
   get localTokenClone() {
-    const actor = new CONFIG.Actor.documentClass(this.moveToken.actor.toObject())
-    const document = new CONFIG.Token.documentClass(this.moveToken.document.toObject())
-    return { document, actor };
+    const moveToken = this.moveToken;
+    const actor = new CONFIG.Actor.documentClass(moveToken.actor.toObject())
+    const document = new CONFIG.Token.documentClass(moveToken.document.toObject())
+    const tClone = { document, actor, _original: moveToken };
+
+    // Add the movementType and needed properties to calculate movement type.
+    Object.defineProperties(tClone, {
+      movementType: {
+        get: movementType
+      },
+      center: {
+        get: function() {
+          const {x, y} = this._original.getCenterPoint(this.document);
+          return new PIXI.Point(x, y);
+        }
+      },
+      elevationE: {
+        get: function() {
+          return this.document.elevation
+        }
+      }
+    });
+    return tClone;
   }
 
   // ----- NOTE: Primary methods ----- //
@@ -106,12 +128,15 @@ export class MovePenalty {
    * @returns {number} The number used to multiply the move speed along the segment.
    */
   movementPenaltyForSegment(startCoords, endCoords) {
+    const t0 = performance.now();
     const start = getCenterPoint3d(startCoords);
     const end = getCenterPoint3d(endCoords);
     const cutawayShapes = this._cutawayShapes(start, end);
     if ( !cutawayShapes.length ) return 1;
     const cutawayIxs = this._intersectionsForCutawayShapes(start, end, cutawayShapes);
     const changePts = this._penaltiesForIntersections(start, end, cutawayIxs);
+    const t1 = performance.now();
+    log(`movementPenaltyForSegment| ${startCoords.x},${startCoords.y},${startCoords.z}(${startCoords.i},${startCoords.j},${startCoords.k}) --> ${endCoords.x},${endCoords.y},${endCoords.z}(${endCoords.i},${endCoords.j},${endCoords.k}) took ${(t1-t0).toNearest(0.01)} ms.`);
     return changePts.avgMultiplier;
   }
 
@@ -140,9 +165,10 @@ export class MovePenalty {
    */
   _cutawayShapes(start, end) {
     const shapes = [];
+    const terrainAPI = this.constructor.terrainAPI;
     for ( const region of this.regions ) {
-      this.terrainAPI.ElevationHandler._fromPoint3d(start);
-      this.terrainAPI.ElevationHandler._fromPoint3d(end);
+      terrainAPI.ElevationHandler._fromPoint3d(start);
+      terrainAPI.ElevationHandler._fromPoint3d(end);
       const combined = region.terrainmapper._cutaway(start, end);
       if ( !combined ) continue;
       const polys = combined.toPolygons();
@@ -210,8 +236,8 @@ export class MovePenalty {
       return arr;
     }
 
-    const testRegions = this.terrainAPI && this.regions;
-    const tokenMultiplier = this.tokenMultiplier;
+    const testRegions = this.constructor.terrainAPI && this.regions;
+    const tokenMultiplier = this.constructor.tokenMultiplier;
     let tClone = this.moveToken;
     if ( testRegions ) {
       tClone = this.localTokenClone;
