@@ -3,6 +3,7 @@ canvas,
 game,
 CONFIG,
 Hooks,
+loadTemplates,
 ui
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -29,19 +30,7 @@ import {
   MoveDistanceGridless,
   MoveDistanceGridded } from "./MoveDistance.js";
 
-import {
-  MovePenalty,
-  MovePenaltyGridless,
-  MovePenaltyGridded,
-
-  // For debugging
-  TokenMovePenaltyGridless,
-  TerrainMovePenaltyGridless,
-  DrawingMovePenaltyGridless,
-
-  TokenMovePenaltyGridded,
-  DrawingMovePenaltyGridded,
-  TerrainMovePenaltyGridded } from "./MovePenalty.js";
+import { MovePenalty } from "./MovePenalty.js";
 
 // Pathfinding
 import { BorderTriangle, BorderEdge } from "./pathfinding/BorderTriangle.js";
@@ -153,18 +142,7 @@ Hooks.once("init", function() {
       MoveDistance,
       MoveDistanceGridless,
       MoveDistanceGridded,
-      MovePenalty,
-      MovePenaltyGridless,
-      MovePenaltyGridded,
-
-      // For debugging
-      TokenMovePenaltyGridless,
-      TerrainMovePenaltyGridless,
-      DrawingMovePenaltyGridless,
-
-      TokenMovePenaltyGridded,
-      DrawingMovePenaltyGridded,
-      TerrainMovePenaltyGridded
+      MovePenalty
     },
 
     // Pathfinding
@@ -187,7 +165,7 @@ Hooks.once("init", function() {
     Settings
   };
 
-  loadTemplates(Object.values(TEMPLATES)).then(_value => log(`Templates loaded.`)); // eslint-disable-line no-unused-vars
+  loadTemplates(Object.values(TEMPLATES)).then(_value => log(`Templates loaded.`));
 });
 
 // Setup is after init; before ready.

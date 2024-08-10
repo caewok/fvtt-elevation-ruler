@@ -56,7 +56,7 @@ PATCHES.MOVEMENT_SELECTION.HOOKS = { renderTokenHUD };
  * Return movement type based on the flag and if auto, on token elevation.
  * @type {MOVEMENT_TYPE}
  */
-function movementType() {
+export function movementType() {
   // For dnd5e, use status types
   if ( game.system.id === "dnd5e" ) {
     if ( !this.actor?.statuses ) return "WALK";
