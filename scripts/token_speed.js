@@ -9,7 +9,7 @@ PIXI
 
 import { SPEED } from "./const.js";
 import { Settings } from "./settings.js";
-import { measureSegment } from "./Ruler.js";
+import { measureSegment } from "./segments.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { gridShape, pointFromGridCoordinates, canvasElevationFromCoordinates } from "./grid_coordinates.js";
