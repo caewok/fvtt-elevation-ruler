@@ -171,22 +171,23 @@ export function constructPathfindingSegments(segments, segmentMap) {
   if ( !segmentMap.size ) return segments;
   const newSegments = [];
   for ( const segment of segments ) {
-    const A = Point3d.fromObject(segment.ray.A);
-    const B = Point3d.fromObject(segment.ray.B);
-    const pathPoints = segmentMap.get(A.to2d().key);
+    const key = `${segment.ray.A.key}|${segment.ray.B.key}`;
+    const pathPoints = segmentMap.get(key);
     if ( !pathPoints ) {
       newSegments.push(segment);
       continue;
     }
-
+    const A = Point3d.fromObject(segment.ray.A);
+    const B = Point3d.fromObject(segment.ray.B);
     const nPoints = pathPoints.length;
     let prevPt = pathPoints[0];
-    prevPt.z ??= segment.ray.A.z;
+    prevPt.z ??= A.z;
     for ( let i = 1; i < nPoints; i += 1 ) {
       const currPt = pathPoints[i];
       currPt.z ??= A.z;
       const newSegment = { ray: new Ray3d(prevPt, currPt) };
       newSegment.ray.pathfinding = true; // TODO: Was used by  canvas.grid.grid._getRulerDestination.
+      newSegment.waypointIdx = segment.waypointIdx;
       newSegments.push(newSegment);
       prevPt = currPt;
     }

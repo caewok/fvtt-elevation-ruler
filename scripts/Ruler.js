@@ -320,23 +320,18 @@ function _getMeasurementSegments(wrapped) {
   if ( !token ) return segments;
 
   const usePathfinding = Settings.get(Settings.KEYS.CONTROLS.PATHFINDING) ^ Settings.FORCE_TOGGLE_PATHFINDING;
+  let pathPoints = [];
+  const t0 = performance.now();
+  const lastSegment = segments.at(-1);
   if ( usePathfinding ) {
-    const t0 = performance.now();
     // If currently pathfinding, set path for the last segment, overriding any prior path.
     // Pathfinding when: the pathfinding icon is enabled or the temporary toggle key is held.
     // TODO: Pathfinding should account for region elevation changes and handle flying/burrowing.
-    const lastSegment = segments.at(-1);
-    const pathPoints = calculatePathPointsForSegment(lastSegment, token);
-    const lastA = PIXI.Point.fromObject(lastSegment.ray.A); // Want 2d version.
-    if ( pathPoints.length > 2 ) segmentMap.set(lastA.key, pathPoints);
-    else segmentMap.delete(lastA.key);
-    const t1 = performance.now();
-    log(`_getMeasurementSegments|Found path with ${pathPoints.length} points in ${t1-t0} ms.`, pathPoints);
+    pathPoints = calculatePathPointsForSegment(lastSegment, token);
+
   } else if ( MODULES_ACTIVE.TERRAIN_MAPPER ){
     // Determine the region path.
-    const t0 = performance.now();
     const ElevationHandler = MODULES_ACTIVE.API.TERRAIN_MAPPER.ElevationHandler;
-    const lastSegment = segments.at(-1);
     const { gridUnitsToPixels, pixelsToGridUnits } = CONFIG.GeometryLib.utils;
     const { A, B } = lastSegment.ray;
     const start = { ...A, elevation: pixelsToGridUnits(A.z) };
@@ -345,18 +340,19 @@ function _getMeasurementSegments(wrapped) {
     const burrowing = tokenIsBurrowing(token, A) || tokenIsBurrowing(token, B);
     const pathPoints = ElevationHandler.constructPath(start, end, { flying, burrowing, token });
     pathPoints.forEach(pt => pt.z = gridUnitsToPixels(pt.elevation));
-    const lastA = PIXI.Point.fromObject(lastSegment.ray.A); // Want 2d version.
-    if ( pathPoints.length > 2 ) segmentMap.set(lastA.key, pathPoints);
-    else segmentMap.delete(lastA.key);
-    const t1 = performance.now();
-    log(`_getMeasurementSegments|Found region path with ${pathPoints.length} points in ${t1-t0} ms.`, pathPoints);
   }
+  const t1 = performance.now();
+  const key = `${lastSegment.ray.A.key}|${lastSegment.ray.B.key}`;
+  if ( pathPoints.length > 2 ) {
+    segmentMap.set(key, pathPoints);
+    log(`_getMeasurementSegments|Found path with ${pathPoints.length} points in ${t1-t0} ms.`, pathPoints);
+  } else segmentMap.delete(key);
 
   // For each segment, replace with path sub-segment if pathfinding or region paths were used for that segment.
-  const t0 = performance.now();
+  const t2 = performance.now();
   const newSegments = constructPathfindingSegments(segments, segmentMap);
-  const t1 = performance.now();
-  log(`_getMeasurementSegments|${newSegments.length} segments processed in ${t1-t0} ms.`);
+  const t3 = performance.now();
+  log(`_getMeasurementSegments|${newSegments.length} segments processed in ${t3-t2} ms.`);
   return newSegments;
 }
 
@@ -397,21 +393,16 @@ function _computeDistance() {
   if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
 
   // Compute the waypoint distances for labeling. (Distance to immediately previous waypoint.)
-  const waypointKeys = new Set(this.waypoints.map(w => PIXI.Point._tmp.copyFrom(w).key));
   let waypointDistance = 0;
   let waypointMoveDistance = 0;
-
   let currWaypointIdx = -1;
-  const maxWaypointIdx = this.waypoints.length - 1;
   for ( const segment of this.segments ) {
-    // Segments assumed to be in order of the waypoint.
-    const A = PIXI.Point._tmp.copyFrom(segment.ray.A);
-    if ( waypointKeys.has(A.key) && currWaypointIdx < maxWaypointIdx ) {
-      currWaypointIdx += 1;
+    if ( Object.hasOwn(segment, "waypointIdx") && segment.waypointIdx !== currWaypointIdx ) {
+      currWaypointIdx = segment.waypointIdx;
       waypointDistance = 0;
       waypointMoveDistance = 0;
     }
-    segment.waypointIdx = currWaypointIdx;
+
     waypointDistance += segment.distance;
     waypointMoveDistance += segment.moveDistance;
     segment.waypointDistance = waypointDistance;
