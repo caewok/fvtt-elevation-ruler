@@ -61,6 +61,28 @@ import { MoveDistance } from "./MoveDistance.js";
  * - clear when drag abandoned
  */
 
+/* Ruler measure workflow
+- Update destination
+- _getMeasurementSegments
+  --> Create new array of segments
+  * ER assigns elevation value to each segment based on user increments: `elevateSegments`
+  * ER either uses pathfinding or TM's region path to expand the segments
+
+- _computeDistance
+  --> iterates over each segment
+  --> calculates totalDistance and totalCost by iterating over segments.
+  --> uses `canvas.grid.measurePath` for each with the _getCostFunction
+  --> calculates distance, cost, cumulative distance, and cumulative cost for each segment
+  * ER uses `_computeSegmentDistances` to calculate 3d distance with move penalty
+  * ER adds segment properties used for labeling
+- _broadcastMeasurement
+- _drawMeasuredPath
+  --> Iterates over each segment, assigning a label to each using _getSegmentLabel
+    * ER adds elevation and move penalty label information
+- _highlightMeasurementSegments
+  * ER splits the highlighting at move breaks if speed highlighting is set
+*/
+
 /* Elevation measurement
 
 Each waypoint has added properties:
@@ -169,7 +191,7 @@ function _broadcastMeasurement(wrapped) {
   wrapped();
 }
 
-// ----- NOTE: Waypoints, Origin, Destination ----- //
+// ----- NOTE: Waypoints, origin, destination ----- //
 
 /**
  * Override Ruler.prototype._addWaypoint
@@ -264,66 +286,6 @@ function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
 // ----- NOTE: Segments ----- //
 
 /**
- * Override Ruler.prototype._computeDistance
- * Use measurement that counts segments within a grid square properly.
- * Add moveDistance property to each segment; track the total.
- * If token not present or Terrain Mapper not active, this will be the same as segment distance.
- */
-function _computeDistance() {
-  // If not this ruler's user, use the segments already calculated and passed via socket.
-  if ( this.user !== game.user ) return;
-
-  log("_computeDistance");
-
-  // Debugging
-  const debug = CONFIG[MODULE_ID].debug;
-  if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
-
-  // Determine the distance of each segment.
-  _computeSegmentDistances.call(this);
-
-  if ( debug ) {
-    switch ( this.segments.length ) {
-      case 1: break;
-      case 2: break;
-      case 3: break;
-      case 4: break;
-      case 5: break;
-      case 6: break;
-      case 7: break;
-      case 8: break;
-      case 9: break;
-    }
-  }
-
-  // Debugging
-  if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
-
-  // Compute the waypoint distances for labeling. (Distance to immediately previous waypoint.)
-  const waypointKeys = new Set(this.waypoints.map(w => PIXI.Point._tmp.copyFrom(w).key));
-  let waypointDistance = 0;
-  let waypointMoveDistance = 0;
-
-  let currWaypointIdx = -1;
-  const maxWaypointIdx = this.waypoints.length - 1;
-  for ( const segment of this.segments ) {
-    // Segments assumed to be in order of the waypoint.
-    const A = PIXI.Point._tmp.copyFrom(segment.ray.A);
-    if ( waypointKeys.has(A.key) && currWaypointIdx < maxWaypointIdx ) {
-      currWaypointIdx += 1;
-      waypointDistance = 0;
-      waypointMoveDistance = 0;
-    }
-    segment.waypointIdx = currWaypointIdx;
-    waypointDistance += segment.distance;
-    waypointMoveDistance += segment.moveDistance;
-    segment.waypointDistance = waypointDistance;
-    segment.waypointMoveDistance = waypointMoveDistance;
-    segment.waypointElevationIncrement = userElevationChangeAtWaypoint(this.waypoints[currWaypointIdx]);
-  }
-}
-
-/**
  * Mixed wrap of  Ruler.prototype._getMeasurementSegments
  * Add elevation information to the segments.
  * Add pathfinding segments.
@@ -396,6 +358,66 @@ function _getMeasurementSegments(wrapped) {
   const t1 = performance.now();
   log(`_getMeasurementSegments|${newSegments.length} segments processed in ${t1-t0} ms.`);
   return newSegments;
+}
+
+/**
+ * Override Ruler.prototype._computeDistance
+ * Use measurement that counts segments within a grid square properly.
+ * Add moveDistance property to each segment; track the total.
+ * If token not present or Terrain Mapper not active, this will be the same as segment distance.
+ */
+function _computeDistance() {
+  // If not this ruler's user, use the segments already calculated and passed via socket.
+  if ( this.user !== game.user ) return;
+
+  log("_computeDistance");
+
+  // Debugging
+  const debug = CONFIG[MODULE_ID].debug;
+  if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
+
+  // Determine the distance of each segment.
+  _computeSegmentDistances.call(this);
+
+  if ( debug ) {
+    switch ( this.segments.length ) {
+      case 1: break;
+      case 2: break;
+      case 3: break;
+      case 4: break;
+      case 5: break;
+      case 6: break;
+      case 7: break;
+      case 8: break;
+      case 9: break;
+    }
+  }
+
+  // Debugging
+  if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
+
+  // Compute the waypoint distances for labeling. (Distance to immediately previous waypoint.)
+  const waypointKeys = new Set(this.waypoints.map(w => PIXI.Point._tmp.copyFrom(w).key));
+  let waypointDistance = 0;
+  let waypointMoveDistance = 0;
+
+  let currWaypointIdx = -1;
+  const maxWaypointIdx = this.waypoints.length - 1;
+  for ( const segment of this.segments ) {
+    // Segments assumed to be in order of the waypoint.
+    const A = PIXI.Point._tmp.copyFrom(segment.ray.A);
+    if ( waypointKeys.has(A.key) && currWaypointIdx < maxWaypointIdx ) {
+      currWaypointIdx += 1;
+      waypointDistance = 0;
+      waypointMoveDistance = 0;
+    }
+    segment.waypointIdx = currWaypointIdx;
+    waypointDistance += segment.distance;
+    waypointMoveDistance += segment.moveDistance;
+    segment.waypointDistance = waypointDistance;
+    segment.waypointMoveDistance = waypointMoveDistance;
+    segment.waypointElevationIncrement = userElevationChangeAtWaypoint(this.waypoints[currWaypointIdx]);
+  }
 }
 
 // ----- NOTE: Segment labeling and highlighting ----- //
@@ -620,7 +642,7 @@ function _onMoveKeyDown(wrapped, context) {
 }
 
 
-// ----- NOTE: Methods ----- //
+// ----- NOTE: New methods ----- //
 
 /**
  * Add Ruler.prototype.incrementElevation
