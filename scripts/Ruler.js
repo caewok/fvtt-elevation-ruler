@@ -445,7 +445,7 @@ function _getSegmentLabel(wrapped, segment, totalDistance) {
   const terrainLabel = segmentTerrainLabel(segment);
 
   // Label when in combat and there are past moves.
-  const combatLabel = segmentCombatLabel();
+  const combatLabel = segmentCombatLabel(this.token);
 
   // Put it all together.
   let label = `${origLabel}`;
