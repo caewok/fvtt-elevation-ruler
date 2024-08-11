@@ -1,6 +1,6 @@
 /* globals
-game,
-Ruler
+CONFIG,
+game
 */
 "use strict";
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -56,31 +56,57 @@ PATCHES.MOVEMENT_SELECTION.HOOKS = { renderTokenHUD };
  * Return movement type based on the flag and if auto, on token elevation.
  * @type {MOVEMENT_TYPE}
  */
-export function movementType() {
-  // For dnd5e, use status types
-  if ( game.system.id === "dnd5e" ) {
-    if ( !this.actor?.statuses ) return "WALK";
-    if ( this.actor.statuses.has("flying") ) return "FLY";
-    if ( this.actor.statuses.has("burrow") ) return "BURROW";
-    if ( Settings.get(Settings.KEYS.AUTO_MOVEMENT_TYPE) ) return determineMovementType(this);
-    return "WALK";
-  }
-
-  // Otherwise, use the Token HUD.
-  const selectedMovement = this.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_SELECTION) ?? MOVEMENT_TYPES.AUTO;
-  if ( selectedMovement === MOVEMENT_TYPES.AUTO ) return determineMovementType(this);
-  return keyForValue(MOVEMENT_TYPES, selectedMovement);
-}
+export function movementType() { return movementTypeForTokenAt(this); }
 
 PATCHES.BASIC.GETTERS = { movementType };
+
+/**
+ * Get the movement type for a token at a position.
+ * @param {Token} token
+ * @param {RegionMovementWaypoint|Point3d} position
+ * @returns {MOVEMENT_TYPE}
+ */
+export function movementTypeForTokenAt(token, position) {
+  if ( game.system.id === "dnd5e" ) return dnd5eMovementType(token, position);
+  return hudMovementType(token, position);
+}
+
+/**
+ * Movement type using the token HUD
+ * @param {Token} token
+ * @param {RegionMovementWaypoint|Point3d} position
+ * @type {MOVEMENT_TYPE}
+ */
+function hudMovementType(token, position) {
+  const selectedMovement = token.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_SELECTION) ?? MOVEMENT_TYPES.AUTO;
+  if ( selectedMovement === MOVEMENT_TYPES.AUTO ) return determineMovementType(token, position);
+  return selectedMovement;
+}
+
+/**
+ * Movement type for dnd5e.
+ * If both flying and burrowing, return flying.
+ * @param {Token} token
+ * @param {RegionMovementWaypoint|Point3d} position
+ * @type {MOVEMENT_TYPE}
+ */
+function dnd5eMovementType(token, position) {
+  if ( !token.actor?.statuses ) return MOVEMENT_TYPES.WALK;
+  if ( token.actor.statuses.has("flying") ) return MOVEMENT_TYPES.FLY;
+  if ( token.actor.statuses.has("burrow") ) return MOVEMENT_TYPES.BURROW;
+  if ( Settings.get(Settings.KEYS.AUTO_MOVEMENT_TYPE) ) return determineMovementType(token, position);
+  return MOVEMENT_TYPES.WALK;
+}
 
 /**
  * Determine movement type based on this token's elevation.
  * @returns {MOVEMENT_TYPE}
  */
-function determineMovementType(token) {
-  const groundElevation = CONFIG.Canvas.rulerClass.terrainElevationAtLocation(token.center);
-  return keyForValue(MOVEMENT_TYPES, Math.sign(token.elevationE - groundElevation) + 1);
+function determineMovementType(token, position) {
+  position ??= { ...token.center, elevation: token.elevationE, z: token.elevationZ };
+  const startingElevation = (position.elevation ?? CONFIG.GeometryLib.utils.pixelsToGridUnits(position.z)) || 0; // Strip NaN
+  const groundElevation = CONFIG.Canvas.rulerClass.terrainElevationAtLocation(position, startingElevation);
+  return MOVEMENT_TYPES.forCurrentElevation(position.elevation, groundElevation);
 }
 
 /**

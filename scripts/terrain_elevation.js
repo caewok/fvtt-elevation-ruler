@@ -119,10 +119,9 @@ elevationAtLocation -- all ruler types
 Used by ruler to get elevation at waypoints and at the end of the ruler.
 */
 
-import { MODULES_ACTIVE, MODULE_ID, FLAGS } from "./const.js";
+import { MODULES_ACTIVE, MODULE_ID, FLAGS, MOVEMENT_TYPES } from "./const.js";
 import { Settings } from "./settings.js";
-import { tokenIsFlying, tokenIsBurrowing } from "./segments.js";
-
+import { movementTypeForTokenAt } from "./token_hud.js";
 
 /**
  * Calculate the user change to elevation at this waypoint.
@@ -226,8 +225,9 @@ function tokenElevationForMovement(start, location, opts = {}) {
   const end = { ...location };
   end.elevation = forceToGround ? terrainElevationAtLocation(location, start.elevation) : start.elevation;
   if ( opts.token && !forceToGround ) {
-    if ( tokenIsFlying(opts.token, start) ) opts.flying ??= true;
-    if ( tokenIsBurrowing(opts.token, start) ) opts.burrowing ??= true;
+    const movementTypeStart = movementTypeForTokenAt(opts.token, start);
+    opts.flying ??= movementTypeStart === MOVEMENT_TYPES.FLY;
+    opts.burrowing ??= movementTypeStart === MOVEMENT_TYPES.BURROW;
   }
   return terrainElevationForMovement(start, end, opts);
 }

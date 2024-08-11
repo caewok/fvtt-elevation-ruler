@@ -15,7 +15,7 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
-import { SPEED, MODULE_ID, MODULES_ACTIVE } from "./const.js";
+import { SPEED, MODULE_ID, MODULES_ACTIVE, MOVEMENT_TYPES } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import {
@@ -30,12 +30,13 @@ import {
   _computeSegmentDistances,
   elevateSegments,
   calculatePathPointsForSegment,
-  tokenIsFlying,
-  tokenIsBurrowing,
   constructPathfindingSegments } from "./segments.js";
+import { movementTypeForTokenAt } from "./token_hud.js";
 import {
-  _getDistanceLabels,
+  distanceLabel,
   segmentElevationLabel,
+  segmentTerrainLabel,
+  segmentCombatLabel,
   levelNameAtElevation,
   highlightLineRectangle } from "./segment_labels_highlighting.js";
 import { tokenSpeedSegmentSplitter } from "./token_speed.js";
@@ -336,8 +337,11 @@ function _getMeasurementSegments(wrapped) {
     const { A, B } = lastSegment.ray;
     const start = { ...A, elevation: pixelsToGridUnits(A.z) };
     const end = { ...B, elevation: pixelsToGridUnits(B.z) };
-    const flying = tokenIsFlying(token, A) || tokenIsFlying(token, B);
-    const burrowing = tokenIsBurrowing(token, A) || tokenIsBurrowing(token, B);
+    const movementTypeStart = movementTypeForTokenAt(token, A);
+    const endGround = terrainElevationAtLocation(end, end.elevation);
+    const movementTypeEnd =  MOVEMENT_TYPES.forCurrentElevation(end.elevation, endGround);
+    const flying = movementTypeStart === MOVEMENT_TYPES.FLY || movementTypeEnd === MOVEMENT_TYPES.FLY;
+    const burrowing = movementTypeStart === MOVEMENT_TYPES.BURROW || movementTypeEnd === MOVEMENT_TYPES.BURROW;
     const pathPoints = ElevationHandler.constructPath(start, end, { flying, burrowing, token });
     pathPoints.forEach(pt => pt.z = gridUnitsToPixels(pt.elevation));
   }
@@ -418,46 +422,35 @@ function _computeDistance() {
  * Add elevation information to the label
  */
 function _getSegmentLabel(wrapped, segment, totalDistance) {
-  // Force distance to be between waypoints instead of (possibly pathfinding) segments.
-  const origSegmentDistance = segment.distance;
-  const {
-    newSegmentDistance,
-    newMoveDistance,
-    newTotalDistance } = _getDistanceLabels(segment.waypointDistance, segment.waypointMoveDistance, totalDistance);
-  segment.distance = newSegmentDistance;
-  const origLabel = wrapped(segment, newTotalDistance);
-  segment.distance = origSegmentDistance;
-  let elevLabel = segmentElevationLabel(this, segment);
-  const levelName = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
-  if ( levelName ) elevLabel += `\n${levelName}`;
-
   if ( CONFIG[MODULE_ID].debug ) {
     if ( totalDistance >= 15 ) { console.debug("_getSegmentLabel: 15", segment, this); }
     if ( totalDistance > 30 ) { console.debug("_getSegmentLabel: 30", segment, this); }
     else if ( totalDistance > 60 ) { console.debug("_getSegmentLabel: 30", segment, this); }
   }
 
-  let moveLabel = "";
-  const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
-  if ( segment.waypointDistance !== segment.waypointMoveDistance ) {
-    if ( CONFIG[MODULE_ID].SPEED.useFontAwesome ) {
-      const style = segment.label.style;
-      if ( !style.fontFamily.includes("fontAwesome") ) style.fontFamily += ",fontAwesome";
-      moveLabel = `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${newMoveDistance}${units}`;
-    } else moveLabel = `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${newMoveDistance}${units}`;
-  }
+  // Force distance to be between waypoints instead of (possibly pathfinding) segments.
+  const origSegmentDistance = segment.distance;
+  segment.distance = distanceLabel(origSegmentDistance);
+  const origLabel = wrapped(segment, distanceLabel(totalDistance));
+  segment.distance = origSegmentDistance;
 
-  let combatLabel = "";
-  if ( game.combat?.started && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
-    const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-    const pastMoveDistance = this.token?.lastMoveDistance;
-    if ( pastMoveDistance ) combatLabel = `\nPrior: ${pastMoveDistance.toNearest(multiple)}${units}`;
-  }
+  // Label for elevation changes.
+  let elevLabel = segmentElevationLabel(this, segment);
 
+  // Label for Levels floors.
+  const levelName = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
+  if ( levelName ) elevLabel += `\n${levelName}`;
+
+  // Label for difficult terrain (variation in move distance vs distance).
+  const terrainLabel = segmentTerrainLabel(segment);
+
+  // Label when in combat and there are past moves.
+  const combatLabel = segmentCombatLabel();
+
+  // Put it all together.
   let label = `${origLabel}`;
   if ( !Settings.get(Settings.KEYS.HIDE_ELEVATION) ) label += `\n${elevLabel}`;
-  label += `${moveLabel}${combatLabel}`;
-
+  label += `${terrainLabel}${combatLabel}`;
   return label;
 }
 
@@ -575,7 +568,7 @@ async function _animateSegment(token, segment, destination) {
   if ( segment.animation?.name === undefined ) name = token.animationName;
   else name ||= Symbol(token.animationName);
   const updateOptions = {
-    // terrainmapper: { fixedDestination: true, usePath: true },
+    // terrainmapper: { usePath: false },
     rulerSegment: this.segments.length > 1,
     firstRulerSegment: segment.first,
     lastRulerSegment: segment.last,
