@@ -164,9 +164,9 @@ export function segmentTerrainLabel(s) {
  * @param {object} s    Ruler segment
  * @returns {string} The label or "" if none.
  */
-export function segmentCombatLabel() {
+export function segmentCombatLabel(token) {
   if ( game.combat?.started && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
-    const pastMoveDistance = this.token?.lastMoveDistance;
+    const pastMoveDistance = token?.lastMoveDistance;
     const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
     if ( pastMoveDistance ) return `\nPrior: ${distanceLabel(pastMoveDistance)}${units}`;
   }
