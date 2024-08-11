@@ -2,6 +2,7 @@
 canvas,
 CONFIG,
 CONST,
+game,
 PIXI
 */
 "use strict";
@@ -29,6 +30,16 @@ export function highlightLineRectangle(segment, color, name) {
     ptsB[1]
   ]);
   canvas.interface.grid.highlightPosition(name, { x: A.x, y: A.y, color, shape});
+}
+
+/**
+ * Adjust a distance value by the multiple so it displays with limited decimal positions.
+ * @param {number} dist
+ * @returns {number}
+ */
+export function distanceLabel(dist) {
+  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
+  return dist.toNearest(multiple);
 }
 
 /**
@@ -128,4 +139,36 @@ export function segmentElevationLabel(ruler, s) {
   }
   s.label.style.align = s.last ? "center" : "right";
   return labelParts.join(" ");
+}
+
+/**
+ * Construct a label to represent difficult terrain in the ruler.
+ * Difficult terrain is signified by a difference in the segment distance versus its move distance.
+ * @param {object} s    Ruler segment
+ * @returns {string} The label or "" if none.
+ */
+export function segmentTerrainLabel(s) {
+  if ( s.waypointDistance.almostEqual(s.waypointMoveDistance) ) return "";
+  const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
+  const moveDistance = distanceLabel(s.waypointMoveDistance);
+  if ( CONFIG[MODULE_ID].SPEED.useFontAwesome ) {
+    const style = s.label.style;
+    if ( !style.fontFamily.includes("fontAwesome") ) style.fontFamily += ",fontAwesome";
+    return `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${moveDistance}${units}`;
+  }
+  return `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${moveDistance}${units}`;
+}
+
+/**
+ * Construct a label to represent prior movement in combat.
+ * @param {object} s    Ruler segment
+ * @returns {string} The label or "" if none.
+ */
+export function segmentCombatLabel() {
+  if ( game.combat?.started && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
+    const pastMoveDistance = this.token?.lastMoveDistance;
+    const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
+    if ( pastMoveDistance ) return `\nPrior: ${distanceLabel(pastMoveDistance)}${units}`;
+  }
+  return "";
 }

@@ -62,26 +62,11 @@ export function _computeSegmentDistances() {
  * @returns {number} numPrevDiagonal
  */
 export function measureSegment(segment, token, movePenaltyInstance, numPrevDiagonal = 0) {
-  segment.numPrevDiagonal = numPrevDiagonal;
-
-  // Measure the path taken if moving over terrain.
-  segment.distance = 0;
-  segment.moveDistance = 0;
-  segment.numDiagonal = 0;
-  const path = [segment.ray.A, segment.ray.B];
-
-  let prevPt = path[0];
-  for ( let i = 1, n = path.length; i < n; i += 1 ) {
-    const currPt = path[i];
-    const res = MoveDistance.measure(prevPt, currPt, { token, useAllElevation: segment.last, numPrevDiagonal, movePenaltyInstance });
-    segment.distance += res.distance;
-    segment.moveDistance += res.moveDistance;
-    segment.numDiagonal += res.numDiagonal;
-    numPrevDiagonal += res.numPrevDiagonal;
-    prevPt = currPt;
-
-  }
-  return numPrevDiagonal;
+  const res = MoveDistance.measure(segment.ray.A, segment.ray.B, { token, useAllElevation: segment.last, numPrevDiagonal, movePenaltyInstance });
+  segment.distance = res.distance;
+  segment.moveDistance = res.moveDistance;
+  segment.numDiagonal = res.numDiagonal;
+  return numPrevDiagonal + res.numPrevDiagonal;
 }
 
 /**
