@@ -26,6 +26,7 @@ function _onMeasuredRulerMovement(wrapped, context) {
 
   // For each controlled token, end the drag.
   canvas.tokens.clearPreviewContainer();
+  ruler.token.document.locked = false;
   ruler.moveToken().then(_response => ruler._endMeasurement());
   return true;
 }
