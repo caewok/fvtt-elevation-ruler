@@ -1,3 +1,13 @@
+# 0.10.0
+Support Terrain Mapper v0.4.0 elevated regions and tiles.
+Better support for difficult terrain using Terrain Mapper or drawings.
+Now incrementing elevation at the end of the waypoint move, to better function with Terrain Mapper.
+Rewrite and simplify the movement penalty calculation. Measure penalties through regions and drawings using 2d cutaway intersections through the 3d shape for a given 3d line segment.
+Adjustments to how fly and burrow are handled.
+Use `actor.system.currentmove` for GURPS so it accounts for encumbrance, etc. Closes #164.
+Potential fix for token document lock (#145) thanks to @aburley1234!
+Update lancer speed attribute for Lancer 2.0. Thanks @BoltsJ!
+
 # 0.9.12
 Correct counting of elevation diagonals. Closes #161.
 Don't modify elevation based on movement type if autodetect movement is disabled. Closes #155.
