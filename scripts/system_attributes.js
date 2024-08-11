@@ -6,7 +6,8 @@ Hooks
 */
 "use strict";
 
-import { SPEED } from "./const.js";
+import { SPEED, MOVEMENT_TYPES } from "./const.js";
+import { keyForValue } from "./util.js";
 
 /**
  * @typedef {object} SpeedCategory
@@ -96,7 +97,7 @@ export function defaultWalkAttribute() {
     case "dnd4e":         return "actor.system.movement.walk.value";
     case "dnd5e":         return "actor.system.attributes.movement.walk";
     case "lancer":        return "actor.system.speed";
-    case "gurps":         return "actor.system.basicmove.value";
+    case "gurps":         return "actor.system.currentmove";
     case "pf1":
     case "D35E":          return "actor.system.attributes.speed.land.total";
     case "shadowrun5e":   return "actor.system.movement.walk.value";
@@ -261,7 +262,8 @@ const SPECIALIZED_SPEED_CATEGORIES = {
  *   (Null will disable speed highlighting.)
  */
 function sfrpgTokenSpeed(token) {
-  let speed = foundry.utils.getProperty(token, SPEED.ATTRIBUTES[token.movementType]);
+  const moveType = token.movementType;
+  let speed = foundry.utils.getProperty(token, SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, moveType)]);
   switch ( token.actor?.type ) {
     case "starship": speed = foundry.utils.getProperty(token, "actor.system.attributes.speed.value"); break;
     case "vehicle": speed = foundry.utils.getProperty(token, "actor.system.attributes.speed.drive"); break;
@@ -281,13 +283,13 @@ function pf2eTokenSpeed(token) {
   const tokenSpeed = token.actor.system.attributes.speed;
   let speed = null;
   switch (token.movementType) {
-    case 'WALK': speed = tokenSpeed.total; break;
-    case 'FLY': {
+    case MOVEMENT_TYPES.WALK: speed = tokenSpeed.total; break;
+    case MOVEMENT_TYPES.FLY: {
       const flySpeed = tokenSpeed.otherSpeeds.find(x => x.type == "fly");
       if ( typeof flySpeed !== "undefined" ) speed = flySpeed.total;
       break;
     }
-    case 'BURROW': {
+    case MOVEMENT_TYPES.BURROW: {
       const burrowSpeed = tokenSpeed.otherSpeeds.find(x => x.type == "burrow");
       if ( typeof burrowSpeed !== "undefined" ) speed = burrowSpeed.total;
       break;

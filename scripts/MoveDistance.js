@@ -8,7 +8,7 @@ CONST
 // Class to measure distance between two points, accounting for token movement through terrain.
 
 import { PhysicalDistanceGridless, PhysicalDistanceGridded } from "./PhysicalDistance.js";
-import { MovePenalty, MovePenaltyGridless, MovePenaltyGridded } from "./MovePenalty.js";
+import { MovePenalty } from "./MovePenalty.js";
 import { unitElevationFromCoordinates, pointFromGridCoordinates } from "./grid_coordinates.js";
 
 export class MoveDistance {
@@ -24,7 +24,9 @@ export class MoveDistance {
    *  Instead of mathematical shortcuts from center, actual grid squares are counted.
    *  Euclidean on a grid also uses grid squares, but measures using actual diagonal from center to center.
    */
-  static measure(a, b, { gridless = false, ...opts } = {}) {
+  static measure(a, b, { token, gridless = false, movePenaltyInstance, ...opts } = {}) {
+    opts.penaltyFn = movePenaltyInstance ? movePenaltyInstance.movementPenaltyForSegment.bind(movePenaltyInstance) : () => 1;
+    opts.token = token;
     const cl = this._getChildClass(gridless);
     return cl.measure(a, b, opts);
   }
@@ -57,7 +59,7 @@ export class MoveDistanceGridless extends MoveDistance {
    *  Euclidean on a grid also uses grid squares, but measures using actual diagonal from center to center.
    */
   static measure(a, b, { token, useAllElevation = true, stopTarget, penaltyFn } = {}) {
-    penaltyFn ??= MovePenaltyGridless.movePenaltyFn();
+    penaltyFn ??= () => 1;
 
     // Recursively calls measure without a stop target to find a breakpoint.
     if ( stopTarget ) {
@@ -69,7 +71,7 @@ export class MoveDistanceGridless extends MoveDistance {
     }
 
     // Determine penalty proportion of the a|b segment.
-    const penalty = penaltyFn(a, b, { token });
+    const penalty = 1 / penaltyFn(a, b, { token });
     const d = PhysicalDistanceGridless.measure(a, b);
     return {
       distance: d,
@@ -130,7 +132,6 @@ export class MoveDistanceGridded extends MoveDistance {
    * @param {boolean} [opts.useAllElevation]          When false, stop once 2d destination is reached
    *                                                  regardless of elevation
    * @param {number} [opts.stopTarget]                Stop the move once this amount of distance is covered
-   * @param {function} [opts.penaltyFn]               MovePenalty.movePenaltyFn() or a subclass version
    * @returns {number} Distance in grid units.
    *  A segment wholly within a square may be 0 distance.
    *  Instead of mathematical shortcuts from center, actual grid squares are counted.
@@ -148,7 +149,7 @@ export class MoveDistanceGridded extends MoveDistance {
     }
 
     // Step over each grid shape in turn. Change the distance by penalty amount.
-    penaltyFn ??= MovePenaltyGridded.movePenaltyFn();
+    penaltyFn ??= () => 1;
     const tokenMultiplier = MovePenalty.tokenMultiplier;
     let dTotal = 0;
     let dMoveTotal = 0;
@@ -158,7 +159,7 @@ export class MoveDistanceGridded extends MoveDistance {
       const changeCount = PhysicalDistanceGridded.sumGridMoves(prevGridCoords, currGridCoords);
       PhysicalDistanceGridded._convertElevationMovesToDiagonal(changeCount);
       const d = PhysicalDistanceGridded.measure(prevGridCoords, currGridCoords, { changeCount, numPrevDiagonal });
-      let penalty = penaltyFn(currGridCoords, prevGridCoords, { token, tokenMultiplier });
+      let penalty = 1 / penaltyFn(currGridCoords, prevGridCoords, { token, tokenMultiplier });
       if ( !Number.isFinite(penalty) ) penalty = 1;
       const dMove = d * penalty;
 

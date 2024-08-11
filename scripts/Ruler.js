@@ -1,5 +1,6 @@
 /* globals
 canvas,
+CanvasAnimation,
 CONFIG,
 CONST,
 game,
@@ -14,30 +15,35 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
-import { SPEED, MODULE_ID, FLAGS } from "./const.js";
+import { SPEED, MODULE_ID, MODULES_ACTIVE, MOVEMENT_TYPES } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import {
   elevationFromWaypoint,
-  elevationAtWaypoint,
   originElevation,
   destinationElevation,
   terrainElevationAtLocation,
-  userElevationChangeAtWaypoint
-} from "./terrain_elevation.js";
-
+  terrainElevationForMovement,
+  terrainPathForMovement,
+  userElevationChangeAtWaypoint } from "./terrain_elevation.js";
 import {
-  _getMeasurementSegments,
-  _getSegmentLabel,
-  _animateSegment,
-  _highlightMeasurementSegment
-} from "./segments.js";
-
+  _computeSegmentDistances,
+  elevateSegments,
+  calculatePathPointsForSegment,
+  constructPathfindingSegments } from "./segments.js";
+import { movementTypeForTokenAt } from "./token_hud.js";
+import {
+  distanceLabel,
+  segmentElevationLabel,
+  segmentTerrainLabel,
+  segmentCombatLabel,
+  levelNameAtElevation,
+  highlightLineRectangle } from "./segment_labels_highlighting.js";
+import { tokenSpeedSegmentSplitter } from "./token_speed.js";
 import { log } from "./util.js";
-
 import { PhysicalDistance } from "./PhysicalDistance.js";
-
 import { MoveDistance } from "./MoveDistance.js";
+
 
 /**
  * Modified Ruler
@@ -56,20 +62,39 @@ import { MoveDistance } from "./MoveDistance.js";
  * - clear when drag abandoned
  */
 
+/* Ruler measure workflow
+- Update destination
+- _getMeasurementSegments
+  --> Create new array of segments
+  * ER assigns elevation value to each segment based on user increments: `elevateSegments`
+  * ER either uses pathfinding or TM's region path to expand the segments
+
+- _computeDistance
+  --> iterates over each segment
+  --> calculates totalDistance and totalCost by iterating over segments.
+  --> uses `canvas.grid.measurePath` for each with the _getCostFunction
+  --> calculates distance, cost, cumulative distance, and cumulative cost for each segment
+  * ER uses `_computeSegmentDistances` to calculate 3d distance with move penalty
+  * ER adds segment properties used for labeling
+- _broadcastMeasurement
+- _drawMeasuredPath
+  --> Iterates over each segment, assigning a label to each using _getSegmentLabel
+    * ER adds elevation and move penalty label information
+- _highlightMeasurementSegments
+  * ER splits the highlighting at move breaks if speed highlighting is set
+*/
+
 /* Elevation measurement
 
 Each waypoint has added properties:
 - _userElevationIncrements: Elevation shifts up or down at this point due to user input
-- _terrainElevation: Ground/terrain elevation, calculated as needed
-- _prevElevation: The calculated elevation of this waypoint, which is the previous waypoint elevation
-  plus changes due to moving across regions
-- _forceToGround: This waypoint should force its elevation to the terrain ground level.
-
-When a waypoint is added, its _prevElevation is calculated. Then its elevation is further modified by its properties.
+- _terrainElevation: Ground/terrain elevation at this location, calculated as needed
+- elevation: The calculated elevation of this waypoint, which is the previous waypoint elevation
+  plus changes due to user increments, terrain
 
 */
 
-// ----- NOTE: Wrappers ----- //
+// ----- NOTE: Ruler broadcasting ----- //
 
 /**
  * Wrap Ruler.prototype._getMeasurementData
@@ -139,6 +164,37 @@ function update(wrapper, data) {
 }
 
 /**
+ * Mixed wrap Ruler#_broadcastMeasurement
+ * For token ruler, don't broadcast the ruler if the token is invisible or disposition secret.
+ */
+function _broadcastMeasurement(wrapped) {
+  // Update the local token elevation if using token ruler.
+  if ( this._isTokenRuler && this.token?.hasPreview ) {
+    const destination = this.segments.at(-1)?.ray.B;
+    const previewToken = this.token._preview;
+    if ( destination ) {
+      const destElevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(destination.z);
+      const elevationChanged = previewToken.document.elevation !== destElevation;
+      if ( elevationChanged && isFinite(destElevation) ) {
+        previewToken.document.elevation = destElevation;
+        previewToken.renderFlags.set({ "refreshTooltip": true })
+      }
+    }
+  }
+
+  // Don't broadcast invisible, hidden, or secret token movement when dragging.
+  if ( this._isTokenRuler
+    && this.token
+    && (this.token.document.disposition === CONST.TOKEN_DISPOSITIONS.SECRET
+     || this.token.document.hasStatusEffect(CONFIG.specialStatusEffects.INVISIBLE)
+     || this.token.document.isHidden) ) return;
+
+  wrapped();
+}
+
+// ----- NOTE: Waypoints, origin, destination ----- //
+
+/**
  * Override Ruler.prototype._addWaypoint
  * Add elevation increments before measuring.
  * @param {Point} point                    The waypoint
@@ -154,12 +210,16 @@ function _addWaypoint(point, {snap=true}={}) {
   // Set defaults
   waypoint._userElevationIncrements = 0;
   waypoint._forceToGround = Settings.FORCE_TO_GROUND;
+  waypoint.elevation = 0;
 
   // Determine the elevation up until this point
-  if ( !this.waypoints.length ) {
-    waypoint._prevElevation = this.token?.elevationE ?? canvas.scene?.flags?.terrainmapper?.[FLAGS.SCENE.BACKGROUND_ELEVATION] ?? 0;
-    waypoint._forceToGround ||= this.token ? (Settings.useAutoMoveDetection && this.token.movementType === "WALK") : false;
-  } else waypoint._prevElevation = elevationFromWaypoint(this.waypoints.at(-1), waypoint, this.token);
+  const isOriginWaypoint = !this.waypoints.length;
+  if ( isOriginWaypoint ) {
+    waypoint._forceToGround = false;
+    waypoint.elevation = this.token?.elevationE ?? terrainElevationAtLocation(point) ?? 0;
+  } else {
+    waypoint.elevation = elevationFromWaypoint(this.waypoints.at(-1), waypoint, this.token);
+  }
 
   this.waypoints.push(waypoint);
   this._state = Ruler.STATES.MEASURING;
@@ -224,37 +284,80 @@ function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
   };
 }
 
+// ----- NOTE: Segments ----- //
+
 /**
- * Mixed wrap Ruler.prototype._animateMovement
- * Add additional controlled tokens to the move, if permitted.
+ * Mixed wrap of  Ruler.prototype._getMeasurementSegments
+ * Add elevation information to the segments.
+ * Add pathfinding segments.
+ * Add segments for traversing regions.
  */
-async function _animateMovement(wrapped, token) {
-  if ( !this.segments || !this.segments.length ) return; // Ruler._animateMovement expects at least one segment.
-
-  log(`Moving ${token.name} ${this.segments.length} segments.`, [...this.segments]);
-
-  this.segments.forEach((s, idx) => s.idx = idx);
-
-  //_recalculateOffset.call(this, token);
-  const promises = [wrapped(token)];
-  for ( const controlledToken of canvas.tokens.controlled ) {
-    if ( controlledToken === token ) continue;
-    if ( !(this.user.isGM || this._canMove(controlledToken)) ) {
-      ui.notifications.error(`${game.i18n.localize("RULER.MovementNotAllowed")} for ${controlledToken.name}`);
-      continue;
+function _getMeasurementSegments(wrapped) {
+  // If not the user's ruler, segments calculated by original user and copied via socket.
+  if ( this.user !== game.user ) {
+    // Reconstruct labels if necessary.
+    let labelIndex = 0;
+    this.segments ??= [];
+    for ( const s of this.segments ) {
+      if ( !s.label ) continue; // Not every segment has a label.
+      s.label = this.labels.children[labelIndex++];
     }
-    promises.push(wrapped(controlledToken));
+    return this.segments;
   }
-  return Promise.allSettled(promises);
-}
 
-/**
- * Wrap Ruler.prototype._canMove
- * Allow GM full reign to move tokens.
- */
-function _canMove(wrapper, token) {
-  if ( this.user.isGM ) return true;
-  return wrapper(token);
+  // No segments are present if dragging back to the origin point.
+  const segments = wrapped();
+  const segmentMap = this._pathfindingSegmentMap ??= new Map();
+  if ( !segments.length ) {
+    segmentMap.clear();
+    return segments;
+  }
+
+  // Add z value (elevation in pixel units) to the segments.
+  elevateSegments(this, segments);
+
+  // If no movement token, then no region paths or pathfinding.
+  const token = this.token;
+  if ( !token ) return segments;
+
+  const usePathfinding = Settings.get(Settings.KEYS.CONTROLS.PATHFINDING) ^ Settings.FORCE_TOGGLE_PATHFINDING;
+  let pathPoints = [];
+  const t0 = performance.now();
+  const lastSegment = segments.at(-1);
+  if ( usePathfinding ) {
+    // If currently pathfinding, set path for the last segment, overriding any prior path.
+    // Pathfinding when: the pathfinding icon is enabled or the temporary toggle key is held.
+    // TODO: Pathfinding should account for region elevation changes and handle flying/burrowing.
+    pathPoints = calculatePathPointsForSegment(lastSegment, token);
+
+  } else if ( MODULES_ACTIVE.TERRAIN_MAPPER ){
+    // Determine the region path.
+    const ElevationHandler = MODULES_ACTIVE.API.TERRAIN_MAPPER.ElevationHandler;
+    const { gridUnitsToPixels, pixelsToGridUnits } = CONFIG.GeometryLib.utils;
+    const { A, B } = lastSegment.ray;
+    const start = { ...A, elevation: pixelsToGridUnits(A.z) };
+    const end = { ...B, elevation: pixelsToGridUnits(B.z) };
+    const movementTypeStart = movementTypeForTokenAt(token, A);
+    const endGround = terrainElevationAtLocation(end, end.elevation);
+    const movementTypeEnd =  MOVEMENT_TYPES.forCurrentElevation(end.elevation, endGround);
+    const flying = movementTypeStart === MOVEMENT_TYPES.FLY || movementTypeEnd === MOVEMENT_TYPES.FLY;
+    const burrowing = movementTypeStart === MOVEMENT_TYPES.BURROW || movementTypeEnd === MOVEMENT_TYPES.BURROW;
+    const pathPoints = ElevationHandler.constructPath(start, end, { flying, burrowing, token });
+    pathPoints.forEach(pt => pt.z = gridUnitsToPixels(pt.elevation));
+  }
+  const t1 = performance.now();
+  const key = `${lastSegment.ray.A.key}|${lastSegment.ray.B.key}`;
+  if ( pathPoints.length > 2 ) {
+    segmentMap.set(key, pathPoints);
+    log(`_getMeasurementSegments|Found path with ${pathPoints.length} points in ${t1-t0} ms.`, pathPoints);
+  } else segmentMap.delete(key);
+
+  // For each segment, replace with path sub-segment if pathfinding or region paths were used for that segment.
+  const t2 = performance.now();
+  const newSegments = constructPathfindingSegments(segments, segmentMap);
+  const t3 = performance.now();
+  log(`_getMeasurementSegments|${newSegments.length} segments processed in ${t3-t2} ms.`);
+  return newSegments;
 }
 
 /**
@@ -266,6 +369,8 @@ function _canMove(wrapper, token) {
 function _computeDistance() {
   // If not this ruler's user, use the segments already calculated and passed via socket.
   if ( this.user !== game.user ) return;
+
+  log("_computeDistance");
 
   // Debugging
   const debug = CONFIG[MODULE_ID].debug;
@@ -292,20 +397,16 @@ function _computeDistance() {
   if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
 
   // Compute the waypoint distances for labeling. (Distance to immediately previous waypoint.)
-  const waypointKeys = new Set(this.waypoints.map(w => PIXI.Point._tmp.copyFrom(w).key));
   let waypointDistance = 0;
   let waypointMoveDistance = 0;
-
   let currWaypointIdx = -1;
   for ( const segment of this.segments ) {
-    // Segments assumed to be in order of the waypoint.
-    const A = PIXI.Point._tmp.copyFrom(segment.ray.A);
-    if ( waypointKeys.has(A.key) ) {
-      currWaypointIdx += 1;
+    if ( Object.hasOwn(segment, "waypointIdx") && segment.waypointIdx !== currWaypointIdx ) {
+      currWaypointIdx = segment.waypointIdx;
       waypointDistance = 0;
       waypointMoveDistance = 0;
     }
-    segment.waypointIdx = currWaypointIdx;
+
     waypointDistance += segment.distance;
     waypointMoveDistance += segment.moveDistance;
     segment.waypointDistance = waypointDistance;
@@ -314,81 +415,190 @@ function _computeDistance() {
   }
 }
 
+// ----- NOTE: Segment labeling and highlighting ----- //
+
 /**
- * Calculate the distance of each segment.
- * Segments are considered a group, so that alternating diagonals gives the same result
- * with or without the segment breaks.
+ * Wrap Ruler.prototype._getSegmentLabel
+ * Add elevation information to the label
  */
-function _computeSegmentDistances() {
-  const token = this.token;
-
-  // Loop over each segment in turn, adding the physical distance and the move distance.
-  let totalDistance = 0;
-  let totalMoveDistance = 0;
-  let totalDiagonals = 0;
-  let numPrevDiagonal = game.combat?.started ? (this.token?._combatMoveData?.numDiagonal ?? 0) : 0;
-
-  if ( this.segments.length ) {
-    this.segments[0].first = true;
-    this.segments.at(-1).last = true;
-  }
-  for ( const segment of this.segments ) {
-    numPrevDiagonal = measureSegment(segment, token, numPrevDiagonal);
-    totalDistance += segment.distance;
-    totalMoveDistance += segment.moveDistance;
-    totalDiagonals = numPrevDiagonal; // Already summed in measureSegment.
+function _getSegmentLabel(wrapped, segment, totalDistance) {
+  if ( CONFIG[MODULE_ID].debug ) {
+    if ( totalDistance >= 15 ) { console.debug("_getSegmentLabel: 15", segment, this); }
+    if ( totalDistance > 30 ) { console.debug("_getSegmentLabel: 30", segment, this); }
+    else if ( totalDistance > 60 ) { console.debug("_getSegmentLabel: 30", segment, this); }
   }
 
-  this.totalDistance = totalDistance;
-  this.totalMoveDistance = totalMoveDistance;
-  this.totalDiagonals = totalDiagonals;
+  // Force distance to be between waypoints instead of (possibly pathfinding) segments.
+  const origSegmentDistance = segment.distance;
+  segment.distance = distanceLabel(origSegmentDistance);
+  const origLabel = wrapped(segment, distanceLabel(totalDistance));
+  segment.distance = origSegmentDistance;
+
+  // Label for elevation changes.
+  let elevLabel = segmentElevationLabel(this, segment);
+
+  // Label for Levels floors.
+  const levelName = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
+  if ( levelName ) elevLabel += `\n${levelName}`;
+
+  // Label for difficult terrain (variation in move distance vs distance).
+  const terrainLabel = segmentTerrainLabel(segment);
+
+  // Label when in combat and there are past moves.
+  const combatLabel = segmentCombatLabel(this.token);
+
+  // Put it all together.
+  let label = `${origLabel}`;
+  if ( !Settings.get(Settings.KEYS.HIDE_ELEVATION) ) label += `\n${elevLabel}`;
+  label += `${terrainLabel}${combatLabel}`;
+  return label;
 }
 
 /**
- * Measure a given segment, updating its distance labels accordingly.
- * Segment modified in place.
- * @param {RulerSegment} segment          Segment to measure
- * @param {Token} [token]                 Token to use for the measurement
- * @param {number} [numPrevDiagonal=0]    Number of previous diagonals for the segment
- * @returns {number} numPrevDiagonal
+ * Wrap Ruler.prototype._highlightMeasurementSegment
+ * @param {RulerMeasurementSegment} segment
  */
-export function measureSegment(segment, token, numPrevDiagonal = 0) {
-  segment.numPrevDiagonal = numPrevDiagonal;
-  const res = MoveDistance.measure(
-    segment.ray.A,
-    segment.ray.B,
-    { token, useAllElevation: segment.last, numPrevDiagonal });
-  segment.distance = res.distance;
-  segment.moveDistance = res.moveDistance;
-  segment.numDiagonal = res.numDiagonal;
-  return res.numPrevDiagonal;
+const TOKEN_SPEED_SPLITTER = new WeakMap();
+
+function _highlightMeasurementSegment(wrapped, segment) {
+  // Temporarily override cached ray.distance such that the ray distance is two-dimensional,
+  // so highlighting selects correct squares.
+  // Otherwise the highlighting algorithm can get confused for high-elevation segments.
+  segment.ray._distance = PIXI.Point.distanceBetween(segment.ray.A, segment.ray.B);
+
+  // Adjust the color if this user has selected speed highlighting.
+  // Highlight each split in turn, changing highlight color each time.
+  if ( Settings.useSpeedHighlighting(this.token) ) {
+    if ( segment.first ) TOKEN_SPEED_SPLITTER.set(this.token, tokenSpeedSegmentSplitter(this, this.token))
+    const splitterFn = TOKEN_SPEED_SPLITTER.get(this.token);
+    if ( splitterFn ) {
+      const priorColor = this.color;
+      const segments = splitterFn(segment);
+      if ( segments.length ) {
+        for ( const segment of segments ) {
+          this.color = segment.speed.color;
+          segment.ray._distance = PIXI.Point.distanceBetween(segment.ray.A, segment.ray.B);
+          wrapped(segment);
+
+          // If gridless, highlight a rectangular shaped portion of the line.
+          if ( canvas.grid.isGridless ) highlightLineRectangle(segment, this.color, this.name);
+        }
+        // Reset to the default color.
+        this.color = priorColor;
+        return;
+      }
+    }
+  }
+
+  wrapped(segment);
+  segment.ray._distance = undefined; // Reset the distance measurement.
 }
 
-// TODO:
-// Need to recalculate segment distances and segment numPrevDiagonal, because
-// each split will potentially screw up numPrevDiagonal.
-// May not even need to store numPrevDiagonal in segments.
-// Also need to handle array of speed points.
-//   Need CONFIG function that takes a token and gives array of speeds with colors.
 
-
+// ----- NOTE: Token movement ----- //
 
 /**
- * Mixed wrap Ruler#_broadcastMeasurement
- * For token ruler, don't broadcast the ruler if the token is invisible or disposition secret.
+ * Mixed wrap Ruler.prototype._animateMovement
+ * Add additional controlled tokens to the move, if permitted.
  */
-function _broadcastMeasurement(wrapped) {
-  // Don't broadcast invisible, hidden, or secret token movement when dragging.
-  if ( this._isTokenRuler
-    && this.token
-    && (this.token.document.disposition === CONST.TOKEN_DISPOSITIONS.SECRET
-     || this.token.document.hasStatusEffect(CONFIG.specialStatusEffects.INVISIBLE)
-     || this.token.document.isHidden) ) return;
+async function _animateMovement(wrapped, token) {
+  if ( !this.segments || !this.segments.length ) return; // Ruler._animateMovement expects at least one segment.
 
-  wrapped();
+  if ( CONFIG[MODULE_ID].debug ) {
+    console.groupCollapsed(`${MODULE_ID}|_animateMovement`);
+    log(`Moving ${token.name} ${this.segments.length} segments.`, [...this.segments]);
+    console.table(this.segments.flatMap(s => {
+      const A = { ...s.ray.A };
+      const B = { ...s.ray.B };
+      B.distance = s.distance;
+      B.moveDistance = s.moveDistance;
+      return [A, B];
+    }));
+    console.groupEnd(`${MODULE_ID}|_animateMovement`);
+  }
+
+  this.segments.forEach((s, idx) => s.idx = idx);
+
+  //_recalculateOffset.call(this, token);
+  const promises = [wrapped(token)];
+  for ( const controlledToken of canvas.tokens.controlled ) {
+    if ( controlledToken === token ) continue;
+    if ( !(this.user.isGM || this._canMove(controlledToken)) ) {
+      ui.notifications.error(`${game.i18n.localize("RULER.MovementNotAllowed")} for ${controlledToken.name}`);
+      continue;
+    }
+    promises.push(wrapped(controlledToken));
+  }
+  return Promise.allSettled(promises);
 }
+
+/**
+ * Wrap Ruler.prototype._canMove
+ * Allow GM full reign to move tokens.
+ */
+function _canMove(wrapper, token) {
+  if ( this.user.isGM ) return true;
+  return wrapper(token);
+}
+
+/**
+ * Override Ruler.prototype._animateSegment
+ * When moving the token along the segments, update the token elevation to the destination + increment
+ * for the given segment.
+ * Mark the token update if pathfinding for this segment.
+ */
+async function _animateSegment(token, segment, destination) {
+  log(`Updating ${token.name} destination from ({${token.document.x},${token.document.y}) to (${destination.x},${destination.y}) for segment (${segment.ray.A.x},${segment.ray.A.y})|(${segment.ray.B.x},${segment.ray.B.y})`);
+
+  // If the segment is teleporting and the segment destination is not a waypoint or ruler destination, skip.
+  // Doesn't work because _animateMovement stops the movement if the token does not make it to the
+  // next waypoint.
+//   if ( segment.teleport
+//     && !(segment.B.x === this.destination.x && segment.B.y === this.destination.y )
+//     && !this.waypoints.some(w => segment.B.x === w.x && segment.B.y === w.y) ) return;
+
+  // Update elevation before the token move.
+  // Only update drop to ground and user increment changes.
+  // Leave the rest to region elevation from Terrain Mapper or other modules.
+  // const waypoint = this.waypoints[segment.waypointIdx];
+  // const newElevation = waypoint.elevation;
+  // if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
+
+  let name;
+  if ( segment.animation?.name === undefined ) name = token.animationName;
+  else name ||= Symbol(token.animationName);
+  const updateOptions = {
+    // terrainmapper: { usePath: false },
+    rulerSegment: this.segments.length > 1,
+    firstRulerSegment: segment.first,
+    lastRulerSegment: segment.last,
+    rulerSegmentOrigin: segment.ray.A,
+    rulerSegmentDestination: segment.ray.B,
+    teleport: segment.teleport,
+    animation: {...segment.animation, name}
+  }
+  const {x, y} = token.document._source;
+  await token.animate({x, y}, {name, duration: 0});
+  await token.document.update(destination, updateOptions);
+  await CanvasAnimation.getAnimation(name)?.promise;
+  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
+  const newElevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z).toNearest(multiple);
+  if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
+}
+
+
 
 // ----- NOTE: Event handling ----- //
+
+/**
+ * Wrap Ruler.prototype.clear
+ * Delete the move penalty instance
+ */
+function clear(wrapper) {
+  log("-----Clearing movePenaltyInstance-----");
+  delete this._movePenaltyInstance;
+  return wrapper();
+}
 
 /**
  * Wrap Ruler.prototype._onDragStart
@@ -415,29 +625,8 @@ function _onMoveKeyDown(wrapped, context) {
   wrapped(context);
 }
 
-PATCHES.BASIC.WRAPS = {
-  _getMeasurementData,
-  update,
-  _removeWaypoint,
-  _getMeasurementOrigin,
-  _getMeasurementDestination,
 
-  // Wraps related to segments
-  _getSegmentLabel,
-
-  // Events
-  _onDragStart,
-  _canMove,
-  _onMoveKeyDown
-};
-
-PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments, _broadcastMeasurement };
-
-PATCHES.BASIC.OVERRIDES = { _computeDistance, _animateSegment, _addWaypoint };
-
-PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
-
-// ----- NOTE: Methods ----- //
+// ----- NOTE: New methods ----- //
 
 /**
  * Add Ruler.prototype.incrementElevation
@@ -448,16 +637,13 @@ function incrementElevation() {
   if ( !ruler || !ruler.active ) return;
 
   // Increment the elevation at the last waypoint.
+  log("incrementElevation");
   const waypoint = this.waypoints.at(-1);
   waypoint._userElevationIncrements ??= 0;
   waypoint._userElevationIncrements += 1;
 
-  // Update the ruler display.
+  // Update the ruler display (will also broadcast the measurement)
   ruler.measure(this.destination, { force: true });
-
-  // Broadcast the activity (see ControlsLayer.prototype._onMouseMove)
-  this._broadcastMeasurement();
-  // game.user.broadcastActivity({ ruler: ruler.toJSON() });
 }
 
 /**
@@ -469,6 +655,7 @@ function decrementElevation() {
   if ( !ruler || !ruler.active ) return;
 
   // Decrement the elevation at the last waypoint.
+  log("decrementElevation");
   const waypoint = this.waypoints.at(-1);
   waypoint._userElevationIncrements ??= 0;
   waypoint._userElevationIncrements -= 1;
@@ -495,6 +682,28 @@ async function teleport(_context) {
   return this.moveToken();
 }
 
+PATCHES.BASIC.WRAPS = {
+  clear,
+  _getMeasurementData,
+  update,
+  _removeWaypoint,
+  _getMeasurementOrigin,
+  _getMeasurementDestination,
+
+  // Wraps related to segments
+  _getSegmentLabel,
+
+  // Events
+  _onDragStart,
+  _canMove,
+  _onMoveKeyDown
+};
+
+PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments, _broadcastMeasurement };
+
+PATCHES.BASIC.OVERRIDES = { _computeDistance, _animateSegment, _addWaypoint };
+
+PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 
 PATCHES.BASIC.METHODS = {
   incrementElevation,
@@ -508,9 +717,11 @@ PATCHES.BASIC.GETTERS = {
 };
 
 PATCHES.BASIC.STATIC_METHODS = {
-  elevationAtWaypoint,
   userElevationChangeAtWaypoint,
   terrainElevationAtLocation,
+  terrainElevationForMovement,
+  terrainPathForMovement,
+  elevationFromWaypoint,
   measureDistance: PhysicalDistance.measure.bind(PhysicalDistance),
   measureMoveDistance: MoveDistance.measure.bind(MoveDistance)
 };
