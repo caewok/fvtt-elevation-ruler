@@ -121,6 +121,7 @@ Used by ruler to get elevation at waypoints and at the end of the ruler.
 
 import { MODULES_ACTIVE, MODULE_ID, FLAGS } from "./const.js";
 import { Settings } from "./settings.js";
+import { tokenIsFlying, tokenIsBurrowing } from "./segments.js";
 
 
 /**
@@ -220,10 +221,15 @@ function elevationAtLocation(location, { startE = 0, forceToGround = false } ) {
  * @param {boolean} [opts.forceToGround=false]          If true, override the end elevation with nearest ground to that 3d point.
  * @returns {number} The destination elevation, in grid units
  */
-function tokenElevationForMovement(start, location, { token, forceToGround = false }) {
+function tokenElevationForMovement(start, location, opts = {}) {
+  const forceToGround = opts.forceToGround ?? false;
   const end = { ...location };
   end.elevation = forceToGround ? terrainElevationAtLocation(location, start.elevation) : start.elevation;
-  return terrainElevationForMovement(start, end, token);
+  if ( opts.token && !forceToGround ) {
+    if ( tokenIsFlying(opts.token, start) ) opts.flying ??= true;
+    if ( tokenIsBurrowing(opts.token, start) ) opts.burrowing ??= true;
+  }
+  return terrainElevationForMovement(start, end, opts);
 }
 
 /**
@@ -266,12 +272,12 @@ export function terrainElevationAtLocation(location, startingElevation = 0) {
  * For a given token move along segment start|end, return the elevation at location.
  * @param {RegionMovementWaypoint} start                Start location with elevation property
  * @param {RegionMovementWaypoint} end                  Desired end location
- * @param {Token} token                                 Token doing the movement
+ * @param {object} [opts]                               Options passed to TerrainMapper. Should include token.
  * @returns {number} Elevation, in grid units
  */
-export function terrainElevationForMovement(start, end, token) {
+export function terrainElevationForMovement(start, end, opts) {
   end.elevation ??= start.elevation;
-  const res = TMElevationForMovement(start, end, token);
+  const res = TMElevationForMovement(start, end, opts);
   return res ?? terrainElevationAtLocation(end, start.elevation);
 }
 
@@ -280,11 +286,11 @@ export function terrainElevationForMovement(start, end, token) {
  * For a given token move along a segment start|end, return the path points for the terrain elevation changes.
  * @param {RegionMovementWaypoint} start                Start location with elevation property
  * @param {RegionMovementWaypoint} end                  Desired end location
- * @param {Token} token                                 Token doing the movement
+ * @param {object} [opts]                               Options passed to TerrainMapper. Should include token.
  * @returns {StraightLinePath<RegionMovementWaypoint>} Array of path points.
  */
-export function terrainPathForMovement(start, end, token) {
-  return TMPathForMovement(start, end, token);
+export function terrainPathForMovement(start, end, opts) {
+  return TMPathForMovement(start, end, opts);
 }
 
 
@@ -315,15 +321,13 @@ function TMElevationAtPoint(location, startingElevation = Number.POSITIVE_INFINI
  * Measure the terrain elevation when moving a token with Terrain Mapper.
  * @param {RegionMovementWaypoint} start                Start location with elevation property
  * @param {RegionMovementWaypoint} end                  Desired end location
- * @param {Token} token                                 Token doing the movement
+ * @param {object} [opts]                               Options passed to TerrainMapper. Should include token.
  * @returns {number|undefined} Elevation, in grid units
  */
-function TMElevationForMovement(start, end, token) {
-  start.elevation ??= CONFIG.GeometryLib.utils.pixelsToGridUnits(start.z);
-  end.elevation ??= CONFIG.GeometryLib.utils.pixelsToGridUnits(end.z);
+function TMElevationForMovement(start, end, opts) {
   const api = MODULES_ACTIVE.API.TERRAIN_MAPPER
   if ( !api || !api.ElevationHandler ) return undefined;
-  return TMPathForMovement(start, end, token).at(-1)?.elevation;
+  return TMPathForMovement(start, end, opts).at(-1)?.elevation;
 }
 
 /**
@@ -331,15 +335,15 @@ function TMElevationForMovement(start, end, token) {
  * with Terrain Mapper.
  * @param {RegionMovementWaypoint} start                Start location with elevation property
  * @param {RegionMovementWaypoint} end                  Desired end location
- * @param {Token} token                                 Token doing the movement
+ * @param {object} [opts]                               Options passed to TerrainMapper. Should include token.
  * @returns {StraightLinePath<RegionMovementWaypoint>} Array of path points.
  */
-function TMPathForMovement(start, end, token) {
+function TMPathForMovement(start, end, opts) {
   start.elevation ??= CONFIG.GeometryLib.utils.pixelsToGridUnits(start.z);
   end.elevation ??= CONFIG.GeometryLib.utils.pixelsToGridUnits(end.z);
   const api = MODULES_ACTIVE.API.TERRAIN_MAPPER
   if ( !api || !api.ElevationHandler ) return [start, end];
-  return api.ElevationHandler.constructPath(start, end, { token });
+  return api.ElevationHandler.constructPath(start, end, opts);
 }
 
 // ----- NOTE: LEVELS ELEVATION ----- //
