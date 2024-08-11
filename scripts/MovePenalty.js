@@ -7,11 +7,11 @@ PIXI
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { MODULE_ID, FLAGS, MODULES_ACTIVE, SPEED } from "./const.js";
+import { MODULE_ID, FLAGS, MODULES_ACTIVE, SPEED, MOVEMENT_TYPES } from "./const.js";
 import { Settings } from "./settings.js";
 import { getCenterPoint3d } from "./grid_coordinates.js";
 import { movementType } from "./token_hud.js";
-import { log } from "./util.js";
+import { log, keyForValue } from "./util.js";
 
 /*
 Class to measure penalty, as percentage of distance, between two points.
@@ -57,7 +57,10 @@ export class MovePenalty {
    */
   constructor(moveToken, speedFn) {
     this.moveToken = moveToken;
-    this.speedFn = speedFn ?? (token => foundry.utils.getProperty(token, SPEED.ATTRIBUTES[token.movementType]));
+    this.speedFn = speedFn ?? (token => {
+      const moveType = token.movementType;
+      foundry.utils.getProperty(token, SPEED.ATTRIBUTES[MOVEMENT_TYPES, keyForValue(moveType)])
+    });
     this.localTokenClone = this.constructor._constructTokenClone(this.moveToken);
     const tokenMultiplier = this.constructor.tokenMultiplier;
     const terrainAPI = this.constructor.terrainAPI;

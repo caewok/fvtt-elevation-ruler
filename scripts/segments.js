@@ -4,7 +4,7 @@ game
 */
 "use strict";
 
-import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
+import { MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
@@ -82,34 +82,6 @@ export function measureSegment(segment, token, movePenaltyInstance, numPrevDiago
 
   }
   return numPrevDiagonal;
-}
-
-/**
- * Determine the token movement types.
- * @param {Token} token                     Token doing the movement
- * @param {Point3d} pt      Location to test (typically the start position of the token)
- * @returns {boolean} True if token has flying status or implicitly is flying
- */
-export function tokenIsFlying(token, pt) {
-  if ( token.movementType === "FLY" ) return true;
-  const ElevationHandler = MODULES_ACTIVE.API?.TERRAIN_MAPPER?.ElevationHandler;
-  if ( !ElevationHandler ) return false;
-  pt.elevation ??= CONFIG.GeometryLib.utils.pixelsToGridUnits(pt.z);
-  return ElevationHandler.elevationType(pt) === ElevationHandler.ELEVATION_LOCATIONS.FLOATING;
-}
-
-/**
- * Determine the token movement types.
- * @param {Token} token                     Token doing the movement
- * @param {Point3d} pt      Location to test (typically the start position of the token)
- * @returns {boolean} True if token has flying status or implicitly is flying
- */
-export function tokenIsBurrowing(token, pt) {
-  if ( token.movementType === "BURROW" ) return true;
-  const ElevationHandler = MODULES_ACTIVE.API?.TERRAIN_MAPPER?.ElevationHandler;
-  if ( !ElevationHandler ) return false;
-  pt.elevation ??= CONFIG.GeometryLib.utils.pixelsToGridUnits(pt.z);
-  return ElevationHandler.elevationType(pt) === ElevationHandler.ELEVATION_LOCATIONS.BURROWING;
 }
 
 /**

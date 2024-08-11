@@ -39,8 +39,17 @@ export const MOVEMENT_TYPES = {
   AUTO: -1,
   BURROW: 0,
   WALK: 1,
-  FLY: 2
+  FLY: 2,
+
+  /**
+   * Get the movement type for a given ground versus current elevation.
+   * @param {number} currElev     Elevation in grid units
+   * @param {number} groundElev   Ground elevation in grid units
+   * @returns {MOVEMENT_TYPE}
+   */
+  forCurrentElevation: function movementTypeForCurrentElevation(currElev, groundElev = 0) { return Math.sign(currElev - groundElev) + 1; }
 };
+
 
 export const MOVEMENT_BUTTONS = {
   [MOVEMENT_TYPES.AUTO]: "road-lock",
@@ -101,13 +110,21 @@ SPEED.maximumCategoryDistance = function(token, speedCategory, tokenSpeed) {
 };
 
 /**
+ * Get the key for a given object value. Presumes unique values, otherwise returns first.
+ */
+function keyForValue(object, value) {
+  return Object.keys(object).find(key => object[key] === value);
+}
+
+/**
  * Given a token, retrieve its base speed.
  * @param {Token} token                   Token whose speed is required
  * @returns {number|null} Distance, in grid units. Null if no speed provided for that category.
  *   (Null will disable speed highlighting.)
  */
 SPEED.tokenSpeed = function(token) {
-  const speed = foundry.utils.getProperty(token, SPEED.ATTRIBUTES[token.movementType]);
+  const moveType = token.movementType;
+  const speed = foundry.utils.getProperty(token, SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, moveType)]);
   if ( speed === null ) return null;
   return Number(speed);
 };

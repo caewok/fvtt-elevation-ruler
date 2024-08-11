@@ -15,7 +15,7 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
-import { SPEED, MODULE_ID, MODULES_ACTIVE } from "./const.js";
+import { SPEED, MODULE_ID, MODULES_ACTIVE, MOVEMENT_TYPES } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import {
@@ -30,9 +30,8 @@ import {
   _computeSegmentDistances,
   elevateSegments,
   calculatePathPointsForSegment,
-  tokenIsFlying,
-  tokenIsBurrowing,
   constructPathfindingSegments } from "./segments.js";
+import { movementTypeForTokenAt } from "./token_hud.js";
 import {
   _getDistanceLabels,
   segmentElevationLabel,
@@ -336,8 +335,11 @@ function _getMeasurementSegments(wrapped) {
     const { A, B } = lastSegment.ray;
     const start = { ...A, elevation: pixelsToGridUnits(A.z) };
     const end = { ...B, elevation: pixelsToGridUnits(B.z) };
-    const flying = tokenIsFlying(token, A) || tokenIsFlying(token, B);
-    const burrowing = tokenIsBurrowing(token, A) || tokenIsBurrowing(token, B);
+    const movementTypeStart = movementTypeForTokenAt(token, A);
+    const endGround = terrainElevationAtLocation(end, end.elevation);
+    const movementTypeEnd =  MOVEMENT_TYPES.forCurrentElevation(end.elevation, endGround);
+    const flying = movementTypeStart === MOVEMENT_TYPES.FLY || movementTypeEnd === MOVEMENT_TYPES.FLY;
+    const burrowing = movementTypeStart === MOVEMENT_TYPES.BURROW || movementTypeEnd === MOVEMENT_TYPES.BURROW;
     const pathPoints = ElevationHandler.constructPath(start, end, { flying, burrowing, token });
     pathPoints.forEach(pt => pt.z = gridUnitsToPixels(pt.elevation));
   }
