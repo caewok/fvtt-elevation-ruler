@@ -1,10 +1,6 @@
 /* globals
-canvas,
-CanvasAnimation,
 CONFIG,
-CONST,
-game,
-PIXI
+game
 */
 "use strict";
 
@@ -12,111 +8,108 @@ import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
-import { perpendicularPoints, log  } from "./util.js";
+import { log  } from "./util.js";
 import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
 import { MovePenalty } from "./MovePenalty.js";
-import { tokenSpeedSegmentSplitter } from "./token_speed.js";
+import { MoveDistance } from "./MoveDistance.js";
 
 /**
- * Mixed wrap of  Ruler.prototype._getMeasurementSegments
- * Add elevation information to the segments.
- * Add pathfinding segments.
- * Add segments for traversing regions.
+ * Calculate the distance of each segment.
+ * Segments are considered a group, so that alternating diagonals gives the same result
+ * with or without the segment breaks.
  */
-export function _getMeasurementSegments(wrapped) {
-  // If not the user's ruler, segments calculated by original user and copied via socket.
-  if ( this.user !== game.user ) {
-    // Reconstruct labels if necessary.
-    let labelIndex = 0;
-    this.segments ??= [];
-    for ( const s of this.segments ) {
-      if ( !s.label ) continue; // Not every segment has a label.
-      s.label = this.labels.children[labelIndex++];
-    }
-    return this.segments;
-  }
-
-  // No segments are present if dragging back to the origin point.
-  const segments = wrapped();
-  const segmentMap = this._pathfindingSegmentMap ??= new Map();
-  if ( !segments.length ) {
-    segmentMap.clear();
-    return segments;
-  }
-
-  // Add z value (elevation in pixel units) to the segments.
-  elevateSegments(this, segments);
-
-  // If no movement token, then no region paths or pathfinding.
+export function _computeSegmentDistances() {
   const token = this.token;
-  if ( !token ) return segments;
 
-  const usePathfinding = Settings.get(Settings.KEYS.CONTROLS.PATHFINDING) ^ Settings.FORCE_TOGGLE_PATHFINDING;
-  if ( usePathfinding ) {
-    const t0 = performance.now();
-    // If currently pathfinding, set path for the last segment, overriding any prior path.
-    // Pathfinding when: the pathfinding icon is enabled or the temporary toggle key is held.
-    // TODO: Pathfinding should account for region elevation changes and handle flying/burrowing.
-    const lastSegment = segments.at(-1);
-    const pathPoints = calculatePathPointsForSegment(lastSegment, token);
-    const lastA = PIXI.Point.fromObject(lastSegment.ray.A); // Want 2d version.
-    if ( pathPoints.length > 2 ) segmentMap.set(lastA.key, pathPoints);
-    else segmentMap.delete(lastA.key);
-    const t1 = performance.now();
-    log(`_getMeasurementSegments|Found path with ${pathPoints.length} points in ${t1-t0} ms.`, pathPoints);
-  } else if ( MODULES_ACTIVE.TERRAIN_MAPPER ){
-    // Determine the region path.
-    const t0 = performance.now();
-    const ElevationHandler = MODULES_ACTIVE.API.TERRAIN_MAPPER.ElevationHandler;
-    const lastSegment = segments.at(-1);
-    const { gridUnitsToPixels, pixelsToGridUnits } = CONFIG.GeometryLib.utils;
-    const { A, B } = lastSegment.ray;
-    const start = { ...A, elevation: pixelsToGridUnits(A.z) };
-    const end = { ...B, elevation: pixelsToGridUnits(B.z) };
-    const flying = tokenIsFlying(token, A) || tokenIsFlying(token, B);
-    const burrowing = tokenIsBurrowing(token, A) || tokenIsBurrowing(token, B);
-    const pathPoints = ElevationHandler.constructPath(start, end, { flying, burrowing, token });
-    pathPoints.forEach(pt => pt.z = gridUnitsToPixels(pt.elevation));
-    const lastA = PIXI.Point.fromObject(lastSegment.ray.A); // Want 2d version.
-    if ( pathPoints.length > 2 ) segmentMap.set(lastA.key, pathPoints);
-    else segmentMap.delete(lastA.key);
-    const t1 = performance.now();
-    log(`_getMeasurementSegments|Found region path with ${pathPoints.length} points in ${t1-t0} ms.`, pathPoints);
+  // Loop over each segment in turn, adding the physical distance and the move distance.
+  let totalDistance = 0;
+  let totalMoveDistance = 0;
+  let totalDiagonals = 0;
+  let numPrevDiagonal = game.combat?.started ? (this.token?._combatMoveData?.numDiagonal ?? 0) : 0;
+
+  if ( this.segments.length ) {
+    this.segments[0].first = true;
+    this.segments.at(-1).last = true;
   }
 
-  // For each segment, replace with path sub-segment if pathfinding or region paths were used for that segment.
-  const t0 = performance.now();
-  const newSegments = constructPathfindingSegments(segments, segmentMap);
-  const t1 = performance.now();
-  log(`_getMeasurementSegments|${newSegments.length} segments processed in ${t1-t0} ms.`);
-  return newSegments;
+  // Construct a move penalty instance that covers all the segments.
+  let movePenaltyInstance;
+  if ( token ) {
+    movePenaltyInstance = this._movePenaltyInstance ??= new MovePenalty(token);
+    const path = this.segments.map(s => s.ray.A);
+    path.push(this.segments.at(-1).ray.B);
+    movePenaltyInstance.restrictToPath(path);
+  }
+
+  for ( const segment of this.segments ) {
+    numPrevDiagonal = measureSegment(segment, token, movePenaltyInstance, numPrevDiagonal);
+    totalDistance += segment.distance;
+    totalMoveDistance += segment.moveDistance;
+    totalDiagonals = numPrevDiagonal; // Already summed in measureSegment.
+  }
+
+  this.totalDistance = totalDistance;
+  this.totalMoveDistance = totalMoveDistance;
+  this.totalDiagonals = totalDiagonals;
+}
+
+/**
+ * Measure a given segment, updating its distance labels accordingly.
+ * Segment modified in place.
+ * @param {RulerSegment} segment          Segment to measure
+ * @param {Token} [token]                 Token to use for the measurement
+ * @param {number} [numPrevDiagonal=0]    Number of previous diagonals for the segment
+ * @returns {number} numPrevDiagonal
+ */
+export function measureSegment(segment, token, movePenaltyInstance, numPrevDiagonal = 0) {
+  segment.numPrevDiagonal = numPrevDiagonal;
+
+  // Measure the path taken if moving over terrain.
+  segment.distance = 0;
+  segment.moveDistance = 0;
+  segment.numDiagonal = 0;
+  const path = [segment.ray.A, segment.ray.B];
+
+  let prevPt = path[0];
+  for ( let i = 1, n = path.length; i < n; i += 1 ) {
+    const currPt = path[i];
+    const res = MoveDistance.measure(prevPt, currPt, { token, useAllElevation: segment.last, numPrevDiagonal, movePenaltyInstance });
+    segment.distance += res.distance;
+    segment.moveDistance += res.moveDistance;
+    segment.numDiagonal += res.numDiagonal;
+    numPrevDiagonal += res.numPrevDiagonal;
+    prevPt = currPt;
+
+  }
+  return numPrevDiagonal;
 }
 
 /**
  * Determine the token movement types.
  * @param {Token} token                     Token doing the movement
- * @param {RegionMovementWaypoint} loc      Location to test (typically the start position of the token)
+ * @param {Point3d} pt      Location to test (typically the start position of the token)
  * @returns {boolean} True if token has flying status or implicitly is flying
  */
-function tokenIsFlying(token, loc) {
+export function tokenIsFlying(token, pt) {
   if ( token.movementType === "FLY" ) return true;
   const ElevationHandler = MODULES_ACTIVE.API?.TERRAIN_MAPPER?.ElevationHandler;
   if ( !ElevationHandler ) return false;
-  return ElevationHandler.elevationType(loc) === ElevationHandler.ELEVATION_LOCATIONS.FLOATING;
+  pt.elevation ??= CONFIG.GeometryLib.utils.pixelsToGridUnits(pt.z);
+  return ElevationHandler.elevationType(pt) === ElevationHandler.ELEVATION_LOCATIONS.FLOATING;
 }
 
 /**
  * Determine the token movement types.
  * @param {Token} token                     Token doing the movement
- * @param {RegionMovementWaypoint} loc      Location to test (typically the start position of the token)
- * @param {RegionMovementWaypoint} end      Ending location
+ * @param {Point3d} pt      Location to test (typically the start position of the token)
  * @returns {boolean} True if token has flying status or implicitly is flying
  */
-function tokenIsBurrowing(token, loc) {
+export function tokenIsBurrowing(token, pt) {
   if ( token.movementType === "BURROW" ) return true;
   const ElevationHandler = MODULES_ACTIVE.API?.TERRAIN_MAPPER?.ElevationHandler;
   if ( !ElevationHandler ) return false;
-  return ElevationHandler.elevationType(loc) === ElevationHandler.ELEVATION_LOCATIONS.BURROWING;
+  pt.elevation ??= CONFIG.GeometryLib.utils.pixelsToGridUnits(pt.z);
+  return ElevationHandler.elevationType(pt) === ElevationHandler.ELEVATION_LOCATIONS.BURROWING;
 }
 
 /**
@@ -124,7 +117,7 @@ function tokenIsBurrowing(token, loc) {
  * @param {RulerMeasurementSegment} segment
  * @returns {PIXI.Point[]}
  */
-function calculatePathPointsForSegment(segment, token) {
+export function calculatePathPointsForSegment(segment, token) {
   const A = Point3d.fromObject(segment.ray.A);
   const B = Point3d.fromObject(segment.ray.B);
 
@@ -172,29 +165,30 @@ function calculatePathPointsForSegment(segment, token) {
  * @param {RulerMeasurementSegment[]} segments
  * @returns {RulerMeasurementSegment[]} Updated segment array
  */
-function constructPathfindingSegments(segments, segmentMap) {
+export function constructPathfindingSegments(segments, segmentMap) {
   // For each segment, check the map for pathfinding points.
   // If any, replace segment with the points.
   // Make sure to keep the label for the last segment piece only
   if ( !segmentMap.size ) return segments;
   const newSegments = [];
   for ( const segment of segments ) {
-    const A = Point3d.fromObject(segment.ray.A);
-    const B = Point3d.fromObject(segment.ray.B);
-    const pathPoints = segmentMap.get(A.to2d().key);
+    const key = `${segment.ray.A.key}|${segment.ray.B.key}`;
+    const pathPoints = segmentMap.get(key);
     if ( !pathPoints ) {
       newSegments.push(segment);
       continue;
     }
-
+    const A = Point3d.fromObject(segment.ray.A);
+    const B = Point3d.fromObject(segment.ray.B);
     const nPoints = pathPoints.length;
     let prevPt = pathPoints[0];
-    prevPt.z ??= segment.ray.A.z;
+    prevPt.z ??= A.z;
     for ( let i = 1; i < nPoints; i += 1 ) {
       const currPt = pathPoints[i];
       currPt.z ??= A.z;
       const newSegment = { ray: new Ray3d(prevPt, currPt) };
       newSegment.ray.pathfinding = true; // TODO: Was used by  canvas.grid.grid._getRulerDestination.
+      newSegment.waypointIdx = segment.waypointIdx;
       newSegments.push(newSegment);
       prevPt = currPt;
     }
@@ -210,190 +204,11 @@ function constructPathfindingSegments(segments, segmentMap) {
 }
 
 /**
- * Wrap Ruler.prototype._getSegmentLabel
- * Add elevation information to the label
- */
-export function _getSegmentLabel(wrapped, segment, totalDistance) {
-  // Force distance to be between waypoints instead of (possibly pathfinding) segments.
-  const origSegmentDistance = segment.distance;
-  const {
-    newSegmentDistance,
-    newMoveDistance,
-    newTotalDistance } = _getDistanceLabels(segment.waypointDistance, segment.waypointMoveDistance, totalDistance);
-  segment.distance = newSegmentDistance;
-  const origLabel = wrapped(segment, newTotalDistance);
-  segment.distance = origSegmentDistance;
-  let elevLabel = segmentElevationLabel(this, segment);
-  const levelName = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
-  if ( levelName ) elevLabel += `\n${levelName}`;
-
-  if ( CONFIG[MODULE_ID].debug ) {
-    if ( totalDistance >= 15 ) { console.debug("_getSegmentLabel: 15", segment, this); }
-    if ( totalDistance > 30 ) { console.debug("_getSegmentLabel: 30", segment, this); }
-    else if ( totalDistance > 60 ) { console.debug("_getSegmentLabel: 30", segment, this); }
-  }
-
-  let moveLabel = "";
-  const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
-  if ( segment.waypointDistance !== segment.waypointMoveDistance ) {
-    if ( CONFIG[MODULE_ID].SPEED.useFontAwesome ) {
-      const style = segment.label.style;
-      if ( !style.fontFamily.includes("fontAwesome") ) style.fontFamily += ",fontAwesome";
-      moveLabel = `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${newMoveDistance}${units}`;
-    } else moveLabel = `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${newMoveDistance}${units}`;
-  }
-
-  let combatLabel = "";
-  if ( game.combat?.started && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
-    const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-    const pastMoveDistance = this.token?.lastMoveDistance;
-    if ( pastMoveDistance ) combatLabel = `\nPrior: ${pastMoveDistance.toNearest(multiple)}${units}`;
-  }
-
-  let label = `${origLabel}`;
-  if ( !Settings.get(Settings.KEYS.HIDE_ELEVATION) ) label += `\n${elevLabel}`;
-  label += `${moveLabel}${combatLabel}`;
-
-  return label;
-}
-
-/**
- * Return modified segment and total distance labels
- * @param {number} segmentDistance
- * @param {number} segmentMoveDistance
- * @param {number} totalDistance
- * @returns {object}
- */
-export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance) {
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-  if ( canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS ) return {
-    newSegmentDistance: segmentDistance,
-    newMoveDistance: Number(moveDistance.toFixed(2)),
-    newTotalDistance: totalDistance
-  };
-
-  const newSegmentDistance = segmentDistance.toNearest(multiple);
-  const newMoveDistance = moveDistance.toNearest(multiple);
-  const newTotalDistance = totalDistance.toNearest(multiple);
-
-  return { newSegmentDistance, newMoveDistance, newTotalDistance };
-}
-
-
-/**
- * Override Ruler.prototype._animateSegment
- * When moving the token along the segments, update the token elevation to the destination + increment
- * for the given segment.
- * Mark the token update if pathfinding for this segment.
- */
-export async function _animateSegment(token, segment, destination) {
-  log(`Updating ${token.name} destination from ({${token.document.x},${token.document.y}) to (${destination.x},${destination.y}) for segment (${segment.ray.A.x},${segment.ray.A.y})|(${segment.ray.B.x},${segment.ray.B.y})`);
-
-  // If the segment is teleporting and the segment destination is not a waypoint or ruler destination, skip.
-  // Doesn't work because _animateMovement stops the movement if the token does not make it to the
-  // next waypoint.
-//   if ( segment.teleport
-//     && !(segment.B.x === this.destination.x && segment.B.y === this.destination.y )
-//     && !this.waypoints.some(w => segment.B.x === w.x && segment.B.y === w.y) ) return;
-
-  // Update elevation before the token move.
-  // Only update drop to ground and user increment changes.
-  // Leave the rest to region elevation from Terrain Mapper or other modules.
-  // const waypoint = this.waypoints[segment.waypointIdx];
-  // const newElevation = waypoint.elevation;
-  // if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
-
-  let name;
-  if ( segment.animation?.name === undefined ) name = token.animationName;
-  else name ||= Symbol(token.animationName);
-  const updateOptions = {
-    terrainmapper: { fixedDestination: true, usePath: true },
-    rulerSegment: this.segments.length > 1,
-    firstRulerSegment: segment.first,
-    lastRulerSegment: segment.last,
-    rulerSegmentOrigin: segment.ray.A,
-    rulerSegmentDestination: segment.ray.B,
-    teleport: segment.teleport,
-    animation: {...segment.animation, name}
-  }
-  const {x, y} = token.document._source;
-  await token.animate({x, y}, {name, duration: 0});
-  await token.document.update(destination, updateOptions);
-  await CanvasAnimation.getAnimation(name)?.promise;
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-  const newElevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z).toNearest(multiple);
-  if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
-}
-
-// ----- NOTE: Segment highlighting ----- //
-
-const TOKEN_SPEED_SPLITTER = new WeakMap();
-
-/**
- * Wrap Ruler.prototype._highlightMeasurementSegment
- * @param {RulerMeasurementSegment} segment
- */
-export function _highlightMeasurementSegment(wrapped, segment) {
-  // Temporarily override cached ray.distance such that the ray distance is two-dimensional,
-  // so highlighting selects correct squares.
-  // Otherwise the highlighting algorithm can get confused for high-elevation segments.
-  segment.ray._distance = PIXI.Point.distanceBetween(segment.ray.A, segment.ray.B);
-
-  // Adjust the color if this user has selected speed highlighting.
-  // Highlight each split in turn, changing highlight color each time.
-  if ( Settings.useSpeedHighlighting(this.token) ) {
-    if ( segment.first ) TOKEN_SPEED_SPLITTER.set(this.token, tokenSpeedSegmentSplitter(this, this.token))
-    const splitterFn = TOKEN_SPEED_SPLITTER.get(this.token);
-    if ( splitterFn ) {
-      const priorColor = this.color;
-      const segments = splitterFn(segment);
-      if ( segments.length ) {
-        for ( const segment of segments ) {
-          this.color = segment.speed.color;
-          segment.ray._distance = PIXI.Point.distanceBetween(segment.ray.A, segment.ray.B);
-          wrapped(segment);
-
-          // If gridless, highlight a rectangular shaped portion of the line.
-          if ( canvas.grid.isGridless ) highlightLineRectangle(segment, this.color, this.name);
-        }
-        // Reset to the default color.
-        this.color = priorColor;
-        return;
-      }
-    }
-  }
-
-  wrapped(segment);
-  segment.ray._distance = undefined; // Reset the distance measurement.
-}
-
-/**
- * Highlight a rectangular shaped portion of the line.
- * For use on gridless maps where ruler does not highlight.
- * @param {RulerMeasurementSegment} segment
- * @param {Color} color   Color to use
- * @param {string} name   Name of the ruler for tracking the highlight graphics
- */
-function highlightLineRectangle(segment, color, name) {
-  const { A, B } = segment.ray;
-  const width = Math.floor(canvas.scene.dimensions.size * (CONFIG[MODULE_ID].gridlessHighlightWidthMultiplier ?? 0.2));
-  const ptsA = perpendicularPoints(A, B, width * 0.5);
-  const ptsB = perpendicularPoints(B, A, width * 0.5);
-  const shape = new PIXI.Polygon([
-    ptsA[0],
-    ptsA[1],
-    ptsB[0],
-    ptsB[1]
-  ]);
-  canvas.interface.grid.highlightPosition(name, { x: A.x, y: A.y, color, shape});
-}
-
-/**
  * Take 2d segments and make 3d.
  * @param {Ruler} ruler
  * @param {object[]} segments
  */
-function elevateSegments(ruler, segments) {  // Add destination as the final waypoint
+export function elevateSegments(ruler, segments) {  // Add destination as the final waypoint
   const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
 
   // Index the default measurement segments to waypoints, keeping in mind that some segments could refer to history.
@@ -430,79 +245,3 @@ function elevateSegments(ruler, segments) {  // Add destination as the final way
 }
 
 
-/**
- * Should Levels floor labels be used?
- * @returns {boolean}
- */
-function useLevelsLabels() {
-  if ( !MODULES_ACTIVE.LEVELS ) return false;
-  const labelOpt = Settings.get(Settings.KEYS.USE_LEVELS_LABEL);
-  return labelOpt === Settings.KEYS.LEVELS_LABELS.ALWAYS
-    || (labelOpt === Settings.KEYS.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);
-}
-
-/**
- * Find the name of the level, if any, at a given elevation.
- * @param {number} e    Elevation to use.
- * @returns First elevation found that is named and has e within its range.
- */
-function levelNameAtElevation(e) {
-  if ( !useLevelsLabels() ) return undefined;
-  const sceneLevels = canvas.scene.getFlag("levels", "sceneLevels"); // Array with [0]: bottom; [1]: top; [2]: name
-  if ( !sceneLevels ) return undefined;
-
-  // Just get the first labeled
-  const lvl = sceneLevels.find(arr => arr[2] !== "" && e >= arr[0] && e <= arr[1]);
-  return lvl ? lvl[2] : undefined;
-}
-
-/*
- * Construct a label to represent elevation changes in the ruler.
- * Waypoint version: @10 ft
- * Total version: @10 ft [↑10 ft] (Bracketed is the total elevation)
- * Total version for Token Ruler: none
- * Display current elevation if there was a previous change in elevation or not a token measurement
- * and the current elevation is nonzero.
- * @param {object} s  Ruler segment
- * @return {string}
- */
-function segmentElevationLabel(ruler, s) {
-  // Arrows: ↑ ↓ ↕
-  // Token ruler uses the preview token for elevation.
-  if ( s.last && ruler.isTokenRuler ) return "";
-
-
-  // If this is the last segment, show the total elevation change if any.
-  const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(s.ray.B.z);
-  const totalE = elevation - canvas.controls.ruler.originElevation;
-  const displayTotalChange = Boolean(totalE) && s.last;
-
-  // Determine if any previous waypoint had an elevation change.
-  let elevationChanged = false;
-  let currE = elevation;
-  for ( let i = s.waypointIdx; i > -1; i -= 1 ) {
-    const prevE = ruler.waypoints[i].elevation;
-    if ( currE !== prevE ) {
-      elevationChanged = true;
-      break;
-    }
-    currE = prevE;
-  }
-
-  // For basic ruler measurements, it is not obvious what the elevation is at start.
-  // So display any nonzero elevation at that point.
-  const displayCurrentElevation = elevationChanged || (!ruler.token && elevation);
-
-  // Put together the two parts of the label: current elevation and total elevation.
-  const labelParts = [];
-  const units = canvas.scene.grid.units;
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-  if ( displayCurrentElevation ) labelParts.push(`@${Number(elevation.toNearest(multiple))} ${units}`);
-  if ( displayTotalChange ) {
-    const segmentArrow = (totalE > 0) ? "↑" :"↓";
-    const totalChange = `[${segmentArrow}${Math.abs(Number(totalE.toNearest(multiple)))} ${units}]`;
-    labelParts.push(totalChange);
-  }
-  s.label.style.align = s.last ? "center" : "right";
-  return labelParts.join(" ");
-}
