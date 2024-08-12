@@ -693,7 +693,7 @@ export class WallTracer extends Graph {
     if ( this.edges.has(wallId) ) return;
 
     // Construct a new wall edge set.
-    this.addObjectEdge(PIXI.Point.fromObject(wall.edge.a), PIXI.Point.fromObject(wall.edge.b), wall);
+    this.addObjectEdge(wall.edge.a, wall.edge.b, wall);
     this.wallIds.add(wallId);
   }
 
