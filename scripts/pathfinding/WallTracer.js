@@ -276,7 +276,6 @@ export class WallTracerEdge extends GraphEdge {
    * @returns {PIXI.Point} The point along the wall line. Ratio 0: endpoint A; 1: endpoint B.
    */
   static pointAtEdgeRatio(edgeA, edgeB, edgeT) {
-    edgeT = CONFIG.GeometryLib.utils.roundDecimals(edgeT, WallTracerEdge.PLACES);
     if ( edgeT.almostEqual(0) ) return edgeA;
     if ( edgeT.almostEqual(1) ) return edgeB;
     return edgeA.projectToward(edgeB, edgeT);
