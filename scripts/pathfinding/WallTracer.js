@@ -215,8 +215,8 @@ export class WallTracerEdge extends GraphEdge {
   /**
    * Construct an edge.
    * To be used instead of constructor in most cases.
-   * @param {Point} edgeA                 First object edge endpoint
-   * @param {Point} edgeB                 Other object edge endpoint
+   * @param {PIXI.Point} edgeA                 First object edge endpoint
+   * @param {PIXI.Point} edgeB                 Other object edge endpoint
    * @param {PlaceableObject[]} [objects] Object(s) that contains this edge, if any
    * @param {number} [tA=0]               Where the A endpoint of this edge falls on the object
    * @param {number} [tB=1]               Where the B endpoint of this edge falls on the object
@@ -225,8 +225,6 @@ export class WallTracerEdge extends GraphEdge {
   static fromObjects(edgeA, edgeB, objects, tA = 0, tB = 1) {
     tA = Math.clamp(tA, 0, 1);
     tB = Math.clamp(tB, 0, 1);
-    edgeA = PIXI.Point.fromObject(edgeA);
-    edgeB = PIXI.Point.fromObject(edgeB);
     const eA = this.pointAtEdgeRatio(edgeA, edgeB, tA);
     const eB = this.pointAtEdgeRatio(edgeA, edgeB, tB);
     const A = new WallTracerVertex(eA.x, eA.y);
