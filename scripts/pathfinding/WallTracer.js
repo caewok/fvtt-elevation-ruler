@@ -731,6 +731,22 @@ export class WallTracer extends Graph {
     // This will remove unnecessary vertices and recombine edges.
     if ( _recurse ) {
       const remainingObjects = edges.reduce((acc, curr) => acc = acc.union(curr.objects), new Set());
+
+      // Add in objects that share a vertex with the removed edge(s).
+      edges.forEach(edge => {
+        const aKey = edge.A.key;
+        const bKey = edge.B.key;
+        if ( this.vertices.has(aKey) ) {
+          const v = this.vertices.get(aKey);
+          v.edges.forEach(edge => edge.objects.forEach(obj => remainingObjects.add(obj)));
+        }
+        if ( this.vertices.has(bKey) ) {
+          const v = this.vertices.get(bKey);
+          v.edges.forEach(edge => edge.objects.forEach(obj => remainingObjects.add(obj)));
+        }
+      });
+
+      // Remove all the objects and then recreate them to redo the associated edges.
       remainingObjects.forEach(obj => obj instanceof Wall
         ? this.removeWall(obj.id, false) : this.removeToken(obj.id, false));
       remainingObjects.forEach(obj => obj instanceof Wall
