@@ -476,7 +476,7 @@ export class Settings extends ModuleSettingsAbstract {
     const res = SCENE_GRAPH._checkInternalConsistency();
     if ( !res.allConsistent ) {
       log(`WallTracer|setTokenBlocksPathfinding ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
-      SCENE_GRAPH.reset();
+      SCENE_GRAPH._reset();
     }
   }
 

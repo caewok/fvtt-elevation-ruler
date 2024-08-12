@@ -6,6 +6,7 @@
 
 import { SCENE_GRAPH } from "./WallTracer.js";
 import { Pathfinder } from "./pathfinding.js";
+import { log } from "../util.js";
 
 // Track wall creation, update, and deletion, constructing WallTracerEdges as we go.
 // Use to update the pathfinding triangulation.
