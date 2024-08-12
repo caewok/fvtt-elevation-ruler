@@ -54,6 +54,7 @@ const SETTINGS = {
     CHOICE: "speed-highlighting-choice", // New multiple-choice for enabling speed highlighting.
     NO_HOSTILES: "speed-highlighting-no-hostiles",
     COMBAT_HISTORY: "token-ruler-combat-history",
+    COMBINE_PRIOR_WITH_TOTAL: "combine-prior-with-total",
     CHOICES: {
       NEVER: "speed-highlighting-choice-never",
       COMBAT: "speed-highlighting-choice-combat",
@@ -233,6 +234,16 @@ export class Settings extends ModuleSettingsAbstract {
     register(KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY, {
       name: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY}.name`),
       hint: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY}.hint`),
+      scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL, {
+      name: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL}.name`),
+      hint: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL}.hint`),
       scope: "user",
       config: true,
       default: false,
