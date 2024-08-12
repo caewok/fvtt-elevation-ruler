@@ -839,16 +839,16 @@ export class WallTracer extends Graph {
     }
 
     // Each vertex has edges contained in the edge set.
-    out.badVertices = new Set(...[...this.vertices.values()].filter(vertex => vertex.edges.every(edge => !this.edges.has(edge.key))));
+    out.badVertices = new Set([...this.vertices.values()].filter(vertex => vertex.edges.every(edge => !this.edges.has(edge.key))));
 
     // Quadtree has edges contained in the edge set.
-    out.badQuadtreeEdges = new Set(...[...quadtreeEdges.values()].filter(edge => !this.edges.has(edge.key)));
+    out.badQuadtreeEdges = new Set([...quadtreeEdges.values()].filter(edge => !this.edges.has(edge.key)));
 
     // Each object has a key in the objectEdges
-    out.badObjects = new Set(...[...objectIds.values()].filter(id => !this.objectEdges.has(id)));
+    out.badObjects = new Set([...objectIds.values()].filter(id => !this.objectEdges.has(id)))
 
     // Each objectEdges key is in one of the three object sets
-    out.badObjectEdges = new Set(...[...this.objectEdges.keys()].filter(key => !objectIds.has(key)));
+    out.badObjectEdges = new Set([...this.objectEdges.keys()].filter(key => !objectIds.has(key)));
 
     out.allConsistent = out.edgesDistinctVertices
       && out.edgesVerticesInSet
