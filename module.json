@@ -5,7 +5,6 @@
   "description": "Modify Foundry VTT ruler for use when dragging tokens, pathfinding, and measuring elevation.",
   "version": "#{VERSION}#",
   "library": false,
-  "manifestPlusVersion": "1.0.0",
   "compatibility": {
     "minimum": "12",
     "verified": "12.330"
