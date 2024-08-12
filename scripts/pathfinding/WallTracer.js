@@ -307,18 +307,28 @@ export class WallTracerEdge extends GraphEdge {
    * @param {number} edgeT  The portion on this *edge* that designates a point.
    * @returns {WallTracerEdge[]|null} Array of two edge tracer edges that share t endpoint.
    */
-  splitAtT(edgeT) {
+  splitAtT(edgeT, vertices = new Map()) {
     edgeT = Math.clamp(edgeT, 0, 1);
     if ( edgeT.almostEqual(0) || edgeT.almostEqual(1) ) return null;
 
-    // Construct two new edges, divided at the edgeT location.
+    // Determine the intersection point based on the edgeT.
     const { A, B } = this;
     const objects = [...this.objects];
+    const ix = this.constructor.pointAtEdgeRatio(A.point, B.point, edgeT);
 
+    // Prefer existing vertices. Test nearby permutations.
+    for ( const x of [0, -0.1, 0.1] ) {
+      for ( const y of [0, -0.1, 0.1] ) {
+        const testIx = ix.add({ x, y }, PIXI.Point._tmp);
+        if ( !vertices.has(testIx.key) ) continue;
+        ix.copyFrom(testIx);
+        break;
+      }
+    }
 
-
-    const edge1 = this.constructor.fromObjects(A, B, objects, 0, edgeT);
-    const edge2 = this.constructor.fromObjects(A, B, objects, edgeT, 1);
+    // Construct the two new edges along this line. Note that rounding will likely cause the edges to be not collinear.
+    const edge1 = this.constructor.fromObjects(A.point, ix, objects, 0, 1);
+    const edge2 = this.constructor.fromObjects(ix, B.point, objects, 0, 1);
     return [edge1, edge2];
   }
 
@@ -608,7 +618,7 @@ export class WallTracer extends Graph {
       if ( overlapC ) {
         // Beginning overlap.
         let overlappingEdge = overlapC.edge;
-        let splitEdges = overlappingEdge.splitAtT(overlapC.t1);
+        let splitEdges = overlappingEdge.splitAtT(overlapC.t1, this.vertices);
         if ( splitEdges ) {
           this.deleteEdge(overlappingEdge);
           const overlapIdx = overlapC.t1 > overlapC.endT1 ? 0 : 1;
@@ -622,7 +632,7 @@ export class WallTracer extends Graph {
 
         // Ending overlap.
         const splitT = prorateTSplit(overlapC.t1, overlapC.endT1);
-        splitEdges = overlappingEdge.splitAtT(splitT);
+        splitEdges = overlappingEdge.splitAtT(splitT, this.vertices);
         if ( splitEdges ) {
           this.deleteEdge(overlappingEdge);
           const overlapIdx = overlapC.t1 > overlapC.endT1 ? 0 : 1;
@@ -640,7 +650,7 @@ export class WallTracer extends Graph {
       // For normal intersections, split the other edge. If the other edge forms a T-intersection,
       // it will not get split (splits at t1 = 0 or t1 = 1).
       for ( const cObj of cObjs ) {
-        const splitEdges = cObj.edge.splitAtT(cObj.t1); // If the split is at the endpoint, will be null.
+        const splitEdges = cObj.edge.splitAtT(cObj.t1, this.vertices); // If the split is at the endpoint, will be null.
         if ( splitEdges ) {
           // Remove the existing edge and add the new edges.
           // With overlaps, it is possible the edge was already removed.
