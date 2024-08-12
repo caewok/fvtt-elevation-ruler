@@ -229,8 +229,7 @@ export class WallTracerEdge extends GraphEdge {
     const eB = this.pointAtEdgeRatio(edgeA, edgeB, tB);
     const A = new WallTracerVertex(eA.x, eA.y);
     const B = new WallTracerVertex(eB.x, eB.y);
-    const dist = PIXI.Point.distanceSquaredBetween(A.point, B.point);
-    const edge = new this(A, B, dist);
+    const edge = new this(A, B);
     objects.forEach(obj => edge.objects.add(obj));
     return edge;
   }
@@ -304,6 +303,7 @@ export class WallTracerEdge extends GraphEdge {
 
   /**
    * Split this edge at some t value.
+   * Prefer existing vertices for the split.
    * @param {number} edgeT  The portion on this *edge* that designates a point.
    * @returns {WallTracerEdge[]|null} Array of two edge tracer edges that share t endpoint.
    */
@@ -314,6 +314,9 @@ export class WallTracerEdge extends GraphEdge {
     // Construct two new edges, divided at the edgeT location.
     const { A, B } = this;
     const objects = [...this.objects];
+
+
+
     const edge1 = this.constructor.fromObjects(A, B, objects, 0, edgeT);
     const edge2 = this.constructor.fromObjects(A, B, objects, edgeT, 1);
     return [edge1, edge2];
