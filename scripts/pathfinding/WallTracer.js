@@ -123,12 +123,6 @@ export class WallTracerVertex extends GraphVertex {
   /** @type {PIXI.Point} */
   #vertex = new PIXI.Point(); // Stored separately so vertices can be added, etc.
 
-  /** @type {number} */
-  key = -1;
-
-  /** @type {string} */
-  keyString = "-1";
-
   /**
    * @param {number} x
    * @param {number} y
@@ -139,8 +133,6 @@ export class WallTracerVertex extends GraphVertex {
     const key = point.key;
     super(key);
     this.#vertex = point;
-    this.key = key;
-    this.keyString = key.toString();
   }
 
   /** @type {*} */
@@ -154,6 +146,9 @@ export class WallTracerVertex extends GraphVertex {
 
   /** @type {PIXI.Point} */
   get point() { return this.#vertex.clone(); } // Clone to avoid internal modification.
+
+  /** @alias {number} */
+  get key() { return this.value; }
 
   /**
    * Test for equality against another vertex
@@ -174,7 +169,7 @@ export class WallTracerVertex extends GraphVertex {
    * @param {function} [callback]
    * @returns {string}
    */
-  toString() { return this.keyString; }
+  toString() { return this.value.toString(); }
 
   draw(drawingOptions = {}) {
     Draw.point(this, drawingOptions);
