@@ -490,9 +490,16 @@ export class WallTracer extends Graph {
    * @inherited
    */
   addEdge(edge) {
-    if ( this.edges.has(edge.key) ) return this.edges.get(edge.key);
     if ( edge.A.key === edge.B.key ) return null;
+    if ( this.edges.has(edge.key) ) {
+      // This edge already exists. But this edge's objects may not be in the existing edge objects.
+      const existingEdge = this.edges.get(edge.key);
+      edge.objects.forEach(obj => this._addEdgeToObjectSet(obj.id, existingEdge));
+      edge.objects.forEach(obj => existingEdge.objects.add(obj));
+      return ;
+    }
 
+    // Construct a new edge.
     edge = super.addEdge(edge);
     this.edgesQuadtree.insert({ r: edge.bounds, t: edge });
 
@@ -539,9 +546,6 @@ export class WallTracer extends Graph {
     edgeSet.delete(edge);
     const obj = [...edge.objects].find(obj => obj.id === id);
     edge.objects.delete(obj); // Delink the object from the edge.
-
-    // If the object has no edges remaining, stop tracking the object.
-    if ( !edgeSet.size ) this.objectEdges.delete(id);
 
     // If this edge has no associated objects, delete the edge.
     if ( !edge.objects.size ) this.deleteEdge(edge);
@@ -719,6 +723,9 @@ export class WallTracer extends Graph {
     const edges = [...this.objectEdges.get(id)]; // Shallow copy the edges b/c they will be removed from the set.
     if ( !edges.length ) return;
     edges.forEach(edge => this._removeEdgeFromObjectSet(id, edge));
+
+    // Stop tracking the object.
+    this.objectEdges.delete(id);
 
     // For each remaining object in the object set, remove it temporarily and re-add it.
     // This will remove unnecessary vertices and recombine edges.
