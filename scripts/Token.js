@@ -58,8 +58,10 @@ function preUpdateToken(document, changes, _options, _userId) {
     // Store the combat move distance and the last round for which the combat move occurred.
     // Map to each unique combat.
     const combatData = {...token._combatMoveData};
-    if ( combatData.lastRound < game.combat.round ) combatData.lastMoveDistance = lastMoveDistance;
-    else combatData.lastMoveDistance += lastMoveDistance;
+    if ( _options.firstRulerSegment ) {
+      if (combatData.lastRound < game.combat.round ) combatData.lastMoveDistance = lastMoveDistance;
+      else combatData.lastMoveDistance += lastMoveDistance;
+    }
     combatData.numDiagonal = numDiagonal;
     combatData.lastRound = game.combat.round;
     combatMoveData = { [game.combat.id]: combatData };

@@ -142,6 +142,7 @@ Elevation Ruler defines certain keybindings:
 - Use Token Ruler: Display the ruler when dragging tokens.
 - Use Token Speed Highlighting: Highlight grid squares under the ruler based on the token's speed. See API, below, for how to modify colors and speed categories.
 - Track Combat Move: When displaying the speed highlighting during combat, count any movement already made by the token this combat round.
+- Combine Prior Movement with Total Movement: When Track Combat Move is enabled, combine the token's prior movement in the round with the total movement. Otherwise, place the prior movement on a separate line.
 - Round Distance to Multiple: Round the measurement display by this multiple. For example, "10" will round 111.23 to 110.
 - Token as Terrain Multiplier: How much does a token penalize movement through that token?
 - Terrain Grid Measurement: When measuring movement through terrain on a gridded map, how should the terrain be accounted for?
