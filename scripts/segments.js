@@ -1,4 +1,5 @@
 /* globals
+canvas,
 CONFIG,
 game
 */
@@ -104,6 +105,14 @@ export function calculatePathPointsForSegment(segment, token) {
   pathPoints = pf.cleanPath(pathPoints);
   const t3 = performance.now();
   log(`Cleaned to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t3 - t2} ms.`, pathPoints);
+
+  // Snap to grid
+  if ( !canvas.grid.isGridless && Settings.get(Settings.KEYS.PATHFINDING.SNAP_TO_GRID) ) {
+    const t4 = performance.now();
+    pathPoints = pf.alignPathToGrid(pathPoints);
+    const t5 = performance.now();
+    log(`Snapped to grid to ${pathPoints?.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t5 - t4} ms.`, pathPoints);
+  }
 
   // If less than 3 points after cleaning, just use the original segment.
   if ( pathPoints.length < 2 ) {

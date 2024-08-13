@@ -4,7 +4,8 @@ CanvasQuadtree,
 CONFIG,
 foundry,
 game,
-PIXI
+PIXI,
+Region
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -472,7 +473,169 @@ export class Pathfinder {
    * @returns {PIXI.Point[]}
    */
   cleanPath(pathPoints) { return cleanGridPathRDP(pathPoints, this.token); }
+
+  /**
+   * Force a set of path points to a grid.
+   * @param {PIXI.Point[]} pathPoints
+   * @returns {PIXI.Point[]}
+   */
+  alignPathToGrid(pathPoints) {
+    const gridPts = alignPathToGrid(pathPoints, this.token);
+    return cleanGridPathPoints(gridPts);
+  }
 }
+
+/**
+ * Version of array that removes duplicate points based on x,y and optional z or elevation.
+ */
+class NoDupePointsArray extends Array {
+  push(...args) {
+    const newArgs = [];
+    let prev = this.at(-1);
+    if ( !(prev && this.constructor.isDuplicate(args[0], prev) ) ) newArgs.push(args[0]);
+    prev = args[0];
+    for ( let i = 1, n = args.length; i < n; i += 1 ) {
+      const elem = args[i];
+      if ( this.constructor.isDuplicate(elem, prev) ) continue;
+      newArgs.push(elem);
+      prev = elem;
+    }
+    super.push(...newArgs);
+  }
+  static isDuplicate(a, b) {
+    let dupe = true;
+    dupe &&= a.x.almostEqual(b.x);
+    dupe &&= a.y.almostEqual(b.y);
+    if ( Object.hasOwn(a, "elevation") ) dupe &&= a.elevation.almostEqual(b.elevation);
+    if ( Object.hasOwn(a, "z") ) dupe &&= a.z.almostEqual(b.z);
+    return dupe;
+  }
+
+  /**
+   * Build a points array from an array of region segments
+   * @param {RegionMovementSegment[]} segments
+   * @param {object} [opts]
+   * @param {RegionMovementWaypoint} [opts.start]
+   * @param {RegionMovementWaypoint} [opts.end]
+   * @returns {RegionMovementWaypoint[]}
+   */
+  static fromSegments(segments, { start, end } = {}) {
+    const { ENTER, MOVE, EXIT } = Region.MOVEMENT_SEGMENT_TYPES;
+    const path = new this();
+    if ( start ) path.push(start);
+    for ( const segment of segments ) {
+      switch ( segment.type ) {
+        case ENTER: path.push(segment.to); break;
+        case MOVE: path.push(segment.from, segment.to); break;
+        case EXIT: path.push(segment.to); break;
+      }
+    }
+    if ( end ) path.push(end);
+    return path;
+  }
+}
+
+/**
+ * Clean a set of grid path points by dropping intermediate points in the same direction.
+ * So if moving diagonally NE, drop all points until direction changes.
+ * @param {PIXI.Point[]} pathPoints
+ * @returns {PIXI.Point[]}
+ */
+function cleanGridPathPoints(pathPoints) {
+  if ( pathPoints.length < 3 ) return pathPoints;
+  let a = pathPoints[0];
+  let b = pathPoints[1];
+  const cleanedPts = [a];
+  for ( let i = 2, n = pathPoints.length - 1; i < n; i += 1 ) {
+    const c = pathPoints[i];
+    const abDir = { x: b.x - a.x, y: b.y - a.y };
+    const cbDir = { x: c.x - b.x, y: c.y - b.y};
+    if ( !(abDir.x.almostEqual(cbDir.x) && abDir.y.almostEqual(cbDir.y)) ) cleanedPts.push(b);
+    a = b;
+    b = c;
+  }
+  cleanedPts.push(pathPoints.at(-1));
+  return cleanedPts;
+}
+
+/**
+ * Align the path to the grid.
+ * Will only align path to the extent it does not collide with a wall.
+ * @param {PIXI.Point[]} pathPoints
+ * @returns {PIXI.Point[]}
+ */
+function alignPathToGrid(pathPoints, token) {
+  if ( pathPoints.length < 2 ) return pathPoints;
+
+  // For each segment, retrieve the grid points that do not result in collisions.
+  const gridPoints = new Array(pathPoints.length - 1);
+  for ( let i = 0, n = pathPoints.length - 1; i < n; i += 1 ) {
+    const a = { x: pathPoints[i].x, y: pathPoints[i].y }; // Drop z for now.
+    const b = { x: pathPoints[i + 1].x, y: pathPoints[i + 1].y };
+    gridPoints[i] = alignSegmentToGrid(a, b, token);
+  }
+
+  // Check dropping the connections between segments.
+  // Grid points are [a, gridPt0,... gridPt1, b].
+  // Next grid points are [b, gridPt0, ... gridPt1, c]
+  // if gridPt1 equals gridPt0, then can connect the two segments.
+  for ( let i = 0, n = gridPoints.length - 1; i < n; i += 1 ) {
+    const prevPts = gridPoints[i];
+    const nextPts = gridPoints[i + 1];
+    const prevPt = prevPts.at(-2);
+    const nextPt = nextPts.at(1);
+    if ( prevPt && nextPt && prevPt.x === nextPt.x && prevPt.y === nextPt.y ) {
+      prevPts.pop();
+      prevPts.pop();
+      nextPts.shift();
+    }
+  }
+  const deDupedPoints = new NoDupePointsArray();
+  deDupedPoints.push(...gridPoints.flat())
+  return deDupedPoints;
+  // deDupedPoints.forEach(pt => Draw.point(pt))
+}
+
+/**
+ * Align a single segment of a path to the grid.
+ * Keeps the a and b endpoints.
+ */
+function alignSegmentToGrid(a, b, token) {
+  if ( hasCollision(a, b, token) ) return [a, b];
+  const gridPoints = canvas.grid.getDirectPath([a, b]);
+  const allPoints = [a, ...gridPoints.map(pt => canvas.grid.getCenterPoint(pt)), b];
+
+  // Test if a --> b has collision. If so, change b to the line.
+  const testedSet = new Set();
+  let currA = allPoints[0];
+  for ( let i = 1, n = allPoints.length - 1; i < n; i += 1 ) {
+    const currB = allPoints[i];
+    if ( hasCollision(currA, currB, token) ) allPoints[i] = foundry.utils.closestPointToSegment(currB, a, b);
+    else  testedSet.add(`${key(currA)}|${key(currB)}`);
+  }
+
+  // Test if a --> b has collision. If so, change a to the line.
+  currA = allPoints[1];
+  for ( let i = 2, n = allPoints.length; i < n; i += 1 ) {
+    const currB = allPoints[i];
+    const keyAB = `${key(currA)}|${key(currB)}`
+    if ( testedSet.has(keyAB) ) continue;
+    if ( hasCollision(currA, currB, token) ) allPoints[i - 1] = foundry.utils.closestPointToSegment(currA, a, b);
+    // else  testedSet.add(`${key(currA)}|${key(currB)}`);
+  }
+
+  return allPoints;
+}
+
+/**
+ * Integer key used for tracking what points were tested.
+ */
+function key(pt) {
+  const x = Math.round(pt.x);
+  const y = Math.round(pt.y);
+  return (x << 16) ^ y;
+}
+
 
 
 /**

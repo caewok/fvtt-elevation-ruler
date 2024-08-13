@@ -29,7 +29,8 @@ const SETTINGS = {
       HOSTILE: "pathfinding_tokens_block_hostile",
       ALL: "pathfinding_tokens_block_all"
     },
-    LIMIT_TOKEN_LOS: "pathfinding_limit_token_los"
+    LIMIT_TOKEN_LOS: "pathfinding_limit_token_los",
+    SNAP_TO_GRID: "pathfinding_snap_to_grid"
   },
 
   HIDE_ELEVATION: "hide-elevation-ruler",
@@ -162,6 +163,16 @@ export class Settings extends ModuleSettingsAbstract {
     register(KEYS.PATHFINDING.LIMIT_TOKEN_LOS, {
       name: localize(`${KEYS.PATHFINDING.LIMIT_TOKEN_LOS}.name`),
       hint: localize(`${KEYS.PATHFINDING.LIMIT_TOKEN_LOS}.hint`),
+      scope: "world",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.PATHFINDING.SNAP_TO_GRID, {
+      name: localize(`${KEYS.PATHFINDING.SNAP_TO_GRID}.name`),
+      hint: localize(`${KEYS.PATHFINDING.SNAP_TO_GRID}.hint`),
       scope: "world",
       config: true,
       default: false,
