@@ -57,10 +57,7 @@ export class MovePenalty {
    */
   constructor(moveToken, speedFn) {
     this.moveToken = moveToken;
-    this.speedFn = speedFn ?? (token => {
-      const moveType = token.movementType;
-      foundry.utils.getProperty(token, SPEED.ATTRIBUTES[MOVEMENT_TYPES, keyForValue(moveType)])
-    });
+    this.speedFn = speedFn ?? (token => foundry.utils.getProperty(token, SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES,  token.movementType)]));
     this.localTokenClone = this.constructor._constructTokenClone(this.moveToken);
     const tokenMultiplier = this.constructor.tokenMultiplier;
     const terrainAPI = this.constructor.terrainAPI;
