@@ -402,6 +402,7 @@ function _computeDistance() {
   let waypointMoveDistance = 0;
   let currWaypointIdx = -1;
   for ( const segment of this.segments ) {
+    if ( segment.history ) continue;
     if ( Object.hasOwn(segment, "waypointIdx") && segment.waypointIdx !== currWaypointIdx ) {
       currWaypointIdx = segment.waypointIdx;
       waypointDistance = 0;
@@ -533,7 +534,31 @@ async function _animateMovement(wrapped, token) {
     }
     promises.push(wrapped(controlledToken));
   }
+  if ( game.combat.active ) {
+    token[MODULE_ID] ??= {};
+    token[MODULE_ID].measurementHistory = this._createMeasurementHistory();
+  }
+
   return Promise.allSettled(promises);
+}
+
+/**
+ * Wrap Ruler.prototype._getMeasurementHistory
+ * @returns {RulerMeasurementHistory|void}
+ */
+function _getMeasurementHistory(wrapped) {
+  const history = wrapped();
+  const token = this.token;
+  if ( !(token && game.combat.active) ) return history;
+  token[MODULE_ID] ??= {};
+  const tokenHistory = token[MODULE_ID].measurementHistory;
+  if ( !tokenHistory || !tokenHistory.length ) return history;
+  const combatData = token._combatMoveData;
+  if ( combatData.lastRound < game.combat.round ) {
+    token[MODULE_ID].measurementHistory = [];
+    return history;
+  }
+  return token[MODULE_ID].measurementHistory;
 }
 
 /**
@@ -693,6 +718,7 @@ PATCHES.BASIC.WRAPS = {
   _removeWaypoint,
   _getMeasurementOrigin,
   _getMeasurementDestination,
+  _getMeasurementHistory,
 
   // Wraps related to segments
   _getSegmentLabel,
