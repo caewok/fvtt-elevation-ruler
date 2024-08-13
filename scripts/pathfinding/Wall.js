@@ -21,6 +21,7 @@ PATCHES.PATHFINDING = {};
  * @param {string} userId                           The ID of the User who triggered the creation workflow
  */
 function createWall(document, _options, _userId) {
+  if ( document.move === CONST.WALL_MOVEMENT_TYPES.NONE ) return;
   SCENE_GRAPH.addWall(document.object);
   Pathfinder.dirty = true;
   const res = SCENE_GRAPH._checkInternalConsistency();
@@ -38,12 +39,15 @@ function createWall(document, _options, _userId) {
  * @param {string} userId                           The ID of the User who triggered the update workflow
  */
 function updateWall(document, changes, _options, _userId) {
-  // Only update the edges if the coordinates have changed.
-  if ( !Object.hasOwn(changes, "c") ) return;
+  // Only update the edges if the coordinates or move type have changed.
+  if ( !(Object.hasOwn(changes, "c") || Object.hasOwn(changes, "move")) ) return;
+  if ( changes.move === CONST.WALL_MOVEMENT_TYPES.NONE ) SCENE_GRAPH.removeWall(document.id);
+  else {
+    // Easiest approach is to trash the edges for the wall and re-create them.
+    SCENE_GRAPH.removeWall(document.id);
+    SCENE_GRAPH.addWall(document.object);
+  }
 
-  // Easiest approach is to trash the edges for the wall and re-create them.
-  SCENE_GRAPH.removeWall(document.id);
-  SCENE_GRAPH.addWall(document.object);
   Pathfinder.dirty = true;
   const res = SCENE_GRAPH._checkInternalConsistency();
   if ( !res.allConsistent ) {
