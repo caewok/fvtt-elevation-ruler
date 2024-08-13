@@ -113,6 +113,21 @@ Hooks.once("init", function() {
      * @type {boolean}
      */
     debug: false
+
+    /**
+     * Ruler label styles
+     */
+    labelStyles: {
+      total: CONFIG.canvasTextStyle.clone(),
+      elevation: CONFIG.canvasTextStyle.clone(),
+      terrain: CONFIG.canvasTextStyle.clone(),
+      waypoint: CONFIG.canvasTextStyle.clone(),
+    }
+
+    /**
+     * The style of the ruler total distance.
+     */
+
   };
 
   /* To add a movement to the api:
