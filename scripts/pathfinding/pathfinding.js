@@ -535,6 +535,8 @@ class NoDupePointsArray extends Array {
   }
 }
 
+
+
 /**
  * Clean a set of grid path points by dropping intermediate points in the same direction.
  * So if moving diagonally NE, drop all points until direction changes.
@@ -568,33 +570,63 @@ function alignPathToGrid(pathPoints, token) {
   if ( pathPoints.length < 2 ) return pathPoints;
 
   // For each segment, retrieve the grid points that do not result in collisions.
-  const gridPoints = new Array(pathPoints.length - 1);
+  let gridPoints = new Array(pathPoints.length - 1);
   for ( let i = 0, n = pathPoints.length - 1; i < n; i += 1 ) {
-    const a = { x: pathPoints[i].x, y: pathPoints[i].y }; // Drop z for now.
-    const b = { x: pathPoints[i + 1].x, y: pathPoints[i + 1].y };
+    const a = { x: pathPoints[i].x, y: pathPoints[i].y, isEndpoint: true }; // Drop z for now.
+    const b = { x: pathPoints[i + 1].x, y: pathPoints[i + 1].y, isEndpoint: true  };
     gridPoints[i] = alignSegmentToGrid(a, b, token);
   }
 
   // Check dropping the connections between segments.
-  // Grid points are [a, gridPt0,... gridPt1, b].
-  // Next grid points are [b, gridPt0, ... gridPt1, c]
-  // if gridPt1 equals gridPt0, then can connect the two segments.
-  for ( let i = 0, n = gridPoints.length - 1; i < n; i += 1 ) {
-    const prevPts = gridPoints[i];
-    const nextPts = gridPoints[i + 1];
-    const prevPt = prevPts.at(-2);
-    const nextPt = nextPts.at(1);
-    if ( prevPt && nextPt && prevPt.x === nextPt.x && prevPt.y === nextPt.y ) {
-      prevPts.pop();
-      prevPts.pop();
-      nextPts.shift();
-    }
-  }
+  gridPoints = cleanSegmentConnections(gridPoints, token);
+
+  // Deduplicate the remaining points, combining into single array.
   const deDupedPoints = new NoDupePointsArray();
   deDupedPoints.push(...gridPoints.flat())
   return deDupedPoints;
   // deDupedPoints.forEach(pt => Draw.point(pt))
 }
+
+/**
+ * Shorten connections between segments.
+ * Grid points are [a, gridPt0,... gridPt1, b].
+ * Next grid points are [b, gridPt0, ... gridPt1, c]
+ * If gridPt1 equals gridPt0, then can connect the two segments.
+ * @param {PIXI.Point[][]} gridPoints
+ * @returns {PIXI.Point[][]}
+ */
+function cleanSegmentConnections(gridPoints, token) {
+  // Drop empty arrays.
+  gridPoints = gridPoints.filter(arr => arr.length);
+
+  // Compare two of the point arrays and attempt to combine.
+  let prevPts = gridPoints[0];
+  for ( let i = 1, n = gridPoints.length; i < n; i += 1 ) {
+    const nextPts = gridPoints[i];
+    const a = prevPts.at(-2);
+    const b = prevPts.at(-1);
+    const c = nextPts.at(0);
+    const d = nextPts.at(1);
+    if ( !(b && c) ) {
+      prevPts = nextPts;
+      continue;
+    }
+
+    // previous: [...a, b]
+    // next: [c, d, ...]
+    // Implicitly all below must have b && c.
+    if ( a && d && b.isEndpoint && c.isEndpoint && !hasCollision(a, d, token) ) {
+      // If b and c are endpoints, can drop both if there is no collision between a and d.
+      prevPts.pop();
+      nextPts.shift();
+    } else if ((b.x === c.x && b.y === c.y)  // Either b or c is not an endpoint; drop b as both are equal.
+            || (a && b.isEndpoint && !hasCollision(a, c, token)) ) prevPts.pop(); // Drop endpoint b.
+    else if ( d && c.isEndpoint && !hasCollision(b, d, token) ) nextPts.shift(); // Drop endpoint c.
+    prevPts = nextPts;
+  }
+  return gridPoints;
+}
+
 
 /**
  * Align a single segment of a path to the grid.
