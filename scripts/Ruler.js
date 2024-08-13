@@ -42,8 +42,8 @@ import {
   highlightLineRectangle } from "./segment_labels_highlighting.js";
 import { tokenSpeedSegmentSplitter } from "./token_speed.js";
 import { log } from "./util.js";
-import { PhysicalDistance } from "./PhysicalDistance.js";
-import { MoveDistance } from "./MoveDistance.js";
+import { PhysicalDistance } from "./measurement/PhysicalDistance.js";
+import { MoveDistance } from "./measurement/MoveDistance.js";
 
 
 /**

@@ -16,9 +16,9 @@ import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarP
 import { SCENE_GRAPH } from "./WallTracer.js";
 import { cdt2dConstrainedGraph, cdt2dToBorderTriangles } from "../delaunator/cdt2d_access_functions.js";
 import { Settings } from "../settings.js";
-import { PhysicalDistanceGridless } from "../PhysicalDistance.js";
+import { PhysicalDistanceGridless } from "../measurement/PhysicalDistance.js";
 import { MODULE_ID } from "../const.js";
-import { MovePenalty } from "../MovePenalty.js";
+import { MovePenalty } from "../measurement/MovePenalty.js";
 
 /* Testing
 

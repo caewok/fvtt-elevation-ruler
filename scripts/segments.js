@@ -11,8 +11,8 @@ import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { log  } from "./util.js";
 import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
-import { MovePenalty } from "./MovePenalty.js";
-import { MoveDistance } from "./MoveDistance.js";
+import { MovePenalty } from "./measurement/MovePenalty.js";
+import { MoveDistance } from "./measurement/MoveDistance.js";
 
 /**
  * Calculate the distance of each segment.

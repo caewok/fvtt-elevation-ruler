@@ -13,7 +13,7 @@ import { measureSegment } from "./segments.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { gridShape, pointFromGridCoordinates, canvasElevationFromCoordinates } from "./measurement/grid_coordinates.js";
-import { MovePenalty } from "./MovePenalty.js";
+import { MovePenalty } from "./measurement/MovePenalty.js";
 
 // Functions used to determine token speed colors.
 

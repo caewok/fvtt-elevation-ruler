@@ -23,14 +23,14 @@ import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d, gridShap
 import {
   PhysicalDistance,
   PhysicalDistanceGridless,
-  PhysicalDistanceGridded } from "./PhysicalDistance.js";
+  PhysicalDistanceGridded } from "./measurement/PhysicalDistance.js";
 
 import {
   MoveDistance,
   MoveDistanceGridless,
-  MoveDistanceGridded } from "./MoveDistance.js";
+  MoveDistanceGridded } from "./measurement/MoveDistance.js";
 
-import { MovePenalty } from "./MovePenalty.js";
+import { MovePenalty } from "./measurement/MovePenalty.js";
 
 // Pathfinding
 import { BorderTriangle, BorderEdge } from "./pathfinding/BorderTriangle.js";

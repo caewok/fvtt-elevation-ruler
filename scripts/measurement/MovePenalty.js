@@ -7,11 +7,11 @@ PIXI
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { MODULE_ID, FLAGS, MODULES_ACTIVE, SPEED, MOVEMENT_TYPES } from "./const.js";
-import { Settings } from "./settings.js";
-import { getCenterPoint3d } from "./measurement/grid_coordinates.js";
-import { movementType } from "./token_hud.js";
-import { log, keyForValue } from "./util.js";
+import { MODULE_ID, FLAGS, MODULES_ACTIVE, SPEED, MOVEMENT_TYPES } from "../const.js";
+import { Settings } from "../settings.js";
+import { getCenterPoint3d } from "./grid_coordinates.js";
+import { movementType } from "../token_hud.js";
+import { log, keyForValue } from "../util.js";
 
 /*
 Class to measure penalty, as percentage of distance, between two points.

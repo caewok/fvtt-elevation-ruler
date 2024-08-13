@@ -10,8 +10,8 @@ Wall
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 import { MODULE_ID } from "../const.js";
-import { MoveDistance } from "../MoveDistance.js";
-import { PhysicalDistance } from "../PhysicalDistance.js";
+import { MoveDistance } from "../measurement/MoveDistance.js";
+import { PhysicalDistance } from "../measurement/PhysicalDistance.js";
 import { Draw } from "../geometry/Draw.js";
 import { WallTracerEdge } from "./WallTracer.js";
 

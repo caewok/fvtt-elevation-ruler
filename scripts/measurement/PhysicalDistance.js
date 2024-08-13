@@ -7,14 +7,14 @@ PIXI
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { GRID_DIAGONALS } from "./const.js";
+import { GRID_DIAGONALS } from "../const.js";
 import {
   pointFromGridCoordinates,
   unitElevationFromCoordinates,
   getCenterPoint3d,
   getDirectPath,
-  diagonalRule } from "./measurement/grid_coordinates.js";
-import { Point3d } from "./geometry/3d/Point3d.js";
+  diagonalRule } from "./grid_coordinates.js";
+import { Point3d } from "../geometry/3d/Point3d.js";
 
 // Class that handles physical distance measurement between two points.
 
