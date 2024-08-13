@@ -890,13 +890,18 @@ export class WallTracer extends Graph {
    * @returns {WallTracer}
    */
   static fromCurrentScene() {
+    const NORMAL = CONST.WALL_MOVEMENT_TYPES.NORMAL;
     const modelGraph = new this();
     for ( const edge of canvas.edges.values() ) {
-      if ( edge.object instanceof Wall ) modelGraph.addWall(edge.object);
-      else if ( edge.type === "outerBounds"
-             || edge.type === "innerBounds" ) modelGraph.addCanvasEdge(edge);
+      switch ( edge.type ) {
+        case "wall": {
+          if ( edge.object.document.move === NORMAL ) modelGraph.addWall(edge.object);
+          break;
+        }
+        case "outerBounds":
+        case "innerBounds": modelGraph.addCanvasEdge(edge); break;
+      }
     }
-
     if ( Settings.useTokensInPathfinding ) canvas.tokens.placeables.forEach(token => modelGraph.addToken(token));
     return modelGraph;
   }
