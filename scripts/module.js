@@ -17,7 +17,7 @@ import { defaultHPAttribute } from "./system_attributes.js";
 import { registerGeometry } from "./geometry/registration.js";
 
 // Grid coordinates
-import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d, gridShape } from "./grid_coordinates.js";
+import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d, gridShape } from "./measurement/grid_coordinates.js";
 
 // Measure classes
 import {

@@ -9,7 +9,7 @@ PIXI
 
 // Helper functions to handle GridCoordinates and v11 alternatives.
 
-import { Point3d } from "./geometry/3d/Point3d.js";
+import { Point3d } from "../geometry/3d/Point3d.js";
 
 // ----- NOTE: Conversion functions to handle v11 and v12 ----- //
 
