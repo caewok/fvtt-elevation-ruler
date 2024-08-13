@@ -58,6 +58,9 @@
     "elevationruler.settings.token-ruler-combat-history.name": "Track Combat Move",
     "elevationruler.settings.token-ruler-combat-history.hint": "For token speed highlighting, sum all the token moves within the round when displaying the highlight.",
 
+    "elevationruler.settings.combine-prior-with-total.name": "Combine Prior Movement with Total Movement",
+    "elevationruler.settings.combine-prior-with-total.hint": "When Track Combat Move is enabled, combine the token's prior movement in the round with the total movement. Otherwise, place the prior movement on a separate line.",
+
     "elevationruler.settings.token-speed-property.name": "Token Walk Property",
     "elevationruler.settings.token-speed-property.hint": "For token speed highlighting, this is the actor property representing token walking speed.",
 

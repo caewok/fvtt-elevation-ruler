@@ -34,6 +34,7 @@ import {
 import { movementTypeForTokenAt } from "./token_hud.js";
 import {
   distanceLabel,
+  getPriorDistance,
   segmentElevationLabel,
   segmentTerrainLabel,
   segmentCombatLabel,
@@ -431,6 +432,9 @@ function _getSegmentLabel(wrapped, segment, totalDistance) {
   // Force distance to be between waypoints instead of (possibly pathfinding) segments.
   const origSegmentDistance = segment.distance;
   segment.distance = distanceLabel(origSegmentDistance);
+  const priorDistance = getPriorDistance(this.token);
+  const combinePriorWithTotal = Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL)
+  this.totalDistance = distanceLabel(totalDistance) + ((combinePriorWithTotal && segment.first) ? priorDistance : 0);
   const origLabel = wrapped(segment, distanceLabel(totalDistance));
   segment.distance = origSegmentDistance;
 
@@ -445,7 +449,7 @@ function _getSegmentLabel(wrapped, segment, totalDistance) {
   const terrainLabel = segmentTerrainLabel(segment);
 
   // Label when in combat and there are past moves.
-  const combatLabel = segmentCombatLabel(this.token);
+  const combatLabel = (combinePriorWithTotal) ? "" : segmentCombatLabel(this.token, priorDistance);
 
   // Put it all together.
   let label = `${origLabel}`;
