@@ -1,3 +1,15 @@
+# 0.10.1
+
+## New Features
+Add toggle in settings to snap pathfinding to the grid when possible.
+Add toggle in setting to combine prior movement with total movement in the same line. Thanks @Larkinabout!
+
+## Bug fixes and other updates
+Fix display of terrain region penalty measurement.
+Update Polish, Italian, and Brazilian Portugese translations. Closes #171. Thanks @GregoryWarn, @Kharmans, and @Lioheart!
+Fixes for the scene graph used for pathfinding. Address graph errors when the token overlaps walls. Address graph errors with overlapping walls.
+
+
 # 0.10.0
 Support Terrain Mapper v0.4.0 elevated regions and tiles.
 Better support for difficult terrain using Terrain Mapper or drawings.
