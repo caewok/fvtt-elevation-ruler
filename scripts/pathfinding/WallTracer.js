@@ -123,12 +123,6 @@ export class WallTracerVertex extends GraphVertex {
   /** @type {PIXI.Point} */
   #vertex = new PIXI.Point(); // Stored separately so vertices can be added, etc.
 
-  /** @type {number} */
-  key = -1;
-
-  /** @type {string} */
-  keyString = "-1";
-
   /**
    * @param {number} x
    * @param {number} y
@@ -139,8 +133,6 @@ export class WallTracerVertex extends GraphVertex {
     const key = point.key;
     super(key);
     this.#vertex = point;
-    this.key = key;
-    this.keyString = key.toString();
   }
 
   /** @type {*} */
@@ -154,6 +146,9 @@ export class WallTracerVertex extends GraphVertex {
 
   /** @type {PIXI.Point} */
   get point() { return this.#vertex.clone(); } // Clone to avoid internal modification.
+
+  /** @alias {number} */
+  get key() { return this.value; }
 
   /**
    * Test for equality against another vertex
@@ -174,7 +169,7 @@ export class WallTracerVertex extends GraphVertex {
    * @param {function} [callback]
    * @returns {string}
    */
-  toString() { return this.keyString; }
+  toString() { return this.value.toString(); }
 
   draw(drawingOptions = {}) {
     Draw.point(this, drawingOptions);
@@ -220,8 +215,8 @@ export class WallTracerEdge extends GraphEdge {
   /**
    * Construct an edge.
    * To be used instead of constructor in most cases.
-   * @param {Point} edgeA                 First object edge endpoint
-   * @param {Point} edgeB                 Other object edge endpoint
+   * @param {PIXI.Point} edgeA                 First object edge endpoint
+   * @param {PIXI.Point} edgeB                 Other object edge endpoint
    * @param {PlaceableObject[]} [objects] Object(s) that contains this edge, if any
    * @param {number} [tA=0]               Where the A endpoint of this edge falls on the object
    * @param {number} [tB=1]               Where the B endpoint of this edge falls on the object
@@ -230,14 +225,11 @@ export class WallTracerEdge extends GraphEdge {
   static fromObjects(edgeA, edgeB, objects, tA = 0, tB = 1) {
     tA = Math.clamp(tA, 0, 1);
     tB = Math.clamp(tB, 0, 1);
-    edgeA = PIXI.Point.fromObject(edgeA);
-    edgeB = PIXI.Point.fromObject(edgeB);
     const eA = this.pointAtEdgeRatio(edgeA, edgeB, tA);
     const eB = this.pointAtEdgeRatio(edgeA, edgeB, tB);
     const A = new WallTracerVertex(eA.x, eA.y);
     const B = new WallTracerVertex(eB.x, eB.y);
-    const dist = PIXI.Point.distanceSquaredBetween(A.point, B.point);
-    const edge = new this(A, B, dist);
+    const edge = new this(A, B);
     objects.forEach(obj => edge.objects.add(obj));
     return edge;
   }
@@ -283,7 +275,6 @@ export class WallTracerEdge extends GraphEdge {
    * @returns {PIXI.Point} The point along the wall line. Ratio 0: endpoint A; 1: endpoint B.
    */
   static pointAtEdgeRatio(edgeA, edgeB, edgeT) {
-    edgeT = CONFIG.GeometryLib.utils.roundDecimals(edgeT, WallTracerEdge.PLACES);
     if ( edgeT.almostEqual(0) ) return edgeA;
     if ( edgeT.almostEqual(1) ) return edgeB;
     return edgeA.projectToward(edgeB, edgeT);
@@ -312,18 +303,32 @@ export class WallTracerEdge extends GraphEdge {
 
   /**
    * Split this edge at some t value.
+   * Prefer existing vertices for the split.
    * @param {number} edgeT  The portion on this *edge* that designates a point.
    * @returns {WallTracerEdge[]|null} Array of two edge tracer edges that share t endpoint.
    */
-  splitAtT(edgeT) {
+  splitAtT(edgeT, vertices = new Map()) {
     edgeT = Math.clamp(edgeT, 0, 1);
     if ( edgeT.almostEqual(0) || edgeT.almostEqual(1) ) return null;
 
-    // Construct two new edges, divided at the edgeT location.
+    // Determine the intersection point based on the edgeT.
     const { A, B } = this;
     const objects = [...this.objects];
-    const edge1 = this.constructor.fromObjects(A, B, objects, 0, edgeT);
-    const edge2 = this.constructor.fromObjects(A, B, objects, edgeT, 1);
+    const ix = this.constructor.pointAtEdgeRatio(A.point, B.point, edgeT);
+
+    // Prefer existing vertices. Test nearby permutations.
+    for ( const x of [0, -0.1, 0.1] ) {
+      for ( const y of [0, -0.1, 0.1] ) {
+        const testIx = ix.add({ x, y }, PIXI.Point._tmp);
+        if ( !vertices.has(testIx.key) ) continue;
+        ix.copyFrom(testIx);
+        break;
+      }
+    }
+
+    // Construct the two new edges along this line. Note that rounding will likely cause the edges to be not collinear.
+    const edge1 = this.constructor.fromObjects(A.point, ix, objects, 0, 1);
+    const edge2 = this.constructor.fromObjects(ix, B.point, objects, 0, 1);
     return [edge1, edge2];
   }
 
@@ -485,9 +490,16 @@ export class WallTracer extends Graph {
    * @inherited
    */
   addEdge(edge) {
-    if ( this.edges.has(edge.key) ) return this.edges.get(edge.key);
     if ( edge.A.key === edge.B.key ) return null;
+    if ( this.edges.has(edge.key) ) {
+      // This edge already exists. But this edge's objects may not be in the existing edge objects.
+      const existingEdge = this.edges.get(edge.key);
+      edge.objects.forEach(obj => this._addEdgeToObjectSet(obj.id, existingEdge));
+      edge.objects.forEach(obj => existingEdge.objects.add(obj));
+      return ;
+    }
 
+    // Construct a new edge.
     edge = super.addEdge(edge);
     this.edgesQuadtree.insert({ r: edge.bounds, t: edge });
 
@@ -534,9 +546,6 @@ export class WallTracer extends Graph {
     edgeSet.delete(edge);
     const obj = [...edge.objects].find(obj => obj.id === id);
     edge.objects.delete(obj); // Delink the object from the edge.
-
-    // If the object has no edges remaining, stop tracking the object.
-    if ( !edgeSet.size ) this.objectEdges.delete(id);
 
     // If this edge has no associated objects, delete the edge.
     if ( !edge.objects.size ) this.deleteEdge(edge);
@@ -613,7 +622,7 @@ export class WallTracer extends Graph {
       if ( overlapC ) {
         // Beginning overlap.
         let overlappingEdge = overlapC.edge;
-        let splitEdges = overlappingEdge.splitAtT(overlapC.t1);
+        let splitEdges = overlappingEdge.splitAtT(overlapC.t1, this.vertices);
         if ( splitEdges ) {
           this.deleteEdge(overlappingEdge);
           const overlapIdx = overlapC.t1 > overlapC.endT1 ? 0 : 1;
@@ -627,7 +636,7 @@ export class WallTracer extends Graph {
 
         // Ending overlap.
         const splitT = prorateTSplit(overlapC.t1, overlapC.endT1);
-        splitEdges = overlappingEdge.splitAtT(splitT);
+        splitEdges = overlappingEdge.splitAtT(splitT, this.vertices);
         if ( splitEdges ) {
           this.deleteEdge(overlappingEdge);
           const overlapIdx = overlapC.t1 > overlapC.endT1 ? 0 : 1;
@@ -645,7 +654,7 @@ export class WallTracer extends Graph {
       // For normal intersections, split the other edge. If the other edge forms a T-intersection,
       // it will not get split (splits at t1 = 0 or t1 = 1).
       for ( const cObj of cObjs ) {
-        const splitEdges = cObj.edge.splitAtT(cObj.t1); // If the split is at the endpoint, will be null.
+        const splitEdges = cObj.edge.splitAtT(cObj.t1, this.vertices); // If the split is at the endpoint, will be null.
         if ( splitEdges ) {
           // Remove the existing edge and add the new edges.
           // With overlaps, it is possible the edge was already removed.
@@ -688,7 +697,7 @@ export class WallTracer extends Graph {
     if ( this.edges.has(wallId) ) return;
 
     // Construct a new wall edge set.
-    this.addObjectEdge(PIXI.Point.fromObject(wall.edge.a), PIXI.Point.fromObject(wall.edge.b), wall);
+    this.addObjectEdge(wall.edge.a, wall.edge.b, wall);
     this.wallIds.add(wallId);
   }
 
@@ -715,10 +724,29 @@ export class WallTracer extends Graph {
     if ( !edges.length ) return;
     edges.forEach(edge => this._removeEdgeFromObjectSet(id, edge));
 
+    // Stop tracking the object.
+    this.objectEdges.delete(id);
+
     // For each remaining object in the object set, remove it temporarily and re-add it.
     // This will remove unnecessary vertices and recombine edges.
     if ( _recurse ) {
       const remainingObjects = edges.reduce((acc, curr) => acc = acc.union(curr.objects), new Set());
+
+      // Add in objects that share a vertex with the removed edge(s).
+      edges.forEach(edge => {
+        const aKey = edge.A.key;
+        const bKey = edge.B.key;
+        if ( this.vertices.has(aKey) ) {
+          const v = this.vertices.get(aKey);
+          v.edges.forEach(edge => edge.objects.forEach(obj => remainingObjects.add(obj)));
+        }
+        if ( this.vertices.has(bKey) ) {
+          const v = this.vertices.get(bKey);
+          v.edges.forEach(edge => edge.objects.forEach(obj => remainingObjects.add(obj)));
+        }
+      });
+
+      // Remove all the objects and then recreate them to redo the associated edges.
       remainingObjects.forEach(obj => obj instanceof Wall
         ? this.removeWall(obj.id, false) : this.removeToken(obj.id, false));
       remainingObjects.forEach(obj => obj instanceof Wall
@@ -834,16 +862,16 @@ export class WallTracer extends Graph {
     }
 
     // Each vertex has edges contained in the edge set.
-    out.badVertices = new Set(...[...this.vertices.values()].filter(vertex => vertex.edges.every(edge => !this.edges.has(edge.key))));
+    out.badVertices = new Set([...this.vertices.values()].filter(vertex => vertex.edges.every(edge => !this.edges.has(edge.key))));
 
     // Quadtree has edges contained in the edge set.
-    out.badQuadtreeEdges = new Set(...[...quadtreeEdges.values()].filter(edge => !this.edges.has(edge.key)));
+    out.badQuadtreeEdges = new Set([...quadtreeEdges.values()].filter(edge => !this.edges.has(edge.key)));
 
     // Each object has a key in the objectEdges
-    out.badObjects = new Set(...[...objectIds.values()].filter(id => !this.objectEdges.has(id)));
+    out.badObjects = new Set([...objectIds.values()].filter(id => !this.objectEdges.has(id)))
 
     // Each objectEdges key is in one of the three object sets
-    out.badObjectEdges = new Set(...[...this.objectEdges.keys()].filter(key => !objectIds.has(key)));
+    out.badObjectEdges = new Set([...this.objectEdges.keys()].filter(key => !objectIds.has(key)));
 
     out.allConsistent = out.edgesDistinctVertices
       && out.edgesVerticesInSet
@@ -862,13 +890,18 @@ export class WallTracer extends Graph {
    * @returns {WallTracer}
    */
   static fromCurrentScene() {
+    const NORMAL = CONST.WALL_MOVEMENT_TYPES.NORMAL;
     const modelGraph = new this();
     for ( const edge of canvas.edges.values() ) {
-      if ( edge.object instanceof Wall ) modelGraph.addWall(edge.object);
-      else if ( edge.type === "outerBounds"
-             || edge.type === "innerBounds" ) modelGraph.addCanvasEdge(edge);
+      switch ( edge.type ) {
+        case "wall": {
+          if ( edge.object.document.move === NORMAL ) modelGraph.addWall(edge.object);
+          break;
+        }
+        case "outerBounds":
+        case "innerBounds": modelGraph.addCanvasEdge(edge); break;
+      }
     }
-
     if ( Settings.useTokensInPathfinding ) canvas.tokens.placeables.forEach(token => modelGraph.addToken(token));
     return modelGraph;
   }

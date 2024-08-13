@@ -29,7 +29,8 @@ const SETTINGS = {
       HOSTILE: "pathfinding_tokens_block_hostile",
       ALL: "pathfinding_tokens_block_all"
     },
-    LIMIT_TOKEN_LOS: "pathfinding_limit_token_los"
+    LIMIT_TOKEN_LOS: "pathfinding_limit_token_los",
+    SNAP_TO_GRID: "pathfinding_snap_to_grid"
   },
 
   HIDE_ELEVATION: "hide-elevation-ruler",
@@ -54,6 +55,7 @@ const SETTINGS = {
     CHOICE: "speed-highlighting-choice", // New multiple-choice for enabling speed highlighting.
     NO_HOSTILES: "speed-highlighting-no-hostiles",
     COMBAT_HISTORY: "token-ruler-combat-history",
+    COMBINE_PRIOR_WITH_TOTAL: "combine-prior-with-total",
     CHOICES: {
       NEVER: "speed-highlighting-choice-never",
       COMBAT: "speed-highlighting-choice-combat",
@@ -169,6 +171,16 @@ export class Settings extends ModuleSettingsAbstract {
       requiresReload: false
     });
 
+    register(KEYS.PATHFINDING.SNAP_TO_GRID, {
+      name: localize(`${KEYS.PATHFINDING.SNAP_TO_GRID}.name`),
+      hint: localize(`${KEYS.PATHFINDING.SNAP_TO_GRID}.hint`),
+      scope: "world",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
     register(KEYS.HIDE_ELEVATION, {
       name: localize(`${KEYS.HIDE_ELEVATION}.name`),
       hint: localize(`${KEYS.HIDE_ELEVATION}.hint`),
@@ -233,6 +245,16 @@ export class Settings extends ModuleSettingsAbstract {
     register(KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY, {
       name: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY}.name`),
       hint: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY}.hint`),
+      scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL, {
+      name: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL}.name`),
+      hint: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL}.hint`),
       scope: "user",
       config: true,
       default: false,
@@ -476,7 +498,7 @@ export class Settings extends ModuleSettingsAbstract {
     const res = SCENE_GRAPH._checkInternalConsistency();
     if ( !res.allConsistent ) {
       log(`WallTracer|setTokenBlocksPathfinding ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
-      SCENE_GRAPH.reset();
+      SCENE_GRAPH._reset();
     }
   }
 
