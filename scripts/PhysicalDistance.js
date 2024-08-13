@@ -13,7 +13,7 @@ import {
   unitElevationFromCoordinates,
   getCenterPoint3d,
   getDirectPath,
-  diagonalRule } from "./grid_coordinates.js";
+  diagonalRule } from "./measurement/grid_coordinates.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 
 // Class that handles physical distance measurement between two points.
