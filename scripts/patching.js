@@ -11,6 +11,9 @@ import { PATCHES as PATCHES_Token } from "./Token.js";
 import { PATCHES as PATCHES_ClientKeybindings } from "./ClientKeybindings.js";
 import { PATCHES as PATCHES_DrawingConfig } from "./DrawingConfig.js";
 
+// Measuring distance
+import { PATCHES_GridlessGrid } from "./measurement/Grid.js";
+
 // Pathfinding
 import { PATCHES as PATCHES_Wall } from "./pathfinding/Wall.js";
 import { PATCHES as PATCHES_CanvasEdges } from "./pathfinding/CanvasEdges.js";
@@ -31,6 +34,7 @@ const PATCHES = {
   CombatTracker: PATCHES_CombatTracker,
   ["foundry.canvas.edges.CanvasEdges"]: PATCHES_CanvasEdges,
   DrawingConfig: PATCHES_DrawingConfig,
+  ["foundry.grid.GridlessGrid"]: PATCHES_GridlessGrid,
   ["CONFIG.Canvas.rulerClass"]: PATCHES_Ruler,
   Token: mergeObject(mergeObject(PATCHES_Token, PATCHES_TokenPF), PATCHES_TokenHUD),
   Wall: PATCHES_Wall

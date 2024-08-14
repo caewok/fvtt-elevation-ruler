@@ -18,6 +18,7 @@ import { registerGeometry } from "./geometry/registration.js";
 
 // Grid coordinates
 import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d, gridShape } from "./measurement/grid_coordinates.js";
+import { GridCoordinates, RegionMovementWaypoint3d, GridCoordinates3d } from "./measurement/grid_coordinates_new.js";
 
 // Measure classes
 import {
@@ -131,10 +132,12 @@ Hooks.once("init", function() {
     coordinates: {
       pointFromGridCoordinates,
       getCenterPoint3d,
-      getGridPosition3d
+      getGridPosition3d,
+      GridCoordinates,
+      RegionMovementWaypoint3d,
+      GridCoordinates3d
     },
 
-    // Measure classes
     measure: {
       PhysicalDistance,
       PhysicalDistanceGridless,
@@ -145,7 +148,6 @@ Hooks.once("init", function() {
       MovePenalty
     },
 
-    // Pathfinding
     pathfinding: {
       BorderTriangle,
       BorderEdge,
