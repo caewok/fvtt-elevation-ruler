@@ -7,7 +7,6 @@ PIXI
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { GRID_DIAGONALS } from "../const.js";
 import {
   pointFromGridCoordinates,
   unitElevationFromCoordinates,
@@ -155,7 +154,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
     const distance = canvas.dimensions.distance;
     const diagonalMult = this.#diagonalDistanceMultiplier();
     const diagonalDist = distance * diagonalMult;
-    const D = GRID_DIAGONALS;
+    const D = CONST.GRID_DIAGONALS;
     switch ( diagonalRule() ) {
       case D.ALTERNATING_1: {
         const pastOdd = numPrevDiagonal % 2;
@@ -180,7 +179,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
   static #diagonalDistanceMultiplier() {
     if ( canvas.grid.isHexagonal ) return 1;
     if ( canvas.grid.isGridless ) return Math.SQRT2;
-    const D = GRID_DIAGONALS;
+    const D = CONST.GRID_DIAGONALS;
     switch ( diagonalRule() ) {
       case D.EQUIDISTANT: return 1;
       case D.EXACT: return Math.SQRT2;
@@ -296,7 +295,7 @@ export class PhysicalDistanceGridded extends PhysicalDistance {
     // If vertical projection, increment elevation only.
     // If diagonal or horizontal, increment both elevation and grid step.
     // Flip horizontal/vertical for hex rows.
-    const diagAllowed = canvas.grid.diagonals !== GRID_DIAGONALS.ILLEGAL;
+    const diagAllowed = canvas.grid.diagonals !== CONST.GRID_DIAGONALS.ILLEGAL;
     const [elevOnlyMove, canvasOnlyMove] = isHexRow() ? ["H", "V"] : ["V", "H"];
     let prevProjPt = projPtsIter.next().value;
     let prevPt = pts2dIter.next().value;

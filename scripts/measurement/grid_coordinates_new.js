@@ -29,6 +29,18 @@ import { Point3d } from "../geometry/3d/Point3d.js";
  * A 2d point that can function as Point|GridOffset. For just a point, use PIXI.Point.
  */
 export class GridCoordinates extends PIXI.Point {
+  /**
+   * Factory function that converts a GridOffset to GridCoordinates.
+   * The {x, y} coordinates are centered.
+   * @param {GridOffset} offset
+   * @returns {GridCoordinates}
+   */
+  static fromOffset(offset) {
+    const pt = new this();
+    pt.setOffset(offset);
+    return pt;
+  }
+
   /** @type {number} */
   get i() { return canvas.grid.getOffset({ x: this.x, y: this.y }).i }
 
@@ -68,14 +80,20 @@ export class GridCoordinates extends PIXI.Point {
   toPoint() { return PIXI.Point.fromObject(this); }
 
   /**
-   * Coerce this point to match the offset value.
+   * Change this point to a specific offset value. The point will be centered.
+   * @param {GridOffset} offset
    */
-  matchOffset() {
-    const { i, j } = canvas.grid.getOffset({ x: this.x, y: this.y });
-    this.i = i;
-    this.j = j;
+  setOffset(offset) {
+    const { x, y } = canvas.grid.getCenterPoint(offset);
+    this.x = x;
+    this.y = y;
     return this;
   }
+
+  /**
+   * Center this point based on its current offset value.
+   */
+  centerToOffset() { return this.setOffset(this); }
 
   /**
    * For compatibility with PIXI.Point.
@@ -160,6 +178,18 @@ export class RegionMovementWaypoint3d extends Point3d {
  * Links z to the elevation property.
  */
 export class GridCoordinates3d extends RegionMovementWaypoint3d {
+  /**
+   * Factory function that converts a GridOffset to GridCoordinates.
+   * @param {GridOffset} offset
+   * @param {number} [elevation]      Override the elevation in offset, if any. In grid units
+   * @returns {GridCoordinates3d}
+   */
+  static fromOffset(offset, elevation) {
+    const pt = new this();
+    pt.setOffset(offset);
+    if ( typeof elevation !== "undefined" ) pt.elevation = elevation;
+    return pt;
+  }
 
   /** @type {number} */
   get i() { return canvas.grid.getOffset({ x: this.x, y: this.y }).i }
@@ -196,7 +226,7 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
    */
   get topLeft() {
     const tl = this.constructor.fromObject(canvas.grid.getTopLeftPoint({ x: this.x, y: this.y }));
-    tl.z = CONFIG.GeometryLib.utils.gridUnitsToPixels(this.elevationForUnit(this.k));
+    tl.z = CONFIG.GeometryLib.utils.gridUnitsToPixels(this.constructor.elevationForUnit(this.k));
     return tl;
   }
 
@@ -207,7 +237,7 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
    */
   get center() {
     const center = this.constructor.fromObject(canvas.grid.getCenterPoint({ x: this.x, y: this.y }));
-    center.z = CONFIG.GeometryLib.utils.gridUnitsToPixels(this.elevationForUnit(this.k));
+    center.z = CONFIG.GeometryLib.utils.gridUnitsToPixels(this.constructor.elevationForUnit(this.k));
     return center;
   }
 
@@ -218,16 +248,21 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
   toWaypoint() { return RegionMovementWaypoint3d.fromObject(this); }
 
   /**
-   * Coerce this point to match the offset value.
+   * Change this point to a specific offset value.
+   * @param {GridOffset} offset
    */
-  matchOffset() {
-    const { i, j } = canvas.grid.getOffset({ x: this.x, y: this.y });
-    const k = this.constructor.unitElevation(this.elevation);
-    this.i = i;
-    this.j = j;
-    this.k = k;
+  setOffset(offset) {
+    const { x, y } = canvas.grid.getCenterPoint(offset);
+    this.x = x;
+    this.y = y;
+    this.elevation = this.constructor.elevationForUnit(offset.k || 0);
     return this;
   }
+
+  /**
+   * Center this point based on its current offset value.
+   */
+  centerToOffset() { return this.setOffset(this); }
 
   /**
    * Conversion to 2d.

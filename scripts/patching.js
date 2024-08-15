@@ -12,7 +12,7 @@ import { PATCHES as PATCHES_ClientKeybindings } from "./ClientKeybindings.js";
 import { PATCHES as PATCHES_DrawingConfig } from "./DrawingConfig.js";
 
 // Measuring distance
-import { PATCHES_GridlessGrid } from "./measurement/Grid.js";
+import { PATCHES_GridlessGrid, PATCHES_SquareGrid, PATCHES_HexagonalGrid } from "./measurement/Grid.js";
 
 // Pathfinding
 import { PATCHES as PATCHES_Wall } from "./pathfinding/Wall.js";
@@ -35,6 +35,8 @@ const PATCHES = {
   ["foundry.canvas.edges.CanvasEdges"]: PATCHES_CanvasEdges,
   DrawingConfig: PATCHES_DrawingConfig,
   ["foundry.grid.GridlessGrid"]: PATCHES_GridlessGrid,
+  ["foundry.grid.HexagonalGrid"]: PATCHES_HexagonalGrid,
+  ["foundry.grid.SquareGrid"]: PATCHES_SquareGrid,
   ["CONFIG.Canvas.rulerClass"]: PATCHES_Ruler,
   Token: mergeObject(mergeObject(PATCHES_Token, PATCHES_TokenPF), PATCHES_TokenHUD),
   Wall: PATCHES_Wall
