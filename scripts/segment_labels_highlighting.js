@@ -38,8 +38,9 @@ export function highlightLineRectangle(segment, color, name) {
  * @returns {number}
  */
 export function distanceLabel(dist) {
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-  return dist.toNearest(multiple);
+  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE);
+  if (multiple) return dist.toNearest(multiple);
+  return dist;
 }
 
 /**

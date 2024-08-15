@@ -74,7 +74,7 @@
     "elevationruler.settings.token-speed-multiplier.hint": "For token speed highlighting, this is the multiplier used to go from walk to run (dash) to maximum. For example, with a multiplier of 2, a token with 25 walk speed will have its ruler highlight orange after the first 25 units of distance, and red after the first 50.",
 
     "elevationruler.settings.round-to-multiple.name": "Round Distance to Multiple",
-    "elevationruler.settings.round-to-multiple.hint": "For gridless distance measurement, round the distance displayed to the nearest multiple of the number entered. Set to 0 to disable rounding.",
+    "elevationruler.settings.round-to-multiple.hint": "Round the distance displayed to the nearest multiple of the number entered. Set to 0 to disable rounding.",
 
     "elevationruler.settings.token-terrain-multiplier.name": "Token as Terrain Multiplier",
     "elevationruler.settings.token-terrain-multiplier.hint": "Multiplier to use to calculate movement speed when moving through other tokens. Set to 1 to ignore. Values less than 1 treat token spaces as faster than normal; values greater than 1 penalize movement through token spaces.",
