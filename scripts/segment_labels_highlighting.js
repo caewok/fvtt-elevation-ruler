@@ -9,7 +9,7 @@ PIXI
 
 import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
 import { Settings } from "./settings.js";
-import { perpendicularPoints  } from "./util.js";
+import { perpendicularPoints, roundMultiple } from "./util.js";
 
 /**
  * Highlight a rectangular shaped portion of the line.
@@ -38,9 +38,7 @@ export function highlightLineRectangle(segment, color, name) {
  * @returns {number}
  */
 export function distanceLabel(dist) {
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE);
-  if (multiple) return dist.toNearest(multiple);
-  return dist;
+  return roundMultiple(dist);
 }
 
 /**
@@ -51,16 +49,15 @@ export function distanceLabel(dist) {
  * @returns {object}
  */
 export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance) {
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
   if ( canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS ) return {
     newSegmentDistance: segmentDistance,
     newMoveDistance: Number(moveDistance.toFixed(2)),
     newTotalDistance: totalDistance
   };
 
-  const newSegmentDistance = segmentDistance.toNearest(multiple);
-  const newMoveDistance = moveDistance.toNearest(multiple);
-  const newTotalDistance = totalDistance.toNearest(multiple);
+  const newSegmentDistance = roundMultiple(segmentDistance);
+  const newMoveDistance = roundMultiple(moveDistance);
+  const newTotalDistance = roundMultiple(totalDistance);
 
   return { newSegmentDistance, newMoveDistance, newTotalDistance };
 }
@@ -131,11 +128,10 @@ export function segmentElevationLabel(ruler, s) {
   // Put together the two parts of the label: current elevation and total elevation.
   const labelParts = [];
   const units = canvas.scene.grid.units;
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-  if ( displayCurrentElevation ) labelParts.push(`@${Number(elevation.toNearest(multiple))} ${units}`);
+  if ( displayCurrentElevation ) labelParts.push(`@${Number(roundMultiple(elevation))} ${units}`);
   if ( displayTotalChange ) {
     const segmentArrow = (totalE > 0) ? "↑" :"↓";
-    const totalChange = `[${segmentArrow}${Math.abs(Number(totalE.toNearest(multiple)))} ${units}]`;
+    const totalChange = `[${segmentArrow}${Math.abs(Number(roundMultiple(totalE)))} ${units}]`;
     labelParts.push(totalChange);
   }
   s.label.style.align = s.last ? "center" : "right";
