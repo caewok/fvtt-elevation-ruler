@@ -191,6 +191,16 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
     return pt;
   }
 
+  /**
+   * Factory function to determine the grid square/hex center for the point.
+   * @param {Point3d}
+   * @returns {GridCoordinate3d}
+   */
+  static gridCenterForPoint(pt) {
+    pt = new this(pt.x, pt.y, pt.z);
+    return pt.centerToOffset();
+  }
+
   /** @type {number} */
   get i() { return canvas.grid.getOffset({ x: this.x, y: this.y }).i }
 
@@ -240,6 +250,8 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
     center.z = CONFIG.GeometryLib.utils.gridUnitsToPixels(this.constructor.elevationForUnit(this.k));
     return center;
   }
+
+
 
   /**
    * Convert this point to a RegionMovementWaypoint.
