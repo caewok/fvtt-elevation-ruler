@@ -122,11 +122,136 @@ function _measurePathSquareGrid(wrapped, waypoints, {cost}, result) {
   let diagonals = 0;
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
     const end = waypoints[i];
+
+    // Determine the distance for the projected 2d segment.
+    // Pass a fake cost function to retrieve the grid offsets.
+    const costFnResults = [];
+    const costFn = (fromOffset, toOffset, offsetDistance) => costFnResults.push({ fromOffset, toOffset, offsetDistance });
+    const result2d = constructGridMeasurePathResult([start.to2d(), end.to2d()]);
+    wrapped([start.to2d(), end.to2d()], {cost: costFn}, result2d); // canvas.grid._measurePath([start.to2d(), end.to2d()], {cost: costFn}, result2d)
+
+    // At each step, elevate 1+ steps.
+    // 1. Elevation move. (straight) (Can do more than 1)
+    // 2. Canvas straight move.
+    // 3. Canvas diagonal
+    // 4. Canvas straight + elevation (diagonal)
+    // 5. Canvas diagonal + elevation (diagonal) (double diagonal)
+
+    // Split up the elevation evenly across the move according to following:
+    // - Prefer elevation moves when doing a canvas diagonal move.
+    // - Finish elevation moves by the time of the last move.
+    // - If less elevation steps than canvas steps, stagger the elevation steps.
+    const startOffset = GridCoordinates3d.fromObject(start);
+    const endOffset = GridCoordinates3d.fromObject(end);
+    let elevationStepsRemaining = Math.abs(startOffset.k - endOffset.k);
+    let singleDiagonalRemaining = Math.min(0, elevationStepsRemaining - result2d.diagonals);
+    let elevationStepsPer = Math.ceil(elevationStepsRemaining / result2d.spaces); // Update in loop.
+
+    // Mod set such that (i + 1) % mod equals 0 when one elevation step ideally should be used.
+    // So if 10 canvas steps and 1 elevation step, elevation step would occur halfway, at mod 5. (4 + 1) % 5 = 0.
+    // If 10 canvas steps and 2 elevation steps, mod 4. i = 3, i = 6. Math.ceil(10 / (2 + 1)) = 4
+    const elevationStepMod = Math.ceil(result2d.spaces / (elevationStepsRemaining + 1));
+
+    // Handle situations where double diagonals bunched at end. E.g., s s s d d d
+    // If less single diagonals remaining than needed, elevate accordingly.
+    let singleDiagonalStepsRemaining = Math.max(0, result2d.spaces - result2d.diagonals);
+
+
+    // Cycle over each canvas step in turn
+    let ns = 0;
+    let nd = 0;
+    let ndd = 0;
+    startOffset.z = start.z;
+    endOffset.z = start.z;
+    const distanceFn = singleOffsetDistanceFn(diagonals);
+    for ( let i = 0, n = costFnResults.length; i < n; i += 1 ) {
+      startOffset.i = canvasStep.fromOffset.i;
+      startOffset.j = canvasStep.fromOffset.j;
+      endOffset.i = canvasStep.toOffset.i;
+      endOffset.j = canvasStep.toOffset.j;
+      const canvasDiagMove = startOffset.i !== endOffset.i && startOffset.j !== endOffset.j;
+
+      if ( elevationStepsRemaining ) {
+        if ( canvasDiagMove ) {
+          // Double diagonal. #5.
+          endOffset.k += 1;
+          const offsetDistance = distanceFn(false, true, true);
+          const newCost = cost(startOffset, endOffset, offsetDistance);
+
+        }
+
+
+      } else {
+        // We already know the 2d offset distance.
+        // But need to pass the correct offsets to the real cost function.
+        // Also might have alternating diagonals which must be tracked.
+        // Move is either #2 or #3.
+      }
+
+      if ( elevationStepsPer > 1 ) {
+        // Add in single elevation steps.
+      }
+
+
+    }
+
+    for ( const canvasStep of costFnResults ) {
+      startOffset.i = canvasStep.fromOffset.i;
+      startOffset.j = canvasStep.fromOffset.j;
+      endOffset.i = canvasStep.toOffset.i;
+      endOffset.j = canvasStep.toOffset.j;
+      if ( elevationSteps ) {
+        endOffset.k += 1;
+        elevationSteps -= 1;
+      }
+
+      if ( elevationSteps ) {
+        endOffset.k += 1;
+        elevationSteps -= 1;
+
+        // Determine if this is a straight + diagonal (#4) or double diagonal (#5).
+        // const canvasStraightMove = startOffset.i !== endOffset.i ^ startOffset.j !== endOffset.j;
+        // const canvasDiagMove = startOffset.i !== endOffset.i && startOffset.j !== endOffset.j;
+
+
+        const newCost = cost(startOffset, endOffset, )
+
+
+      } else {
+        // We already know the 2d offset distance.
+        // But need to pass the correct offsets to the real cost function.
+        // Also might have alternating diagonals which must be tracked.
+        // Move is either #2 or #3.
+      }
+
+
+      const elevMove = startOffset.k !== endOffset.k;
+
+      // We already have the canvas offset distance.
+      let offsetDist = costStep.offsetDistance;
+
+
+      startOffset.setOffset(endOffset);
+
+      // Extra elevation moves
+    }
+
+    // Added elevation at end moving straight up/down. (#1)
+
+
+
+
+
+
     const { origin2d, destination2d } = project3dLineSquareGrid(start, end);
     const result2d = constructGridMeasurePathResult([origin2d, destination2d]);
 
     // Determine the distance for the projected 2d segment.
-    wrapped([origin2d, destination2d], {}, result2d); // canvas.grid._measurePath([origin2d, destination2d], {}, result2d)
+    // Pass a fake cost function to retrieve the grid offsets.
+
+
+
+
 
     // Add the distance results of the projected segment to overall results.
     result.distance += result2d.distance;
@@ -176,6 +301,200 @@ function _measurePathSquareGrid(wrapped, waypoints, {cost}, result) {
   }
   return result;
 }
+
+/**
+ * Constructs a direct path for a hex grid, account for elevation and diagonal elevation.
+ * Spreads out the elevation moves over the course of the path.
+ * For a hex grid, there is no "double diagonal" to worry about.
+ * @param {RegionMovementWaypoint3d} start
+ * @param {RegionMovementWaypoint3d} end
+ */
+function directPath3dHex(start, end) {
+  const path2d = canvas.grid.getDirectPath([start.to2d(), end.to2d()]);
+  if ( start.z.almostEqual(end.z) ) {
+    const elev = start.elevation;
+    return path2d.map(pt => GridCoordinates3d.fromOffset(pt, elev));
+  }
+
+  const num2dMoves = path2d.length - 1;
+  const startOffset = GridCoordinates3d.fromObject(start);
+  startOffset.centerToOffset();
+  startOffset.i = path2d[0].i;
+  startOffset.j = path2d[0].j;
+
+  // currOffset will be modified in the loop but needs to have the starting elevation.
+  const currOffset = new GridCoordinates3d();
+  currOffset.k = startOffset.k;
+
+  const path3d = [startOffset.clone()];
+  let elevationStepsRemaining = Math.abs(startOffset.k - endOffset.k);
+  const doElevationStepMod = Math.ceil((num2dMoves) / (elevationStepsRemaining + 1));
+  for ( let i = 1, stepsRemaining = num2dMoves, n = num2dMoves + 1; i < n; i += 1, stepsRemaining -= 1 ) {
+    currOffset.i = path2d[i].i;
+    currOffset.j = path2d[i].j;
+
+    const doElevationStep = ((i + 1) % doElevationStepMod) === 0;
+    let elevationSteps = doElevationStep && (elevationStepsRemaining > 0) ? Math.ceil(elevationStepsRemaining / stepsRemaining) : 0;
+    console.log(`${i} ${stepsRemaining} | elevationSteps: ${elevationSteps}`)
+    elevationStepsRemaining -= elevationSteps
+
+    // Apply the first elevation step as a diagonal upwards move in combination with the canvas 2d move.
+    if ( elevationSteps ) {
+      currOffset.k += 1;
+      elevationSteps -= 1;
+    }
+    path3d.push(currOffset.clone());
+
+    // Add additional elevation-only moves as necessary.
+    while ( elevationSteps > 0 ) {
+      currOffset.k += 1;
+      elevationSteps -= 1;
+      path3d.push(currOffset.clone());
+    }
+  }
+  return path3d;
+}
+
+
+/**
+ * Constructs a direct path for a square grid, accounting for elevation and diagonal elevation
+ * in a quasi-optimal manner. Spreads out the elevation moves over the course of the path.
+ * Double-diagonals are slightly favored for some diagonal measurement
+ * types, so this accounts for those by preferring to move elevation when moving 2d diagonally.
+ * @param {RegionMovementWaypoint3d} start
+ * @param {RegionMovementWaypoint3d} end
+ */
+function directPath3dSquare(start, end) {
+  const path2d = canvas.grid.getDirectPath([start.to2d(), end.to2d()]);
+  if ( start.z.almostEqual(end.z) ) {
+    const elev = start.elevation;
+    return path2d.map(pt => GridCoordinates3d.fromOffset(pt, elev));
+  }
+
+  const num2dMoves = path2d.length - 1;
+  const prevOffset = GridCoordinates3d.fromObject(start);
+  prevOffset.centerToOffset();
+  prevOffset.i = path2d[0].i;
+  prevOffset.j = path2d[0].j;
+
+  // currOffset will be modified in the loop but needs to have the starting elevation.
+  const currOffset = new GridCoordinates3d();
+  currOffset.k = prevOffset.k;
+
+  // Do 1 elevation move for each 2d diagonal move. Spread out over the diagonal steps.
+  const num2dDiagonal = 0;
+  let prev = path2d[0];
+  for ( let i = 1, n = path2d.length; i < n; i += 1 ) {
+    const curr = path2d[i];
+    num2dDiagonal += ((prev.i !== curr.i) && (prev.j !== curr.j));
+    prev = curr;
+  }
+  const elevationStepsRemaining = Math.abs(prevOffset.k - endOffset.k);
+  let doubleDiagonalElevationStepsRemaining = Math.min(num2dDiagonal, elevationStepsRemaining);
+  let doubleDiagonalElevationStep = 0;
+  const doDoubleDiagonalElevationStepMod = Math.ceil(num2dDiagonal / (doubleDiagonalElevationStepsRemaining + 1));
+
+  // Do 1 elevation move for each 2d non-diagonal move. Spread out over the non-diagonal steps.
+  const num2dStraight = num2dMoves - num2dDiagonal;
+  let diagonalElevationStepsRemaining = Math.min(elevationStepsRemaining - doubleDiagonalElevationStepsRemaining, num2dStraight);
+  let diagonalElevationStep = 0;
+  const doDiagonalElevationStepMod = Math.ceil(num2dStraight / (diagonalElevationStepsRemaining + 1));
+
+  // Rest are all additional elevation-only moves. Spread out evenly.
+  let additionalElevationStepsRemaining = Math.max(0, elevationStepsRemaining - diagonalElevationStepsRemaining - diagonalElevationStepsRemaining);
+  const doAdditionalElevationStepMod = Math.ceil(num2dMoves / (additionalElevationStepsRemaining + 1));
+
+  const path3d = [startOffset.clone()];
+  for ( let i = 1, stepsRemaining = num2dMoves, n = num2dMoves + 1; i < n; i += 1, stepsRemaining -= 1 ) {
+    currOffset.i = path2d[i].i;
+    currOffset.j = path2d[i].j;
+
+    const is2dDiagonal = (currOffset.i !== prevOffset.i) && (currOffset.j !== prevOffset.j);
+    const doDoubleDiagonalElevationStep = is2dDiagonal && doubleDiagonalElevationStepsRemaining > 0 && ((doubleDiagonalElevationStep + 1) % doDoubleDiagonalElevationStepMod) === 0;
+    const doDiagonalElevationStep = !is2dDiagonal && diagonalElevationStepsRemaining > 0 && ((diagonalElevationStep + 1) % doDiagonalElevationStepMod) === 0;
+    const doAdditionalElevationSteps = additionalElevationStepsRemaining > 0 && ((i + 1) % doAdditionalElevationStepMod) === 0;
+
+    console.log(`${i} ${stepsRemaining}`,
+      { doDoubleDiagonalElevationStep, doDiagonalElevationStep, doAdditionalElevationSteps },
+      { doubleDiagonalElevationStepsRemaining, diagonalElevationStepsRemaining, additionalElevationStepsRemaining });
+
+    // Either double or normal diagonals are the same but have separate tracking.
+    if ( doDoubleDiagonalElevationStep ) {
+      currOffset.k += 1;
+      doubleDiagonalElevationStepsRemaining -= 1;
+      doubleDiagonalElevationStep += 1;
+    } else if ( doDiagonalElevationStep ) {
+      currOffset.k += 1;
+      diagonalElevationStepsRemaining -= 1;
+      diagonalElevationStep += 1;
+    }
+    path3d.push(currOffset.clone());
+
+    if ( doAdditionalElevationSteps ) {
+      let elevationSteps =  Math.ceil(additionalElevationStepsRemaining / stepsRemaining);
+      console.log("\t", { elevationSteps });
+      while ( elevationSteps > 0 ) {
+        currOffset.k += 1;
+        elevationSteps -= 1;
+        additionalElevationStepsRemaining -= 1;
+        path3d.push(currOffset.clone());
+      }
+    }
+    prevOffset.setOffset(currOffset);
+  }
+  return path3d;
+}
+
+
+
+/**
+ * Construct a function to determine the offset cost for this canvas for a single 3d move.
+ * @param {number} numDiagonals
+ * @returns {function}
+ *   - @param {boolean} canvasStraightMove
+ *   - @param {boolean} canvasDiagonalMove
+ *   - @param {boolean} elevationMove
+ *   - @returns {number}
+ */
+function singleOffsetDistanceFn(numDiagonals = 0) {
+  const D = CONST.GRID_DIAGONALS;
+  let d = numDiagonals;
+  if ( canvas.grid.diagonals === D.ALTERNATING_1 || canvas.grid.diagonals === D.ALTERNATING_2 ) {
+    const kFn =  canvas.grid.diagonals === D.ALTERNATING_1
+      ? () => d & 1 ? 2 : 1;
+        : () => d & 1 ? 1 : 2;
+    const noHex = !canvas.grid.isHexagonal;
+
+    return (canvasStraightMove, canvasDiagonalMove, elevationMove) => {
+      const s = canvasStraightMove || (!canvasDiagonalMove && elevationMove);
+      const d1 = canvasDiagonalMove && !elevationMove;
+      const d2 = canvasDiagonalMove && elevationMove;
+      if ( (d1 && noHex) || d2 ) d++;
+      const k = kFn();
+      return (s + k * d1 * noHex + k * d2) * canvas.grid.distance;
+    };
+  } else {
+    let k = 1;
+    let k2 = 1;
+    switch ( canvas.grid.diagonals ) {
+        case D.EQUIDISTANT: k = 1; k2 = 1; break;
+        case D.EXACT: k = Math.SQRT2; k2 = Math.SQRT3; break;
+        case D.APPROXIMATE: k = 1.5; k2 = 1.75; break;
+        case D.RECTILINEAR: k = 2; k2 = 3; break;
+    }
+    if ( canvas.grid.isHexagonal ) k = 0;
+
+    return (canvasStraightMove, canvasDiagonalMove, elevationMove) => {
+      const s = canvasStraightMove || (!canvasDiagonalMove && elevationMove);
+      const d1 = canvasDiagonalMove && !elevationMove;
+      const d2 = canvasDiagonalMove && elevationMove;
+      return (s + k * d1 + k2 * d2) * canvas.grid.distance;
+    };
+  }
+}
+
+
+
 
 
 

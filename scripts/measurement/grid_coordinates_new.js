@@ -48,10 +48,10 @@ export class GridCoordinates extends PIXI.Point {
   get j() { return canvas.grid.getOffset({ x: this.x, y: this.y }).j }
 
   /** @type {number} */
-  set i(value) { this.x = canvas.grid.getTopLeftPoint({ i: value, j: this.j }).x; }
+  set i(value) { this.y = canvas.grid.getCenterPoint({ i: value, j: this.j }).y; }
 
   /** @type {number} */
-  set j(value) { this.y = canvas.grid.getTopLeftPoint({ i: this.i, j: value }).y; }
+  set j(value) { this.x = canvas.grid.getCenterPoint({ i: this.i, j: value }).x; }
 
   /**
    * Faster than getting i and j separately.
@@ -211,10 +211,10 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
   get k() { return this.constructor.unitElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(this.z)); }
 
   /** @type {number} */
-  set i(value) { this.x = canvas.grid.getTopLeftPoint({ i: value, j: this.j }).x; }
+  set i(value) { this.y = canvas.grid.getCenterPoint({ i: value, j: this.j }).y; }
 
   /** @type {number} */
-  set j(value) { this.y = canvas.grid.getTopLeftPoint({ i: this.i, j: value }).y; }
+  set j(value) { this.x = canvas.grid.getCenterPoint({ i: this.i, j: value }).x; }
 
   /** @type {number} */
   set k(value) { this.elevation = this.constructor.elevationForUnit(value); }
