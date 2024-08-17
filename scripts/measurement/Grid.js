@@ -55,41 +55,70 @@ function _measurePathGridless(wrapped, waypoints, {cost}, result) {
   // Movement cost requires knowing the 3d positions.
   // Cannot combine the projected waypoints to measure all at once, b/c they would be misaligned.
   // Copy the waypoint so it can be manipulated.
-  let start = GridCoordinates3d.fromObject(waypoints[0]);
+  let diagonals = 0;
+  let start = waypoints[0];
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
-    const end = GridCoordinates3d.fromObject(waypoints[i]);
-    const { origin2d, destination2d } = project3dLineGridless(start, end);
-    const result2d = constructGridMeasurePathResult([origin2d, destination2d]);
+    const end = waypoints[i];
+    const path3d = directPath3dGridless(start, end);
+    const segment = result.segments[i - 1];
+    segment.spaces = path3d.length;
+    let costForSegment = 0;
+    let distanceForSegment = 0;
+    let prevOffset = path3d[0];
+    for ( let j = 1, n = path3d.length; j < n; j += 1 ) {
+      const currOffset = path3d[j];
+      const isElevationMove = prevOffset.k !== currOffset.k;
+      const offsetDistance = Point3d.distanceBetween(prevOffset, currOffset);
+      segment.distance += offsetDistance;
+      segment.cost += cost(prevOffset, currOffset, offsetDistance);
 
-    // Determine distance for projected 2d segment.
-    wrapped([origin2d, destination2d], {}, result2d); // canvas.grid._measurePath([origin2d, destination2d], {}, result2d)
+      // Iterate to next offset.
+      prevOffset = currOffset;
+    }
 
-    // Add the distance results of the projected segment to overall results.
-    result.distance += result2d.distance;
-
-    // Mark distance for segment (not cumulative) and waypoint (cumulative)
-    const segment2d = result2d.segments[0];
-    const resultSegment = result.segments[i - 1];
     const resultStartWaypoint = result.waypoints[i - 1];
     const resultEndWaypoint = result.waypoints[i];
-    resultSegment.distance = segment2d.distance;
-    resultEndWaypoint.distance = resultStartWaypoint.distance + segment2d.distance;
-
-    // Number of spaces for gridless is 0, so can ignore.
-    // result.spaces += segment2d.spaces;
-
-    // Apply the cost function to each 3d point.
-    // For gridless, can simply give the cost function the 3d waypoint offsets. (Technically should be same as the waypoints.)
-    const costForSegment = cost ? cost(start, end, segment2d.cost) : segment2d.cost;
-    result.cost += costForSegment;
-    resultSegment.cost = costForSegment;
-    resultEndWaypoint.cost = resultStartWaypoint.cost + costForSegment;
+    resultEndWaypoint.distance = resultStartWaypoint.distance + segment.distance;
+    resultEndWaypoint.cost = resultStartWaypoint.cost + segment.cost;
+    resultEndWaypoint.spaces = resultStartWaypoint.space + segment.spaces;
 
     // Iterate to next segment.
     start = end;
   }
   return result;
 }
+
+/**
+ * Mixed wrap GridlessGrid#getDirectPath
+ * Returns the sequence of grid offsets of a shortest, direct path passing through the given waypoints.
+ * @param {GridCoordinates[]} waypoints    The waypoints the path must pass through
+ * @returns {GridOffset[]}                 The sequence of grid offsets of a shortest, direct path
+ * @abstract
+ */
+function getDirectPathGridless(wrapped, waypoints) {
+  if ( !(waypoints[0] instanceof Point3d) ) return wrapped(waypoints, {cost}, result);
+  let prevWaypoint = waypoints[0];
+  const path3d = [];
+  for ( let i = 1, n < waypoints.length; i += 1 ) {
+    const currWaypoint = waypoints[i];
+    path3d.push(...directPathGridless(prevWaypoint, currWaypoint));
+    prevWaypoint = currWaypoint;
+  }
+  return path3d;
+}
+
+/**
+ * Constructs a direct path for a gridless grid, accounting for elevation.
+ * While this returns GridCoordinates3d, the direct path here is simply the offset coordinates.
+ * @param {RegionMovementWaypoint3d} start
+ * @param {RegionMovementWaypoint3d} end
+ * @returns {GridCoordinates3d[]}
+ */
+function directPathGridless(start, end) {
+  return [start, end]
+    .map(pt => GridCoordinates3d.fromObject(pt).centerToOffset());
+}
+
 
 // ----- NOTE: SquareGrid ----- //
 
@@ -104,197 +133,47 @@ function _measurePathGridless(wrapped, waypoints, {cost}, result) {
  * @param {GridMeasurePathResult} result    The measurement result that the measurements need to be written to
  */
 function _measurePathSquareGrid(wrapped, waypoints, {cost}, result) {
-  // For each waypoint, project from 3d if the waypoint is a 3d class.
-  // The projected point can be used to determine distance but not movement cost because the passed coordinates will be incorrect.
-  // Movement cost requires knowing the 3d positions.
-  // Difficult b/c we need to re-construct the 3d grid movement for each segment.
   if ( !(waypoints[0] instanceof Point3d) ) return wrapped(waypoints, {cost}, result);
-  initializeResultObjectSquareGrid(result);
-  result.waypoints.forEach(waypoint => initializeResultObjectSquareGrid(waypoint));
-  result.segments.forEach(segment => initializeResultObjectSquareGrid(segment));
+  initializeResultObject(result);
+  result.waypoints.forEach(waypoint => initializeResultObject(waypoint));
+  result.segments.forEach(segment => initializeResultObject(segment));
 
   // For each waypoint, project from 3d if the waypoint is a 3d class.
   // The projected point can be used to determine distance but not movement cost because the passed coordinates will be incorrect.
   // Movement cost requires knowing the 3d positions.
   // Cannot combine the projected waypoints to measure all at once, b/c they would be misaligned.
   // Copy the waypoint so it can be manipulated.
-  let start = waypoints[0];
   let diagonals = 0;
+  let start = waypoints[0];
+  const offsetDistanceFn = singleOffsetSquareDistanceFn(diagonals);
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
     const end = waypoints[i];
+    const path3d = directPath3dSquare(start, end);
+    const segment = result.segments[i - 1];
+    segment.spaces = path3d.length;
+    let costForSegment = 0;
+    let distanceForSegment = 0;
+    let prevOffset = path3d[0];
+    const prevDiagonals = offsetDistanceFn.diagonals;
+    for ( let j = 1, n = path3d.length; j < n; j += 1 ) {
+      const currOffset = path3d[j];
+      const isElevationMove = prevOffset.k !== currOffset.k;
+      const isStraight2dMove = (prevOffset.i === currOffset.i) ^ (prevOffset.j === currOffset.j);
+      const isDiagonal2dMove = (prevOffset.i !== currOffset.i) && (prevOffset.j !== currOffset.j);
+      const offsetDistance = offsetDistanceFn(isElevationMove, true, false, );
+      segment.distance += offsetDistance;
+      segment.cost += cost(prevOffset, currOffset, offsetDistance);
 
-    // Determine the distance for the projected 2d segment.
-    // Pass a fake cost function to retrieve the grid offsets.
-    const costFnResults = [];
-    const costFn = (fromOffset, toOffset, offsetDistance) => costFnResults.push({ fromOffset, toOffset, offsetDistance });
-    const result2d = constructGridMeasurePathResult([start.to2d(), end.to2d()]);
-    wrapped([start.to2d(), end.to2d()], {cost: costFn}, result2d); // canvas.grid._measurePath([start.to2d(), end.to2d()], {cost: costFn}, result2d)
-
-    // At each step, elevate 1+ steps.
-    // 1. Elevation move. (straight) (Can do more than 1)
-    // 2. Canvas straight move.
-    // 3. Canvas diagonal
-    // 4. Canvas straight + elevation (diagonal)
-    // 5. Canvas diagonal + elevation (diagonal) (double diagonal)
-
-    // Split up the elevation evenly across the move according to following:
-    // - Prefer elevation moves when doing a canvas diagonal move.
-    // - Finish elevation moves by the time of the last move.
-    // - If less elevation steps than canvas steps, stagger the elevation steps.
-    const startOffset = GridCoordinates3d.fromObject(start);
-    const endOffset = GridCoordinates3d.fromObject(end);
-    let elevationStepsRemaining = Math.abs(startOffset.k - endOffset.k);
-    let singleDiagonalRemaining = Math.min(0, elevationStepsRemaining - result2d.diagonals);
-    let elevationStepsPer = Math.ceil(elevationStepsRemaining / result2d.spaces); // Update in loop.
-
-    // Mod set such that (i + 1) % mod equals 0 when one elevation step ideally should be used.
-    // So if 10 canvas steps and 1 elevation step, elevation step would occur halfway, at mod 5. (4 + 1) % 5 = 0.
-    // If 10 canvas steps and 2 elevation steps, mod 4. i = 3, i = 6. Math.ceil(10 / (2 + 1)) = 4
-    const elevationStepMod = Math.ceil(result2d.spaces / (elevationStepsRemaining + 1));
-
-    // Handle situations where double diagonals bunched at end. E.g., s s s d d d
-    // If less single diagonals remaining than needed, elevate accordingly.
-    let singleDiagonalStepsRemaining = Math.max(0, result2d.spaces - result2d.diagonals);
-
-
-    // Cycle over each canvas step in turn
-    let ns = 0;
-    let nd = 0;
-    let ndd = 0;
-    startOffset.z = start.z;
-    endOffset.z = start.z;
-    const distanceFn = singleOffsetDistanceFn(diagonals);
-    for ( let i = 0, n = costFnResults.length; i < n; i += 1 ) {
-      startOffset.i = canvasStep.fromOffset.i;
-      startOffset.j = canvasStep.fromOffset.j;
-      endOffset.i = canvasStep.toOffset.i;
-      endOffset.j = canvasStep.toOffset.j;
-      const canvasDiagMove = startOffset.i !== endOffset.i && startOffset.j !== endOffset.j;
-
-      if ( elevationStepsRemaining ) {
-        if ( canvasDiagMove ) {
-          // Double diagonal. #5.
-          endOffset.k += 1;
-          const offsetDistance = distanceFn(false, true, true);
-          const newCost = cost(startOffset, endOffset, offsetDistance);
-
-        }
-
-
-      } else {
-        // We already know the 2d offset distance.
-        // But need to pass the correct offsets to the real cost function.
-        // Also might have alternating diagonals which must be tracked.
-        // Move is either #2 or #3.
-      }
-
-      if ( elevationStepsPer > 1 ) {
-        // Add in single elevation steps.
-      }
-
-
+      // Iterate to next offset.
+      prevOffset = currOffset;
     }
-
-    for ( const canvasStep of costFnResults ) {
-      startOffset.i = canvasStep.fromOffset.i;
-      startOffset.j = canvasStep.fromOffset.j;
-      endOffset.i = canvasStep.toOffset.i;
-      endOffset.j = canvasStep.toOffset.j;
-      if ( elevationSteps ) {
-        endOffset.k += 1;
-        elevationSteps -= 1;
-      }
-
-      if ( elevationSteps ) {
-        endOffset.k += 1;
-        elevationSteps -= 1;
-
-        // Determine if this is a straight + diagonal (#4) or double diagonal (#5).
-        // const canvasStraightMove = startOffset.i !== endOffset.i ^ startOffset.j !== endOffset.j;
-        // const canvasDiagMove = startOffset.i !== endOffset.i && startOffset.j !== endOffset.j;
-
-
-        const newCost = cost(startOffset, endOffset, )
-
-
-      } else {
-        // We already know the 2d offset distance.
-        // But need to pass the correct offsets to the real cost function.
-        // Also might have alternating diagonals which must be tracked.
-        // Move is either #2 or #3.
-      }
-
-
-      const elevMove = startOffset.k !== endOffset.k;
-
-      // We already have the canvas offset distance.
-      let offsetDist = costStep.offsetDistance;
-
-
-      startOffset.setOffset(endOffset);
-
-      // Extra elevation moves
-    }
-
-    // Added elevation at end moving straight up/down. (#1)
-
-
-
-
-
-
-    const { origin2d, destination2d } = project3dLineSquareGrid(start, end);
-    const result2d = constructGridMeasurePathResult([origin2d, destination2d]);
-
-    // Determine the distance for the projected 2d segment.
-    // Pass a fake cost function to retrieve the grid offsets.
-
-
-
-
-
-    // Add the distance results of the projected segment to overall results.
-    result.distance += result2d.distance;
-
-    // Mark distance for segment (not cumulative) and waypoint (cumulative)
-    const segment2d = result2d.segments[0];
-    const resultSegment = result.segments[i - 1];
+    segment.diagonals = offsetDistanceFn.diagonals - prevDiagonals;
     const resultStartWaypoint = result.waypoints[i - 1];
     const resultEndWaypoint = result.waypoints[i];
-    resultSegment.distance = segment2d.distance;
-    resultEndWaypoint.distance = resultStartWaypoint.distance + segment2d.distance;
-
-    // Apply the cost function to each 3d point.
-    // For gridless, can simply give the cost function the 3d waypoint offsets. (Technically should be same as the waypoints.)
-    // Trick: Need the grid steps, in 3d, to pass to the cost function.
-    // Get these by using the direct path.
-    const pts3d = gridUnder3dLine(start, end);
-    const moveCalc = offsetMoveCost(diagonals);
-    let prevCoord = pts3d[0];
-    let costForSegment = 0;
-    for ( let i = 1, n = pts3d.length; i < n; i += 1 ) {
-      // Determine the offset cost based on the move type.
-      const currCoord = pts3d[1];
-      const moveCost = moveCalc(prevCoord, currCoord);
-      costForSegment += cost ? cost(prevCoord, currCoord, moveCost) : moveCost;
-    }
-    diagonals = moveCalc.diagonals;
-
-    // Running total of diagonals
-    result.diagonals += diagonals;
-    resultSegment.diagonals = diagonals;
-    resultEndWaypoint.diagonals = resultStartWaypoint.diagonals + diagonals;
-
-    // Running total of costs.
-    result.cost += costForSegment;
-    resultSegment.cost = costForSegment;
-    resultEndWaypoint.cost = resultStartWaypoint.cost + costForSegment;
-
-    // Running total of spaces.
-    const nSpaces = pts3d.length - 1;
-    result.spaces += nSpaces;
-    resultSegment.spaces = nSpaces;
-    resultEndWaypoint.spaces = resultStartWaypoint.spaces + nSpaces;
+    resultEndWaypoint.distance = resultStartWaypoint.distance + segment.distance;
+    resultEndWaypoint.cost = resultStartWaypoint.cost + segment.cost;
+    resultEndWaypoint.spaces = resultStartWaypoint.space + segment.spaces;
+    resultEndWaypoint.diagonals = resultStartWaypoint.diagonals + segment.diagonals;
 
     // Iterate to next segment.
     start = end;
@@ -303,54 +182,20 @@ function _measurePathSquareGrid(wrapped, waypoints, {cost}, result) {
 }
 
 /**
- * Constructs a direct path for a hex grid, account for elevation and diagonal elevation.
- * Spreads out the elevation moves over the course of the path.
- * For a hex grid, there is no "double diagonal" to worry about.
- * @param {RegionMovementWaypoint3d} start
- * @param {RegionMovementWaypoint3d} end
+ * Mixed wrap SquareGrid#getDirectPath
+ * Returns the sequence of grid offsets of a shortest, direct path passing through the given waypoints.
+ * @param {GridCoordinates[]} waypoints    The waypoints the path must pass through
+ * @returns {GridOffset[]}                 The sequence of grid offsets of a shortest, direct path
+ * @abstract
  */
-function directPath3dHex(start, end) {
-  const path2d = canvas.grid.getDirectPath([start.to2d(), end.to2d()]);
-  if ( start.z.almostEqual(end.z) ) {
-    const elev = start.elevation;
-    return path2d.map(pt => GridCoordinates3d.fromOffset(pt, elev));
-  }
-
-  const num2dMoves = path2d.length - 1;
-  const startOffset = GridCoordinates3d.fromObject(start);
-  startOffset.centerToOffset();
-  startOffset.i = path2d[0].i;
-  startOffset.j = path2d[0].j;
-
-  // currOffset will be modified in the loop but needs to have the starting elevation.
-  const currOffset = new GridCoordinates3d();
-  currOffset.k = startOffset.k;
-
-  const path3d = [startOffset.clone()];
-  let elevationStepsRemaining = Math.abs(startOffset.k - endOffset.k);
-  const doElevationStepMod = Math.ceil((num2dMoves) / (elevationStepsRemaining + 1));
-  for ( let i = 1, stepsRemaining = num2dMoves, n = num2dMoves + 1; i < n; i += 1, stepsRemaining -= 1 ) {
-    currOffset.i = path2d[i].i;
-    currOffset.j = path2d[i].j;
-
-    const doElevationStep = ((i + 1) % doElevationStepMod) === 0;
-    let elevationSteps = doElevationStep && (elevationStepsRemaining > 0) ? Math.ceil(elevationStepsRemaining / stepsRemaining) : 0;
-    console.log(`${i} ${stepsRemaining} | elevationSteps: ${elevationSteps}`)
-    elevationStepsRemaining -= elevationSteps
-
-    // Apply the first elevation step as a diagonal upwards move in combination with the canvas 2d move.
-    if ( elevationSteps ) {
-      currOffset.k += 1;
-      elevationSteps -= 1;
-    }
-    path3d.push(currOffset.clone());
-
-    // Add additional elevation-only moves as necessary.
-    while ( elevationSteps > 0 ) {
-      currOffset.k += 1;
-      elevationSteps -= 1;
-      path3d.push(currOffset.clone());
-    }
+function getDirectPathSquareGrid(wrapped, waypoints) {
+  if ( !(waypoints[0] instanceof Point3d) ) return wrapped(waypoints, {cost}, result);
+  let prevWaypoint = waypoints[0];
+  const path3d = [];
+  for ( let i = 1, n < waypoints.length; i += 1 ) {
+    const currWaypoint = waypoints[i];
+    path3d.push(...directPath3dSquare(prevWaypoint, currWaypoint));
+    prevWaypoint = currWaypoint;
   }
   return path3d;
 }
@@ -363,6 +208,7 @@ function directPath3dHex(start, end) {
  * types, so this accounts for those by preferring to move elevation when moving 2d diagonally.
  * @param {RegionMovementWaypoint3d} start
  * @param {RegionMovementWaypoint3d} end
+ * @returns {GridCoordinates3d[]}
  */
 function directPath3dSquare(start, end) {
   const path2d = canvas.grid.getDirectPath([start.to2d(), end.to2d()]);
@@ -446,32 +292,74 @@ function directPath3dSquare(start, end) {
 }
 
 
-
 /**
- * Construct a function to determine the offset cost for this canvas for a single 3d move.
+ * Construct a function to determine the offset cost for this canvas for a single 3d move on a hex grid.
+ * For hexes, the diagonal only occurs with an elevation + hex move.
  * @param {number} numDiagonals
  * @returns {function}
- *   - @param {boolean} canvasStraightMove
- *   - @param {boolean} canvasDiagonalMove
  *   - @param {boolean} elevationMove
+ *   - @param {boolean} canvasStraightMove
  *   - @returns {number}
  */
-function singleOffsetDistanceFn(numDiagonals = 0) {
+function singleOffsetHexDistanceFn(numDiagonals = 0) {
   const D = CONST.GRID_DIAGONALS;
-  let d = numDiagonals;
+  let nDiag = numDiagonals;
+  let fn;
   if ( canvas.grid.diagonals === D.ALTERNATING_1 || canvas.grid.diagonals === D.ALTERNATING_2 ) {
-    const kFn =  canvas.grid.diagonals === D.ALTERNATING_1
+    const kFn = canvas.grid.diagonals === D.ALTERNATING_1
       ? () => d & 1 ? 2 : 1;
         : () => d & 1 ? 1 : 2;
-    const noHex = !canvas.grid.isHexagonal;
+    fn = (elevationMove, canvasStraightMove) => {
+      const s = canvasStraightMove || (!canvasDiagonalMove && elevationMove);
+      const d = canvasStraightMove && elevationMove;
+      nDiag += d;
+      const k = kFn();
+      return (s + k * d) * canvas.grid.distance;
+    };
+  } else {
+    let k = 1;
+    switch ( canvas.grid.diagonals ) {
+        case D.EQUIDISTANT: k = 1; break;
+        case D.EXACT: k = Math.SQRT2; break;
+        case D.APPROXIMATE: k = 1.5;  break;
+        case D.RECTILINEAR: k = 2; break;
+    }
+    fn = (elevationMove, canvasStraightMove) => {
+      const s = canvasStraightMove || (!canvasDiagonalMove && elevationMove);
+      const d = canvasStraightMove && elevationMove;
+      return (s + k * d) * canvas.grid.distance;
+    };
+  }
+  Object.defineProperty(fn, "diagonals", {
+    get : () => nDiag
+  });
+  return fn;
+}
 
-    return (canvasStraightMove, canvasDiagonalMove, elevationMove) => {
+/**
+ * Construct a function to determine the offset cost for this canvas for a single 3d move on a square grid.
+ * @param {number} numDiagonals
+ * @returns {function}
+ *   - @param {boolean} elevationMove
+ *   - @param {boolean} canvasStraightMove
+ *   - @param {boolean} canvasDiagonalMove
+ *   - @returns {number}
+ */
+function singleOffsetSquareDistanceFn(numDiagonals = 0) {
+  const D = CONST.GRID_DIAGONALS;
+  let nDiag = numDiagonals;
+  let fn;
+  if ( canvas.grid.diagonals === D.ALTERNATING_1 || canvas.grid.diagonals === D.ALTERNATING_2 ) {
+    const kFn = canvas.grid.diagonals === D.ALTERNATING_1
+      ? () => d & 1 ? 2 : 1;
+        : () => d & 1 ? 1 : 2;
+    fn = (elevationMove, canvasStraightMove, canvasDiagonalMove) => {
       const s = canvasStraightMove || (!canvasDiagonalMove && elevationMove);
       const d1 = canvasDiagonalMove && !elevationMove;
       const d2 = canvasDiagonalMove && elevationMove;
-      if ( (d1 && noHex) || d2 ) d++;
+      if ( d1 || d2 ) nDiag++;
       const k = kFn();
-      return (s + k * d1 * noHex + k * d2) * canvas.grid.distance;
+      return (s + k * d1 + k * d2) * canvas.grid.distance;
     };
   } else {
     let k = 1;
@@ -482,15 +370,17 @@ function singleOffsetDistanceFn(numDiagonals = 0) {
         case D.APPROXIMATE: k = 1.5; k2 = 1.75; break;
         case D.RECTILINEAR: k = 2; k2 = 3; break;
     }
-    if ( canvas.grid.isHexagonal ) k = 0;
-
-    return (canvasStraightMove, canvasDiagonalMove, elevationMove) => {
+    fn = (elevationMove, canvasStraightMove, canvasDiagonalMove) => {
       const s = canvasStraightMove || (!canvasDiagonalMove && elevationMove);
       const d1 = canvasDiagonalMove && !elevationMove;
       const d2 = canvasDiagonalMove && elevationMove;
       return (s + k * d1 + k2 * d2) * canvas.grid.distance;
     };
   }
+  Object.defineProperty(fn, "diagonals", {
+    get : () => nDiag
+  });
+  return fn;
 }
 
 
@@ -551,7 +441,7 @@ function gridChangeType3d(a, b) {
 // ----- NOTE: HexagonalGrid ----- //
 
 /**
- * Wrap HexagonalGrid.prototype._measurePath
+ * Mixed wrap HexagonalGrid.prototype._measurePath
  * @param {GridMeasurePathWaypoint[]} waypoints           The waypoints the path must pass through
  * @param {object} options                                Additional measurement options
  * @param {GridMeasurePathCostFunction} [options.cost]    The function that returns the cost
@@ -560,10 +450,6 @@ function gridChangeType3d(a, b) {
  */
 
 function _measurePathHexagonalGrid(wrapped, waypoints, {cost}, result) {
-  // For each waypoint, project from 3d if the waypoint is a 3d class.
-  // The projected point can be used to determine distance but not movement cost because the passed coordinates will be incorrect.
-  // Movement cost requires knowing the 3d positions.
-  // Difficult b/c we need to re-construct the 3d grid movement for each segment.
   if ( !(waypoints[0] instanceof Point3d) ) return wrapped(waypoints, {cost}, result);
   initializeResultObject(result);
   result.waypoints.forEach(waypoint => initializeResultObject(waypoint));
@@ -574,47 +460,111 @@ function _measurePathHexagonalGrid(wrapped, waypoints, {cost}, result) {
   // Movement cost requires knowing the 3d positions.
   // Cannot combine the projected waypoints to measure all at once, b/c they would be misaligned.
   // Copy the waypoint so it can be manipulated.
-  let start = GridCoordinates3d.fromObject(waypoints[0]);
+  let diagonals = 0;
+  let start = waypoints[0];
+  const offsetDistanceFn = singleOffsetDistanceFn(diagonals);
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
-    const end = GridCoordinates3d.fromObject(waypoints[i]);
-    const { origin2d, destination2d } = project3dLineSquareGrid(start, end);
-    destination2d.centerToOffset(); // Necessary for hex grids so the distance is correct.
-    const result2d = constructGridMeasurePathResult([origin2d, destination2d]);
+    const end = waypoints[i];
+    const path3d = directPath3dHex(start, end);
+    const segment = result.segments[i - 1];
+    segment.spaces = path3d.length;
+    let costForSegment = 0;
+    let distanceForSegment = 0;
+    let prevOffset = path3d[0];
+    const prevDiagonals = offsetDistanceFn.diagonals;
+    for ( let j = 1, n = path3d.length; j < n; j += 1 ) {
+      const currOffset = path3d[j];
+      const isElevationMove = prevOffset.k !== currOffset.k;
+      const offsetDistance = offsetDistanceFn(true, false, isElevationMove);
+      segment.distance += offsetDistance;
+      segment.cost += cost(prevOffset, currOffset, offsetDistance);
 
-    // Determine the distance for the projected 2d segment.
-    wrapped([origin2d, destination2d], {}, result2d); // canvas.grid._measurePath([origin2d, destination2d], {}, result2d)
+      // Iterate to next offset.
+      prevOffset = currOffset;
+    }
+    segment.diagonals = offsetDistanceFn.diagonals - prevDiagonals;
 
-    // Add the distance results of the projected segment to overall results.
-    result.distance += result2d.distance;
-
-    // Mark distance for segment (not cumulative) and waypoint (cumulative)
-    const segment2d = result2d.segments[0];
-    const resultSegment = result.segments[i - 1];
     const resultStartWaypoint = result.waypoints[i - 1];
     const resultEndWaypoint = result.waypoints[i];
-    resultSegment.distance = segment2d.distance;
-    resultEndWaypoint.distance = resultStartWaypoint.distance + segment2d.distance;
+    resultEndWaypoint.distance = resultStartWaypoint.distance + segment.distance;
+    resultEndWaypoint.cost = resultStartWaypoint.cost + segment.cost;
+    resultEndWaypoint.spaces = resultStartWaypoint.space + segment.spaces;
 
-    // Apply the cost function to each 3d point.
-    // For gridless, can simply give the cost function the 3d waypoint offsets. (Technically should be same as the waypoints.)
-    // Trick: Need the grid steps, in 3d, to pass to the cost function.
-    // Get these by using the direct path.
-    const pts3d = gridUnder3dLine(start, end);
+    // Iterate to next segment.
+    start = end;
+  }
+  return result;
+}
+
+/**
+ * Mixed wrap HexagonalGrid#getDirectPath
+ * Returns the sequence of grid offsets of a shortest, direct path passing through the given waypoints.
+ * @param {GridCoordinates[]} waypoints    The waypoints the path must pass through
+ * @returns {GridOffset[]}                 The sequence of grid offsets of a shortest, direct path
+ * @abstract
+ */
+function getDirectPathHexagonalGrid(wrapped, waypoints) {
+  if ( !(waypoints[0] instanceof Point3d) ) return wrapped(waypoints, {cost}, result);
+  let prevWaypoint = waypoints[0];
+  const path3d = [];
+  for ( let i = 1, n < waypoints.length; i += 1 ) {
+    const currWaypoint = waypoints[i];
+    path3d.push(...directPath3dHex(prevWaypoint, currWaypoint));
+    prevWaypoint = currWaypoint;
+  }
+  return path3d;
+}
+
+/**
+ * Measure a path for a gridded scene. Handles hex and square grids.
+ * @param {GridMeasurePathWaypoint[]} waypoints           The waypoints the path must pass through
+ * @param {object} options                                Additional measurement options
+ * @param {GridMeasurePathCostFunction} [options.cost]    The function that returns the cost
+ *   for a given move between grid spaces (default is the distance travelled)
+ * @param {GridMeasurePathResult} result    The measurement result that the measurements need to be written to
+ */
+function _measurePathGridded(waypoints, { cost }, result) {
+  initializeResultObject(result);
+  result.waypoints.forEach(waypoint => initializeResultObject(waypoint));
+  result.segments.forEach(segment => initializeResultObject(segment));
+
+  // For each waypoint, project from 3d if the waypoint is a 3d class.
+  // The projected point can be used to determine distance but not movement cost because the passed coordinates will be incorrect.
+  // Movement cost requires knowing the 3d positions.
+  // Cannot combine the projected waypoints to measure all at once, b/c they would be misaligned.
+  // Copy the waypoint so it can be manipulated.
+  let diagonals = 0;
+  let start = waypoints[0];
+  const offsetDistanceFn = canvas.grid.isHexagonal ? singleOffsetHexDistanceFn(diagonals) : singleOffsetSquareDistanceFn(diagonals);
+  const pathFn = canvas.grid.isHexagonal ? directPath3dHex : directPath3dSquare;
+  for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
+    const end = waypoints[i];
+    const path3d = pathFn(start, end);
+    const segment = result.segments[i - 1];
+    segment.spaces = path3d.length;
     let costForSegment = 0;
-    if ( cost ) pts3d.reduce((acc, curr) => {
-      costForSegment += cost(acc, curr) // TODO: Need to pass the distance either from the original wrapped or recalculated.
-      acc = curr;
-    });
-    else cost = 0; // TODO: Need to pass the cost either from the original wrapped or recalculated.
-    result.cost += costForSegment;
-    resultSegment.cost = costForSegment;
-    resultEndWaypoint.cost = resultStartWaypoint.cost + costForSegment;
+    let distanceForSegment = 0;
+    let prevOffset = path3d[0];
+    const prevDiagonals = offsetDistanceFn.diagonals;
+    for ( let j = 1, n = path3d.length; j < n; j += 1 ) {
+      const currOffset = path3d[j];
+      const isElevationMove = prevOffset.k !== currOffset.k;
+      const isStraight2dMove = (prevOffset.i === currOffset.i) ^ (prevOffset.j === currOffset.j);
+      const isDiagonal2dMove = (prevOffset.i !== currOffset.i) && (prevOffset.j !== currOffset.j);
+      const offsetDistance = offsetDistanceFn(isElevationMove, isStraight2dMove, isDiagonal2dMove);
+      segment.distance += offsetDistance;
+      segment.cost += cost(prevOffset, currOffset, offsetDistance);
 
-    // Add in spaces.
-    const nSpaces = pts3d.length - 1;
-    result.spaces += nSpaces;
-    resultSegment.spaces = nSpaces;
-    resultEndWaypoint.spaces = resultStartWaypoint.spaces + nSpaces;
+      // Iterate to next offset.
+      prevOffset = currOffset;
+    }
+    segment.diagonals = offsetDistanceFn.diagonals - prevDiagonals;
+    const resultStartWaypoint = result.waypoints[i - 1];
+    const resultEndWaypoint = result.waypoints[i];
+    resultEndWaypoint.distance = resultStartWaypoint.distance + segment.distance;
+    resultEndWaypoint.cost = resultStartWaypoint.cost + segment.cost;
+    resultEndWaypoint.spaces = resultStartWaypoint.space + segment.spaces;
+    resultEndWaypoint.diagonals = resultStartWaypoint.diagonals + segment.diagonals;
 
     // Iterate to next segment.
     start = end;
@@ -623,12 +573,66 @@ function _measurePathHexagonalGrid(wrapped, waypoints, {cost}, result) {
 }
 
 
+/**
+ * Constructs a direct path for a hex grid, accounting for elevation and diagonal elevation.
+ * Spreads out the elevation moves over the course of the path.
+ * For a hex grid, there is no "double diagonal" to worry about.
+ * @param {RegionMovementWaypoint3d} start
+ * @param {RegionMovementWaypoint3d} end
+ * @returns {GridCoordinates3d[]}
+ */
+function directPath3dHex(start, end) {
+  const path2d = canvas.grid.getDirectPath([start.to2d(), end.to2d()]);
+  if ( start.z.almostEqual(end.z) ) {
+    const elev = start.elevation;
+    return path2d.map(pt => GridCoordinates3d.fromOffset(pt, elev));
+  }
+
+  const num2dMoves = path2d.length - 1;
+  const startOffset = GridCoordinates3d.fromObject(start);
+  startOffset.centerToOffset();
+  startOffset.i = path2d[0].i;
+  startOffset.j = path2d[0].j;
+
+  // currOffset will be modified in the loop but needs to have the starting elevation.
+  const currOffset = new GridCoordinates3d();
+  currOffset.k = startOffset.k;
+
+  const path3d = [startOffset.clone()];
+  let elevationStepsRemaining = Math.abs(startOffset.k - endOffset.k);
+  const doElevationStepMod = Math.ceil((num2dMoves) / (elevationStepsRemaining + 1));
+  for ( let i = 1, stepsRemaining = num2dMoves, n = num2dMoves + 1; i < n; i += 1, stepsRemaining -= 1 ) {
+    currOffset.i = path2d[i].i;
+    currOffset.j = path2d[i].j;
+
+    const doElevationStep = ((i + 1) % doElevationStepMod) === 0;
+    let elevationSteps = doElevationStep && (elevationStepsRemaining > 0) ? Math.ceil(elevationStepsRemaining / stepsRemaining) : 0;
+    console.log(`${i} ${stepsRemaining} | elevationSteps: ${elevationSteps}`)
+    elevationStepsRemaining -= elevationSteps
+
+    // Apply the first elevation step as a diagonal upwards move in combination with the canvas 2d move.
+    if ( elevationSteps ) {
+      currOffset.k += 1;
+      elevationSteps -= 1;
+    }
+    path3d.push(currOffset.clone());
+
+    // Add additional elevation-only moves as necessary.
+    while ( elevationSteps > 0 ) {
+      currOffset.k += 1;
+      elevationSteps -= 1;
+      path3d.push(currOffset.clone());
+    }
+  }
+  return path3d;
+}
+
 
 // ----- NOTE: Patches ----- //
 
-PATCHES_GridlessGrid.BASIC.WRAPS = { _measurePath: _measurePathGridless };
-PATCHES_SquareGrid.BASIC.WRAPS = { _measurePath: _measurePathSquareGrid };
-PATCHES_HexagonalGrid.BASIC.WRAPS = { _measurePath: _measurePathHexagonalGrid };
+PATCHES_GridlessGrid.BASIC.WRAPS = { _measurePath: _measurePathGridless, getDirectPath: getDirectPathGridless };
+PATCHES_SquareGrid.BASIC.WRAPS = { _measurePath: _measurePathSquareGrid, getDirectPath: getDirectPathSquareGrid };
+PATCHES_HexagonalGrid.BASIC.WRAPS = { _measurePath: _measurePathHexagonalGrid, getDirectPath: getDirectPathHexagonalGrid };
 
 // ----- NOTE: Helper functions ----- //
 
