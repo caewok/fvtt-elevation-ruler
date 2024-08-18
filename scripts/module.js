@@ -19,7 +19,7 @@ import { registerGeometry } from "./geometry/registration.js";
 // Grid coordinates
 import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d, gridShape } from "./measurement/grid_coordinates.js";
 import { GridCoordinates, RegionMovementWaypoint3d, GridCoordinates3d } from "./measurement/grid_coordinates_new.js";
-import { gridUnder3dLine, project3dLine, testMeasurePath } from "./measurement/Grid.js";
+import { testMeasurePath } from "./measurement/Grid.js";
 
 // Measure classes
 import {
@@ -137,8 +137,6 @@ Hooks.once("init", function() {
       GridCoordinates,
       RegionMovementWaypoint3d,
       GridCoordinates3d,
-      gridUnder3dLine,
-      project3dLine,
       testMeasurePath
     },
 
