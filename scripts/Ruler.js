@@ -362,12 +362,12 @@ function _getMeasurementSegments(wrapped) {
 }
 
 /**
- * Override Ruler.prototype._computeDistance
+ * Wrap Ruler.prototype._computeDistance
  * Use measurement that counts segments within a grid square properly.
  * Add moveDistance property to each segment; track the total.
  * If token not present or Terrain Mapper not active, this will be the same as segment distance.
  */
-function _computeDistance() {
+function _computeDistance(wrapped) {
   // If not this ruler's user, use the segments already calculated and passed via socket.
   if ( this.user !== game.user ) return;
 
@@ -378,7 +378,7 @@ function _computeDistance() {
   if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
 
   // Determine the distance of each segment.
-  _computeSegmentDistances.call(this);
+  // _computeSegmentDistances.call(this);
 
   if ( debug ) {
     switch ( this.segments.length ) {
@@ -396,6 +396,8 @@ function _computeDistance() {
 
   // Debugging
   if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
+
+  wrapped();
 
   // Compute the waypoint distances for labeling. (Distance to immediately previous waypoint.)
   let waypointDistance = 0;
@@ -415,6 +417,25 @@ function _computeDistance() {
     segment.waypointElevationIncrement = userElevationChangeAtWaypoint(this.waypoints[currWaypointIdx]);
   }
 }
+
+/**
+ * Wrap Ruler.prototype._getCostFunction()
+ * Return the movement penalty calculator.
+ */
+function _getCostFunction() {
+  if ( !this.token ) return undefined;
+
+  // Construct a move penalty instance that covers all the segments.
+  movePenaltyInstance = this._movePenaltyInstance ??= new MovePenalty(this.token);
+  const path = this.segments.map(s => s.ray.A);
+  path.push(this.segments.at(-1).ray.B);
+  movePenaltyInstance.restrictToPath(path);
+  return (prevOffset, currOffset, offsetDistance) => {
+    const penalty = movePenaltyInstance.movementPenaltyForSegment(prevOffset, currOffset);
+    return offsetDistance * penalty;
+  }
+}
+
 
 // ----- NOTE: Segment labeling and highlighting ----- //
 
@@ -695,6 +716,8 @@ PATCHES.BASIC.WRAPS = {
   _getMeasurementDestination,
 
   // Wraps related to segments
+  _computeDistance,
+  _getCostFunction,
   _getSegmentLabel,
 
   // Events
@@ -705,7 +728,7 @@ PATCHES.BASIC.WRAPS = {
 
 PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments, _broadcastMeasurement };
 
-PATCHES.BASIC.OVERRIDES = { _computeDistance, _animateSegment, _addWaypoint };
+PATCHES.BASIC.OVERRIDES = { _animateSegment, _addWaypoint };
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 

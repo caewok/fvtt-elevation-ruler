@@ -182,7 +182,7 @@ export function elevateSegments(ruler, segments) {  // Add destination as the fi
   const nHistory = ruler.history.length;
   for ( let i = 0, n = segments.length; i < n; i += 1 ) {
     const segment = segments[i];
-    segment.first = i === 0;
+    // segment.first = i === 0;
     segment.waypointIdx = Math.max(i - nHistory, -1);
   }
 
