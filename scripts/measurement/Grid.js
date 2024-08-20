@@ -118,9 +118,11 @@ function directPath3dSquare(start, end, path2d) {
     const doDiagonalElevationStep = !is2dDiagonal && diagonalElevationStepsRemaining > 0 && ((diagonalElevationStep + 1) % doDiagonalElevationStepMod) === 0;
     const doAdditionalElevationSteps = additionalElevationStepsRemaining > 0 && ((i + 1) % doAdditionalElevationStepMod) === 0;
 
+    /*
     console.log(`${i} ${stepsRemaining}`,
       { doDoubleDiagonalElevationStep, doDiagonalElevationStep, doAdditionalElevationSteps },
       { doubleDiagonalElevationStepsRemaining, diagonalElevationStepsRemaining, additionalElevationStepsRemaining });
+    */
 
     // Either double or normal diagonals are the same but have separate tracking.
     if ( doDoubleDiagonalElevationStep ) {
@@ -136,7 +138,7 @@ function directPath3dSquare(start, end, path2d) {
 
     if ( doAdditionalElevationSteps ) {
       let elevationSteps =  Math.ceil(additionalElevationStepsRemaining / stepsRemaining);
-      console.log("\t", { elevationSteps });
+      // console.log("\t", { elevationSteps });
       while ( elevationSteps > 0 ) {
         currOffset.k += 1;
         elevationSteps -= 1;
@@ -365,6 +367,9 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
     default: // All hex grids
       offsetDistanceFn = singleOffsetHexDistanceFn(diagonals);
   }
+  const altGridDistanceFn = GridCoordinates3d.alternatingGridDistanceFn();
+  const altGridDistanceOffsetFn = GridCoordinates3d.alternatingGridDistanceFn();
+
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
     const end = waypoints[i];
     const path3d = canvas.grid.getDirectPath([start, end]);
@@ -374,8 +379,13 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
     const prevDiagonals = offsetDistanceFn.diagonals;
     for ( let j = 1, n = path3d.length; j < n; j += 1 ) {
       const currOffset = path3d[j];
-      const dist = Point3d.distanceBetween(prevOffset, currOffset);
+      const dist = GridCoordinates3d.distanceBetween(prevOffset, currOffset, altGridDistanceFn);
       const offsetDistance = offsetDistanceFn(prevOffset, currOffset);
+
+      // debug
+      const offsetDistanceAlt = GridCoordinates3d.gridDistanceBetweenOffsets(prevOffset, currOffset, altGridDistanceOffsetFn);
+      if ( !offsetDistance.almostEqual(offsetDistanceAlt) ) console.log(`${_measurePath}|${offsetDistance} vs ${offsetDistanceAlt}`);
+
       segment.distance += (dist.almostEqual(offsetDistance) ? offsetDistance : dist);
       segment.cost += cost(prevOffset, currOffset, offsetDistance);
       prevOffset = currOffset;
