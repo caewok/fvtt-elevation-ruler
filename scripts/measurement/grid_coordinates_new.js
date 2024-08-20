@@ -169,7 +169,8 @@ function hexGridDistanceBetween(p0, p1, altGridDistFn) {
   // TODO: Make setting to use Euclidean distance.
   // exactDistanceFn = setting ? Math.hypot : exactGridDistance;
   let l;
-  switch ( canvas.grid.diagonals ) {
+  const diagonals = game.settings.get("core", "gridDiagonals");
+  switch ( diagonals ) {
     case D.EQUIDISTANT: l = maxAxis; break; // Max dx, dy, dz
     case D.EXACT: l = exactGridDistance(maxAxis, minAxis); break;
     case D.APPROXIMATE: l = approxGridDistance(maxAxis, minAxis); break;
@@ -219,7 +220,7 @@ function alternatingGridDistance(opts = {}) {
   let prevMaxAxis = opts.prevMaxAxis ?? lPrev;
   let prevMidAxis = opts.prevMidAxis ?? lPrev;
   let prevMinAxis = opts.prevMinAxis ?? lPrev;
-  return (maxAxis, midAxis, minAxis) => {
+  return (maxAxis = 0, midAxis = 0, minAxis = 0) => {
     prevMaxAxis += maxAxis;
     prevMidAxis += midAxis;
     prevMinAxis += minAxis;
@@ -254,6 +255,9 @@ function _alternatingGridDistance(maxAxis = 0, midAxis = 0, minAxis = 0) {
   // (A * (1 - deltaX)) + (B * (deltaX - deltaY)) + (C * (deltaY - deltaZ)) + (D * deltaZ);
 }
 
+
+
+
 /**
  * Measure the 3d segment distance for a square grid, accounting for diagonal movement.
  * @param {Point|Point3d} a
@@ -272,12 +276,13 @@ function squareGridDistanceBetween(p0, p1, altGridDistFn) {
 
   // Make dx the maximum, dy, the middle, and dz the minimum change across the axes.
   // If two-dimensional, dz will be zero. (Slightly faster than an array sort.)
+
+
   const minMax = Math.minMax(dx, dy, dz);
-  const midAxis = dx > minMax.min && dx < minMax.max ? dx
-    : dy > minMax.min && dy < minMax.max ? dy
-      : dz;
   const maxAxis = minMax.max;
   const minAxis = minMax.min;
+  const midAxis = dx.between(dy, dz) ? dx
+    : dy.between(dx, dz) ? dy : dz;
 
   // TODO: Make setting to use Euclidean distance.
   // exactDistanceFn = setting ? Math.hypot : exactGridDistance;
@@ -300,10 +305,79 @@ function squareGridDistanceBetween(p0, p1, altGridDistFn) {
 
 /**
  * Measure the 2d segment distance for a square grid, accounting for diagonal movement.
- * Original version from SquareGrid#_measure for debugging.
+ * Original version from HexagonalGrid#_measure for debugging.
  * @param {Point} a
  * @param {Point} b
  * @returns {number} Distance before accounting for grid size.
+ */
+function hexGridDistanceBetweenOrig(p0, p1) {
+  // Convert to (fractional) cube coordinates
+  const toCube = coords => {
+    if ( coords.x !== undefined ) return canvas.grid.pointToCube(coords);
+    if ( coords.i !== undefined ) return canvas.grid.offsetToCube(coords);
+    return coords;
+  };
+
+  const d0 = toCube(p0);
+  const d1 = toCube(p1);
+  const d = foundry.grid.HexagonalGrid.cubeDistance(d0, d1);
+  return d * canvas.grid.distance;
+}
+
+/**
+ * Measure the 3dd segment distance for a square grid, accounting for diagonal movement.
+ * @param {Point} a
+ * @param {Point} b
+ * @returns {number} Distance before accounting for grid size.
+ */
+function hexGridDistance3dBetweenOrig(p0, p1, is3D = true) {
+  // Convert to (fractional) cube coordinates
+  const toCube = coords => {
+    if ( coords.x !== undefined ) return canvas.grid.pointToCube(coords);
+    if ( coords.i !== undefined ) return canvas.grid.offsetToCube(coords);
+    return coords;
+  };
+
+  const d0 = toCube(p0);
+  const d1 = toCube(p1);
+  d0.k = (p0.z / canvas.grid.size) | 0;
+  d1.k = (p1.z / canvas.grid.size) | 0;
+
+  let a = foundry.grid.HexagonalGrid.cubeDistance(d0, d1);
+  let b = 0;
+  if ( is3D ) {
+    b = Math.abs(d0.k - d1.k);
+    if ( a < b ) [a, b] = [b, a];
+  }
+  let l;
+  const D = CONST.GRID_DIAGONALS;
+  const diagonals = game.settings.get("core", "gridDiagonals");
+  let ld = diagonals === D.ALTERNATING_2 ? 1 : 0;
+  switch ( diagonals ) {
+    case D.EQUIDISTANT: l = a; break;
+    case D.EXACT: l = a + ((Math.SQRT2 - 1) * b); break;
+    case D.APPROXIMATE: l = a + (0.5 * b); break;
+    case D.ILLEGAL: l = a + b; break;
+    case D.ALTERNATING_1:
+    case D.ALTERNATING_2:
+      const ld0 = ld;
+      ld += b;
+      l = a + ((Math.abs(((ld - 1) / 2) - Math.floor(ld / 2)) + ((ld - 1) / 2))
+        - (Math.abs(((ld0 - 1) / 2) - Math.floor(ld0 / 2)) + ((ld0 - 1) / 2)));
+      break;
+    case D.RECTILINEAR: l = a + b; break;
+  }
+  return l * canvas.grid.distance;
+}
+
+
+
+/**
+ * Measure the 2d segment distance for a square grid, accounting for diagonal movement.
+ * Original version from SquareGrid#_measure for debugging.
+ * @param {Point} a
+ * @param {Point} b
+ * @returns {number} Distance in grid units
  */
 function squareGridDistanceBetweenOrig(p0, p1, { da = 0, db = 0, l0 = 0 } = 0) {
   // From SquareGrid#_measure
