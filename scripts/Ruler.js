@@ -44,6 +44,7 @@ import { tokenSpeedSegmentSplitter } from "./token_speed.js";
 import { log } from "./util.js";
 import { PhysicalDistance } from "./measurement/PhysicalDistance.js";
 import { MoveDistance } from "./measurement/MoveDistance.js";
+import { MovePenalty } from "./measurement/MovePenalty.js";
 
 
 /**
@@ -426,7 +427,7 @@ function _getCostFunction() {
   if ( !this.token ) return undefined;
 
   // Construct a move penalty instance that covers all the segments.
-  movePenaltyInstance = this._movePenaltyInstance ??= new MovePenalty(this.token);
+  const movePenaltyInstance = this._movePenaltyInstance ??= new MovePenalty(this.token);
   const path = this.segments.map(s => s.ray.A);
   path.push(this.segments.at(-1).ray.B);
   movePenaltyInstance.restrictToPath(path);

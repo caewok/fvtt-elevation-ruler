@@ -262,6 +262,8 @@ function _alternatingGridDistance(maxAxis = 0, midAxis = 0, minAxis = 0) {
  */
 function squareGridDistanceBetween(p0, p1, altGridDistFn) {
   const D = CONST.GRID_DIAGONALS;
+  p0.z ??= 0;
+  p1.z ??= 0;
 
   // Normalize so that dx === 1 when traversing 1 grid space.
   const dx = Math.abs(p0.x - p1.x) / canvas.grid.size;
@@ -330,8 +332,60 @@ function squareGridDistanceBetweenOrig(p0, p1, { da = 0, db = 0, l0 = 0 } = 0) {
     case D.RECTILINEAR:
     case D.ILLEGAL: l = dx + dy; break;
   }
-  return l;
+  return l * canvas.grid.distance;
 }
+
+function squareGridDistance3dBetweenOrig(p0, p1, is3D = true) {
+  const D = CONST.GRID_DIAGONALS;
+  let l0 = canvas.grid.diagonals === D.ALTERNATING_2 ? 1.0 : 0.0;
+  let dx0 = l0;
+  let dy0 = l0;
+  let dz0 = l0;
+
+  let dx = Math.abs(p0.x - p1.x) / canvas.grid.size;
+  let dy = Math.abs(p0.y - p1.y) / canvas.grid.size;
+  if ( dx < dy ) [dx, dy] = [dy, dx];
+  let dz = 0;
+  if ( is3D ) {
+    dz = Math.abs(p0.z - p1.z) / canvas.grid.size;
+    if ( dy < dz ) [dy, dz] = [dz, dy];
+    if ( dx < dy ) [dx, dy] = [dy, dx];
+  }
+
+  // From SquareGrid#_measure
+  let l; // The distance of the segment
+  switch ( canvas.grid.diagonals ) {
+    case D.EQUIDISTANT: l = dx; break;
+    case D.EXACT: l = dx + (((Math.SQRT2 - 1) * (dy - dz)) + ((Math.SQRT3 - 1) * dz)); break;
+    case D.APPROXIMATE: l = dx + ((0.5 * (dy - dz)) + (0.75 * dz)); break;
+    case D.RECTILINEAR: l = dx + (dy + dz); break;
+    case D.ALTERNATING_1:
+    case D.ALTERNATING_2:
+      {
+        dx0 += dx;
+        dy0 += dy;
+        dz0 += dz;
+        const fx = Math.floor(dx0);
+        const fy = Math.floor(dy0);
+        const fz = Math.floor(dz0);
+        const a = fx + (0.5 * fy) + (0.25 * fz);
+        const a0 = Math.floor(a);
+        const a1 = Math.floor(a + 1);
+        const a2 = Math.floor(a + 1.5);
+        const a3 = Math.floor(a + 1.75);
+        const mx = dx0 - fx;
+        const my = dy0 - fy;
+        const mz = dz0 - fz;
+        const l1 = (a0 * (1 - mx)) + (a1 * (mx - my)) + (a2 * (my - mz)) + (a3 * mz);
+        l = l1 - l0;
+        l0 = l1;
+      }
+      break;
+    case D.ILLEGAL: l = dx + (dy + dz); break;
+  }
+  return l * canvas.grid.distance;
+}
+
 
 // ----- NOTE: 3d versions of Foundry typedefs ----- //
 
