@@ -174,7 +174,7 @@ function _broadcastMeasurement(wrapped) {
     const destination = this.segments.at(-1)?.ray.B;
     const previewToken = this.token._preview;
     if ( destination ) {
-      const destElevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(destination.z);
+      const destElevation = distanceLabel(CONFIG.GeometryLib.utils.pixelsToGridUnits(destination.z));
       const elevationChanged = previewToken.document.elevation !== destElevation;
       if ( elevationChanged && isFinite(destElevation) ) {
         previewToken.document.elevation = destElevation;
@@ -508,7 +508,7 @@ function _getSegmentLabel(wrapped, segment) {
 
   // Put it all together.
   let label = `${origLabel}`;
-  if ( !Settings.get(Settings.KEYS.HIDE_ELEVATION) ) label += `\n${elevLabel}`;
+  if ( !Settings.get(Settings.KEYS.LABELING.HIDE_ELEVATION) ) label += `\n${elevLabel}`;
   label += `${terrainLabel}${combatLabel}`;
   return label;
 }
@@ -617,13 +617,6 @@ async function _animateSegment(token, segment, destination) {
 //   if ( segment.teleport
 //     && !(segment.B.x === this.destination.x && segment.B.y === this.destination.y )
 //     && !this.waypoints.some(w => segment.B.x === w.x && segment.B.y === w.y) ) return;
-
-  // Update elevation before the token move.
-  // Only update drop to ground and user increment changes.
-  // Leave the rest to region elevation from Terrain Mapper or other modules.
-  // const waypoint = this.waypoints[segment.waypointIdx];
-  // const newElevation = waypoint.elevation;
-  // if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
 
   let name;
   if ( segment.animation?.name === undefined ) name = token.animationName;

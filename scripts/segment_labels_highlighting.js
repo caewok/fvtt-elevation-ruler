@@ -37,7 +37,7 @@ export function highlightLineRectangle(segment, color, name) {
  * @returns {number}
  */
 export function distanceLabel(dist) {
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE)
+  const multiple = Settings.get(Settings.KEYS.LABELING.ROUND_TO_MULTIPLE)
   if ( !multiple ) return dist;
   return Number(dist.toFixed(multiple));
 }
@@ -48,9 +48,9 @@ export function distanceLabel(dist) {
  */
 function useLevelsLabels() {
   if ( !MODULES_ACTIVE.LEVELS ) return false;
-  const labelOpt = Settings.get(Settings.KEYS.USE_LEVELS_LABEL);
-  return labelOpt === Settings.KEYS.LEVELS_LABELS.ALWAYS
-    || (labelOpt === Settings.KEYS.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);
+  const labelOpt = Settings.get(Settings.KEYS.LABELING.USE_LEVELS_LABEL);
+  return labelOpt === Settings.KEYS.LABELING.LEVELS_LABELS.ALWAYS
+    || (labelOpt === Settings.KEYS.LABELING.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);
 }
 
 /**

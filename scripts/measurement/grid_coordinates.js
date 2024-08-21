@@ -3,6 +3,7 @@ canvas,
 CONFIG,
 CONST,
 foundry,
+game,
 PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -10,6 +11,7 @@ PIXI
 
 import { Point3d } from "../geometry/3d/Point3d.js";
 import { isOdd } from "../util.js";
+import { Settings } from "../settings.js";
 
 
 // ----- NOTE: Foundry typedefs  ----- //
@@ -207,14 +209,15 @@ function hexGridDistanceBetween(p0, p1, altGridDistFn) {
 
   // Like with squareGridDistanceBetween, use the maximum axis to avoid Math.max(), Max.min() throughout.
   const [maxAxis, minAxis] = dist2d > distElev ? [dist2d, distElev] : [distElev, dist2d];
-
-  // TODO: Make setting to use Euclidean distance.
-  // exactDistanceFn = setting ? Math.hypot : exactGridDistance;
   let l;
   const diagonals = game.settings.get("core", "gridDiagonals");
   switch ( diagonals ) {
     case D.EQUIDISTANT: l = maxAxis; break; // Max dx, dy, dz
-    case D.EXACT: l = exactGridDistance(maxAxis, minAxis); break;
+    case D.EXACT: {
+      const fn = Settings.get(Settings.KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE) ? Math.hypot : exactGridDistance;
+      l = fn(maxAxis, minAxis);
+      break;
+    }
     case D.APPROXIMATE: l = approxGridDistance(maxAxis, minAxis); break;
     case D.ALTERNATING_1:
     case D.ALTERNATING_2: {
@@ -241,6 +244,7 @@ function exactGridDistance(maxAxis = 0, midAxis = 0, minAxis = 0) {
   // Equivalent to:
   // maxAxis + (A * (midAxis - minAxis)) + (B * minAxis);
 }
+
 
 /**
  * Track the diagonals required for measuring alternating grid distance.
@@ -329,7 +333,11 @@ function squareGridDistanceBetween(p0, p1, altGridDistFn) {
   let l;
   switch ( canvas.grid.diagonals ) {
     case D.EQUIDISTANT: l = maxAxis; break; // Max dx, dy, dz
-    case D.EXACT: l = exactGridDistance(maxAxis, midAxis, minAxis); break;
+    case D.EXACT: {
+      const fn = Settings.get(Settings.KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE) ? Math.hypot : exactGridDistance;
+      l = fn(maxAxis, midAxis, minAxis);
+      break;
+    }
     case D.APPROXIMATE: l = approxGridDistance(maxAxis, midAxis, minAxis); break;
     case D.ALTERNATING_1:
     case D.ALTERNATING_2: {
@@ -399,12 +407,13 @@ function hexGridDistance3dBetweenOrig(p0, p1, is3D = true) {
     case D.APPROXIMATE: l = a + (0.5 * b); break;
     case D.ILLEGAL: l = a + b; break;
     case D.ALTERNATING_1:
-    case D.ALTERNATING_2:
+    case D.ALTERNATING_2: {
       const ld0 = ld;
       ld += b;
       l = a + ((Math.abs(((ld - 1) / 2) - Math.floor(ld / 2)) + ((ld - 1) / 2))
         - (Math.abs(((ld0 - 1) / 2) - Math.floor(ld0 / 2)) + ((ld0 - 1) / 2)));
       break;
+    }
     case D.RECTILINEAR: l = a + b; break;
   }
   return l * canvas.grid.distance;
