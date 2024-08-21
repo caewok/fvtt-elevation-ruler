@@ -1,7 +1,6 @@
 /* globals
 canvas,
 CONFIG,
-CONST,
 game,
 PIXI
 */
@@ -38,30 +37,9 @@ export function highlightLineRectangle(segment, color, name) {
  * @returns {number}
  */
 export function distanceLabel(dist) {
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-  return dist.toNearest(multiple);
-}
-
-/**
- * Return modified segment and total distance labels
- * @param {number} segmentDistance
- * @param {number} segmentMoveDistance
- * @param {number} totalDistance
- * @returns {object}
- */
-export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance) {
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-  if ( canvas.grid.type !== CONST.GRID_TYPES.GRIDLESS ) return {
-    newSegmentDistance: segmentDistance,
-    newMoveDistance: Number(moveDistance.toFixed(2)),
-    newTotalDistance: totalDistance
-  };
-
-  const newSegmentDistance = segmentDistance.toNearest(multiple);
-  const newMoveDistance = moveDistance.toNearest(multiple);
-  const newTotalDistance = totalDistance.toNearest(multiple);
-
-  return { newSegmentDistance, newMoveDistance, newTotalDistance };
+  const multiple = Settings.get(Settings.KEYS.LABELING.ROUND_TO_MULTIPLE)
+  if ( !multiple ) return dist;
+  return Number(dist.toFixed(multiple));
 }
 
 /**
@@ -70,9 +48,9 @@ export function _getDistanceLabels(segmentDistance, moveDistance, totalDistance)
  */
 function useLevelsLabels() {
   if ( !MODULES_ACTIVE.LEVELS ) return false;
-  const labelOpt = Settings.get(Settings.KEYS.USE_LEVELS_LABEL);
-  return labelOpt === Settings.KEYS.LEVELS_LABELS.ALWAYS
-    || (labelOpt === Settings.KEYS.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);
+  const labelOpt = Settings.get(Settings.KEYS.LABELING.USE_LEVELS_LABEL);
+  return labelOpt === Settings.KEYS.LABELING.LEVELS_LABELS.ALWAYS
+    || (labelOpt === Settings.KEYS.LABELING.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);
 }
 
 /**
@@ -105,7 +83,6 @@ export function segmentElevationLabel(ruler, s) {
   // Token ruler uses the preview token for elevation.
   if ( s.last && ruler.isTokenRuler ) return "";
 
-
   // If this is the last segment, show the total elevation change if any.
   const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(s.ray.B.z);
   const totalE = elevation - canvas.controls.ruler.originElevation;
@@ -114,7 +91,7 @@ export function segmentElevationLabel(ruler, s) {
   // Determine if any previous waypoint had an elevation change.
   let elevationChanged = false;
   let currE = elevation;
-  for ( let i = s.waypointIdx; i > -1; i -= 1 ) {
+  for ( let i = s.waypoint.idx; i > -1; i -= 1 ) {
     const prevE = ruler.waypoints[i].elevation;
     if ( currE !== prevE ) {
       elevationChanged = true;
@@ -130,11 +107,10 @@ export function segmentElevationLabel(ruler, s) {
   // Put together the two parts of the label: current elevation and total elevation.
   const labelParts = [];
   const units = canvas.scene.grid.units;
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-  if ( displayCurrentElevation ) labelParts.push(`@${Number(elevation.toNearest(multiple))} ${units}`);
+  if ( displayCurrentElevation ) labelParts.push(`@${distanceLabel(elevation)} ${units}`);
   if ( displayTotalChange ) {
     const segmentArrow = (totalE > 0) ? "↑" :"↓";
-    const totalChange = `[${segmentArrow}${Math.abs(Number(totalE.toNearest(multiple)))} ${units}]`;
+    const totalChange = `[${segmentArrow}${Math.abs(distanceLabel(totalE))} ${units}]`;
     labelParts.push(totalChange);
   }
   s.label.style.align = s.last ? "center" : "right";
@@ -148,9 +124,9 @@ export function segmentElevationLabel(ruler, s) {
  * @returns {string} The label or "" if none.
  */
 export function segmentTerrainLabel(s) {
-  if ( s.waypointDistance.almostEqual(s.waypointMoveDistance) ) return "";
+  if ( s.waypoint.cost.almostEqual(s.waypoint.offsetDistance) ) return "";
   const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
-  const moveDistance = distanceLabel(s.waypointMoveDistance);
+  const moveDistance = distanceLabel(s.waypoint.cost);
   if ( CONFIG[MODULE_ID].SPEED.useFontAwesome ) {
     const style = s.label.style;
     if ( !style.fontFamily.includes("fontAwesome") ) style.fontFamily += ",fontAwesome";
@@ -166,7 +142,7 @@ export function segmentTerrainLabel(s) {
  */
 export function segmentCombatLabel(token, priorDistance) {
   const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
-  if ( priorDistance ) return `\nPrior: ${priorDistance}${units}`;
+  if ( priorDistance ) return `\nPrior: ${distanceLabel(priorDistance)}${units}`;
   return "";
 }
 
