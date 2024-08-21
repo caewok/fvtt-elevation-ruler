@@ -294,7 +294,7 @@ export class Settings extends ModuleSettingsAbstract {
       hint: localize(`${KEYS.LABELING.ROUND_TO_MULTIPLE}.hint`),
       scope: "world",
       config: true,
-      default: 0,
+      default: 0.1,
       type: Number
     });
 
