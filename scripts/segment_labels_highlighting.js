@@ -83,7 +83,6 @@ export function segmentElevationLabel(ruler, s) {
   // Token ruler uses the preview token for elevation.
   if ( s.last && ruler.isTokenRuler ) return "";
 
-
   // If this is the last segment, show the total elevation change if any.
   const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(s.ray.B.z);
   const totalE = elevation - canvas.controls.ruler.originElevation;

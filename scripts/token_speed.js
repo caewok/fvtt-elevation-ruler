@@ -8,7 +8,6 @@ PIXI
 
 import { SPEED } from "./const.js";
 import { Settings } from "./settings.js";
-import { measureSegment } from "./segments.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { gridShape, canvasElevationFromCoordinates } from "./measurement/grid_coordinates.js";
@@ -54,12 +53,12 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
     minDistance = totalCombatMoveDistance;
   }
 
-  // Construct a move penalty instance that covers all the segments.
-  const movePenaltyInstance = ruler._movePenaltyInstance ??= new MovePenalty(token);
-
   return segment => {
     if ( !tokenSpeed ) {
       segment.speed = defaultColor;
+      const a = GridCoordinates3d.fromObject(segment.ray.A);
+      const b = GridCoordinates3d.fromObject(segment.ray.B);
+      numPrevDiagonal += GridCoordinates3d.numDiagonal(a, b);
       return [segment];
     }
 
@@ -72,13 +71,10 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
         maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
       }
       if ( !speedCategory ) speedCategory = SPEED.CATEGORIES.at(-1);
-
       segment.speed = speedCategory;
-      let newPrevDiagonal = measureSegment(segment, token, movePenaltyInstance, numPrevDiagonal);
 
       // If we have exceeded maxDistance, determine if a split is required.
       const newDistance = totalCombatMoveDistance + segment.cost;
-
       if ( newDistance > maxDistance || newDistance.almostEqual(maxDistance ) ) {
         if ( newDistance > maxDistance ) {
           // Split the segment, inserting the latter portion in the queue for future iteration.
@@ -94,10 +90,9 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
               // Do nothing.
             } else {
               // Split the segment
-              const segments = _splitSegmentAt(segment, breakpoint);
+              const segments = _splitSegmentAt(segment, breakpoint, numPrevDiagonal);
               unprocessed.push(segments[1]);
               segment = segments[0];
-              newPrevDiagonal = measureSegment(segment, token, movePenaltyInstance, numPrevDiagonal);
             }
           }
         }
@@ -110,7 +105,9 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
       // Increment totals.
       processed.push(segment);
       totalCombatMoveDistance += segment.cost;
-      numPrevDiagonal = newPrevDiagonal;
+      const a = GridCoordinates3d.fromObject(segment.ray.A);
+      const b = GridCoordinates3d.fromObject(segment.ray.B);
+      numPrevDiagonal += GridCoordinates3d.numDiagonal(a, b);
     }
     return processed;
   };
@@ -190,30 +187,45 @@ function targetDistanceExceeded(targetCost, a, b, stepDist = 1, numPrevDiagonal 
 }
 
 /**
- * Cut a ruler segment at a specified point. Does not remeasure the resulting segments.
+ * Cut a ruler segment at a specified point.
  * Assumes without testing that the breakpoint lies on the segment between A and B.
  * @param {RulerMeasurementSegment} segment       Segment, with ray property, to split
  * @param {Point3d} breakpoint                    Point to use when splitting the segments
  * @returns [RulerMeasurementSegment, RulerMeasurementSegment]
  */
-function _splitSegmentAt(segment, breakpoint) {
+function _splitSegmentAt(segment, breakpoint, numPrevDiagonal = 0) {
   const { A, B } = segment.ray;
 
   // Split the segment into two at the break point.
   const s0 = {...segment};
-  s0.ray = new Ray3d(A, breakpoint);
-  s0.distance = null;
-  s0.offsetDistance = null;
-  s0.cost = null;
-  s0.numDiagonal = null;
-
   const s1 = {...segment};
+
+  s0.ray = new Ray3d(A, breakpoint);
   s1.ray = new Ray3d(breakpoint, B);
-  s1.distance = null;
-  s1.offsetDistance = null;
-  s1.cost = null;
-  s1.numPrevDiagonal = null;
-  s1.numDiagonal = null;
+
+  const res0 = GridCoordinates3d.gridMeasurementForSegment(s0.ray.A, s0.ray.B, numPrevDiagonal);
+  const res1 = GridCoordinates3d.gridMeasurementForSegment(s1.ray.A, s1.ray.B, numPrevDiagonal + res0.numDiagonal);
+
+  s0.distance = res0.distance;
+  s0.offsetDistance = res0.offsetDistance;
+  s0.cost = res0.cost;
+
+  s1.distance = res1.distance;
+  s1.offsetDistance = res1.offsetDistance;
+  s1.cost = res1.cost;
+
+  s1.cumulativeCost = segment.cumulativeCost;
+  s1.cumulativeDistance = segment.cumulativeDistance;
+  s1.cumulativeOffsetDistance = segment.cumulativeOffsetDistance;
+
+  s0.cumulativeCost = segment.cumulativeCost - s1.cost;
+  s0.cumulativeDistance = segment.cumulativeDistance - s1.distance;
+  s0.cumulativeOffsetDistance = segment.cumulativeOffsetDistance - s1.offsetDistance;
+
+  // s1 waypoint should equal the segment waypoint.
+  s0.waypoint.distance = segment.waypoint.distance - s1.distance;
+  s0.waypoint.offsetDistance = segment.waypoint.offsetDistance - s1.offsetDistance;
+  s0.waypoint.cost = segment.waypoint.cost - s1.cost;
   s1.speed = null;
 
   if ( segment.first ) { s1.first = false; }

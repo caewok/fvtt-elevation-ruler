@@ -425,14 +425,12 @@ function _computeDistance() {
     const distance = measurements[i].distance;
     const cost = segment.history ? this.history.at(i + 1)?.cost ?? 0 : measurements[i].cost;
     const offsetDistance = measurements[i].offsetDistance;
-    this.totalDistance += distance;
-    this.totalCost += cost;
     segment.distance = distance;
     segment.cost = cost;
     segment.offsetDistance = offsetDistance;
-    segment.cumulativeDistance = this.totalDistance;
-    segment.cumulativeCost = this.totalCost;
-    segment.cumulativeoffsetDistance = this.totalOffsetDistance;
+    segment.cumulativeDistance = this.totalDistance += distance;
+    segment.cumulativeCost = this.totalCost += cost;
+    segment.cumulativeOffsetDistance = this.totalOffsetDistance += offsetDistance;
 
     // Values relating the prior waypoint to this segment.
     segment.waypoint ??= {};
@@ -475,21 +473,26 @@ function _getCostFunction() {
  * Wrap Ruler.prototype._getSegmentLabel
  * Add elevation information to the label
  */
-function _getSegmentLabel(wrapped, segment, totalDistance) {
+function _getSegmentLabel(wrapped, segment) {
   if ( CONFIG[MODULE_ID].debug ) {
-    if ( totalDistance >= 15 ) { console.debug("_getSegmentLabel: 15", segment, this); }
-    if ( totalDistance > 30 ) { console.debug("_getSegmentLabel: 30", segment, this); }
-    else if ( totalDistance > 60 ) { console.debug("_getSegmentLabel: 30", segment, this); }
+    if ( this.totalDistance >= 15 ) { console.debug("_getSegmentLabel: 15", segment, this); }
+    if ( this.totalDistance > 30 ) { console.debug("_getSegmentLabel: 30", segment, this); }
+    else if ( this.totalDistance > 60 ) { console.debug("_getSegmentLabel: 30", segment, this); }
   }
 
   // Force distance to be between waypoints instead of (possibly pathfinding) segments.
   const origSegmentDistance = segment.distance;
-  segment.distance = distanceLabel(origSegmentDistance);
-  const priorDistance = getPriorDistance(this.token);
-  const combinePriorWithTotal = Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL)
-  this.totalDistance = distanceLabel(totalDistance) + ((combinePriorWithTotal && segment.first) ? priorDistance : 0);
-  const origLabel = wrapped(segment, distanceLabel(totalDistance));
+  const origTotalDistance = this.totalDistance;
+  segment.distance = distanceLabel(segment.waypoint.distance);
+  let combatLabel = ""; // Label when in combat and there are past moves.
+  if ( Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL) ) {
+    const priorDistance = getPriorDistance(this.token);
+    this.totalDistance += priorDistance;
+  } else combatLabel = segmentCombatLabel(this.token, getPriorDistance(this.token));
+
+  const origLabel = wrapped(segment);
   segment.distance = origSegmentDistance;
+  this.totalDistance = origTotalDistance;
 
   // Label for elevation changes.
   let elevLabel = segmentElevationLabel(this, segment);
@@ -500,9 +503,6 @@ function _getSegmentLabel(wrapped, segment, totalDistance) {
 
   // Label for difficult terrain (variation in move distance vs distance).
   const terrainLabel = segmentTerrainLabel(segment);
-
-  // Label when in combat and there are past moves.
-  const combatLabel = (combinePriorWithTotal) ? "" : segmentCombatLabel(this.token, priorDistance);
 
   // Put it all together.
   let label = `${origLabel}`;
