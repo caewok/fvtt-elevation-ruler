@@ -21,17 +21,7 @@ import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d, gridShap
 import { GridCoordinates, RegionMovementWaypoint3d, GridCoordinates3d } from "./measurement/grid_coordinates_new.js";
 import { testMeasurePath } from "./measurement/Grid.js";
 
-// Measure classes
-import {
-  PhysicalDistance,
-  PhysicalDistanceGridless,
-  PhysicalDistanceGridded } from "./measurement/PhysicalDistance.js";
-
-import {
-  MoveDistance,
-  MoveDistanceGridless,
-  MoveDistanceGridded } from "./measurement/MoveDistance.js";
-
+// Move Penalty
 import { MovePenalty } from "./measurement/MovePenalty.js";
 
 // Pathfinding
@@ -133,20 +123,14 @@ Hooks.once("init", function() {
     coordinates: {
       pointFromGridCoordinates,
       getCenterPoint3d,
-      getGridPosition3d,
-      GridCoordinates,
-      RegionMovementWaypoint3d,
-      GridCoordinates3d,
-      testMeasurePath
+      getGridPosition3d
     },
 
     measure: {
-      PhysicalDistance,
-      PhysicalDistanceGridless,
-      PhysicalDistanceGridded,
-      MoveDistance,
-      MoveDistanceGridless,
-      MoveDistanceGridded,
+      GridCoordinates,
+      RegionMovementWaypoint3d,
+      GridCoordinates3d,
+      testMeasurePath,
       MovePenalty
     },
 

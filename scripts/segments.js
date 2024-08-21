@@ -1,7 +1,6 @@
 /* globals
 canvas,
-CONFIG,
-CONST
+CONFIG
 */
 "use strict";
 
@@ -9,7 +8,7 @@ import { MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
-import { log, isOdd } from "./util.js";
+import { log } from "./util.js";
 import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
 import { GridCoordinates3d } from "./measurement/grid_coordinates_new.js";
@@ -23,18 +22,11 @@ import { GridCoordinates3d } from "./measurement/grid_coordinates_new.js";
  * @returns {number} numPrevDiagonal
  */
 export function measureSegment(segment, numPrevDiagonal = 0) {
-  const lPrevStart = canvas.grid.diagonals === CONST.GRID_DIAGONALS.ALTERNATING_2 ? 1 : 0;
-  const lPrev = isOdd(numPrevDiagonal) ? lPrevStart : Number(!lPrevStart);
-  const cost = canvas.controls.ruler._getCostFunction();
-  const a = segment.ray.A;
-  const b = segment.ray.B;
-  const aOffset = GridCoordinates3d.fromObject(a);
-  const bOffset = GridCoordinates3d.fromObject(b);
-
-  segment.distance = GridCoordinates3d.gridDistanceBetween(a, b, GridCoordinates3d.alternatingGridDistanceFn({ lPrev }));
-  segment.offsetDistance = GridCoordinates3d.gridDistanceBetweenOffsets(a, b, GridCoordinates3d.alternatingGridDistanceFn({ lPrev }));
-  segment.cost = cost ? cost(GridCoordinates3d.fromObject(a), GridCoordinates3d.fromObject(b), segment.offsetDistance) : segment.offsetDistance;
-  segment.numDiagonal = GridCoordinates3d.numDiagonal(aOffset, bOffset);
+  const res = GridCoordinates3d.gridMeasurementForSegment(segment.ray.A, segment.ray.B, numPrevDiagonal);
+  segment.distance = res.distance;
+  segment.offsetDistance = res.offsetDistance;
+  segment.cost = res.cost;
+  segment.numDiagonal = res.numDiagonal;
   return numPrevDiagonal + segment.numDiagonal;
 }
 

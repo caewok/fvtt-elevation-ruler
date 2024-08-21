@@ -8,6 +8,7 @@ CONST
 
 import { GridCoordinates3d, RegionMovementWaypoint3d } from "./grid_coordinates_new.js";
 import { Point3d } from "../geometry/3d/Point3d.js";
+import { MODULE_ID } from "../const.js";
 
 /**
  * Modify Grid classes to measure in 3d.

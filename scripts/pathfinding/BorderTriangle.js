@@ -10,10 +10,9 @@ Wall
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 import { MODULE_ID } from "../const.js";
-import { MoveDistance } from "../measurement/MoveDistance.js";
-import { PhysicalDistance } from "../measurement/PhysicalDistance.js";
 import { Draw } from "../geometry/Draw.js";
 import { WallTracerEdge } from "./WallTracer.js";
+import { GridCoordinates3d } from "../measurement/grid_coordinates_new.js";
 
 const OTHER_DIRECTION = {
   ccw: "cw",
@@ -496,10 +495,10 @@ export class BorderTriangle {
     // TODO: Handle 3d distance. Probably Ray3d with measureDistance or measureDistances.
     // TODO: Handle terrain distance.
     if ( CONFIG[MODULE_ID].pathfindingCheckTerrains ) {
-      const pathRes = MoveDistance.measure(fromPoint, toPoint, { token });
-      return CONFIG.GeometryLib.utils.gridUnitsToPixels(pathRes.moveDistance);
+      const res = gridMeasurementForSegment(fromPoint, toPoint);
+      return CONFIG.GeometryLib.utils.gridUnitsToPixels(res.cost);
     }
-    const distance = PhysicalDistance.measure(fromPoint, toPoint);
+    const distance = GridCoordinates3d.gridDistanceBetween(fromPoint, toPoint);
     return CONFIG.GeometryLib.utils.gridUnitsToPixels(distance);
   }
 

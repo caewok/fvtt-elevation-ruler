@@ -41,8 +41,6 @@ import {
   highlightLineRectangle } from "./segment_labels_highlighting.js";
 import { tokenSpeedSegmentSplitter } from "./token_speed.js";
 import { log } from "./util.js";
-import { PhysicalDistance } from "./measurement/PhysicalDistance.js";
-import { MoveDistance } from "./measurement/MoveDistance.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
 
 
@@ -120,7 +118,8 @@ function _getMeasurementData(wrapper) {
   });
 
   myObj.totalDistance = this.totalDistance;
-  myObj.totalMoveDistance = this.totalMoveDistance;
+  myObj.totalOffsetDistance = this.totalOffsetDistance;
+  myObj.totalCost = this.totalCost;
   myObj.totalDiagonals = this.totalDiagonals;
   myObj._isTokenRuler = this._isTokenRuler;
   return obj;
@@ -152,7 +151,8 @@ function update(wrapper, data) {
 
   // Add the calculated distance totals.
   this.totalDistance = myData.totalDistance;
-  this.totalMoveDistance = myData.totalMoveDistance;
+  this.totalOffsetDistance = myData.totalOffsetDistance;
+  this.totalCost = myData.totalCost;
   this.totalDiagonals = myData.totalDiagonals;
 
   wrapper(data);
@@ -412,12 +412,12 @@ function _computeDistance() {
   const measurements = canvas.grid.measurePath(path, {cost: this._getCostFunction()}).segments;
   this.totalDistance = 0;
   this.totalCost = 0;
-  this.totaloffsetDistance = 0;
+  this.totalOffsetDistance = 0;
 
   // Additional waypoint calcs.
   let waypointDistance = 0;
   let waypointCost = 0;
-  let waypointoffsetDistance = 0;
+  let waypointOffsetDistance = 0;
   let currWaypointIdx = -1;
 
   for ( let i = 0; i < this.segments.length; i++ ) {
@@ -432,7 +432,7 @@ function _computeDistance() {
     segment.offsetDistance = offsetDistance;
     segment.cumulativeDistance = this.totalDistance;
     segment.cumulativeCost = this.totalCost;
-    segment.cumulativeoffsetDistance = this.totaloffsetDistance;
+    segment.cumulativeoffsetDistance = this.totalOffsetDistance;
 
     // Values relating the prior waypoint to this segment.
     segment.waypoint ??= {};
@@ -441,11 +441,11 @@ function _computeDistance() {
       currWaypointIdx = segment.waypoint.idx;
       waypointDistance = 0;
       waypointCost = 0;
-      waypointoffsetDistance = 0;
+      waypointOffsetDistance = 0;
     }
     segment.waypoint.distance = waypointDistance += segment.distance;
     segment.waypoint.cost = waypointCost += segment.cost;
-    segment.waypoint.offsetDistance = waypointoffsetDistance += segment.offsetDistance;
+    segment.waypoint.offsetDistance = waypointOffsetDistance += segment.offsetDistance;
     segment.waypoint.elevationIncrement = userElevationChangeAtWaypoint(this.waypoints[currWaypointIdx]);
   }
 }
@@ -568,7 +568,9 @@ async function _animateMovement(wrapped, token) {
       const A = { ...s.ray.A };
       const B = { ...s.ray.B };
       B.distance = s.distance;
-      B.moveDistance = s.moveDistance;
+      B.offsetDistance = s.offsetDistance;
+      B.cost = s.cost;
+      B.numDiagonal = s.numDiagonal;
       return [A, B];
     }));
     console.groupEnd(`${MODULE_ID}|_animateMovement`);
@@ -778,7 +780,5 @@ PATCHES.BASIC.STATIC_METHODS = {
   terrainElevationAtLocation,
   terrainElevationForMovement,
   terrainPathForMovement,
-  elevationFromWaypoint,
-  measureDistance: PhysicalDistance.measure.bind(PhysicalDistance),
-  measureMoveDistance: MoveDistance.measure.bind(MoveDistance)
+  elevationFromWaypoint
 };
