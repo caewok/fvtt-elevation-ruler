@@ -12,25 +12,16 @@ ui
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID, MOVEMENT_TYPES, MOVEMENT_BUTTONS, SPEED, TEMPLATES } from "./const.js";
-import { log } from "./util.js";
+import { log, gridShape } from "./util.js";
 import { defaultHPAttribute } from "./system_attributes.js";
 import { registerGeometry } from "./geometry/registration.js";
 
 // Grid coordinates
-import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d, gridShape } from "./grid_coordinates.js";
+import { GridCoordinates, RegionMovementWaypoint3d, GridCoordinates3d } from "./measurement/grid_coordinates.js";
+import { testMeasurePath } from "./measurement/Grid.js";
 
-// Measure classes
-import {
-  PhysicalDistance,
-  PhysicalDistanceGridless,
-  PhysicalDistanceGridded } from "./PhysicalDistance.js";
-
-import {
-  MoveDistance,
-  MoveDistanceGridless,
-  MoveDistanceGridded } from "./MoveDistance.js";
-
-import { MovePenalty } from "./MovePenalty.js";
+// Move Penalty
+import { MovePenalty } from "./measurement/MovePenalty.js";
 
 // Pathfinding
 import { BorderTriangle, BorderEdge } from "./pathfinding/BorderTriangle.js";
@@ -128,24 +119,14 @@ Hooks.once("init", function() {
     gridShape,
     PATCHER,
 
-    coordinates: {
-      pointFromGridCoordinates,
-      getCenterPoint3d,
-      getGridPosition3d
-    },
-
-    // Measure classes
     measure: {
-      PhysicalDistance,
-      PhysicalDistanceGridless,
-      PhysicalDistanceGridded,
-      MoveDistance,
-      MoveDistanceGridless,
-      MoveDistanceGridded,
+      GridCoordinates,
+      RegionMovementWaypoint3d,
+      GridCoordinates3d,
+      testMeasurePath,
       MovePenalty
     },
 
-    // Pathfinding
     pathfinding: {
       BorderTriangle,
       BorderEdge,

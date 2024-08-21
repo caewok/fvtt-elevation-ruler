@@ -1,7 +1,6 @@
 /* globals
 canvas,
 CanvasAnimation,
-CONFIG,
 foundry,
 game,
 Ruler
@@ -11,7 +10,7 @@ Ruler
 import { MODULE_ID, FLAGS } from "./const.js";
 import { Settings } from "./settings.js";
 import { log } from "./util.js";
-import { MoveDistance } from "./MoveDistance.js";
+import { GridCoordinates3d } from "./measurement/grid_coordinates.js";
 
 // Patches for the Token class
 export const PATCHES = {};
@@ -45,12 +44,12 @@ function preUpdateToken(document, changes, _options, _userId) {
   let combatMoveData = {};
   const ruler = canvas.controls.ruler;
   if ( ruler.active && ruler.token === token ) {
-    lastMoveDistance = ruler.totalMoveDistance;
+    lastMoveDistance = ruler.totalCost;
     numDiagonal = ruler.totalDiagonals;
   } else {
     const numPrevDiagonal = game.combat?.started ? (token._combatMoveData?.numDiagonal ?? 0) : 0;
-    const res = MoveDistance.measure(token.position, token.document._source, { token, numPrevDiagonal });
-    lastMoveDistance = res.moveDistance;
+    const res = GridCoordinates3d.gridMeasurementForSegment(token.position, token.document._source, numPrevDiagonal);
+    lastMoveDistance = res.cost;
     numDiagonal = res.numDiagonal;
   }
 
