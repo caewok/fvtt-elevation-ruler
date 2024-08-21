@@ -279,6 +279,16 @@ export class Settings extends ModuleSettingsAbstract {
       });
     }
 
+    register(KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE, {
+      name: localize(`${KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE}.name`),
+      hint: localize(`${KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE}.hint`),
+      scope: "world",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
     register(KEYS.LABELING.ROUND_TO_MULTIPLE, {
       name: localize(`${KEYS.LABELING.ROUND_TO_MULTIPLE}.name`),
       hint: localize(`${KEYS.LABELING.ROUND_TO_MULTIPLE}.hint`),
