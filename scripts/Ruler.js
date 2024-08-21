@@ -508,7 +508,7 @@ function _getSegmentLabel(wrapped, segment) {
 
   // Put it all together.
   let label = `${origLabel}`;
-  if ( !Settings.get(Settings.KEYS.HIDE_ELEVATION) ) label += `\n${elevLabel}`;
+  if ( !Settings.get(Settings.KEYS.LABELING.HIDE_ELEVATION) ) label += `\n${elevLabel}`;
   label += `${terrainLabel}${combatLabel}`;
   return label;
 }
