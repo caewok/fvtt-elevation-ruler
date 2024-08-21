@@ -27,7 +27,6 @@ import {
   terrainPathForMovement,
   userElevationChangeAtWaypoint } from "./terrain_elevation.js";
 import {
-  _computeSegmentDistances,
   elevateSegments,
   calculatePathPointsForSegment,
   constructPathfindingSegments } from "./segments.js";
@@ -363,12 +362,12 @@ function _getMeasurementSegments(wrapped) {
 }
 
 /**
- * Wrap Ruler.prototype._computeDistance
- * Use measurement that counts segments within a grid square properly.
- * Add moveDistance property to each segment; track the total.
+ * Override Ruler.prototype._computeDistance
+ * Pass 3d coordinates to measure.
+ * Determine the distance with and without the cost function so movement due to terrain can be calculated.
  * If token not present or Terrain Mapper not active, this will be the same as segment distance.
  */
-function _computeDistance(wrapped) {
+function _computeDistance() {
   // If not this ruler's user, use the segments already calculated and passed via socket.
   if ( this.user !== game.user ) return;
 
@@ -398,24 +397,56 @@ function _computeDistance(wrapped) {
   // Debugging
   if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
 
-  wrapped();
-
-  // Compute the waypoint distances for labeling. (Distance to immediately previous waypoint.)
-  let waypointDistance = 0;
-  let waypointMoveDistance = 0;
-  let currWaypointIdx = -1;
+  // From Ruler#_computeDistance
+  // Changes:
+  // - 3d path.
+  // - Add the offsetDistance property for determining changes due to terrain.
+  // - Calculate distance properties from nearest waypoint, for labeling.
+  let path = [];
+  if ( this.segments.length ) path.push(this.segments[0].ray.A.clone());
   for ( const segment of this.segments ) {
-    if ( Object.hasOwn(segment, "waypointIdx") && segment.waypointIdx !== currWaypointIdx ) {
-      currWaypointIdx = segment.waypointIdx;
-      waypointDistance = 0;
-      waypointMoveDistance = 0;
-    }
+    const B = segment.ray.B.clone();
+    B.teleport = segment.teleport;
+    path.push(B);
+  }
+  const measurements = canvas.grid.measurePath(path, {cost: this._getCostFunction()}).segments;
+  this.totalDistance = 0;
+  this.totalCost = 0;
+  this.totaloffsetDistance = 0;
 
-    waypointDistance += segment.distance;
-    waypointMoveDistance += segment.moveDistance;
-    segment.waypointDistance = waypointDistance;
-    segment.waypointMoveDistance = waypointMoveDistance;
-    segment.waypointElevationIncrement = userElevationChangeAtWaypoint(this.waypoints[currWaypointIdx]);
+  // Additional waypoint calcs.
+  let waypointDistance = 0;
+  let waypointCost = 0;
+  let waypointoffsetDistance = 0;
+  let currWaypointIdx = -1;
+
+  for ( let i = 0; i < this.segments.length; i++ ) {
+    const segment = this.segments[i];
+    const distance = measurements[i].distance;
+    const cost = segment.history ? this.history.at(i + 1)?.cost ?? 0 : measurements[i].cost;
+    const offsetDistance = measurements[i].offsetDistance;
+    this.totalDistance += distance;
+    this.totalCost += cost;
+    segment.distance = distance;
+    segment.cost = cost;
+    segment.offsetDistance = offsetDistance;
+    segment.cumulativeDistance = this.totalDistance;
+    segment.cumulativeCost = this.totalCost;
+    segment.cumulativeoffsetDistance = this.totaloffsetDistance;
+
+    // Values relating the prior waypoint to this segment.
+    segment.waypoint ??= {};
+    if ( !Object.hasOwn(segment.waypoint, "idx") ) console.log("_computeDistance|No waypoint index!");
+    if ( Object.hasOwn(segment.waypoint, "idx") && segment.waypoint.idx !== currWaypointIdx ) {
+      currWaypointIdx = segment.waypoint.idx;
+      waypointDistance = 0;
+      waypointCost = 0;
+      waypointoffsetDistance = 0;
+    }
+    segment.waypoint.distance = waypointDistance += segment.distance;
+    segment.waypoint.cost = waypointCost += segment.cost;
+    segment.waypoint.offsetDistance = waypointoffsetDistance += segment.offsetDistance;
+    segment.waypoint.elevationIncrement = userElevationChangeAtWaypoint(this.waypoints[currWaypointIdx]);
   }
 }
 
@@ -607,8 +638,7 @@ async function _animateSegment(token, segment, destination) {
   await token.animate({x, y}, {name, duration: 0});
   await token.document.update(destination, updateOptions);
   await CanvasAnimation.getAnimation(name)?.promise;
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE) || 1;
-  const newElevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z).toNearest(multiple);
+  const newElevation = distanceLabel(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
   if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
 }
 
@@ -717,7 +747,6 @@ PATCHES.BASIC.WRAPS = {
   _getMeasurementDestination,
 
   // Wraps related to segments
-  _computeDistance,
   _getCostFunction,
   _getSegmentLabel,
 
@@ -729,7 +758,7 @@ PATCHES.BASIC.WRAPS = {
 
 PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments, _broadcastMeasurement };
 
-PATCHES.BASIC.OVERRIDES = { _animateSegment, _addWaypoint };
+PATCHES.BASIC.OVERRIDES = { _animateSegment, _addWaypoint, _computeDistance };
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 
@@ -753,6 +782,3 @@ PATCHES.BASIC.STATIC_METHODS = {
   measureDistance: PhysicalDistance.measure.bind(PhysicalDistance),
   measureMoveDistance: MoveDistance.measure.bind(MoveDistance)
 };
-
-
-

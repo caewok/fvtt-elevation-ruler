@@ -613,6 +613,7 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
 
   /**
    * Change this point to a specific offset value.
+   * Faster than setting each {i, j, k} separately.
    * @param {GridOffset} offset
    */
   setOffset(offset) {
@@ -620,6 +621,18 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
     this.x = x;
     this.y = y;
     this.elevation = this.constructor.elevationForUnit(offset.k || 0);
+    return this;
+  }
+
+  /**
+   * Change this point to a specific offset value in the 2d axes. Do not modify elevation.
+   * Faster than setting each {i, j} separately.
+   * @param {GridOffset} offset
+   */
+  setOffset2d(offset) {
+    const { x, y } = canvas.grid.getCenterPoint(offset);
+    this.x = x;
+    this.y = y;
     return this;
   }
 

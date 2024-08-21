@@ -81,9 +81,8 @@ function directPath3dSquare(start, end, path2d) {
   prevOffset.i = path2d[0].i;
   prevOffset.j = path2d[0].j;
 
-  // currOffset will be modified in the loop but needs to have the starting elevation.
-  const currOffset = new GridCoordinates3d();
-  currOffset.k = prevOffset.k;
+  // currOffset will be modified in the loop; set to end to get elevation steps now.
+  const currOffset = GridCoordinates3d.fromObject(end);
 
   // Do 1 elevation move for each 2d diagonal move. Spread out over the diagonal steps.
   let num2dDiagonal = 0;
@@ -108,10 +107,10 @@ function directPath3dSquare(start, end, path2d) {
   let additionalElevationStepsRemaining = Math.max(0, elevationStepsRemaining - diagonalElevationStepsRemaining - diagonalElevationStepsRemaining);
   const doAdditionalElevationStepMod = Math.ceil(num2dMoves / (additionalElevationStepsRemaining + 1));
 
+  currOffset.k = prevOffset.k; // Begin with the starting elevation, incrementing periodically in the loop.
   const path3d = [prevOffset.clone()];
   for ( let i = 1, stepsRemaining = num2dMoves, n = num2dMoves + 1; i < n; i += 1, stepsRemaining -= 1 ) {
-    currOffset.i = path2d[i].i;
-    currOffset.j = path2d[i].j;
+    currOffset.setOffset2d(path2d[i]);
 
     const is2dDiagonal = (currOffset.i !== prevOffset.i) && (currOffset.j !== prevOffset.j);
     const doDoubleDiagonalElevationStep = is2dDiagonal && doubleDiagonalElevationStepsRemaining > 0 && ((doubleDiagonalElevationStep + 1) % doDoubleDiagonalElevationStepMod) === 0;
@@ -230,16 +229,15 @@ function directPath3dHex(start, end, path2d) {
   startOffset.i = path2d[0].i;
   startOffset.j = path2d[0].j;
 
-  // currOffset will be modified in the loop but needs to have the starting elevation.
-  const currOffset = new GridCoordinates3d();
-  currOffset.k = startOffset.k;
+  // currOffset will be modified in the loop; set to end to get elevation steps now.
+  const currOffset = GridCoordinates3d.fromObject(end);
 
   const path3d = [startOffset.clone()];
   let elevationStepsRemaining = Math.abs(startOffset.k - currOffset.k);
   const doElevationStepMod = Math.ceil((num2dMoves) / (elevationStepsRemaining + 1));
+  currOffset.k = startOffset.k; // Begin with the starting elevation, incrementing periodically in the loop.
   for ( let i = 1, stepsRemaining = num2dMoves, n = num2dMoves + 1; i < n; i += 1, stepsRemaining -= 1 ) {
-    currOffset.i = path2d[i].i;
-    currOffset.j = path2d[i].j;
+    currOffset.setOffset2d(path2d[i]);
 
     const doElevationStep = ((i + 1) % doElevationStepMod) === 0;
     let elevationSteps = doElevationStep && (elevationStepsRemaining > 0) ? Math.ceil(elevationStepsRemaining / stepsRemaining) : 0;
@@ -332,6 +330,7 @@ function initializeResultObject(obj) {
   obj.spaces ??= 0;
   obj.cost ??= 0;
   obj.diagonals ??= 0;
+  obj.offsetDistance ??= 0;
 }
 
 /**
@@ -375,34 +374,40 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
     const path3d = canvas.grid.getDirectPath([start, end]);
     const segment = result.segments[i - 1];
     segment.spaces = path3d.length - 1;
-    let prevOffset = path3d[0];
+    let prevPathPt = path3d[0]; // Path points are GridCoordinates3d.
     const prevDiagonals = offsetDistanceFn.diagonals;
     for ( let j = 1, n = path3d.length; j < n; j += 1 ) {
-      const currOffset = path3d[j];
-      const dist = GridCoordinates3d.distanceBetween(prevOffset, currOffset, altGridDistanceFn);
-      const offsetDistance = offsetDistanceFn(prevOffset, currOffset);
+      const currPathPt = path3d[j];
+      const dist = GridCoordinates3d.gridDistanceBetween(prevPathPt, currPathPt, altGridDistanceFn);
+      const offsetDistance = offsetDistanceFn(prevPathPt, currPathPt);
 
       // debug
-      const offsetDistanceAlt = GridCoordinates3d.gridDistanceBetweenOffsets(prevOffset, currOffset, altGridDistanceOffsetFn);
-      if ( !offsetDistance.almostEqual(offsetDistanceAlt) ) console.log(`${_measurePath}|${offsetDistance} vs ${offsetDistanceAlt}`);
+      const offsetDistanceAlt = GridCoordinates3d.gridDistanceBetweenOffsets(prevPathPt, currPathPt, altGridDistanceOffsetFn);
+      if ( !offsetDistance.almostEqual(offsetDistanceAlt) ) console.warn(`_measurePath|offset vs alt: ${offsetDistance},  ${offsetDistanceAlt}`, prevPathPt, currPathPt);
+      if ( dist !== offsetDistance && dist.almostEqual(offsetDistance) ) console.warn(`_measurePath| distance vs offset: ${dist}, ${offsetDistance}`, prevPathPt, currPathPt);
 
       segment.distance += (dist.almostEqual(offsetDistance) ? offsetDistance : dist);
-      segment.cost += cost(prevOffset, currOffset, offsetDistance);
-      prevOffset = currOffset;
+      segment.offsetDistance += offsetDistance;
+      segment.cost += cost(prevPathPt, currPathPt, offsetDistance);
+      prevPathPt = currPathPt;
     }
-    segment.distance = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.distance);
     segment.diagonals = offsetDistanceFn.diagonals - prevDiagonals;
+
+    // Accumulate the waypoint totals
     const resultStartWaypoint = result.waypoints[i - 1];
     const resultEndWaypoint = result.waypoints[i];
     resultEndWaypoint.distance = resultStartWaypoint.distance + segment.distance;
     resultEndWaypoint.cost = resultStartWaypoint.cost + segment.cost;
     resultEndWaypoint.spaces = resultStartWaypoint.spaces + segment.spaces;
     resultEndWaypoint.diagonals = resultStartWaypoint.diagonals + segment.diagonals;
+    resultEndWaypoint.offsetDistance = resultStartWaypoint.offsetDistance + segment.offsetDistance;
 
-    result.distance += resultEndWaypoint.distance
-    result.cost += resultEndWaypoint.cost
-    result.spaces += resultEndWaypoint.spaces
-    result.diagonals += resultEndWaypoint.diagonals
+    // Accumulate the result totals
+    result.distance += resultEndWaypoint.distance;
+    result.cost += resultEndWaypoint.cost;
+    result.spaces += resultEndWaypoint.spaces;
+    result.diagonals += resultEndWaypoint.diagonals;
+    result.offsetDistance += resultEndWaypoint.offsetDistance;
 
     // Iterate to next segment.
     start = end;

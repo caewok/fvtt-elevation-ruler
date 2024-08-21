@@ -183,8 +183,8 @@ export class MovePenalty {
       });
       console.groupEnd(`${MODULE_ID}|movementPenaltyForSegment`);
     }
-    this.#penaltyCache.set(key, avgMultiplier);
-    return avgMultiplier;
+    this.#penaltyCache.set(key, 1 / avgMultiplier);
+    return 1 / avgMultiplier;
   }
 
   // ----- NOTE: Secondary methods ----- //

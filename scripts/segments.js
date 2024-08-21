@@ -1,7 +1,6 @@
 /* globals
 canvas,
-CONFIG,
-game
+CONFIG
 */
 "use strict";
 
@@ -13,46 +12,6 @@ import { log  } from "./util.js";
 import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
 import { MoveDistance } from "./measurement/MoveDistance.js";
-
-/**
- * Calculate the distance of each segment.
- * Segments are considered a group, so that alternating diagonals gives the same result
- * with or without the segment breaks.
- */
-export function _computeSegmentDistances() {
-  const token = this.token;
-
-  // Loop over each segment in turn, adding the physical distance and the move distance.
-  let totalDistance = 0;
-  let totalMoveDistance = 0;
-  let totalDiagonals = 0;
-  let numPrevDiagonal = game.combat?.started ? (this.token?._combatMoveData?.numDiagonal ?? 0) : 0;
-
-  if ( this.segments.length ) {
-    this.segments[0].first = true;
-    this.segments.at(-1).last = true;
-  }
-
-  // Construct a move penalty instance that covers all the segments.
-  let movePenaltyInstance;
-  if ( token ) {
-    movePenaltyInstance = this._movePenaltyInstance ??= new MovePenalty(token);
-    const path = this.segments.map(s => s.ray.A);
-    path.push(this.segments.at(-1).ray.B);
-    movePenaltyInstance.restrictToPath(path);
-  }
-
-  for ( const segment of this.segments ) {
-    numPrevDiagonal = measureSegment(segment, token, movePenaltyInstance, numPrevDiagonal);
-    totalDistance += segment.distance;
-    totalMoveDistance += segment.moveDistance;
-    totalDiagonals = numPrevDiagonal; // Already summed in measureSegment.
-  }
-
-  this.totalDistance = totalDistance;
-  this.totalMoveDistance = totalMoveDistance;
-  this.totalDiagonals = totalDiagonals;
-}
 
 /**
  * Measure a given segment, updating its distance labels accordingly.
@@ -152,9 +111,9 @@ export function constructPathfindingSegments(segments, segmentMap) {
     for ( let i = 1; i < nPoints; i += 1 ) {
       const currPt = pathPoints[i];
       currPt.z ??= A.z;
-      const newSegment = { ray: new Ray3d(prevPt, currPt) };
+      const newSegment = { ray: new Ray3d(prevPt, currPt), waypoint: {} };
       newSegment.ray.pathfinding = true; // TODO: Was used by  canvas.grid.grid._getRulerDestination.
-      newSegment.waypointIdx = segment.waypointIdx;
+      newSegment.waypoint.idx = segment.waypoint.idx;
       newSegments.push(newSegment);
       prevPt = currPt;
     }
@@ -183,7 +142,7 @@ export function elevateSegments(ruler, segments) {  // Add destination as the fi
   for ( let i = 0, n = segments.length; i < n; i += 1 ) {
     const segment = segments[i];
     // segment.first = i === 0;
-    segment.waypointIdx = Math.max(i - nHistory, -1);
+    segment.waypoint = { idx: Math.max(i - nHistory, -1) };
   }
 
   // Add destination as the final waypoint
@@ -198,9 +157,9 @@ export function elevateSegments(ruler, segments) {  // Add destination as the fi
 
   // Add the waypoint elevations to the corresponding segment endpoints.
   for ( const segment of segments ) {
-    if ( !~segment.waypointIdx ) continue;
-    const startWaypoint = waypoints[segment.waypointIdx];
-    const endWaypoint = waypoints[segment.waypointIdx + 1];
+    if ( !~segment.waypoint.idx ) continue;
+    const startWaypoint = waypoints[segment.waypoint.idx];
+    const endWaypoint = waypoints[segment.waypoint.idx + 1];
     if ( !startWaypoint || !endWaypoint ) continue; // Should not happen.
 
     // Convert to 3d Rays
