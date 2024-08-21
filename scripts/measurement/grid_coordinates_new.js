@@ -157,6 +157,33 @@ export class GridCoordinates extends PIXI.Point {
    * Return a function that can repeatedly measure segments, tracking the alternating diagonals.
    */
   static alternatingGridDistanceFn = alternatingGridDistance;
+
+  /**
+   * Measure distance, offset, and cost for a given 2d segment a|b.
+   * Uses `gridDistanceBetween`.
+   * @param {Point} a                   Start of the segment
+   * @param {Point} b                   End of the segment
+   * @param {number} [numPrevDiagonal=0]   Number of diagonals thus far
+   * @param {function} [costFn]           Optional cost function; defaults to canvas.controls.ruler._getCostFunction
+   * @returns {object}
+   *   - @prop {number} distance          gridDistanceBetween for a|b
+   *   - @prop {number} offsetDistance    gridDistanceBetweenOffsets for a|b
+   *   - @prop {number} cost              Measured cost using the cost function
+   *   - @prop {number} numDiagonal       Number of diagonals between the offsets if square or hex elevation
+   */
+  static gridMeasurementForSegment(a, b, numPrevDiagonal = 0, costFn) {
+    costFn ??= canvas.controls.ruler._getCostFunction();
+    const lPrevStart = canvas.grid.diagonals === CONST.GRID_DIAGONALS.ALTERNATING_2 ? 1 : 0;
+    const lPrev = isOdd(numPrevDiagonal) ? lPrevStart : Number(!lPrevStart);
+    const aOffset = this.fromObject(a);
+    const bOffset = this.fromObject(b);
+    const distance = this.gridDistanceBetween(a, b, this.alternatingGridDistanceFn({ lPrev }));
+    const offsetDistance = this.gridDistanceBetweenOffsets(a, b, this.alternatingGridDistanceFn({ lPrev }));
+    const cost = costFn ? costFn(a, b, offsetDistance) : offsetDistance;
+    const numDiagonal = this.numDiagonal(aOffset, bOffset);
+    return { distance, offsetDistance, cost, numDiagonal };
+  }
+
 }
 
 /**
