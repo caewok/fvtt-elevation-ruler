@@ -42,7 +42,7 @@ import {
 import { tokenSpeedSegmentSplitter } from "./token_speed.js";
 import { log } from "./util.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
-
+import { GridCoordinates3d } from "./measurement/grid_coordinates.js";
 
 /**
  * Modified Ruler
@@ -457,10 +457,12 @@ function _getCostFunction() {
 
   // Construct a move penalty instance that covers all the segments.
   const movePenaltyInstance = this._movePenaltyInstance ??= new MovePenalty(this.token);
-  const path = this.segments.map(s => s.ray.A);
-  path.push(this.segments.at(-1).ray.B);
+  const path = this.segments.map(s => GridCoordinates3d.fromObject(s.ray.A));
+  path.push(GridCoordinates3d.fromObject(this.segments.at(-1).ray.B));
   movePenaltyInstance.restrictToPath(path);
   return (prevOffset, currOffset, offsetDistance) => {
+    if ( !(prevOffset instanceof GridCoordinates3d) ) prevOffset = GridCoordinates3d.fromOffset(prevOffset);
+    if ( !(currOffset instanceof GridCoordinates3d) ) currOffset = GridCoordinates3d.fromOffset(currOffset);
     const penalty = movePenaltyInstance.movementPenaltyForSegment(prevOffset, currOffset);
     return offsetDistance * penalty;
   }

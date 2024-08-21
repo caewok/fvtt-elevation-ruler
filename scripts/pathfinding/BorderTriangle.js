@@ -12,7 +12,7 @@ Wall
 import { MODULE_ID } from "../const.js";
 import { Draw } from "../geometry/Draw.js";
 import { WallTracerEdge } from "./WallTracer.js";
-import { GridCoordinates3d } from "../measurement/grid_coordinates_new.js";
+import { GridCoordinates3d } from "../measurement/grid_coordinates.js";
 
 const OTHER_DIRECTION = {
   ccw: "cw",

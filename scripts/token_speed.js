@@ -10,9 +10,9 @@ import { SPEED } from "./const.js";
 import { Settings } from "./settings.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
-import { gridShape, canvasElevationFromCoordinates } from "./measurement/grid_coordinates.js";
+import { gridShape } from "./util.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
-import { GridCoordinates3d } from "./measurement/grid_coordinates_new.js";
+import { GridCoordinates3d } from "./measurement/grid_coordinates.js";
 
 // Functions used to determine token speed colors.
 
@@ -134,9 +134,17 @@ function locateSegmentBreakpoint(segment, splitMoveDistance, { gridless, numPrev
   if ( !gridless ) {
     // We can get the end grid.
     // Use halfway between the intersection points for this grid shape.
-    breakpoint = Point3d.fromObject(segmentGridHalfIntersection(breakpoint, A, B) ?? A);
+    breakpoint = GridCoordinates3d.fromObject(segmentGridHalfIntersection(breakpoint, A, B) ?? A);
     if ( breakpoint.equals(A) ) breakpoint.z = A.z;
-    else breakpoint.z = canvasElevationFromCoordinates(breakpoint);
+    else if ( breakpoint.equals(B) ) breakpoint.z = B.z;
+    else {
+      // Reset elevation to the proportional unit elevation between A.z and B.z if found.
+      const t = Point3d.distanceBetween(A, breakpoint) / Point3d.distanceBetween(A, B);
+      breakpoint.z = A.z + ((B.z - A.z) * t);
+      const elevation = GridCoordinates3d.elevationForUnit(breakpoint.k);
+      const z = CONFIG.GeometryLib.utils.gridUnitsToPixels(elevation);
+      if ( z.between(A.z, B.z) ) breakpoint.z = z;
+    }
   }
   return breakpoint;
 }

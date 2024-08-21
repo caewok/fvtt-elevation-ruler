@@ -6,7 +6,7 @@ CONST
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { GridCoordinates3d, RegionMovementWaypoint3d } from "./grid_coordinates_new.js";
+import { GridCoordinates3d, RegionMovementWaypoint3d } from "./grid_coordinates.js";
 import { Point3d } from "../geometry/3d/Point3d.js";
 import { MODULE_ID } from "../const.js";
 

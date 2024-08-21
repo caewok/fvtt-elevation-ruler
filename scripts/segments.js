@@ -94,8 +94,7 @@ export function constructPathfindingSegments(segments, segmentMap) {
     for ( let i = 1; i < nPoints; i += 1 ) {
       const currPt = pathPoints[i];
       currPt.z ??= A.z;
-      const newSegment = { ray: new Ray3d(prevPt, currPt), waypoint: {} };
-      newSegment.ray.pathfinding = true; // TODO: Was used by  canvas.grid.grid._getRulerDestination.
+      const newSegment = { ray: new Ray3d(prevPt, currPt), waypoint: {}, history: segment.history, teleport: segment.teleport };
       newSegment.waypoint.idx = segment.waypoint.idx;
       newSegments.push(newSegment);
       prevPt = currPt;
@@ -105,9 +104,12 @@ export function constructPathfindingSegments(segments, segmentMap) {
     if ( lastPathSegment ) {
       lastPathSegment.ray.B.z = B.z;
       lastPathSegment.label = segment.label;
-      lastPathSegment.ray.pathfinding = false;
     }
   }
+  const firstSegment = newSegments.at(0);
+  const lastSegment = newSegments.at(-1);
+  if ( firstSegment ) firstSegment.first = true;
+  if ( lastSegment ) lastSegment.last = true;
   return newSegments;
 }
 

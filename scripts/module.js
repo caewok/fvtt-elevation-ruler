@@ -12,13 +12,12 @@ ui
 import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID, MOVEMENT_TYPES, MOVEMENT_BUTTONS, SPEED, TEMPLATES } from "./const.js";
-import { log } from "./util.js";
+import { log, gridShape } from "./util.js";
 import { defaultHPAttribute } from "./system_attributes.js";
 import { registerGeometry } from "./geometry/registration.js";
 
 // Grid coordinates
-import { pointFromGridCoordinates, getCenterPoint3d, getGridPosition3d, gridShape } from "./measurement/grid_coordinates.js";
-import { GridCoordinates, RegionMovementWaypoint3d, GridCoordinates3d } from "./measurement/grid_coordinates_new.js";
+import { GridCoordinates, RegionMovementWaypoint3d, GridCoordinates3d } from "./measurement/grid_coordinates.js";
 import { testMeasurePath } from "./measurement/Grid.js";
 
 // Move Penalty
@@ -119,12 +118,6 @@ Hooks.once("init", function() {
   game.modules.get(MODULE_ID).api = {
     gridShape,
     PATCHER,
-
-    coordinates: {
-      pointFromGridCoordinates,
-      getCenterPoint3d,
-      getGridPosition3d
-    },
 
     measure: {
       GridCoordinates,
