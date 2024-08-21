@@ -18,6 +18,20 @@ export function log(...args) {
 }
 
 /**
+ * Is this number even?
+ * @param {number} n
+ * @returns {boolean}
+ */
+export function isEven(n) { return  ~n & 1; }
+
+/**
+ * Is this number odd?
+ * @param {number} n
+ * @returns {boolean}
+ */
+export function isOdd(n) { return n & 1; }
+
+/**
  * Get the snapped grid position for the upper left corner of a token of any size.
  * So a 2x2 token would return the upper left corner of that token, snapped to a grid corner.
  * @param {Point} point   Point for which you want the upper left corner

@@ -110,6 +110,20 @@ export class GridCoordinates extends PIXI.Point {
   to3d() { return GridCoordinates3d.fromObject(this); }
 
   /**
+   * Determine the number of diagonals based on two 2d offsets for a square grid.
+   * If hexagonal, no diagonals.
+   * @param {GridOffset} aOffset
+   * @param {GridOffset} bOffset
+   * @returns {number}
+   */
+  static numDiagonal(aOffset, bOffset) {
+    if ( canvas.grid.isHexagonal ) return 0;
+    let di = Math.abs(aOffset.i - bOffset.i);
+    let dj = Math.abs(aOffset.j - bOffset.j);
+    return Math.min(di, dj);
+  }
+
+  /**
    * Measure the distance between two points accounting for the current grid rules.
    * For square, this accounts for the diagonal rules. For hex, measures in number of hexes.
    * @param {Point} a
@@ -216,7 +230,7 @@ function exactGridDistance(maxAxis = 0, midAxis = 0, minAxis = 0) {
  *   - @returns {number} The distance in number of squares or hexes
  */
 function alternatingGridDistance(opts = {}) {
-  let lPrev = opts.lPrev ?? canvas.grid.diagonals === CONST.GRID_DIAGONALS.ALTERNATING_1 ? 0 : 1;
+  let lPrev = opts.lPrev ?? canvas.grid.diagonals === CONST.GRID_DIAGONALS.ALTERNATING_2 ? 1 : 0;
   let prevMaxAxis = opts.prevMaxAxis ?? lPrev;
   let prevMidAxis = opts.prevMidAxis ?? lPrev;
   let prevMinAxis = opts.prevMinAxis ?? lPrev;
@@ -276,8 +290,6 @@ function squareGridDistanceBetween(p0, p1, altGridDistFn) {
 
   // Make dx the maximum, dy, the middle, and dz the minimum change across the axes.
   // If two-dimensional, dz will be zero. (Slightly faster than an array sort.)
-
-
   const minMax = Math.minMax(dx, dy, dz);
   const maxAxis = minMax.max;
   const minAxis = minMax.min;
@@ -651,6 +663,23 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
    * @returns {this}
    */
   to3d() { return this; }
+
+  /**
+   * Determine the number of diagonals based on two offsets.
+   * If hexagonal, only elevation diagonals count.
+   * @param {GridOffset} aOffset
+   * @param {GridOffset} bOffset
+   * @returns {number}
+   */
+  static numDiagonal(aOffset, bOffset) {
+    if ( canvas.grid.isHexagonal ) return Math.abs(aOffset.k - bOffset.k);
+    let di = Math.abs(aOffset.i - bOffset.i);
+    let dj = Math.abs(aOffset.j - bOffset.j);
+    let dk = Math.abs(aOffset.k - bOffset.k);
+    const midAxis = di.between(dj, dk) ? di
+      : dj.between(di, dk) ? dj : dk;
+    return midAxis;
+  }
 
   /**
    * Calculate the unit elevation for a given set of coordinates.

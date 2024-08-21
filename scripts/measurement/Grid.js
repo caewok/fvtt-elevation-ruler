@@ -368,6 +368,7 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
   }
   const altGridDistanceFn = GridCoordinates3d.alternatingGridDistanceFn();
   const altGridDistanceOffsetFn = GridCoordinates3d.alternatingGridDistanceFn();
+  const altGridDistanceOffsetFn2 = GridCoordinates3d.alternatingGridDistanceFn();
 
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
     const end = waypoints[i];
@@ -381,10 +382,14 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
       const dist = GridCoordinates3d.gridDistanceBetween(prevPathPt, currPathPt, altGridDistanceFn);
       const offsetDistance = offsetDistanceFn(prevPathPt, currPathPt);
 
-      // debug
-      const offsetDistanceAlt = GridCoordinates3d.gridDistanceBetweenOffsets(prevPathPt, currPathPt, altGridDistanceOffsetFn);
-      if ( !offsetDistance.almostEqual(offsetDistanceAlt) ) console.warn(`_measurePath|offset vs alt: ${offsetDistance},  ${offsetDistanceAlt}`, prevPathPt, currPathPt);
-      if ( dist !== offsetDistance && dist.almostEqual(offsetDistance) ) console.warn(`_measurePath| distance vs offset: ${dist}, ${offsetDistance}`, prevPathPt, currPathPt);
+      // Debug:
+      // Can we use gridDistanceBetweenOffsets instead of the offsetDistanceFn?
+      // Can we assume dist will already be rounded to the nearest offsetDistance if very close?
+      if ( CONFIG[MODULE_ID].debug ) {
+        const offsetDistanceAlt = GridCoordinates3d.gridDistanceBetweenOffsets(prevPathPt, currPathPt, altGridDistanceOffsetFn2);
+        if ( !offsetDistance.almostEqual(offsetDistanceAlt) ) console.warn(`_measurePath|offset vs alt: ${offsetDistance},  ${offsetDistanceAlt}`, prevPathPt, currPathPt);
+        if ( dist !== offsetDistance && dist.almostEqual(offsetDistance) ) console.warn(`_measurePath| distance vs offset: ${dist}, ${offsetDistance}`, prevPathPt, currPathPt);
+      }
 
       segment.distance += (dist.almostEqual(offsetDistance) ? offsetDistance : dist);
       segment.offsetDistance += offsetDistance;

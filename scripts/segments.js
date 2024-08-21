@@ -1,6 +1,7 @@
 /* globals
 canvas,
-CONFIG
+CONFIG,
+CONST
 */
 "use strict";
 
@@ -8,10 +9,10 @@ import { MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { Point3d } from "./geometry/3d/Point3d.js";
-import { log  } from "./util.js";
+import { log, isOdd } from "./util.js";
 import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
-import { MoveDistance } from "./measurement/MoveDistance.js";
+import { GridCoordinates3d } from "./measurement/grid_coordinates_new.js";
 
 /**
  * Measure a given segment, updating its distance labels accordingly.
@@ -21,12 +22,20 @@ import { MoveDistance } from "./measurement/MoveDistance.js";
  * @param {number} [numPrevDiagonal=0]    Number of previous diagonals for the segment
  * @returns {number} numPrevDiagonal
  */
-export function measureSegment(segment, token, movePenaltyInstance, numPrevDiagonal = 0) {
-  const res = MoveDistance.measure(segment.ray.A, segment.ray.B, { token, useAllElevation: segment.last, numPrevDiagonal, movePenaltyInstance });
-  segment.distance = res.distance;
-  segment.moveDistance = res.moveDistance;
-  segment.numDiagonal = res.numDiagonal;
-  return numPrevDiagonal + res.numPrevDiagonal;
+export function measureSegment(segment, numPrevDiagonal = 0) {
+  const lPrevStart = canvas.grid.diagonals === CONST.GRID_DIAGONALS.ALTERNATING_2 ? 1 : 0;
+  const lPrev = isOdd(numPrevDiagonal) ? lPrevStart : Number(!lPrevStart);
+  const cost = canvas.controls.ruler._getCostFunction();
+  const a = segment.ray.A;
+  const b = segment.ray.B;
+  const aOffset = GridCoordinates3d.fromObject(a);
+  const bOffset = GridCoordinates3d.fromObject(b);
+
+  segment.distance = GridCoordinates3d.gridDistanceBetween(a, b, GridCoordinates3d.alternatingGridDistanceFn({ lPrev }));
+  segment.offsetDistance = GridCoordinates3d.gridDistanceBetweenOffsets(a, b, GridCoordinates3d.alternatingGridDistanceFn({ lPrev }));
+  segment.cost = cost ? cost(GridCoordinates3d.fromObject(a), GridCoordinates3d.fromObject(b), segment.offsetDistance) : segment.offsetDistance;
+  segment.numDiagonal = GridCoordinates3d.numDiagonal(aOffset, bOffset);
+  return numPrevDiagonal + segment.numDiagonal;
 }
 
 /**
