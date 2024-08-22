@@ -226,6 +226,7 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
   @ 10 ft             (2) <-- elevation at that point
   */
   const labelIcons = CONFIG[MODULE_ID].labeling.icons;
+  const childLabels = {};
 
   // (1) Total Distance
   let totalDistLabel = `${distanceLabel(ruler.totalDistance)}`;
@@ -236,94 +237,94 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
   origLabel = origLabel.replace(getDefaultLabel(segment), "");
 
   // (3) Waypoint
-  let waypointLabel = segment.waypoint.idx > 0 ? `${labelIcons.waypoint} ${distanceLabel(segment.waypoint.distance)}` : "";
+  if ( segment.last && segment.waypoint.idx > 0 ) childLabels.waypoint = {
+    icon: `${labelIcons.waypoint}`,
+    value: segment.waypoint.distance,
+    descriptor: game.i18n.localize(`${MODULE_ID}.waypoint`)
+  };
+
 
   // (4) Elevation
-  let elevLabel = "";
   const displayElevation = !Settings.get(Settings.KEYS.LABELING.HIDE_ELEVATION)
     && !(segment.last && ruler.isTokenRuler);
   if ( displayElevation ) {
     const { elevation, elevationDelta, elevationChanged } = elevationForRulerLabel(ruler, segment);
     if ( elevationChanged || (!ruler.token && elevation) ) {
-      if ( segment.last && elevationDelta ) {
-        const icon = elevationDelta > 0 ? labelIcons.elevationUp : labelIcons.elevationDown;
-        const descriptor = game.i18n.localize(elevationDelta > 0 ? `${MODULE_ID}.up` : `${MODULE_ID}.down`);
-        elevLabel = `${icon}${distanceLabel(elevationDelta)} ${descriptor}`;
-      } else elevLabel = `${labelIcons.elevationAt}${distanceLabel(elevation)}`;
+      if ( segment.last && elevationDelta ) childLabels.elevation = {
+        icon: elevationDelta > 0 ? labelIcons.elevationUp : labelIcons.elevationDown,
+        value: Math.abs(elevationDelta),
+        descriptor: game.i18n.localize(elevationDelta > 0 ? `${MODULE_ID}.up` : `${MODULE_ID}.down`)};
+      else childLabels.elevation = {
+        icon: `${labelIcons.elevationAt}`,
+        value: elevation
+      };
     }
   }
 
   // (5) Terrain
-  let terrainLabel = "";
-  if ( !segment.waypoint.cost.almostEqual(segment.waypoint.offsetDistance) ) {
-    terrainLabel = `${CONFIG[MODULE_ID].SPEED.terrainSymbol}${distanceLabel(segment.waypoint.cost - segment.waypoint.offsetDistance)}`;
-  }
+  if ( segment.last && !segment.waypoint.cost.almostEqual(segment.waypoint.offsetDistance) ) childLabels.terrain = {
+    icon: `${CONFIG[MODULE_ID].SPEED.terrainSymbol}`,
+    value: segment.waypoint.cost - segment.waypoint.offsetDistance,
+    descriptor: game.i18n.localize(`${MODULE_ID}.added`)
+  };
 
   // (6) Combat prior move
-  let priorMoveLabel = "";
-  if ( ruler.token && !Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL) ) {
+  if ( segment.last && ruler.token && !Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL) ) {
     const priorDist = getPriorDistance(ruler.token);
-    if ( priorDist ) priorMoveLabel = `${labelIcons.priorMovement}${distanceLabel(priorDist)}`;
+    if ( priorDist ) childLabels.priorMove = {
+      icon: `${labelIcons.priorMovement}`,
+      value: priorDist,
+      descriptor: game.i18n.localize(`${MODULE_ID}.prior`)
+    };
   }
 
-  // Add in units
+  // Set spacing based on the largest value string.
+  // Add spacing accordingly
+  let maxValueChars = 0;
+  Object.values(childLabels).forEach(obj => {
+    obj.valueStr = `${distanceLabel(obj.value)}`;
+    maxValueChars = Math.max(maxValueChars, obj.valueStr.length);
+  });
+
+  // Build the string for each.
+  // icon value unit description
   const units = canvas.grid.units;
-  if ( units ) {
-    totalDistLabel += ` ${units}`;
-    if ( waypointLabel !== "" ) waypointLabel += ` ${units}`;
-    if ( elevLabel !== "" ) elevLabel += ` ${units}`;
-    if ( terrainLabel !== "" ) terrainLabel += ` ${units}`;
-    if ( priorMoveLabel !== "" ) priorMoveLabel += ` ${units}`;
-  }
-
-  // Add phrase describing the label. (Elevation handled above.)
-  if ( waypointLabel !== "" ) {
-    const descriptor = game.i18n.localize(`${MODULE_ID}.waypoint`);
-    waypointLabel += ` ${descriptor}`;
-  }
-  if ( terrainLabel !== "" ) {
-    const descriptor = game.i18n.localize(`${MODULE_ID}.added`);
-    terrainLabel += ` ${descriptor}`;
-  }
-  if ( priorMoveLabel !== "" ) {
-    const descriptor = game.i18n.localize(`${MODULE_ID}.prior`);
-    priorMoveLabel += ` ${descriptor}`;
-  }
+  Object.values(childLabels).forEach(obj => {
+    if ( obj.valueStr.length < maxValueChars ) obj.valueStr.padStart(maxValueChars - obj.valueStr.length, " ");
+    obj.label = `${obj.icon} ${obj.valueStr}`;
+    if ( units ) obj.label += ` ${units}`;
+    if ( obj.descriptor ) obj.label += ` ${obj.descriptor}`;
+  });
+  if ( units ) totalDistLabel += ` ${units}`;
 
   // Construct a label style for each.
-  let height = segment.label.height;
+  const childTextContainers = [];
   if ( origLabel !== "" ) {
-    const textLabel = constructSecondaryLabel(segment, origLabel, "other", height);
-    height += textLabel.height;
+    const textLabel = constructSecondaryLabel(segment, origLabel, "other");
+    alignChildTextLeft(segment.label, textLabel, childTextContainers);
+    childTextContainers.push(textLabel);
+  } else {
+    const textLabel = segment.label.getChildByName("other");
+    if ( textLabel ) textLabel.visible = false;
   }
 
-  if ( segment.last && waypointLabel !== "" ) {
-    const textLabel = constructSecondaryLabel(segment, waypointLabel, "waypoint", height);
-    height += textLabel.height;
+  for ( const name of ["waypoint", "elevation", "terrain", "priorMove"] ) {
+    const obj = childLabels[name];
+    if ( obj ) {
+      const textLabel = constructSecondaryLabel(segment, obj.label, name);
+      alignChildTextLeft(segment.label, textLabel, childTextContainers);
+      childTextContainers.push(textLabel);
+    } else {
+      const textLabel = segment.label.getChildByName(name);
+      if ( textLabel ) textLabel.visible = false;
+    }
   }
-
-  if ( elevLabel !== "" ) {
-    const textLabel = constructSecondaryLabel(segment, elevLabel, "elevation", height);
-    height += textLabel.height;
-  }
-
-  if ( segment.last && terrainLabel !== "" ) {
-    const textLabel = constructSecondaryLabel(segment, terrainLabel, "terrain", height);
-    height += textLabel.height;
-  }
-
-  if ( segment.last && priorMoveLabel !== "" ) {
-    const textLabel = constructSecondaryLabel(segment, priorMoveLabel, "priorMove", height);
-    height += textLabel.height;
-  }
-
   return totalDistLabel;
 }
 
-function constructSecondaryLabel(segment, text, name, height = 0) {
+function constructSecondaryLabel(segment, text, name) {
   const labelStyles = CONFIG[MODULE_ID].labeling.styles;
   const textScale = CONFIG[MODULE_ID].labeling.secondaryTextScale;
-  const anchor = CONFIG[MODULE_ID].labeling.secondaryTextAnchor;
 
   let textLabel = segment.label.getChildByName(name);
   if ( !textLabel ) {
@@ -333,10 +334,10 @@ function constructSecondaryLabel(segment, text, name, height = 0) {
     segment.label.addChild(textLabel);
     if ( !textLabel.style.fontFamily.includes("fontAwesome") ) textLabel.style.fontFamily += ",fontAwesome";
   }
+  textLabel.visible = true;
   textLabel.text = text;
   textLabel.style.fontSize = Math.round(segment.label.style.fontSize * textScale);
-  textLabel.anchor = anchor;
-  textLabel.position = { x: 0, y: height };
+  textLabel.anchor = { x: 0.5, y: 0.5 };
   return textLabel;
 }
 
@@ -352,4 +353,22 @@ function getDefaultLabel(segment) {
     label += "]";
   }
   return label;
+}
+
+
+function alignChildTextLeft(parent, child, priorChildren = []) {
+  parent.anchor = { x: 0.5, y: 0.5 };
+  child.anchor = { x: 0.5, y: 0.5 }
+
+  /* Align relative to center of parent and child.
+  -----•----- 11
+-------•-------  15 --> shift over by (15 / 11) / 2. Add half height for each.
+  */
+
+  const otherHeights = priorChildren.reduce((acc, curr) => {
+    if ( !curr.visible ) return acc;
+    return acc + curr.height;
+  }, 0);
+  child.position.x = (child.width - parent.width) * 0.5;
+  child.position.y = (parent.height * 0.5) + (child.height * 0.5) + otherHeights;
 }

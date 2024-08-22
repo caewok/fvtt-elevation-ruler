@@ -502,7 +502,7 @@ function _getSegmentLabel(wrapped, segment) {
   this.totalDistance = origTotalDistance;
 
   if ( Settings.get(Settings.KEYS.LABELING.SCALE_TEXT) ) {
-    segment.label.style.fontSize = CONFIG.canvasTextStyle.fontSize * canvas.dimensions.size / 100 * CONFIG[MODULE_ID].textScale;
+    segment.label.style.fontSize = Math.round(CONFIG.canvasTextStyle.fontSize * canvas.dimensions.size / 100 * CONFIG[MODULE_ID].labeling.textScale);
   }
 
   if ( !segment.label.style.fontFamily.includes("fontAwesome") ) segment.label.style.fontFamily += ",fontAwesome";

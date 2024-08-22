@@ -123,11 +123,11 @@ Hooks.once("init", function() {
 
       /** Font awesome icons or unicode */
       icons: {
-        elevationAt: "\ud83e", // <i class="fa-solid fa-at"></i>
-        elevationDown: "\ue4b8", // <i class="fa-solid fa-arrows-down-to-line"></i>
-        elevationUp: "\ue4c2", // <i class="fa-solid fa-arrows-up-to-line"></i>
-        waypoint: "\uf041", // <i class="fa-solid fa-location-pin"></i>
-        priorMovement: "\ue553" // <i class="fa-solid fa-person-walking-dashed-line-arrow-right"></i>
+        elevationAt: "@", // https://fontawesome.com/icons/at?f=classic&s=solid
+        elevationDown: "\uf0d7", // https://fontawesome.com/icons/caret-down?f=classic&s=solid
+        elevationUp: "\uf0d8", // https://fontawesome.com/icons/caret-up?f=classic&s=solid
+        waypoint: "\uf041", // https://fontawesome.com/icons/location-pin?f=classic&s=solid
+        priorMovement: "\ue553" // https://fontawesome.com/icons/person-walking-dashed-line-arrow-right?f=classic&s=solid
       },
 
       /** Enlarge or shrink all ruler text */
@@ -135,9 +135,6 @@ Hooks.once("init", function() {
 
       /** For custom ruler labels, how large to make the lines relative to the distance number */
       secondaryTextScale: 2/3,
-
-      /** Change the anchor point for secondary text */
-      secondaryTextAnchor: { x: 0.5, y: 1 }
     }
   };
 

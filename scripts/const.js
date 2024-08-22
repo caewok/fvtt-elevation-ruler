@@ -91,7 +91,7 @@ export const SPEED = {
    * If not using Font Awesome, paste in unicode, e.g. "🥾" or "\u0xF0"
    * @type {string}
    */
-  terrainSymbol: "\ue52f" // <i class="fa-solid fa-mountain-sun"></i>
+  terrainSymbol: "\ue52f" // https://fontawesome.com/icons/mountain-sun?f=classic&s=solid
 };
 
 /**
