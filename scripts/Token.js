@@ -1,7 +1,6 @@
 /* globals
 canvas,
 CanvasAnimation,
-CONFIG,
 foundry,
 game,
 Ruler
@@ -11,7 +10,7 @@ Ruler
 import { MODULE_ID, FLAGS } from "./const.js";
 import { Settings } from "./settings.js";
 import { log } from "./util.js";
-import { MoveDistance } from "./MoveDistance.js";
+import { GridCoordinates3d } from "./measurement/grid_coordinates.js";
 
 // Patches for the Token class
 export const PATCHES = {};
@@ -45,12 +44,12 @@ function preUpdateToken(document, changes, _options, _userId) {
   let combatMoveData = {};
   const ruler = canvas.controls.ruler;
   if ( ruler.active && ruler.token === token ) {
-    lastMoveDistance = ruler.totalMoveDistance;
+    lastMoveDistance = ruler.totalCost;
     numDiagonal = ruler.totalDiagonals;
   } else {
     const numPrevDiagonal = game.combat?.started ? (token._combatMoveData?.numDiagonal ?? 0) : 0;
-    const res = MoveDistance.measure(token.position, token.document._source, { token, numPrevDiagonal });
-    lastMoveDistance = res.moveDistance;
+    const res = GridCoordinates3d.gridMeasurementForSegment(token.position, token.document._source, numPrevDiagonal);
+    lastMoveDistance = res.cost;
     numDiagonal = res.numDiagonal;
   }
 
@@ -74,77 +73,6 @@ function preUpdateToken(document, changes, _options, _userId) {
   // Update the flag with the new data.
   foundry.utils.setProperty(changes, `flags.${MODULE_ID}.${FLAGS.MOVEMENT_HISTORY}`, flagData);
 }
-
-/**
- * Hook refreshToken.
- * Adjust terrain as the token moves; handle animation pauses.
- */
-// function refreshToken(token, flags) {
-//
-//
-//   if ( !token.isPreview ) {
-//     //log(`refreshToken|${token.name} not preview`);
-//     // console.groupEnd(`${MODULE_ID}|refreshToken`);
-//     return;
-//   }
-//   console.group(`${MODULE_ID}|refreshToken`);
-//   if ( flags.refreshElevation ) {
-//     log(`refreshToken|${token.name} changing elevation. Original: ${token._original?.elevationE} clone: ${token.elevationE} `);
-//     // console.groupEnd(`${MODULE_ID}|refreshToken`);
-//   }
-//
-//   if ( !( flags.refreshPosition || flags.refreshElevation || flags.refreshSize ) ) {
-//     log(`refreshToken|${token.name} preview not moving`);
-//     console.groupEnd(`${MODULE_ID}|refreshToken`);
-//     return;
-//   }
-//   const ruler = canvas.controls.ruler;
-//   if ( ruler.state !== Ruler.STATES.MEASURING ) {
-//     log(`refreshToken|${token.name} ruler not measuring`);
-//     console.groupEnd(`${MODULE_ID}|refreshToken`);
-//     return;
-//   }
-//   if ( !ruler._isTokenRuler ) {
-//     log(`refreshToken|${token.name} ruler not token ruler`);
-//     console.groupEnd(`${MODULE_ID}|refreshToken`);
-//     return;
-//   }
-//
-//
-//
-//   //const ruler = canvas.controls.ruler;
-//
-//
-//
-//
-// //   const isRulerClone = token.isPreview
-// //     && ( flags.refreshPosition || flags.refreshElevation || flags.refreshSize )
-// //     && ruler.state === Ruler.STATES.MEASURING
-// //     && ruler._isTokenRuler;
-// //   log(`refreshToken|${token.name} rulerClone: ${isRulerClone}`);
-// //   if ( !isRulerClone ) return;
-//
-//   // Token is clone in a ruler drag operation.
-//   const destination = ruler.segments.at(-1)?.ray.B;
-//   if ( !destination ) return;
-//   const destElevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(destination.z);
-//   log(`refreshToken|Preview token ${token.name} destination elevation is ${destElevation} at ${destination.x},${destination.y}`);
-//
-//   const elevationChanged = token.document.elevation !== destElevation;
-//   if ( elevationChanged ) {
-//     if ( isFinite(destElevation) ) {
-//       log(`refreshToken|Setting preview token ${token.name} elevation to ${destElevation} at ${destination.x},${destination.y}`);
-//       token.document.elevation = destElevation;
-//       token.renderFlags.set({ "refreshTooltip": true });
-//       console.groupEnd(`${MODULE_ID}|refreshToken`);
-//       return;
-//     } else {
-//       const origin = token._original.center;
-//       console.error(`${MODULE_ID}|refreshToken destination elevation is not finite. Moving from ${origin.x},${origin.y}, @${token._original.elevation} --> ${destination?.x},${destination?.y}.`)
-//     }
-//   }
-//   console.groupEnd(`${MODULE_ID}|refreshToken`);
-// }
 
 // ----- NOTE: Wraps ----- //
 

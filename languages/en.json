@@ -106,11 +106,25 @@
     "elevationruler.settings.automatic-movement-type.name": "Autodetect Movement Type",
     "elevationruler.settings.automatic-movement-type.hint": "Automatically detect the movement type based on token position. Set the token status effect to 'fly' or 'burrowing' to override.",
 
+    "elevationruler.settings.euclidean-grid-distance.name": "Prefer Euclidean Distance",
+    "elevationruler.settings.euclidean-grid-distance.hint": "For gridded scenes, if 'Exact (√2)' is chosen for the 'Square Grid Diagonals' core setting, this will force it to measure Euclidean distance instead of distance in unit hexes/squares. For hex grids, only diagonal elevation movement is affected.",
+
+    "elevationruler.settings.scale-text.name": "Scale Ruler Text",
+    "elevationruler.settings.scale-text.hint": "When enabled, ruler text will be scaled depending on `canvas.dimensions.size`. Further adjust scaling by using `CONFIG.elevationruler.textScale`.",
+
+    "elevationruler.settings.customized-labels.name": "Customized Ruler Text",
+    "elevationruler.settings.customized-labels.hint": "Customize the ruler text. Change styles using `CONFIG.elevationruler.labelStyles` and `CONFIG.elevationruler.labelIcons`.",
+
     "elevationruler.controls.prefer-token-elevation.name": "Prefer Token Elevation",
     "elevationruler.controls.pathfinding-control.name": "Use Pathfinding",
 
     "elevationruler.drawingconfig.movementPenalty.name": "Movement Bonus/Penalty",
     "elevationruler.drawingconfig.movementPenalty.hint": "Set to 1 for no penalty. Values greater than one penalize movement by that percent; values less than one effectively grant a bonus to movement. For example, set to 2 to double movement through this area. Movement under the drawing elevation will be ignored.",
 
-    "elevationruler.clearMovement": "Clear Combatant Movement"
+    "elevationruler.clearMovement": "Clear Combatant Movement",
+    "elevationruler.waypoint": "waypoint",
+    "elevationruler.up": "up",
+    "elevationruler.down": "down",
+    "elevationruler.added": "added",
+    "elevationruler.prior": "prior"
 }

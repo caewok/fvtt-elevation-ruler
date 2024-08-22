@@ -33,20 +33,28 @@ const SETTINGS = {
     SNAP_TO_GRID: "pathfinding_snap_to_grid"
   },
 
-  HIDE_ELEVATION: "hide-elevation-ruler",
+  LABELING: {
+    HIDE_ELEVATION: "hide-elevation-ruler",
+    ROUND_TO_MULTIPLE: "round-to-multiple",
+    USE_LEVELS_LABEL: "levels-use-floor-label",
+    LEVELS_LABELS: {
+      NEVER: "levels-labels-never",
+      UI_ONLY: "levels-labels-ui",
+      ALWAYS: "levels-labels-always"
+    },
+    CUSTOMIZED: "customized-labels",
+    SCALE_TEXT: "scale-text"
+  },
 
-  USE_LEVELS_LABEL: "levels-use-floor-label",
-  LEVELS_LABELS: {
-    NEVER: "levels-labels-never",
-    UI_ONLY: "levels-labels-ui",
-    ALWAYS: "levels-labels-always"
+  MEASURING: {
+    EUCLIDEAN_GRID_DISTANCE: "euclidean-grid-distance",
+    AUTO_MOVEMENT_TYPE: "automatic-movement-type"
   },
 
   NO_MODS: "no-modules-message",
   TOKEN_RULER: {
     ENABLED: "enable-token-ruler",
     HIDE_GM: "hide-gm-ruler",
-    ROUND_TO_MULTIPLE: "round-to-multiple",
     TOKEN_MULTIPLIER: "token-terrain-multiplier"
   },
 
@@ -73,7 +81,6 @@ const SETTINGS = {
 //     AREA_THRESHOLD: "grid-terrain-area-threshold"
 //   },
 
-  AUTO_MOVEMENT_TYPE: "automatic-movement-type"
 };
 
 const KEYBINDINGS = {
@@ -110,17 +117,17 @@ export class Settings extends ModuleSettingsAbstract {
   static registerAll() {
     const { KEYS, register, localize } = this;
 
-    register(KEYS.USE_LEVELS_LABEL, {
-      name: localize(`${KEYS.USE_LEVELS_LABEL}.name`),
-      hint: localize(`${KEYS.USE_LEVELS_LABEL}.hint`),
+    register(KEYS.LABELING.USE_LEVELS_LABEL, {
+      name: localize(`${KEYS.LABELING.USE_LEVELS_LABEL}.name`),
+      hint: localize(`${KEYS.LABELING.USE_LEVELS_LABEL}.hint`),
       scope: "world",
       config: MODULES_ACTIVE.LEVELS,
-      default: KEYS.LEVELS_LABELS.ALWAYS,
+      default: KEYS.LABELING.LEVELS_LABELS.ALWAYS,
       type: String,
       choices: {
-        [KEYS.LEVELS_LABELS.NEVER]: localize(`${KEYS.LEVELS_LABELS.NEVER}`),
-        [KEYS.LEVELS_LABELS.UI_ONLY]: localize(`${KEYS.LEVELS_LABELS.UI_ONLY}`),
-        [KEYS.LEVELS_LABELS.ALWAYS]: localize(`${KEYS.LEVELS_LABELS.ALWAYS}`)
+        [KEYS.LABELING.LEVELS_LABELS.NEVER]: localize(`${KEYS.LABELING.LEVELS_LABELS.NEVER}`),
+        [KEYS.LABELING.LEVELS_LABELS.UI_ONLY]: localize(`${KEYS.LABELING.LEVELS_LABELS.UI_ONLY}`),
+        [KEYS.LABELING.LEVELS_LABELS.ALWAYS]: localize(`${KEYS.LABELING.LEVELS_LABELS.ALWAYS}`)
       }
     });
 
@@ -175,16 +182,6 @@ export class Settings extends ModuleSettingsAbstract {
       name: localize(`${KEYS.PATHFINDING.SNAP_TO_GRID}.name`),
       hint: localize(`${KEYS.PATHFINDING.SNAP_TO_GRID}.hint`),
       scope: "world",
-      config: true,
-      default: false,
-      type: Boolean,
-      requiresReload: false
-    });
-
-    register(KEYS.HIDE_ELEVATION, {
-      name: localize(`${KEYS.HIDE_ELEVATION}.name`),
-      hint: localize(`${KEYS.HIDE_ELEVATION}.hint`),
-      scope: "user",
       config: true,
       default: false,
       type: Boolean,
@@ -263,9 +260,9 @@ export class Settings extends ModuleSettingsAbstract {
     });
 
     if ( game.system.id === "dnd5e" ) {
-      register(KEYS.AUTO_MOVEMENT_TYPE, {
-        name: localize(`${KEYS.AUTO_MOVEMENT_TYPE}.name`),
-        hint: localize(`${KEYS.AUTO_MOVEMENT_TYPE}.hint`),
+      register(KEYS.MEASURING.AUTO_MOVEMENT_TYPE, {
+        name: localize(`${KEYS.MEASURING.AUTO_MOVEMENT_TYPE}.name`),
+        hint: localize(`${KEYS.MEASURING.AUTO_MOVEMENT_TYPE}.hint`),
         scope: "user",
         config: true,
         default: true,
@@ -274,12 +271,52 @@ export class Settings extends ModuleSettingsAbstract {
       });
     }
 
-    register(KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE, {
-      name: localize(`${KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE}.name`),
-      hint: localize(`${KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE}.hint`),
+    register(KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE, {
+      name: localize(`${KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE}.name`),
+      hint: localize(`${KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE}.hint`),
       scope: "world",
       config: true,
-      default: 0,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.LABELING.SCALE_TEXT, {
+      name: localize(`${KEYS.LABELING.SCALE_TEXT}.name`),
+      hint: localize(`${KEYS.LABELING.SCALE_TEXT}.hint`),
+      scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.LABELING.CUSTOMIZED, {
+      name: localize(`${KEYS.LABELING.CUSTOMIZED}.name`),
+      hint: localize(`${KEYS.LABELING.CUSTOMIZED}.hint`),
+      scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.LABELING.HIDE_ELEVATION, {
+      name: localize(`${KEYS.LABELING.HIDE_ELEVATION}.name`),
+      hint: localize(`${KEYS.LABELING.HIDE_ELEVATION}.hint`),
+      scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.LABELING.ROUND_TO_MULTIPLE, {
+      name: localize(`${KEYS.LABELING.ROUND_TO_MULTIPLE}.name`),
+      hint: localize(`${KEYS.LABELING.ROUND_TO_MULTIPLE}.hint`),
+      scope: "world",
+      config: true,
+      default: 0.1,
       type: Number
     });
 
@@ -536,7 +573,7 @@ export class Settings extends ModuleSettingsAbstract {
     return true;
   }
 
-  static useAutoMoveDetection() { return game.system.id === "dnd5e" && this.get(this.KEYS.AUTO_MOVEMENT_TYPE); }
+  static useAutoMoveDetection() { return game.system.id === "dnd5e" && this.get(this.KEYS.MEASURING.AUTO_MOVEMENT_TYPE); }
 }
 
 /**
