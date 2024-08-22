@@ -103,23 +103,49 @@ Hooks.once("init", function() {
      * Enable certain debug console logging and tests.
      * @type {boolean}
      */
-    debug: false
+    debug: false,
 
     /**
-     * Ruler label styles
+     * Settings related to the ruler text labels.
      */
-    labelStyles: {
-      total: CONFIG.canvasTextStyle.clone(),
-      elevation: CONFIG.canvasTextStyle.clone(),
-      terrain: CONFIG.canvasTextStyle.clone(),
-      waypoint: CONFIG.canvasTextStyle.clone(),
+    labeling: {
+       /**
+       * Ruler label styles
+       */
+      styles: {
+        total: CONFIG.canvasTextStyle.clone(),
+        other: CONFIG.canvasTextStyle.clone(),
+        waypoint: CONFIG.canvasTextStyle.clone(),
+        elevation: CONFIG.canvasTextStyle.clone(),
+        terrain: CONFIG.canvasTextStyle.clone(),
+        priorMove: CONFIG.canvasTextStyle.clone()
+      },
+
+      /** Font awesome icons or unicode */
+      icons: {
+        elevationAt: "\ud83e", // <i class="fa-solid fa-at"></i>
+        elevationDown: "\ue4b8", // <i class="fa-solid fa-arrows-down-to-line"></i>
+        elevationUp: "\ue4c2", // <i class="fa-solid fa-arrows-up-to-line"></i>
+        waypoint: "\uf041", // <i class="fa-solid fa-location-pin"></i>
+        priorMovement: "\ue553" // <i class="fa-solid fa-person-walking-dashed-line-arrow-right"></i>
+      },
+
+      /** Enlarge or shrink all ruler text */
+      textScale: 1,
+
+      /** For custom ruler labels, how large to make the lines relative to the distance number */
+      secondaryTextScale: 2/3,
+
+      /** Change the anchor point for secondary text */
+      secondaryTextAnchor: { x: 0.5, y: 1 }
     }
-
-    /**
-     * The style of the ruler total distance.
-     */
-
   };
+
+  // Default colors. Waypoint and total use the Foundry default color.
+  const labelStyles = CONFIG[MODULE_ID].labeling.styles;
+  labelStyles.elevation.fill = "61D1E4";
+  labelStyles.terrain.fill = "FF8883";
+  labelStyles.priorMove.fill = "FF8883";
 
   /* To add a movement to the api:
   CONFIG.elevationruler.MOVEMENT_TYPES.SWIM = 3; // Increment by 1 from the highest-valued movement type

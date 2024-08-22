@@ -34,11 +34,9 @@ import { movementTypeForTokenAt } from "./token_hud.js";
 import {
   distanceLabel,
   getPriorDistance,
-  segmentElevationLabel,
-  segmentTerrainLabel,
-  segmentCombatLabel,
-  levelNameAtElevation,
-  highlightLineRectangle } from "./segment_labels_highlighting.js";
+  highlightLineRectangle,
+  basicTextLabel,
+  customizedTextLabel } from "./segment_labels_highlighting.js";
 import { tokenSpeedSegmentSplitter } from "./token_speed.js";
 import { log } from "./util.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
@@ -306,6 +304,15 @@ function _getMeasurementSegments(wrapped) {
     return this.segments;
   }
 
+  // Remove the grandchildren of labels for which the segment is no longer valid.
+  const nSegments = this.history.length + this.waypoints.length + 1;
+  if ( this.labels.children.length > nSegments ) {
+    this.labels.children.forEach((l, idx) => {
+      if ( idx < nSegments ) return;
+      l.children.forEach(c => c.destroy());
+    });
+  }
+
   // No segments are present if dragging back to the origin point.
   const segments = wrapped();
   const segmentMap = this._pathfindingSegmentMap ??= new Map();
@@ -486,32 +493,26 @@ function _getSegmentLabel(wrapped, segment) {
   const origSegmentDistance = segment.distance;
   const origTotalDistance = this.totalDistance;
   segment.distance = distanceLabel(segment.waypoint.distance);
-  let combatLabel = ""; // Label when in combat and there are past moves.
   if ( Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL) ) {
     const priorDistance = getPriorDistance(this.token);
     this.totalDistance += priorDistance;
-  } else combatLabel = segmentCombatLabel(this.token, getPriorDistance(this.token));
-
+  }
   const origLabel = wrapped(segment);
   segment.distance = origSegmentDistance;
   this.totalDistance = origTotalDistance;
 
-  // Label for elevation changes.
-  let elevLabel = segmentElevationLabel(this, segment);
+  if ( Settings.get(Settings.KEYS.LABELING.SCALE_TEXT) ) {
+    segment.label.style.fontSize = CONFIG.canvasTextStyle.fontSize * canvas.dimensions.size / 100 * CONFIG[MODULE_ID].textScale;
+  }
 
-  // Label for Levels floors.
-  const levelName = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
-  if ( levelName ) elevLabel += `\n${levelName}`;
+  if ( !segment.label.style.fontFamily.includes("fontAwesome") ) segment.label.style.fontFamily += ",fontAwesome";
 
-  // Label for difficult terrain (variation in move distance vs distance).
-  const terrainLabel = segmentTerrainLabel(segment);
-
-  // Put it all together.
-  let label = `${origLabel}`;
-  if ( !Settings.get(Settings.KEYS.LABELING.HIDE_ELEVATION) ) label += `\n${elevLabel}`;
-  label += `${terrainLabel}${combatLabel}`;
-  return label;
+  if ( Settings.get(Settings.KEYS.LABELING.CUSTOMIZED) ) return customizedTextLabel(this, segment, origLabel);
+  return basicTextLabel(this, segment, origLabel);
 }
+
+
+
 
 /**
  * Wrap Ruler.prototype._highlightMeasurementSegment
@@ -650,6 +651,9 @@ async function _animateSegment(token, segment, destination) {
 function clear(wrapper) {
   log("-----Clearing movePenaltyInstance-----");
   delete this._movePenaltyInstance;
+
+  // Remove the grandchildren, if any. Created by ruler label styles.
+  this.labels.children.forEach(l => l.children.forEach(c => c.destroy()));
   return wrapper();
 }
 

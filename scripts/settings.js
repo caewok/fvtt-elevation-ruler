@@ -42,6 +42,8 @@ const SETTINGS = {
       UI_ONLY: "levels-labels-ui",
       ALWAYS: "levels-labels-always"
     },
+    CUSTOMIZED: "customized-labels",
+    SCALE_TEXT: "scale-text"
   },
 
   MEASURING: {
@@ -186,16 +188,6 @@ export class Settings extends ModuleSettingsAbstract {
       requiresReload: false
     });
 
-    register(KEYS.LABELING.HIDE_ELEVATION, {
-      name: localize(`${KEYS.LABELING.HIDE_ELEVATION}.name`),
-      hint: localize(`${KEYS.LABELING.HIDE_ELEVATION}.hint`),
-      scope: "user",
-      config: true,
-      default: false,
-      type: Boolean,
-      requiresReload: false
-    });
-
     // ----- NOTE: Token ruler ----- //
     register(KEYS.TOKEN_RULER.ENABLED, {
       name: localize(`${KEYS.TOKEN_RULER.ENABLED}.name`),
@@ -283,6 +275,36 @@ export class Settings extends ModuleSettingsAbstract {
       name: localize(`${KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE}.name`),
       hint: localize(`${KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE}.hint`),
       scope: "world",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.LABELING.SCALE_TEXT, {
+      name: localize(`${KEYS.LABELING.SCALE_TEXT}.name`),
+      hint: localize(`${KEYS.LABELING.SCALE_TEXT}.hint`),
+      scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.LABELING.CUSTOMIZED, {
+      name: localize(`${KEYS.LABELING.CUSTOMIZED}.name`),
+      hint: localize(`${KEYS.LABELING.CUSTOMIZED}.hint`),
+      scope: "user",
+      config: true,
+      default: false,
+      type: Boolean,
+      requiresReload: false
+    });
+
+    register(KEYS.LABELING.HIDE_ELEVATION, {
+      name: localize(`${KEYS.LABELING.HIDE_ELEVATION}.name`),
+      hint: localize(`${KEYS.LABELING.HIDE_ELEVATION}.hint`),
+      scope: "user",
       config: true,
       default: false,
       type: Boolean,

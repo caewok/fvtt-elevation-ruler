@@ -2,7 +2,8 @@
 canvas,
 CONFIG,
 game,
-PIXI
+PIXI,
+PreciseText
 */
 "use strict";
 
@@ -75,30 +76,18 @@ export function levelNameAtElevation(e) {
  * Total version for Token Ruler: none
  * Display current elevation if there was a previous change in elevation or not a token measurement
  * and the current elevation is nonzero.
- * @param {object} s  Ruler segment
+ * @param {Ruler} ruler
+ * @param {RulerSegment} segment
  * @return {string}
  */
-export function segmentElevationLabel(ruler, s) {
+export function segmentElevationLabel(ruler, segment) {
   // Arrows: ↑ ↓ ↕
   // Token ruler uses the preview token for elevation.
-  if ( s.last && ruler.isTokenRuler ) return "";
+  if ( segment.last && ruler.isTokenRuler ) return "";
 
   // If this is the last segment, show the total elevation change if any.
-  const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(s.ray.B.z);
-  const totalE = elevation - canvas.controls.ruler.originElevation;
-  const displayTotalChange = Boolean(totalE) && s.last;
-
-  // Determine if any previous waypoint had an elevation change.
-  let elevationChanged = false;
-  let currE = elevation;
-  for ( let i = s.waypoint.idx; i > -1; i -= 1 ) {
-    const prevE = ruler.waypoints[i].elevation;
-    if ( currE !== prevE ) {
-      elevationChanged = true;
-      break;
-    }
-    currE = prevE;
-  }
+  const { elevation, elevationDelta, elevationChanged } = elevationForRulerLabel(ruler, segment);
+  const displayTotalChange = Boolean(elevationDelta) && segment.last;
 
   // For basic ruler measurements, it is not obvious what the elevation is at start.
   // So display any nonzero elevation at that point.
@@ -107,14 +96,47 @@ export function segmentElevationLabel(ruler, s) {
   // Put together the two parts of the label: current elevation and total elevation.
   const labelParts = [];
   const units = canvas.scene.grid.units;
-  if ( displayCurrentElevation ) labelParts.push(`@${distanceLabel(elevation)} ${units}`);
+  if ( displayCurrentElevation ) {
+    let elevLabel = `@${distanceLabel(elevation)}`;
+    if ( units ) elevLabel += ` ${units}`;
+    labelParts.push(elevLabel);
+  }
   if ( displayTotalChange ) {
-    const segmentArrow = (totalE > 0) ? "↑" :"↓";
-    const totalChange = `[${segmentArrow}${Math.abs(distanceLabel(totalE))} ${units}]`;
+    const segmentArrow = (elevationDelta > 0) ? "↑" :"↓";
+    let totalChange = `[${segmentArrow}${Math.abs(distanceLabel(elevationDelta))}`;
+    totalChange += (units ? ` ${units}]` : `]`);
     labelParts.push(totalChange);
   }
-  s.label.style.align = s.last ? "center" : "right";
+  segment.label.style.align = segment.last ? "center" : "right";
   return labelParts.join(" ");
+}
+
+/**
+ * Determine the elevation change for the ruler label
+ * @param {Ruler} ruler
+ * @param {RulerSegment} segment
+ * @returns {object}
+ *   - @prop {number} elevation           Final elevation in grid units
+ *   - @prop {number} elevationDelta      Change in elevation from the origin
+ *   - @prop {boolean} elevationChanged   Did elevation change at 1+ waypoints
+ */
+function elevationForRulerLabel(ruler, segment) {
+  // If this is the last segment, show the total elevation change if any.
+  const elevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z);
+  const elevationDelta = elevation - ruler.originElevation;
+
+  // Determine if any previous waypoint had an elevation change.
+  let elevationChanged = false;
+  let currE = elevation;
+  for ( let i = segment.waypoint.idx; i > -1; i -= 1 ) {
+    const prevE = ruler.waypoints[i].elevation;
+    if ( currE !== prevE ) {
+      elevationChanged = true;
+      break;
+    }
+    currE = prevE;
+  }
+  return { elevation, elevationDelta, elevationChanged };
 }
 
 /**
@@ -151,4 +173,183 @@ export function getPriorDistance(token) {
     return distanceLabel(token?.lastMoveDistance) || 0;
   }
   return 0;
+}
+
+/**
+ * Construct the basic ruler label, in which there is a single style with multiple lines.
+ * @param {RulerSegment} segment
+ * @param {string} [origLabel = ""]     The default label returned by Foundry's _getSegmentLabel
+ */
+export function basicTextLabel(ruler, segment, origLabel = "") {
+  // Label for elevation changes.
+  let elevLabel = Settings.get(Settings.KEYS.LABELING.HIDE_ELEVATION) ? "" : segmentElevationLabel(ruler, segment);
+
+  // Label for Levels floors.
+  const levelName = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
+  if ( levelName ) elevLabel += `\n${levelName}`;
+
+  // Label for difficult terrain (variation in move distance vs distance).
+  const terrainLabel = segmentTerrainLabel(segment);
+
+  // Label when in combat and there are past moves.
+  const combatLabel = ( ruler.token && !Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL) )
+    ? segmentCombatLabel(ruler.token, getPriorDistance(ruler.token)) : "";
+
+  // Put it all together.
+  let label = `${origLabel}`;
+  if ( elevLabel !== "" ) label += `\n${elevLabel}`;
+  if ( terrainLabel !== "" ) label += `${terrainLabel}`;
+  if ( combatLabel !== "" ) label += `${combatLabel}`;
+  return label;
+}
+
+/**
+ * Use customized text styles for the ruler labels.
+ * @param {RulerSegment} segment
+ * @param {string} [origLabel = ""]     The default label returned by Foundry's _getSegmentLabel
+ * @returns {string} Text for the top label.
+ */
+export function customizedTextLabel(ruler, segment, origLabel = "") {
+  if ( !segment.label ) return "";
+
+  /* Format:
+  40 ft               (1) <-- total distance, large font
+  Extra text          (2)
+  • 10 ft waypoint    (3)
+  • 20 ft up          (4)
+  • 10 ft added       (5)
+  • 10 ft prior       (6)
+  */
+
+  /* Waypoint format:
+    20 ft             (1) <-- total distance to that point
+  @ 10 ft             (2) <-- elevation at that point
+  */
+  const labelIcons = CONFIG[MODULE_ID].labeling.icons;
+
+  // (1) Total Distance
+  let totalDistLabel = `${distanceLabel(ruler.totalDistance)}`;
+
+  // (2) Extra text
+  // Strip out any custom text from the original label.
+  // Format for Foundry Default: '0 ft [0 ft]'
+  origLabel = origLabel.replace(getDefaultLabel(segment), "");
+
+  // (3) Waypoint
+  let waypointLabel = segment.waypoint.idx > 0 ? `${labelIcons.waypoint} ${distanceLabel(segment.waypoint.distance)}` : "";
+
+  // (4) Elevation
+  let elevLabel = "";
+  const displayElevation = !Settings.get(Settings.KEYS.LABELING.HIDE_ELEVATION)
+    && !(segment.last && ruler.isTokenRuler);
+  if ( displayElevation ) {
+    const { elevation, elevationDelta, elevationChanged } = elevationForRulerLabel(ruler, segment);
+    if ( elevationChanged || (!ruler.token && elevation) ) {
+      if ( segment.last && elevationDelta ) {
+        const icon = elevationDelta > 0 ? labelIcons.elevationUp : labelIcons.elevationDown;
+        const descriptor = game.i18n.localize(elevationDelta > 0 ? `${MODULE_ID}.up` : `${MODULE_ID}.down`);
+        elevLabel = `${icon}${distanceLabel(elevationDelta)} ${descriptor}`;
+      } else elevLabel = `${labelIcons.elevationAt}${distanceLabel(elevation)}`;
+    }
+  }
+
+  // (5) Terrain
+  let terrainLabel = "";
+  if ( !segment.waypoint.cost.almostEqual(segment.waypoint.offsetDistance) ) {
+    terrainLabel = `${CONFIG[MODULE_ID].SPEED.terrainSymbol}${distanceLabel(segment.waypoint.cost - segment.waypoint.offsetDistance)}`;
+  }
+
+  // (6) Combat prior move
+  let priorMoveLabel = "";
+  if ( ruler.token && !Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL) ) {
+    const priorDist = getPriorDistance(ruler.token);
+    if ( priorDist ) priorMoveLabel = `${labelIcons.priorMovement}${distanceLabel(priorDist)}`;
+  }
+
+  // Add in units
+  const units = canvas.grid.units;
+  if ( units ) {
+    totalDistLabel += ` ${units}`;
+    if ( waypointLabel !== "" ) waypointLabel += ` ${units}`;
+    if ( elevLabel !== "" ) elevLabel += ` ${units}`;
+    if ( terrainLabel !== "" ) terrainLabel += ` ${units}`;
+    if ( priorMoveLabel !== "" ) priorMoveLabel += ` ${units}`;
+  }
+
+  // Add phrase describing the label. (Elevation handled above.)
+  if ( waypointLabel !== "" ) {
+    const descriptor = game.i18n.localize(`${MODULE_ID}.waypoint`);
+    waypointLabel += ` ${descriptor}`;
+  }
+  if ( terrainLabel !== "" ) {
+    const descriptor = game.i18n.localize(`${MODULE_ID}.added`);
+    terrainLabel += ` ${descriptor}`;
+  }
+  if ( priorMoveLabel !== "" ) {
+    const descriptor = game.i18n.localize(`${MODULE_ID}.prior`);
+    priorMoveLabel += ` ${descriptor}`;
+  }
+
+  // Construct a label style for each.
+  let height = segment.label.height;
+  if ( origLabel !== "" ) {
+    const textLabel = constructSecondaryLabel(segment, origLabel, "other", height);
+    height += textLabel.height;
+  }
+
+  if ( segment.last && waypointLabel !== "" ) {
+    const textLabel = constructSecondaryLabel(segment, waypointLabel, "waypoint", height);
+    height += textLabel.height;
+  }
+
+  if ( elevLabel !== "" ) {
+    const textLabel = constructSecondaryLabel(segment, elevLabel, "elevation", height);
+    height += textLabel.height;
+  }
+
+  if ( segment.last && terrainLabel !== "" ) {
+    const textLabel = constructSecondaryLabel(segment, terrainLabel, "terrain", height);
+    height += textLabel.height;
+  }
+
+  if ( segment.last && priorMoveLabel !== "" ) {
+    const textLabel = constructSecondaryLabel(segment, priorMoveLabel, "priorMove", height);
+    height += textLabel.height;
+  }
+
+  return totalDistLabel;
+}
+
+function constructSecondaryLabel(segment, text, name, height = 0) {
+  const labelStyles = CONFIG[MODULE_ID].labeling.styles;
+  const textScale = CONFIG[MODULE_ID].labeling.secondaryTextScale;
+  const anchor = CONFIG[MODULE_ID].labeling.secondaryTextAnchor;
+
+  let textLabel = segment.label.getChildByName(name);
+  if ( !textLabel ) {
+    const style = labelStyles[name] ?? labelStyles.waypoint;
+    textLabel = new PreciseText("", style);
+    textLabel.name = name;
+    segment.label.addChild(textLabel);
+    if ( !textLabel.style.fontFamily.includes("fontAwesome") ) textLabel.style.fontFamily += ",fontAwesome";
+  }
+  textLabel.text = text;
+  textLabel.style.fontSize = Math.round(segment.label.style.fontSize * textScale);
+  textLabel.anchor = anchor;
+  textLabel.position = { x: 0, y: height };
+  return textLabel;
+}
+
+function getDefaultLabel(segment) {
+  // Label based on Foundry default _getSegmentLabel.
+  if ( segment.teleport ) return "";
+  const units = canvas.grid.units;
+  let label = `${Math.round(distanceLabel(segment.waypoint.distance) * 100) / 100}`;
+  if ( units ) label += ` ${units}`;
+  if ( segment.last ) {
+    label += ` [${Math.round(canvas.controls.ruler.totalDistance * 100) / 100}`;
+    if ( units ) label += ` ${units}`;
+    label += "]";
+  }
+  return label;
 }
