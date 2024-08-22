@@ -229,7 +229,7 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
   const childLabels = {};
 
   // (1) Total Distance
-  let totalDistLabel = `${distanceLabel(ruler.totalDistance)}`;
+  let totalDistLabel = segment.last ? `${distanceLabel(ruler.totalDistance)}` : `${labelIcons.waypoint} ${distanceLabel(segment.waypoint.distance)}`;
 
   // (2) Extra text
   // Strip out any custom text from the original label.
@@ -250,14 +250,13 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
   if ( displayElevation ) {
     const { elevation, elevationDelta, elevationChanged } = elevationForRulerLabel(ruler, segment);
     if ( elevationChanged || (!ruler.token && elevation) ) {
-      if ( segment.last && elevationDelta ) childLabels.elevation = {
+      if ( !segment.last ) childLabels.elevation = {
+        icon: `${labelIcons.elevationAt}`,
+        value: elevation };
+      else if ( elevationDelta ) childLabels.elevation = {
         icon: elevationDelta > 0 ? labelIcons.elevationUp : labelIcons.elevationDown,
         value: Math.abs(elevationDelta),
         descriptor: game.i18n.localize(elevationDelta > 0 ? `${MODULE_ID}.up` : `${MODULE_ID}.down`)};
-      else childLabels.elevation = {
-        icon: `${labelIcons.elevationAt}`,
-        value: elevation
-      };
     }
   }
 
@@ -278,20 +277,14 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
     };
   }
 
-  // Set spacing based on the largest value string.
-  // Add spacing accordingly
-  let maxValueChars = 0;
-  Object.values(childLabels).forEach(obj => {
-    obj.valueStr = `${distanceLabel(obj.value)}`;
-    maxValueChars = Math.max(maxValueChars, obj.valueStr.length);
-  });
+  // Align so that the icon is left justified and the value is right justified. This aligns the units label or descriptor.
+  alignLeftAndRight(childLabels);
 
   // Build the string for each.
   // icon value unit description
   const units = canvas.grid.units;
   Object.values(childLabels).forEach(obj => {
-    if ( obj.valueStr.length < maxValueChars ) obj.valueStr.padStart(maxValueChars - obj.valueStr.length, " ");
-    obj.label = `${obj.icon} ${obj.valueStr}`;
+    obj.label = `${obj.iconValueStr}`;
     if ( units ) obj.label += ` ${units}`;
     if ( obj.descriptor ) obj.label += ` ${obj.descriptor}`;
   });
@@ -355,7 +348,6 @@ function getDefaultLabel(segment) {
   return label;
 }
 
-
 function alignChildTextLeft(parent, child, priorChildren = []) {
   parent.anchor = { x: 0.5, y: 0.5 };
   child.anchor = { x: 0.5, y: 0.5 }
@@ -371,4 +363,31 @@ function alignChildTextLeft(parent, child, priorChildren = []) {
   }, 0);
   child.position.x = (child.width - parent.width) * 0.5;
   child.position.y = (parent.height * 0.5) + (child.height * 0.5) + otherHeights;
+}
+
+/**
+ * Align the labels by adding narrow spacing.
+ * Align so that each label can be left justified but the units align
+ * Add spaces between the icon and the value.
+ * • 10 ft
+ * +  5 ft
+ */
+const SPACER = "\u200A"; // See https://unicode-explorer.com/articles/space-characters.
+function alignLeftAndRight(childLabels) {
+  const labelStyles =  CONFIG[MODULE_ID].labeling.styles;
+  let targetWidth = 0;
+  Object.entries(childLabels).forEach(([name, obj]) => {
+    obj.iconValueStr = `${obj.icon} ${distanceLabel(obj.value)}`;
+    const tm = PIXI.TextMetrics.measureText(obj.iconValueStr, labelStyles[name]);
+    obj.iconValueWidth = tm.width;
+    targetWidth = Math.max(targetWidth, tm.width);
+  });
+
+  Object.entries(childLabels).forEach(([name, obj]) => {
+    if ( obj.iconValueWidth.almostEqual(targetWidth) || obj.iconValueWidth > targetWidth ) return;
+    const tm = PIXI.TextMetrics.measureText(`${SPACER}`, labelStyles[name]);
+    const numSpaces = Math.floor(targetWidth - obj.iconValueWidth) / tm.width;
+    if ( numSpaces <= 0 ) return;
+    obj.iconValueStr = [`${obj.icon}`, ...Array.fromRange(numSpaces).map(_elem => SPACER), ` ${distanceLabel(obj.value)}`].join("");
+  });
 }
