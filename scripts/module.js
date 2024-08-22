@@ -103,8 +103,46 @@ Hooks.once("init", function() {
      * Enable certain debug console logging and tests.
      * @type {boolean}
      */
-    debug: false
+    debug: false,
+
+    /**
+     * Settings related to the ruler text labels.
+     */
+    labeling: {
+       /**
+       * Ruler label styles
+       */
+      styles: {
+        total: CONFIG.canvasTextStyle.clone(),
+        other: CONFIG.canvasTextStyle.clone(),
+        waypoint: CONFIG.canvasTextStyle.clone(),
+        elevation: CONFIG.canvasTextStyle.clone(),
+        terrain: CONFIG.canvasTextStyle.clone(),
+        priorMove: CONFIG.canvasTextStyle.clone()
+      },
+
+      /** Font awesome icons or unicode */
+      icons: {
+        elevationAt: "@", // https://fontawesome.com/icons/at?f=classic&s=solid
+        elevationDown: "\uf0d7", // https://fontawesome.com/icons/caret-down?f=classic&s=solid
+        elevationUp: "\uf0d8", // https://fontawesome.com/icons/caret-up?f=classic&s=solid
+        waypoint: "\uf041", // https://fontawesome.com/icons/location-pin?f=classic&s=solid
+        priorMovement: "\ue553" // https://fontawesome.com/icons/person-walking-dashed-line-arrow-right?f=classic&s=solid
+      },
+
+      /** Enlarge or shrink all ruler text */
+      textScale: 1,
+
+      /** For custom ruler labels, how large to make the lines relative to the distance number */
+      secondaryTextScale: 2/3,
+    }
   };
+
+  // Default colors. Waypoint and total use the Foundry default color.
+  const labelStyles = CONFIG[MODULE_ID].labeling.styles;
+  labelStyles.elevation.fill = "61D1E4";
+  labelStyles.terrain.fill = "FF8883";
+  labelStyles.priorMove.fill = "FF8883";
 
   /* To add a movement to the api:
   CONFIG.elevationruler.MOVEMENT_TYPES.SWIM = 3; // Increment by 1 from the highest-valued movement type

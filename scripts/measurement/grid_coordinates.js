@@ -196,8 +196,9 @@ export class GridCoordinates extends PIXI.Point {
  */
 function hexGridDistanceBetween(p0, p1, altGridDistFn) {
   const D = CONST.GRID_DIAGONALS;
-  p0.z ??= 0;
-  p1.z ??= 0;
+  if ( !(p0 instanceof Point3d) ) p0 = Point3d.fromObject(p0);
+  if ( !(p1 instanceof Point3d) ) p1 = Point3d.fromObject(p1);
+
 
   // Translate the 2d movement to cube units. Elevation is in grid size units.
   const d0 = canvas.grid.pointToCube(p0);
@@ -312,8 +313,8 @@ function _alternatingGridDistance(maxAxis = 0, midAxis = 0, minAxis = 0) {
  */
 function squareGridDistanceBetween(p0, p1, altGridDistFn) {
   const D = CONST.GRID_DIAGONALS;
-  p0.z ??= 0;
-  p1.z ??= 0;
+  if ( !(p0 instanceof Point3d) ) p0 = Point3d.fromObject(p0);
+  if ( !(p1 instanceof Point3d) ) p1 = Point3d.fromObject(p1);
 
   // Normalize so that dx === 1 when traversing 1 grid space.
   const dx = Math.abs(p0.x - p1.x) / canvas.grid.size;
