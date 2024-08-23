@@ -280,7 +280,7 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
 
 function constructSecondaryLabel(segment, text, name) {
   const labelStyles = CONFIG[MODULE_ID].labeling.styles;
-  const textScale = CONFIG[MODULE_ID].labeling.secondaryTextScale;
+  const secondaryTextScale = CONFIG[MODULE_ID].labeling.secondaryTextScale;
 
   let textLabel = segment.label.getChildByName(name);
   if ( !textLabel ) {
@@ -292,7 +292,7 @@ function constructSecondaryLabel(segment, text, name) {
   }
   textLabel.visible = true;
   textLabel.text = text;
-  textLabel.style.fontSize = Math.round(segment.label.style.fontSize * textScale);
+  textLabel.style.fontSize = Math.round(segment.label.style.fontSize * secondaryTextScale);
   textLabel.anchor = { x: 0.5, y: 0.5 };
   return textLabel;
 }

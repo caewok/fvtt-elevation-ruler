@@ -49,7 +49,8 @@ function getDirectPathGridless(wrapped, waypoints) {
   // 1-to-1 relationship between the waypoints and the offsets2d for gridless.
   return offsets2d.map((offset2d, idx) => {
     const offset3d = GridCoordinates3d.fromOffset(offset2d);
-    offset3d.k = GridCoordinates3d.unitElevation(waypoints[idx].elevation);
+    const waypoint = GridCoordinates3d.fromObject(waypoints[idx]);
+    offset3d.k = GridCoordinates3d.unitElevation(waypoint.elevation);
     return offset3d;
   });
 }
@@ -301,29 +302,6 @@ function singleOffsetHexDistanceFn(numDiagonals = 0) {
   return fn;
 }
 
-// ----- NOTE: Patches ----- //
-
-PATCHES_GridlessGrid.BASIC.WRAPS = { getDirectPath: getDirectPathGridless };
-PATCHES_SquareGrid.BASIC.WRAPS = { getDirectPath: getDirectPathGridded };
-PATCHES_HexagonalGrid.BASIC.WRAPS = { getDirectPath: getDirectPathGridded };
-
-PATCHES_GridlessGrid.BASIC.MIXES = { _measurePath };
-PATCHES_SquareGrid.BASIC.MIXES = { _measurePath };
-PATCHES_HexagonalGrid.BASIC.MIXES = { _measurePath };
-
-// ----- NOTE: Helper functions ----- //
-
-/**
- * Define certain parameters required in the result object.
- */
-function initializeResultObject(obj) {
-  obj.distance ??= 0;
-  obj.spaces ??= 0;
-  obj.cost ??= 0;
-  obj.diagonals ??= 0;
-  obj.offsetDistance ??= 0;
-}
-
 /**
  * Measure a path for a gridded scene. Handles hex and square grids.
  * @param {GridMeasurePathWaypoint[]} waypoints           The waypoints the path must pass through
@@ -403,17 +381,17 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
 /**
  * Wrap HexagonalGrid#getDirectPath and SquareGrid#getDirectPath
  * Returns the sequence of grid offsets of a shortest, direct path passing through the given waypoints.
- * @param {GridCoordinates[]} waypoints    The waypoints the path must pass through
+ * @param {Point3d[]} waypoints            The waypoints the path must pass through
  * @returns {GridOffset[]}                 The sequence of grid offsets of a shortest, direct path
  * @abstract
  */
 function getDirectPathGridded(wrapped, waypoints) {
   if ( !(waypoints[0] instanceof Point3d) ) return wrapped(waypoints);
-  let prevWaypoint = waypoints[0];
+  let prevWaypoint = GridCoordinates3d.fromObject(waypoints[0]);
   const path3d = [];
   const path3dFn = canvas.grid.isHexagonal ? directPath3dHex : directPath3dSquare;
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
-    const currWaypoint = waypoints[i];
+    const currWaypoint = GridCoordinates3d.fromObject(waypoints[i]);
     const path2d = wrapped([prevWaypoint, currWaypoint]);
 
     // Keep the exact start and end points, used by _measure to calculate distance.
@@ -427,3 +405,28 @@ function getDirectPathGridded(wrapped, waypoints) {
   }
   return path3d;
 }
+
+// ----- NOTE: Patches ----- //
+
+PATCHES_GridlessGrid.BASIC.WRAPS = { getDirectPath: getDirectPathGridless };
+PATCHES_SquareGrid.BASIC.WRAPS = { getDirectPath: getDirectPathGridded };
+PATCHES_HexagonalGrid.BASIC.WRAPS = { getDirectPath: getDirectPathGridded };
+
+PATCHES_GridlessGrid.BASIC.MIXES = { _measurePath };
+PATCHES_SquareGrid.BASIC.MIXES = { _measurePath };
+PATCHES_HexagonalGrid.BASIC.MIXES = { _measurePath };
+
+// ----- NOTE: Helper functions ----- //
+
+/**
+ * Define certain parameters required in the result object.
+ */
+function initializeResultObject(obj) {
+  obj.distance ??= 0;
+  obj.spaces ??= 0;
+  obj.cost ??= 0;
+  obj.diagonals ??= 0;
+  obj.offsetDistance ??= 0;
+}
+
+
