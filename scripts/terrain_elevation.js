@@ -162,6 +162,7 @@ export function destinationElevation() {
  * @returns {number} Elevation, in grid units.
  */
 export function elevationFromWaypoint(waypoint, location, token) {
+  waypoint.elevation ??= 0; // Issue #166.
   const isTokenRuler = Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED)
     && ui.controls.activeControl === "token"
     && ui.controls.activeTool === "select"
