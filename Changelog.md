@@ -1,3 +1,7 @@
+# 0.10.3
+Fix for the ruler label blowing up the font size on gridless and hex scenes.
+Fix for gridless measuring in pixel units instead of grid units.
+
 # 0.10.2
 
 ## New Features
