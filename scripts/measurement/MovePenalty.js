@@ -7,11 +7,10 @@ PIXI
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { MODULE_ID, FLAGS, MODULES_ACTIVE, SPEED, MOVEMENT_TYPES } from "./const.js";
-import { Settings } from "./settings.js";
-import { getCenterPoint3d } from "./grid_coordinates.js";
-import { movementType } from "./token_hud.js";
-import { log, keyForValue } from "./util.js";
+import { MODULE_ID, FLAGS, MODULES_ACTIVE, SPEED, MOVEMENT_TYPES } from "../const.js";
+import { Settings } from "../settings.js";
+import { movementType } from "../token_hud.js";
+import { log, keyForValue } from "../util.js";
 
 /*
 Class to measure penalty, as percentage of distance, between two points.
@@ -90,8 +89,8 @@ export class MovePenalty {
 
     // Locate all the regions/drawings/tokens along the path, testing using 2d bounds.
     for ( let i = 1, n = path.length; i < n; i += 1 ) {
-      const a = getCenterPoint3d(path[i - 1]);
-      const b = getCenterPoint3d(path[i]);
+      const a = path[i - 1].center;
+      const b = path[i].center;
       this.tokens.forEach(t => {
         if ( t.constrainedTokenBorder.lineSegmentIntersects(a, b, { inside: true })) this.pathTokens.add(t);
       });
@@ -162,8 +161,8 @@ export class MovePenalty {
    * @returns {number} The number used to multiply the move speed along the segment.
    */
   movementPenaltyForSegment(startCoords, endCoords) {
-    const start = getCenterPoint3d(startCoords);
-    const end = getCenterPoint3d(endCoords);
+    const start = startCoords.center;
+    const end = endCoords.center;
     const key = `${start.key}|${end.key}`;
     if ( this.#penaltyCache.has(key) ) return this.#penaltyCache.get(key);
 
@@ -183,8 +182,8 @@ export class MovePenalty {
       });
       console.groupEnd(`${MODULE_ID}|movementPenaltyForSegment`);
     }
-    this.#penaltyCache.set(key, avgMultiplier);
-    return avgMultiplier;
+    this.#penaltyCache.set(key, 1 / avgMultiplier);
+    return 1 / avgMultiplier;
   }
 
   // ----- NOTE: Secondary methods ----- //

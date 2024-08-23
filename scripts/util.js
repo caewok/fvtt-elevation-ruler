@@ -19,6 +19,58 @@ export function log(...args) {
 }
 
 /**
+ * Is this number even?
+ * @param {number} n
+ * @returns {boolean}
+ */
+export function isEven(n) { return  ~n & 1; }
+
+/**
+ * Is this number odd?
+ * @param {number} n
+ * @returns {boolean}
+ */
+export function isOdd(n) { return n & 1; }
+
+// ----- NOTE: Grid shape ----- //
+
+/**
+ * Helper to get the grid shape for given grid type.
+ * @param {GridCoordinates} coords    Grid (i,j) offset or x,y coordinates
+ * @returns {null|PIXI.Rectangle|PIXI.Polygon}
+ */
+export function gridShape(coords) {
+  const { GRIDLESS, SQUARE } = CONST.GRID_TYPES;
+  switch ( canvas.grid.type ) {
+    case GRIDLESS: return null;
+    case SQUARE: return squareGridShape(coords);
+    default: return hexGridShape(coords);
+  }
+}
+
+/**
+ * Return a rectangle for a given grid square.
+ * @param {GridCoordinates} coords      Grid (i,j) offset or x,y coordinates
+ * @returns {PIXI.Rectangle}
+ */
+function squareGridShape(coords) {
+  const { x, y } = canvas.grid.getTopLeftPoint(coords);
+  const sizeX = canvas.grid.sizeX || canvas.grid.size; // V12 || v11
+  const sizeY = canvas.grid.sizeY || canvas.grid.size; // V12 || v11
+  return new PIXI.Rectangle(x, y, sizeX, sizeY);
+}
+
+/**
+ * Return a polygon for a given grid hex.
+ * @param {GridCoordinates} coords      Grid (i,j) offset or x,y coordinates
+ * @returns {PIXI.Polygon}
+ */
+function hexGridShape(coords) {
+  return new PIXI.Polygon(...canvas.grid.getVertices(coords));
+}
+
+
+/**
  * Get the snapped grid position for the upper left corner of a token of any size.
  * So a 2x2 token would return the upper left corner of that token, snapped to a grid corner.
  * @param {Point} point   Point for which you want the upper left corner

@@ -58,6 +58,9 @@
     "elevationruler.settings.token-ruler-combat-history.name": "Rastrear Movimento de Combate",
     "elevationruler.settings.token-ruler-combat-history.hint": "Para destacar a velocidade do token, soma todos os movimentos do token na rodada, ao exibir o Destaque de Velocidade.",
 
+    "elevationruler.settings.combine-prior-with-total.name": "Combinar Movimento Anterior com Movimento Total",
+    "elevationruler.settings.combine-prior-with-total.hint": "Quando Rastrear Movimento de Combate estiver habilitado, combine o movimento anterior da ficha na rodada com o movimento total. Caso contrário, coloque o movimento anterior em uma linha separada.",
+    
     "elevationruler.settings.token-speed-property.name": "Propriedade de Caminhada do Token",
     "elevationruler.settings.token-speed-property.hint": "Para Destaque de Velocidade do token, esta é a propriedade do ator que representa a velocidade de caminhada do token.",
 
@@ -88,6 +91,9 @@
     "elevationruler.settings.pathfinding_limit_token_los.name": "Limitar Descoberta de Rota às Áreas Exploradas",
     "elevationruler.settings.pathfinding_limit_token_los.hint": "Ao encontrar rotas, limite o alcance da descoberta de rotas às áreas exploradas, a menos que o usuário seja o MJ.",
 
+    "elevationruler.settings.pathfinding_snap_to_grid.name": "Ajustar Descoberta de Rota à Grade",
+    "elevationruler.settings.pathfinding_snap_to_grid.hint": "Ao descobrir uma rota em um mapa com grade, ajuste a rota aos centros da grade, a menos que isso resulte no bloqueio do caminho.",
+    
     "elevationruler.settings.grid-terrain-algorithm.name": "Medição de Grade de Terreno",
     "elevationruler.settings.grid-terrain-algorithm.hint": "Quando estiver em uma grade, como contabilizar penalidades de movimento ou bônus de terreno e tokens? Centro: aplica se o terreno/token se sobrepõe ao centro da grade; Percentual de Área: aplica se o terreno/token cobrir pelo menos esta parte do quadrado/hexágono da grade; Euclidiano: rateado com base na porcentagem do segmento de linha dentro do terreno/token entre esta grade quadrada/hexágono e o anterior.",
     "elevationruler.settings.grid-terrain-choice-center-point": "Centro",

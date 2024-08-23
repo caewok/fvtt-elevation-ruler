@@ -58,6 +58,9 @@
     "elevationruler.settings.token-ruler-combat-history.name": "Śledzenie ruchu w walce",
     "elevationruler.settings.token-ruler-combat-history.hint": "W przypadku podświetlania szybkości tokenów, podczas wyświetlania podświetlenia należy zsumować wszystkie ruchy tokenów w rundzie.",
 
+    "elevationruler.settings.combine-prior-with-total.name": "Połączenie wcześniejszego ruchu z całkowitym ruchem",
+    "elevationruler.settings.combine-prior-with-total.hint": "Jeśli opcja śledzenia ruchu bojowego jest włączona, połącz wcześniejszy ruch tokena w rundzie z całkowitym ruchem. W przeciwnym razie umieść wcześniejszy ruch w osobnej linii.",
+
     "elevationruler.settings.token-speed-property.name": "Właściwość ruchu tokena",
     "elevationruler.settings.token-speed-property.hint": "W przypadku podświetlania szybkości tokena jest to właściwość aktora reprezentująca szybkość chodzenia tokena.",
 
@@ -87,6 +90,9 @@
 
     "elevationruler.settings.pathfinding_limit_token_los.name": "Ograniczenie wyszukiwania ścieżek do zbadanych obszarów",
     "elevationruler.settings.pathfinding_limit_token_los.hint": "Podczas odnajdywania ścieżek należy ograniczyć ich zasięg do zbadanych obszarów, chyba że użytkownikiem jest MG.",
+
+    "elevationruler.settings.pathfinding_snap_to_grid.name": "Wyznaczanie ścieżek - Przyciąganie do siatki",
+    "elevationruler.settings.pathfinding_snap_to_grid.hint": "Podczas wyznaczania ścieżki na mapie z siatką należy przyciągnąć ścieżkę do centrów siatki, chyba że spowoduje to zablokowanie ścieżki.",
 
     "elevationruler.settings.grid-terrain-algorithm.name": "Pomiar siatki terenu",
     "elevationruler.settings.grid-terrain-algorithm.hint": "Jak uwzględnić kary lub premie za ruch wynikające z terenu i tokenów na siatce? Środek: zastosuj, jeśli teren/token pokrywa się ze środkiem siatki; Procent obszaru: zastosuj, jeśli teren/token pokrywa co najmniej taką część kwadratu/heksu siatki; Euklidesowy: proporcjonalnie na podstawie procentu segmentu linii w obrębie terenu/tokenu między tym kwadratem/heksem siatki a poprzednim.",

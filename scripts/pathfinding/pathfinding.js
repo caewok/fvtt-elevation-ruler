@@ -16,9 +16,9 @@ import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarP
 import { SCENE_GRAPH } from "./WallTracer.js";
 import { cdt2dConstrainedGraph, cdt2dToBorderTriangles } from "../delaunator/cdt2d_access_functions.js";
 import { Settings } from "../settings.js";
-import { PhysicalDistanceGridless } from "../PhysicalDistance.js";
 import { MODULE_ID } from "../const.js";
-import { MovePenalty } from "../MovePenalty.js";
+import { MovePenalty } from "../measurement/MovePenalty.js";
+import { GridCoordinates3d } from "../measurement/grid_coordinates.js";
 
 /* Testing
 
@@ -304,7 +304,7 @@ export class Pathfinder {
    * @param {PathNode} current
    */
   _heuristic(goal, current) {
-    const distance = PhysicalDistanceGridless.measure(goal.entryPoint, current.entryPoint);
+    const distance = GridCoordinates3d.gridDistanceBetween(goal.entryPoint, current.entryPoint);
     return CONFIG.GeometryLib.utils.gridUnitsToPixels(distance);
   }
 
