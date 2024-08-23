@@ -189,10 +189,10 @@ export function basicTextLabel(ruler, segment, origLabel = "") {
   if ( levelName ) elevLabel += `\n${levelName}`;
 
   // Label for difficult terrain (variation in move distance vs distance).
-  const terrainLabel = segmentTerrainLabel(segment);
+  const terrainLabel = segment.history ? "" : segmentTerrainLabel(segment);
 
   // Label when in combat and there are past moves.
-  const combatLabel = ( ruler.token && !Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL) )
+  const combatLabel = ( !segment.history && ruler.token && !Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL) )
     ? segmentCombatLabel(ruler.token, getPriorDistance(ruler.token)) : "";
 
   // Put it all together.

@@ -44,7 +44,7 @@ function preUpdateToken(document, changes, _options, _userId) {
   let combatMoveData = {};
   const ruler = canvas.controls.ruler;
   if ( ruler.active && ruler.token === token ) {
-    lastMoveDistance = ruler.totalCost;
+    lastMoveDistance = ruler.totalCost - ruler.history.reduce((acc, curr) => acc + curr.cost, 0);
     numDiagonal = ruler.totalDiagonals;
   } else {
     const numPrevDiagonal = game.combat?.started ? (token._combatMoveData?.numDiagonal ?? 0) : 0;
