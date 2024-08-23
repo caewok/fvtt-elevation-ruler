@@ -7,7 +7,7 @@ New setting to scale the ruler labels based on zoom. Thanks @Aedif for advice on
 
 New setting to force strictly Euclidean measurement for diagonals. Foundry's "Exact" core "Square Grid Diagonals" setting actually measures diagonals in number of hexes or number of squares, which in some cases can vary (slightly) from Euclidean measurement.
 
-New setting and `CONFIG` options to display the ruler labels using configurable styles. Thanks @Ichabod for the idea and layout suggestions. You can control the styles, icons, and scaling using `CONFIG.elevationruler.labeling`. Generally modifications to these should affect the next ruler movement; no reload required.
+New setting and `CONFIG` options to display the ruler labels using configurable styles. Thanks @Ichabod for the idea and layout suggestions! You can control the styles, icons, and scaling using `CONFIG.elevationruler.labeling`. Generally modifications to these should affect the next ruler movement; no reload required.
 
 ## Bug fixes and other updates
 Reworked the measurement system to directly measure the 3d movement instead of projecting to a 2d plane. This matters a lot for hex movement, as projecting assumed a geometrically impossible 3d hex grid whereas now hex elevation movement assumes the 3d hex grid has stacked 2d hexes (square shapes in the z-direction). This means that the core "Square Grid Diagonals" setting is now used to modify how elevation diagonal movement is calculated for 3d hexes. Also now accounts for "double-diagonal" moves in 3d square grids in a more consistent manner. Reworked the movement penalty class to more closely mimic the cost function expected by Foundry ruler. Closes #163 and probably other measurement bugs. Creates unknown number of new measurement bugs!
