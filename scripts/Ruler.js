@@ -314,6 +314,12 @@ function _getMeasurementSegments(wrapped) {
 
   // No segments are present if dragging back to the origin point.
   const segments = wrapped();
+
+  // Make sure the style is cloned for each segment b/c we are adjusting the size.
+  if ( Settings.get(Settings.KEYS.LABELING.SCALE_TEXT) ) {
+    segments.forEach(segment => segment.label.style = segment.label.style.clone())
+  }
+
   const segmentMap = this._pathfindingSegmentMap ??= new Map();
   if ( !segments.length ) {
     segmentMap.clear();
@@ -498,7 +504,7 @@ function _getSegmentLabel(wrapped, segment) {
   this.totalDistance = origTotalDistance;
 
   if ( Settings.get(Settings.KEYS.LABELING.SCALE_TEXT) ) {
-    segment.label.style.fontSize = Math.round(CONFIG.canvasTextStyle.fontSize * canvas.dimensions.size / 100 * CONFIG[MODULE_ID].labeling.textScale);
+    segment.label.style.fontSize = Math.round(CONFIG.canvasTextStyle.fontSize * (canvas.dimensions.size / 100) * CONFIG[MODULE_ID].labeling.textScale);
   }
 
   if ( !segment.label.style.fontFamily.includes("fontAwesome") ) segment.label.style.fontFamily += ",fontAwesome";

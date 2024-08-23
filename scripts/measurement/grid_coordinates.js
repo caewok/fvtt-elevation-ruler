@@ -147,7 +147,7 @@ export class GridCoordinates extends PIXI.Point {
    * @returns {number} Distance, in grid units
    */
   static gridDistanceBetween(a, b, altGridDistFn) {
-    if ( canvas.grid.isGridless ) return this.distanceBetween(a, b);
+    if ( canvas.grid.isGridless ) return CONFIG.GeometryLib.utils.pixelsToGridUnits(this.distanceBetween(a, b));
     const distFn = canvas.grid.isHexagonal ? hexGridDistanceBetween : squareGridDistanceBetween;
     const dist = distFn(a, b, altGridDistFn);
 
@@ -613,7 +613,7 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
    * @returns {number} Distance, in grid units
    */
   static gridDistanceBetween(a, b, altGridDistFn) {
-    if ( canvas.grid.isGridless ) return this.distanceBetween(a, b);
+    if ( canvas.grid.isGridless ) return CONFIG.GeometryLib.utils.pixelsToGridUnits(this.distanceBetween(a, b));
     const distFn = canvas.grid.isHexagonal ? hexGridDistanceBetween : squareGridDistanceBetween;
     const dist = distFn(a, b, altGridDistFn);
 
