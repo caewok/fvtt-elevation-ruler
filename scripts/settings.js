@@ -48,7 +48,8 @@ const SETTINGS = {
 
   MEASURING: {
     EUCLIDEAN_GRID_DISTANCE: "euclidean-grid-distance",
-    AUTO_MOVEMENT_TYPE: "automatic-movement-type"
+    AUTO_MOVEMENT_TYPE: "automatic-movement-type",
+    COMBAT_HISTORY: "token-ruler-combat-history",
   },
 
   NO_MODS: "no-modules-message",
@@ -62,8 +63,6 @@ const SETTINGS = {
     DEPRECATED_ENABLED: "token-ruler-highlighting", // Old boolean setting for whether to enable speed highlighting.
     CHOICE: "speed-highlighting-choice", // New multiple-choice for enabling speed highlighting.
     NO_HOSTILES: "speed-highlighting-no-hostiles",
-    COMBAT_HISTORY: "token-ruler-combat-history",
-    COMBINE_PRIOR_WITH_TOTAL: "combine-prior-with-total",
     CHOICES: {
       NEVER: "speed-highlighting-choice-never",
       COMBAT: "speed-highlighting-choice-combat",
@@ -239,19 +238,9 @@ export class Settings extends ModuleSettingsAbstract {
       requiresReload: false
     });
 
-    register(KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY, {
-      name: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY}.name`),
-      hint: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY}.hint`),
-      scope: "user",
-      config: true,
-      default: false,
-      type: Boolean,
-      requiresReload: false
-    });
-
-    register(KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL, {
-      name: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL}.name`),
-      hint: localize(`${KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL}.hint`),
+    register(KEYS.MEASURING.COMBAT_HISTORY, {
+      name: localize(`${KEYS.MEASURING.COMBAT_HISTORY}.name`),
+      hint: localize(`${KEYS.MEASURING.COMBAT_HISTORY}.hint`),
       scope: "user",
       config: true,
       default: false,

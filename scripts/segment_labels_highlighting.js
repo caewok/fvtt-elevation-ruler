@@ -91,7 +91,7 @@ export function segmentElevationLabel(ruler, segment) {
 
   // For basic ruler measurements, it is not obvious what the elevation is at start.
   // So display any nonzero elevation at that point.
-  const displayCurrentElevation = elevationChanged || (!ruler.token && elevation);
+  const displayCurrentElevation = elevationChanged || (!ruler.token && elevation) || (elevation && segment.history);
 
   // Put together the two parts of the label: current elevation and total elevation.
   const labelParts = [];
@@ -157,19 +157,9 @@ export function segmentTerrainLabel(s) {
   return `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${moveDistance}${units}`;
 }
 
-/**
- * Construct a label to represent prior movement in combat.
- * @param {object} s    Ruler segment
- * @returns {string} The label or "" if none.
- */
-export function segmentCombatLabel(token, priorDistance) {
-  const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
-  if ( priorDistance ) return `\nPrior: ${distanceLabel(priorDistance)}${units}`;
-  return "";
-}
 
 export function getPriorDistance(token) {
-  if ( game.combat?.started && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
+  if ( game.combat?.started && Settings.get(Settings.KEYS.MEASURING.COMBAT_HISTORY) ) {
     return distanceLabel(token?.lastMoveDistance) || 0;
   }
   return 0;
@@ -189,17 +179,12 @@ export function basicTextLabel(ruler, segment, origLabel = "") {
   if ( levelName ) elevLabel += `\n${levelName}`;
 
   // Label for difficult terrain (variation in move distance vs distance).
-  const terrainLabel = segmentTerrainLabel(segment);
-
-  // Label when in combat and there are past moves.
-  const combatLabel = ( ruler.token && !Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL) )
-    ? segmentCombatLabel(ruler.token, getPriorDistance(ruler.token)) : "";
+  const terrainLabel = segment.history ? "" : segmentTerrainLabel(segment);
 
   // Put it all together.
   let label = `${origLabel}`;
   if ( elevLabel !== "" ) label += `\n${elevLabel}`;
   if ( terrainLabel !== "" ) label += `${terrainLabel}`;
-  if ( combatLabel !== "" ) label += `${combatLabel}`;
   return label;
 }
 
@@ -218,7 +203,6 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
   • 10 ft waypoint    (3)
   • 20 ft up          (4)
   • 10 ft added       (5)
-  • 10 ft prior       (6)
   */
 
   /* Waypoint format:
@@ -249,7 +233,7 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
     && !(segment.last && ruler.isTokenRuler);
   if ( displayElevation ) {
     const { elevation, elevationDelta, elevationChanged } = elevationForRulerLabel(ruler, segment);
-    if ( elevationChanged || (!ruler.token && elevation) ) {
+    if ( elevationChanged || (!ruler.token && elevation) || (elevation && segment.history) ) {
       if ( !segment.last ) childLabels.elevation = {
         icon: `${labelIcons.elevationAt}`,
         value: elevation };
@@ -266,16 +250,6 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
     value: segment.waypoint.cost - segment.waypoint.offsetDistance,
     descriptor: game.i18n.localize(`${MODULE_ID}.added`)
   };
-
-  // (6) Combat prior move
-  if ( segment.last && ruler.token && !Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL) ) {
-    const priorDist = getPriorDistance(ruler.token);
-    if ( priorDist ) childLabels.priorMove = {
-      icon: `${labelIcons.priorMovement}`,
-      value: priorDist,
-      descriptor: game.i18n.localize(`${MODULE_ID}.prior`)
-    };
-  }
 
   // Align so that the icon is left justified and the value is right justified. This aligns the units label or descriptor.
   alignLeftAndRight(childLabels);
@@ -301,7 +275,7 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
     if ( textLabel ) textLabel.visible = false;
   }
 
-  for ( const name of ["waypoint", "elevation", "terrain", "priorMove"] ) {
+  for ( const name of ["waypoint", "elevation", "terrain"] ) {
     const obj = childLabels[name];
     if ( obj ) {
       const textLabel = constructSecondaryLabel(segment, obj.label, name);
