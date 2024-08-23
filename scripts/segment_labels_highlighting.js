@@ -91,7 +91,7 @@ export function segmentElevationLabel(ruler, segment) {
 
   // For basic ruler measurements, it is not obvious what the elevation is at start.
   // So display any nonzero elevation at that point.
-  const displayCurrentElevation = elevationChanged || (!ruler.token && elevation);
+  const displayCurrentElevation = elevationChanged || (!ruler.token && elevation) || (elevation && segment.history);
 
   // Put together the two parts of the label: current elevation and total elevation.
   const labelParts = [];
@@ -249,7 +249,7 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
     && !(segment.last && ruler.isTokenRuler);
   if ( displayElevation ) {
     const { elevation, elevationDelta, elevationChanged } = elevationForRulerLabel(ruler, segment);
-    if ( elevationChanged || (!ruler.token && elevation) ) {
+    if ( elevationChanged || (!ruler.token && elevation) || (elevation && segment.history) ) {
       if ( !segment.last ) childLabels.elevation = {
         icon: `${labelIcons.elevationAt}`,
         value: elevation };
