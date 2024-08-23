@@ -261,7 +261,7 @@ export function terrainElevationAtLocation(location, startingElevation = 0) {
   if ( isFinite(tmRes) ) return tmRes;
 
   const levelsRes = LevelsElevationAtPoint(location, startingElevation);
-  if ( isFinite(levelsRes) ) return levelsRes;
+  if ( levelsRes !== null && isFinite(levelsRes) ) return levelsRes;
 
   // Default is the scene or location elevation.
   return location.elevation ?? 0;
