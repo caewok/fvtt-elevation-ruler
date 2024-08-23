@@ -9,7 +9,7 @@ PreciseText
 
 import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
 import { Settings } from "./settings.js";
-import { perpendicularPoints  } from "./util.js";
+import { perpendicularPoints, roundMultiple } from "./util.js";
 
 /**
  * Highlight a rectangular shaped portion of the line.
@@ -30,17 +30,6 @@ export function highlightLineRectangle(segment, color, name) {
     ptsB[1]
   ]);
   canvas.interface.grid.highlightPosition(name, { x: A.x, y: A.y, color, shape});
-}
-
-/**
- * Adjust a distance value by the multiple so it displays with limited decimal positions.
- * @param {number} dist
- * @returns {number}
- */
-export function distanceLabel(dist) {
-  const multiple = Settings.get(Settings.KEYS.LABELING.ROUND_TO_MULTIPLE)
-  if ( !multiple ) return dist;
-  return Number(dist.toFixed(multiple));
 }
 
 /**

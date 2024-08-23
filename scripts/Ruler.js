@@ -38,7 +38,7 @@ import {
   basicTextLabel,
   customizedTextLabel } from "./segment_labels_highlighting.js";
 import { tokenSpeedSegmentSplitter } from "./token_speed.js";
-import { log } from "./util.js";
+import { log, roundMultiple } from "./util.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
 import { GridCoordinates3d } from "./measurement/grid_coordinates.js";
 
@@ -678,7 +678,8 @@ async function _animateSegment(token, segment, destination) {
   await token.animate({x, y}, {name, duration: 0});
   await token.document.update(destination, updateOptions);
   await CanvasAnimation.getAnimation(name)?.promise;
-  const newElevation = distanceLabel(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
+  const newElevation = roundMultiple(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
+
   if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
 }
 
