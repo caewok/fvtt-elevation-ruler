@@ -83,14 +83,15 @@ export const SPEED = {
    * If true, use Font Awesome font unicode instead of basic unicode for displaying terrain symbol.
    * @type {boolean}
    */
-  useFontAwesome: false, // Set to true to use Font Awesome unicode
+  useFontAwesome: true, // Set to true to use Font Awesome unicode
 
   /**
    * Terrain icon.
    * If using Font Awesome, e.g, https://fontawesome.com/icons/bolt?f=classic&s=solid would be "\uf0e7".
+   * If not using Font Awesome, paste in unicode, e.g. "🥾" or "\u0xF0"
    * @type {string}
    */
-  terrainSymbol: "🥾"
+  terrainSymbol: "\ue52f" // https://fontawesome.com/icons/mountain-sun?f=classic&s=solid
 };
 
 /**
@@ -127,54 +128,4 @@ SPEED.tokenSpeed = function(token) {
   const speed = foundry.utils.getProperty(token, SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, moveType)]);
   if ( speed === null ) return null;
   return Number(speed);
-};
-
-/**
- * From Foundry v12
- * The different rules to define and measure diagonal distance/cost in a square grid.
- * The description of each option refers to the distance/cost of moving diagonally relative
- * to the distance/cost of a horizontal or vertical move.
- * @enum {number}
- */
-export const GRID_DIAGONALS = {
-  /**
-   * The diagonal distance is 1. Diagonal movement costs the same as horizontal/vertical movement.
-   */
-  EQUIDISTANT: 0,
-
-  /**
-   * The diagonal distance is √2. Diagonal movement costs √2 times as much as horizontal/vertical movement.
-   */
-  EXACT: 1,
-
-  /**
-   * The diagonal distance is 1.5. Diagonal movement costs 1.5 times as much as horizontal/vertical movement.
-   */
-  APPROXIMATE: 2,
-
-  /**
-   * The diagonal distance is 2. Diagonal movement costs 2 times as much as horizontal/vertical movement.
-   */
-  RECTILINEAR: 3,
-
-  /**
-   * The diagonal distance alternates between 1 and 2 starting at 1.
-   * The first diagonal movement costs the same as horizontal/vertical movement
-   * The second diagonal movement costs 2 times as much as horizontal/vertical movement.
-   * And so on...
-   */
-  ALTERNATING_1: 4,
-
-  /**
-   * The diagonal distance alternates between 2 and 1 starting at 2.
-   * The first diagonal movement costs 2 times as much as horizontal/vertical movement.
-   * The second diagonal movement costs the same as horizontal/vertical movement.
-   * And so on...
-   */
-  ALTERNATING_2: 5,
-
-  /**
-   * The diagonal distance is ∞. Diagonal movement is not allowed/possible.
-   */
-  ILLEGAL: 6
 };

@@ -1,7 +1,6 @@
 /* globals
 canvas,
 CanvasAnimation,
-CONFIG,
 foundry,
 game,
 Ruler
@@ -11,7 +10,7 @@ Ruler
 import { MODULE_ID, FLAGS } from "./const.js";
 import { Settings } from "./settings.js";
 import { log } from "./util.js";
-import { MoveDistance } from "./MoveDistance.js";
+import { GridCoordinates3d } from "./measurement/grid_coordinates.js";
 
 // Patches for the Token class
 export const PATCHES = {};
@@ -45,12 +44,14 @@ function preUpdateToken(document, changes, _options, _userId) {
   let combatMoveData = {};
   const ruler = canvas.controls.ruler;
   if ( ruler.active && ruler.token === token ) {
-    lastMoveDistance = ruler.totalMoveDistance;
+    // Ruler move
+    lastMoveDistance = ruler.totalCost - ruler.history.reduce((acc, curr) => acc + curr.cost, 0);
     numDiagonal = ruler.totalDiagonals;
   } else {
+    // Some other move; likely arrow keys.
     const numPrevDiagonal = game.combat?.started ? (token._combatMoveData?.numDiagonal ?? 0) : 0;
-    const res = MoveDistance.measure(token.position, token.document._source, { token, numPrevDiagonal });
-    lastMoveDistance = res.moveDistance;
+    const res = GridCoordinates3d.gridMeasurementForSegment(token.position, token.document._source, numPrevDiagonal);
+    lastMoveDistance = res.cost;
     numDiagonal = res.numDiagonal;
   }
 
@@ -76,75 +77,33 @@ function preUpdateToken(document, changes, _options, _userId) {
 }
 
 /**
- * Hook refreshToken.
- * Adjust terrain as the token moves; handle animation pauses.
+ * Hook updateToken to store non-ruler movement for combat history.
+ * @param {Document} document                       The existing Document which was updated
+ * @param {object} changed                          Differential data that was used to update the document
+ * @param {Partial<DatabaseUpdateOperation>} options Additional options which modified the update request
+ * @param {string} userId                           The ID of the User who triggered the update workflow
  */
-// function refreshToken(token, flags) {
-//
-//
-//   if ( !token.isPreview ) {
-//     //log(`refreshToken|${token.name} not preview`);
-//     // console.groupEnd(`${MODULE_ID}|refreshToken`);
-//     return;
-//   }
-//   console.group(`${MODULE_ID}|refreshToken`);
-//   if ( flags.refreshElevation ) {
-//     log(`refreshToken|${token.name} changing elevation. Original: ${token._original?.elevationE} clone: ${token.elevationE} `);
-//     // console.groupEnd(`${MODULE_ID}|refreshToken`);
-//   }
-//
-//   if ( !( flags.refreshPosition || flags.refreshElevation || flags.refreshSize ) ) {
-//     log(`refreshToken|${token.name} preview not moving`);
-//     console.groupEnd(`${MODULE_ID}|refreshToken`);
-//     return;
-//   }
-//   const ruler = canvas.controls.ruler;
-//   if ( ruler.state !== Ruler.STATES.MEASURING ) {
-//     log(`refreshToken|${token.name} ruler not measuring`);
-//     console.groupEnd(`${MODULE_ID}|refreshToken`);
-//     return;
-//   }
-//   if ( !ruler._isTokenRuler ) {
-//     log(`refreshToken|${token.name} ruler not token ruler`);
-//     console.groupEnd(`${MODULE_ID}|refreshToken`);
-//     return;
-//   }
-//
-//
-//
-//   //const ruler = canvas.controls.ruler;
-//
-//
-//
-//
-// //   const isRulerClone = token.isPreview
-// //     && ( flags.refreshPosition || flags.refreshElevation || flags.refreshSize )
-// //     && ruler.state === Ruler.STATES.MEASURING
-// //     && ruler._isTokenRuler;
-// //   log(`refreshToken|${token.name} rulerClone: ${isRulerClone}`);
-// //   if ( !isRulerClone ) return;
-//
-//   // Token is clone in a ruler drag operation.
-//   const destination = ruler.segments.at(-1)?.ray.B;
-//   if ( !destination ) return;
-//   const destElevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(destination.z);
-//   log(`refreshToken|Preview token ${token.name} destination elevation is ${destElevation} at ${destination.x},${destination.y}`);
-//
-//   const elevationChanged = token.document.elevation !== destElevation;
-//   if ( elevationChanged ) {
-//     if ( isFinite(destElevation) ) {
-//       log(`refreshToken|Setting preview token ${token.name} elevation to ${destElevation} at ${destination.x},${destination.y}`);
-//       token.document.elevation = destElevation;
-//       token.renderFlags.set({ "refreshTooltip": true });
-//       console.groupEnd(`${MODULE_ID}|refreshToken`);
-//       return;
-//     } else {
-//       const origin = token._original.center;
-//       console.error(`${MODULE_ID}|refreshToken destination elevation is not finite. Moving from ${origin.x},${origin.y}, @${token._original.elevation} --> ${destination?.x},${destination?.y}.`)
-//     }
-//   }
-//   console.groupEnd(`${MODULE_ID}|refreshToken`);
-// }
+function updateToken(document, changed, _options, _userId) {
+  const token = document.object;
+  if ( token.isPreview
+    || !(Object.hasOwn(changed, "x") || Object.hasOwn(changed, "y") || Object.hasOwn(changed, "elevation")) ) return;
+  if ( !game.combat?.started ) return;
+  if ( canvas.controls.ruler.active && canvas.controls.ruler.token === token ) return; // Ruler movement history stored already.
+  if ( !Settings.get(Settings.KEYS.MEASURING.COMBAT_HISTORY) ) return;
+
+  // Add the move to the stored ruler history. Use the token center, not the top left, to match the ruler history.
+  token[MODULE_ID] ??= {};
+  const tokenHistory = token[MODULE_ID].measurementHistory ??= [];
+  const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
+  const origin = token.getCenterPoint(document);
+  const dest = token.getCenterPoint({ x: changed.x ?? document.x, y: changed.y ?? document.y})
+  origin.z = gridUnitsToPixels(document.elevation);
+  origin.teleport = false;
+  origin.cost = 0;
+  dest.z = gridUnitsToPixels(changed.elevation ?? document.elevation);
+  dest.teleport = false;
+  tokenHistory.push(origin, dest);
+}
 
 // ----- NOTE: Wraps ----- //
 
@@ -277,7 +236,7 @@ PATCHES.PATHFINDING.WRAPS = { _onUpdate };
 PATCHES.TOKEN_RULER.MIXES = { _onDragLeftDrop, _onDragLeftCancel };
 
 // PATCHES.BASIC.HOOKS = { refreshToken };
-PATCHES.MOVEMENT_TRACKING.HOOKS = { preUpdateToken };
+PATCHES.MOVEMENT_TRACKING.HOOKS = { preUpdateToken, updateToken };
 PATCHES.MOVEMENT_TRACKING.GETTERS = { lastMoveDistance, _combatMoveData };
 
 // ----- NOTE: Helper functions ----- //
