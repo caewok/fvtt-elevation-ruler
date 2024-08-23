@@ -16,7 +16,7 @@ Use the existing cost approach in Foundry ruler to measure difficult movement.
 
 Fix for rounding happening even when "Rounding Distance to Multiple" is set to 0. Closes #173.
 
-Update Polish translation. Thanks @Lioheart! Closes #180.
+Update Polish translation. Thanks @Lioheart! Closes #180. Update Brazilian Portugese translation. Thanks @Kharmans!
 
 # 0.10.1
 

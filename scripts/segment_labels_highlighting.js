@@ -86,13 +86,13 @@ export function segmentElevationLabel(ruler, segment) {
   const labelParts = [];
   const units = canvas.scene.grid.units;
   if ( displayCurrentElevation ) {
-    let elevLabel = `@${distanceLabel(elevation)}`;
+    let elevLabel = `@${roundMultiple(elevation)}`;
     if ( units ) elevLabel += ` ${units}`;
     labelParts.push(elevLabel);
   }
   if ( displayTotalChange ) {
     const segmentArrow = (elevationDelta > 0) ? "↑" :"↓";
-    let totalChange = `[${segmentArrow}${Math.abs(distanceLabel(elevationDelta))}`;
+    let totalChange = `[${segmentArrow}${Math.abs(roundMultiple(elevationDelta))}`;
     totalChange += (units ? ` ${units}]` : `]`);
     labelParts.push(totalChange);
   }
@@ -137,7 +137,7 @@ function elevationForRulerLabel(ruler, segment) {
 export function segmentTerrainLabel(s) {
   if ( s.waypoint.cost.almostEqual(s.waypoint.offsetDistance) ) return "";
   const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
-  const moveDistance = distanceLabel(s.waypoint.cost);
+  const moveDistance = roundMultiple(s.waypoint.cost);
   if ( CONFIG[MODULE_ID].SPEED.useFontAwesome ) {
     const style = s.label.style;
     if ( !style.fontFamily.includes("fontAwesome") ) style.fontFamily += ",fontAwesome";
@@ -149,7 +149,7 @@ export function segmentTerrainLabel(s) {
 
 export function getPriorDistance(token) {
   if ( game.combat?.started && Settings.get(Settings.KEYS.MEASURING.COMBAT_HISTORY) ) {
-    return distanceLabel(token?.lastMoveDistance) || 0;
+    return roundMultiple(token?.lastMoveDistance) || 0;
   }
   return 0;
 }
@@ -202,7 +202,7 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
   const childLabels = {};
 
   // (1) Total Distance
-  let totalDistLabel = segment.last ? `${distanceLabel(ruler.totalDistance)}` : `${labelIcons.waypoint} ${distanceLabel(segment.waypoint.distance)}`;
+  let totalDistLabel = segment.last ? `${roundMultiple(ruler.totalDistance)}` : `${labelIcons.waypoint} ${roundMultiple(segment.waypoint.distance)}`;
 
   // (2) Extra text
   // Strip out any custom text from the original label.
@@ -301,7 +301,7 @@ function getDefaultLabel(segment) {
   // Label based on Foundry default _getSegmentLabel.
   if ( segment.teleport ) return "";
   const units = canvas.grid.units;
-  let label = `${Math.round(distanceLabel(segment.waypoint.distance) * 100) / 100}`;
+  let label = `${Math.round(roundMultiple(segment.waypoint.distance) * 100) / 100}`;
   if ( units ) label += ` ${units}`;
   if ( segment.last ) {
     label += ` [${Math.round(canvas.controls.ruler.totalDistance * 100) / 100}`;
@@ -340,7 +340,7 @@ function alignLeftAndRight(childLabels) {
   const labelStyles =  CONFIG[MODULE_ID].labeling.styles;
   let targetWidth = 0;
   Object.entries(childLabels).forEach(([name, obj]) => {
-    obj.iconValueStr = `${obj.icon} ${distanceLabel(obj.value)}`;
+    obj.iconValueStr = `${obj.icon} ${roundMultiple(obj.value)}`;
     const tm = PIXI.TextMetrics.measureText(obj.iconValueStr, labelStyles[name]);
     obj.iconValueWidth = tm.width;
     targetWidth = Math.max(targetWidth, tm.width);
@@ -351,6 +351,6 @@ function alignLeftAndRight(childLabels) {
     const tm = PIXI.TextMetrics.measureText(`${SPACER}`, labelStyles[name]);
     const numSpaces = Math.floor(targetWidth - obj.iconValueWidth) / tm.width;
     if ( numSpaces <= 0 ) return;
-    obj.iconValueStr = [`${obj.icon}`, ...Array.fromRange(numSpaces).map(_elem => SPACER), ` ${distanceLabel(obj.value)}`].join("");
+    obj.iconValueStr = [`${obj.icon}`, ...Array.fromRange(numSpaces).map(_elem => SPACER), ` ${roundMultiple(obj.value)}`].join("");
   });
 }

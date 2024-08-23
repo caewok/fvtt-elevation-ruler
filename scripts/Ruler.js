@@ -32,7 +32,6 @@ import {
   constructPathfindingSegments } from "./segments.js";
 import { movementTypeForTokenAt } from "./token_hud.js";
 import {
-  distanceLabel,
   getPriorDistance,
   highlightLineRectangle,
   basicTextLabel,
@@ -172,7 +171,7 @@ function _broadcastMeasurement(wrapped) {
     const destination = this.segments.at(-1)?.ray.B;
     const previewToken = this.token._preview;
     if ( destination ) {
-      const destElevation = distanceLabel(CONFIG.GeometryLib.utils.pixelsToGridUnits(destination.z));
+      const destElevation = roundMultiple(CONFIG.GeometryLib.utils.pixelsToGridUnits(destination.z));
       const elevationChanged = previewToken.document.elevation !== destElevation;
       if ( elevationChanged && isFinite(destElevation) ) {
         previewToken.document.elevation = destElevation;
@@ -493,7 +492,7 @@ function _getSegmentLabel(wrapped, segment) {
   // Force distance to be between waypoints instead of (possibly pathfinding) segments.
   const origSegmentDistance = segment.distance;
   const origTotalDistance = this.totalDistance;
-  segment.distance = distanceLabel(segment.waypoint.distance);
+  segment.distance = roundMultiple(segment.waypoint.distance);
   const origLabel = wrapped(segment);
   segment.distance = origSegmentDistance;
   this.totalDistance = origTotalDistance;
