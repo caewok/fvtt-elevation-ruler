@@ -116,12 +116,6 @@ function directPath3dSquare(start, end, path2d) {
     const doDiagonalElevationStep = !is2dDiagonal && diagonalElevationStepsRemaining > 0 && ((diagonalElevationStep + 1) % doDiagonalElevationStepMod) === 0;
     const doAdditionalElevationSteps = additionalElevationStepsRemaining > 0 && ((i + 1) % doAdditionalElevationStepMod) === 0;
 
-    /*
-    console.log(`${i} ${stepsRemaining}`,
-      { doDoubleDiagonalElevationStep, doDiagonalElevationStep, doAdditionalElevationSteps },
-      { doubleDiagonalElevationStepsRemaining, diagonalElevationStepsRemaining, additionalElevationStepsRemaining });
-    */
-
     // Either double or normal diagonals are the same but have separate tracking.
     if ( doDoubleDiagonalElevationStep ) {
       currOffset.k += 1;
@@ -136,7 +130,6 @@ function directPath3dSquare(start, end, path2d) {
 
     if ( doAdditionalElevationSteps ) {
       let elevationSteps =  Math.ceil(additionalElevationStepsRemaining / stepsRemaining);
-      // console.log("\t", { elevationSteps });
       while ( elevationSteps > 0 ) {
         currOffset.k += 1;
         elevationSteps -= 1;
@@ -240,7 +233,6 @@ function directPath3dHex(start, end, path2d) {
 
     const doElevationStep = ((i + 1) % doElevationStepMod) === 0;
     let elevationSteps = doElevationStep && (elevationStepsRemaining > 0) ? Math.ceil(elevationStepsRemaining / stepsRemaining) : 0;
-    console.log(`${i} ${stepsRemaining} | elevationSteps: ${elevationSteps}`)
     elevationStepsRemaining -= elevationSteps
 
     // Apply the first elevation step as a diagonal upwards move in combination with the canvas 2d move.
