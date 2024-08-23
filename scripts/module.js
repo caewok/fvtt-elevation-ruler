@@ -18,7 +18,6 @@ import { registerGeometry } from "./geometry/registration.js";
 
 // Grid coordinates
 import { GridCoordinates, RegionMovementWaypoint3d, GridCoordinates3d } from "./measurement/grid_coordinates.js";
-import { testMeasurePath } from "./measurement/Grid.js";
 
 // Move Penalty
 import { MovePenalty } from "./measurement/MovePenalty.js";
@@ -158,7 +157,6 @@ Hooks.once("init", function() {
       GridCoordinates,
       RegionMovementWaypoint3d,
       GridCoordinates3d,
-      testMeasurePath,
       MovePenalty
     },
 

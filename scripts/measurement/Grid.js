@@ -1,6 +1,5 @@
 /* globals
 canvas,
-CONFIG,
 CONST
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -8,7 +7,6 @@ CONST
 
 import { GridCoordinates3d } from "./grid_coordinates.js";
 import { Point3d } from "../geometry/3d/Point3d.js";
-import { MODULE_ID } from "../const.js";
 
 /**
  * Modify Grid classes to measure in 3d.
@@ -368,9 +366,6 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
       offsetDistanceFn = singleOffsetHexDistanceFn(diagonals);
   }
   const altGridDistanceFn = GridCoordinates3d.alternatingGridDistanceFn();
-  const altGridDistanceOffsetFn = GridCoordinates3d.alternatingGridDistanceFn();
-  const altGridDistanceOffsetFn2 = GridCoordinates3d.alternatingGridDistanceFn();
-
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
     const end = waypoints[i];
     const path3d = canvas.grid.getDirectPath([start, end]);
@@ -382,17 +377,7 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
       const currPathPt = path3d[j];
       const dist = GridCoordinates3d.gridDistanceBetween(prevPathPt, currPathPt, altGridDistanceFn);
       const offsetDistance = offsetDistanceFn(prevPathPt, currPathPt);
-
-      // Debug:
-      // Can we use gridDistanceBetweenOffsets instead of the offsetDistanceFn?
-      // Can we assume dist will already be rounded to the nearest offsetDistance if very close?
-      if ( CONFIG[MODULE_ID].debug ) {
-        const offsetDistanceAlt = GridCoordinates3d.gridDistanceBetweenOffsets(prevPathPt, currPathPt, altGridDistanceOffsetFn2);
-        if ( !offsetDistance.almostEqual(offsetDistanceAlt) ) console.warn(`_measurePath|offset vs alt: ${offsetDistance},  ${offsetDistanceAlt}`, prevPathPt, currPathPt);
-        if ( dist !== offsetDistance && dist.almostEqual(offsetDistance) ) console.warn(`_measurePath| distance vs offset: ${dist}, ${offsetDistance}`, prevPathPt, currPathPt);
-      }
-
-      segment.distance += (dist.almostEqual(offsetDistance) ? offsetDistance : dist);
+      segment.distance += dist;
       segment.offsetDistance += offsetDistance;
       segment.cost += cost(prevPathPt, currPathPt, offsetDistance);
       prevPathPt = currPathPt;
