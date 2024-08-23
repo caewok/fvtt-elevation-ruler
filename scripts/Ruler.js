@@ -494,10 +494,6 @@ function _getSegmentLabel(wrapped, segment) {
   const origSegmentDistance = segment.distance;
   const origTotalDistance = this.totalDistance;
   segment.distance = distanceLabel(segment.waypoint.distance);
-  if ( Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL) ) {
-    const priorDistance = getPriorDistance(this.token);
-    this.totalDistance += priorDistance;
-  }
   const origLabel = wrapped(segment);
   segment.distance = origSegmentDistance;
   this.totalDistance = origTotalDistance;
