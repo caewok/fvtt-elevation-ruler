@@ -46,6 +46,19 @@ export class GridCoordinates extends PIXI.Point {
     return pt;
   }
 
+  /**
+   * Factory function that converts a Foundry GridCoordinates.
+   * If the object has x,y properties, those are favored over i,j.
+   * @param {object}
+   * @returns {GridCoordinates}
+   */
+  static fromObject(obj) {
+    const newObj = super.fromObject(obj);
+    if ( Object.hasOwn(obj, "i") && !Object.hasOwn(obj, "x") ) newObj.i = obj.i;
+    if ( Object.hasOwn(obj, "j") && !Object.hasOwn(obj, "y") ) newObj.j = obj.j;
+    return newObj;
+  }
+
   /** @type {number} */
   get i() { return canvas.grid.getOffset({ x: this.x, y: this.y }).i }
 
@@ -442,6 +455,23 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
   static gridCenterForPoint(pt) {
     pt = new this(pt.x, pt.y, pt.z);
     return pt.centerToOffset();
+  }
+
+  /**
+   * Factory function that converts a Foundry GridCoordinates.
+   * If the object has x,y,z,elevation properties, those are favored over i,j,k.
+   * @param {object}
+   * @returns {GridCoordinates3d}
+   */
+  static fromObject(obj) {
+    const newObj = super.fromObject(obj);
+    if ( Object.hasOwn(obj, "i") && !Object.hasOwn(obj, "x") ) newObj.i = obj.i;
+    if ( Object.hasOwn(obj, "j") && !Object.hasOwn(obj, "y") ) newObj.j = obj.j;
+    if ( Object.hasOwn(obj, "k")
+      && !(Object.hasOwn(obj, "z")
+        || Object.hasOwn(obj, "elevationZ")
+        || Object.hasOwn(obj, "elevation")) ) newObj.k = obj.k;
+    return newObj;
   }
 
   /** @type {number} */
