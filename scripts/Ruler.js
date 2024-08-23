@@ -526,7 +526,7 @@ function _highlightMeasurementSegment(wrapped, segment) {
   // Adjust the color if this user has selected speed highlighting.
   // Highlight each split in turn, changing highlight color each time.
   if ( Settings.useSpeedHighlighting(this.token) ) {
-    if ( segment.first ) TOKEN_SPEED_SPLITTER.set(this.token, tokenSpeedSegmentSplitter(this, this.token))
+    if ( segment === this.segments[0] ) TOKEN_SPEED_SPLITTER.set(this.token, tokenSpeedSegmentSplitter(this, this.token))
     const splitterFn = TOKEN_SPEED_SPLITTER.get(this.token);
     if ( splitterFn ) {
       const priorColor = this.color;

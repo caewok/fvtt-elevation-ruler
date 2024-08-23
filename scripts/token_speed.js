@@ -44,15 +44,6 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
   let speedCategory = categoryIter.next().value;
   let maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
 
-  // Determine which speed category we are starting with
-  // Add in already moved combat distance and determine the starting category
-  if ( game.combat?.started
-    && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
-
-    totalCombatMoveDistance = token.lastMoveDistance;
-    minDistance = totalCombatMoveDistance;
-  }
-
   return segment => {
     if ( !tokenSpeed ) {
       segment.speed = defaultColor;
