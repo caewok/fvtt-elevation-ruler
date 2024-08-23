@@ -451,7 +451,8 @@ function _computeDistance() {
     segment.waypoint.distance = waypointDistance += segment.distance;
     segment.waypoint.cost = waypointCost += segment.cost;
     segment.waypoint.offsetDistance = waypointOffsetDistance += segment.offsetDistance;
-    segment.waypoint.elevationIncrement = userElevationChangeAtWaypoint(this.waypoints[currWaypointIdx]);
+    if ( ~currWaypointIdx ) segment.waypoint.elevationIncrement = userElevationChangeAtWaypoint(this.waypoints[currWaypointIdx]);
+
   }
 }
 
@@ -591,7 +592,7 @@ async function _animateMovement(wrapped, token) {
     }
     promises.push(wrapped(controlledToken));
   }
-  if ( game.combat.active ) {
+  if ( game.combat?.active ) {
     token[MODULE_ID] ??= {};
     token[MODULE_ID].measurementHistory = this._createMeasurementHistory();
   }
@@ -601,12 +602,13 @@ async function _animateMovement(wrapped, token) {
 
 /**
  * Wrap Ruler.prototype._getMeasurementHistory
+ * Store the history temporarily in the token.
  * @returns {RulerMeasurementHistory|void}
  */
 function _getMeasurementHistory(wrapped) {
   const history = wrapped();
   const token = this.token;
-  if ( !(token && game.combat.active) ) return history;
+  if ( !(token && game.combat?.active) ) return history;
   token[MODULE_ID] ??= {};
   const tokenHistory = token[MODULE_ID].measurementHistory;
   if ( !tokenHistory || !tokenHistory.length ) return history;
@@ -616,6 +618,24 @@ function _getMeasurementHistory(wrapped) {
     return history;
   }
   return token[MODULE_ID].measurementHistory;
+}
+
+/**
+ * Wrap Ruler.prototype._createMeasurementHistory
+ * Store the 3d values for the history
+ * @returns {RulerMeasurementHistory}    The next measurement history
+ */
+function _createMeasurementHistory(wrapped) {
+  const history = wrapped();
+  if ( !history.length ) return history;
+  history[0].z = this.segments[0].ray.A.z;
+  for ( let i = 0, h = 1, n = this.segments.length; i < n; i += 1 ) {
+    const s = this.segments[i];
+    if ( s.ray.distance === 0 ) continue;
+    history[h].z = s.ray.B.z;
+    h += 1;
+  }
+  return history;
 }
 
 /**
@@ -771,6 +791,7 @@ PATCHES.BASIC.WRAPS = {
   _getMeasurementOrigin,
   _getMeasurementDestination,
   _getMeasurementHistory,
+  _createMeasurementHistory,
 
   // Wraps related to segments
   _getCostFunction,

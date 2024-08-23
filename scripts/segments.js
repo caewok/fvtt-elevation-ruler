@@ -139,10 +139,17 @@ export function elevateSegments(ruler, segments) {  // Add destination as the fi
     elevation: ruler.destinationElevation
   }
   const waypoints = [...ruler.waypoints, destWaypoint];
-
-  // Add the waypoint elevations to the corresponding segment endpoints.
   for ( const segment of segments ) {
+    if ( segment.history ) {
+      // History segments are always first.
+      // Convert to 3d Rays
+      const Az = segment.ray.A.z;
+      const Bz = segment.ray.B.z ?? gridUnitsToPixels(waypoints[0].elevation);
+      segment.ray = Ray3d.from2d(segment.ray, { Az, Bz });
+    }
     if ( !~segment.waypoint.idx ) continue;
+
+    // Add the waypoint elevations to the corresponding segment endpoints.
     const startWaypoint = waypoints[segment.waypoint.idx];
     const endWaypoint = waypoints[segment.waypoint.idx + 1];
     if ( !startWaypoint || !endWaypoint ) continue; // Should not happen.
