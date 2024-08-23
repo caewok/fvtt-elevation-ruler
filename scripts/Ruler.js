@@ -588,7 +588,7 @@ async function _animateMovement(wrapped, token) {
     }
     promises.push(wrapped(controlledToken));
   }
-  if ( game.combat?.active ) {
+  if ( game.combat?.active && Settings.get(Settings.KEYS.MEASURING.COMBAT_HISTORY) ) {
     token[MODULE_ID] ??= {};
     token[MODULE_ID].measurementHistory = this._createMeasurementHistory();
   }
@@ -605,6 +605,8 @@ function _getMeasurementHistory(wrapped) {
   const history = wrapped();
   const token = this.token;
   if ( !(token && game.combat?.active) ) return history;
+  if ( !Settings.get(Settings.KEYS.MEASURING.COMBAT_HISTORY) ) return history;
+
   token[MODULE_ID] ??= {};
   const tokenHistory = token[MODULE_ID].measurementHistory;
   if ( !tokenHistory || !tokenHistory.length ) return history;

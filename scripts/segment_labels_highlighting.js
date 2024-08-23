@@ -159,7 +159,7 @@ export function segmentTerrainLabel(s) {
 
 
 export function getPriorDistance(token) {
-  if ( game.combat?.started && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
+  if ( game.combat?.started && Settings.get(Settings.KEYS.MEASURING.COMBAT_HISTORY) ) {
     return distanceLabel(token?.lastMoveDistance) || 0;
   }
   return 0;

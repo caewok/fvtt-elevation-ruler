@@ -89,6 +89,7 @@ function updateToken(document, changed, _options, _userId) {
     || !(Object.hasOwn(changed, "x") || Object.hasOwn(changed, "y") || Object.hasOwn(changed, "elevation")) ) return;
   if ( !game.combat?.started ) return;
   if ( canvas.controls.ruler.active && canvas.controls.ruler.token === token ) return; // Ruler movement history stored already.
+  if ( !Settings.get(Settings.KEYS.MEASURING.COMBAT_HISTORY) ) return;
 
   // Add the move to the stored ruler history. Use the token center, not the top left, to match the ruler history.
   token[MODULE_ID] ??= {};
