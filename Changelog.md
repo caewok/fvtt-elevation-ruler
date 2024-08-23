@@ -14,7 +14,9 @@ Reworked the measurement system to directly measure the 3d movement instead of p
 
 Use the existing cost approach in Foundry ruler to measure difficult movement.
 
-Fix for rounding happening even when "Rounding Distance to Multiple" is set to 0. Closes #173. Thanks @Larkinabout!
+Fix for rounding happening even when "Rounding Distance to Multiple" is set to 0. Closes #173. Fix for Levels / Wall Height always dropping to ground. Closes issue #174. Thanks @Larkinabout for PRs on both!
+
+Fix for GURPS modifying the Ruler waypoints without using the `Ruler#_addWaypoint` method. Closes #166. Submitted [PR #1959](https://github.com/crnormand/gurps/pull/1959).
 
 Update Polish translation. Thanks @Lioheart! Closes #180. Update Brazilian Portugese translation. Thanks @Kharmans!
 

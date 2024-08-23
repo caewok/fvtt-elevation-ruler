@@ -280,13 +280,13 @@ export function renderTemplateSync(path, data) {
 }
 
 /**
- * Rounds the number to the multiple from the Round Distance to Multiple setting. 
+ * Rounds the number to the multiple from the Round Distance to Multiple setting.
  * Otherwise, returns original number.
  * @param {number} num The number to round
  * @returns {number}   The rounded number
  */
 export function roundMultiple (num) {
-  const multiple = Settings.get(Settings.KEYS.TOKEN_RULER.ROUND_TO_MULTIPLE);
+  const multiple = Settings.get(Settings.KEYS.LABELING.ROUND_TO_MULTIPLE);
   if (multiple) return num.toNearest(multiple);
   return num;
 }
