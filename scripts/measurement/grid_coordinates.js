@@ -53,10 +53,10 @@ export class GridCoordinates extends PIXI.Point {
    * @returns {GridCoordinates}
    */
   static fromObject(obj) {
-    const newObj = PIXI.Point.fromObject(obj);
+    const newObj = super.fromObject(obj);
     if ( Object.hasOwn(obj, "i") && !Object.hasOwn(obj, "x") ) newObj.i = obj.i;
     if ( Object.hasOwn(obj, "j") && !Object.hasOwn(obj, "y") ) newObj.j = obj.j;
-    return obj;
+    return newObj;
   }
 
   /** @type {number} */
@@ -464,14 +464,14 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
    * @returns {GridCoordinates3d}
    */
   static fromObject(obj) {
-    const newObj = RegionMovementWaypoint3d.fromObject(obj);
+    const newObj = super.fromObject(obj);
     if ( Object.hasOwn(obj, "i") && !Object.hasOwn(obj, "x") ) newObj.i = obj.i;
     if ( Object.hasOwn(obj, "j") && !Object.hasOwn(obj, "y") ) newObj.j = obj.j;
     if ( Object.hasOwn(obj, "k")
       && !(Object.hasOwn(obj, "z")
         || Object.hasOwn(obj, "elevationZ")
         || Object.hasOwn(obj, "elevation")) ) newObj.k = obj.k;
-    return obj;
+    return newObj;
   }
 
   /** @type {number} */

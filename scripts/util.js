@@ -52,7 +52,7 @@ export function gridShape(coords) {
  * @param {GridCoordinates} coords      Grid (i,j) offset or x,y coordinates
  * @returns {PIXI.Rectangle}
  */
-export function squareGridShape(coords) {
+function squareGridShape(coords) {
   const { x, y } = canvas.grid.getTopLeftPoint(coords);
   const sizeX = canvas.grid.sizeX || canvas.grid.size; // V12 || v11
   const sizeY = canvas.grid.sizeY || canvas.grid.size; // V12 || v11
@@ -64,7 +64,7 @@ export function squareGridShape(coords) {
  * @param {GridCoordinates} coords      Grid (i,j) offset or x,y coordinates
  * @returns {PIXI.Polygon}
  */
-export function hexGridShape(coords) {
+function hexGridShape(coords) {
   return new PIXI.Polygon(...canvas.grid.getVertices(coords));
 }
 
