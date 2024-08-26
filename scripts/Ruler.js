@@ -32,15 +32,12 @@ import {
   constructPathfindingSegments } from "./segments.js";
 import { movementTypeForTokenAt } from "./token_hud.js";
 import {
-  distanceLabel,
   getPriorDistance,
-  segmentElevationLabel,
-  segmentTerrainLabel,
-  segmentCombatLabel,
-  levelNameAtElevation,
-  highlightLineRectangle } from "./segment_labels_highlighting.js";
+  highlightLineRectangle,
+  basicTextLabel,
+  customizedTextLabel } from "./segment_labels_highlighting.js";
 import { tokenSpeedSegmentSplitter } from "./token_speed.js";
-import { log } from "./util.js";
+import { log, roundMultiple } from "./util.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
 import { GridCoordinates3d } from "./measurement/grid_coordinates.js";
 
@@ -174,7 +171,7 @@ function _broadcastMeasurement(wrapped) {
     const destination = this.segments.at(-1)?.ray.B;
     const previewToken = this.token._preview;
     if ( destination ) {
-      const destElevation = CONFIG.GeometryLib.utils.pixelsToGridUnits(destination.z);
+      const destElevation = roundMultiple(CONFIG.GeometryLib.utils.pixelsToGridUnits(destination.z));
       const elevationChanged = previewToken.document.elevation !== destElevation;
       if ( elevationChanged && isFinite(destElevation) ) {
         previewToken.document.elevation = destElevation;
@@ -306,8 +303,23 @@ function _getMeasurementSegments(wrapped) {
     return this.segments;
   }
 
+  // Remove the grandchildren of labels for which the segment is no longer valid.
+  const nSegments = this.history.length + this.waypoints.length + 1;
+  if ( this.labels.children.length > nSegments ) {
+    this.labels.children.forEach((l, idx) => {
+      if ( idx < nSegments ) return;
+      l.children.forEach(c => c.destroy());
+    });
+  }
+
   // No segments are present if dragging back to the origin point.
   const segments = wrapped();
+
+  // Make sure the style is cloned for each segment b/c we are adjusting the size.
+  if ( Settings.get(Settings.KEYS.LABELING.SCALE_TEXT) ) {
+    segments.forEach(segment => segment.label.style = segment.label.style.clone())
+  }
+
   const segmentMap = this._pathfindingSegmentMap ??= new Map();
   if ( !segments.length ) {
     segmentMap.clear();
@@ -444,7 +456,8 @@ function _computeDistance() {
     segment.waypoint.distance = waypointDistance += segment.distance;
     segment.waypoint.cost = waypointCost += segment.cost;
     segment.waypoint.offsetDistance = waypointOffsetDistance += segment.offsetDistance;
-    segment.waypoint.elevationIncrement = userElevationChangeAtWaypoint(this.waypoints[currWaypointIdx]);
+    if ( ~currWaypointIdx ) segment.waypoint.elevationIncrement = userElevationChangeAtWaypoint(this.waypoints[currWaypointIdx]);
+
   }
 }
 
@@ -485,33 +498,23 @@ function _getSegmentLabel(wrapped, segment) {
   // Force distance to be between waypoints instead of (possibly pathfinding) segments.
   const origSegmentDistance = segment.distance;
   const origTotalDistance = this.totalDistance;
-  segment.distance = distanceLabel(segment.waypoint.distance);
-  let combatLabel = ""; // Label when in combat and there are past moves.
-  if ( Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBINE_PRIOR_WITH_TOTAL) ) {
-    const priorDistance = getPriorDistance(this.token);
-    this.totalDistance += priorDistance;
-  } else combatLabel = segmentCombatLabel(this.token, getPriorDistance(this.token));
-
+  segment.distance = roundMultiple(segment.waypoint.distance);
   const origLabel = wrapped(segment);
   segment.distance = origSegmentDistance;
   this.totalDistance = origTotalDistance;
 
-  // Label for elevation changes.
-  let elevLabel = segmentElevationLabel(this, segment);
+  if ( Settings.get(Settings.KEYS.LABELING.SCALE_TEXT) ) {
+    segment.label.style.fontSize = Math.round(CONFIG.canvasTextStyle.fontSize * (canvas.dimensions.size / 100) * CONFIG[MODULE_ID].labeling.textScale);
+  }
 
-  // Label for Levels floors.
-  const levelName = levelNameAtElevation(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
-  if ( levelName ) elevLabel += `\n${levelName}`;
+  if ( !segment.label.style.fontFamily.includes("fontAwesome") ) segment.label.style.fontFamily += ",fontAwesome";
 
-  // Label for difficult terrain (variation in move distance vs distance).
-  const terrainLabel = segmentTerrainLabel(segment);
-
-  // Put it all together.
-  let label = `${origLabel}`;
-  if ( !Settings.get(Settings.KEYS.HIDE_ELEVATION) ) label += `\n${elevLabel}`;
-  label += `${terrainLabel}${combatLabel}`;
-  return label;
+  if ( Settings.get(Settings.KEYS.LABELING.CUSTOMIZED) ) return customizedTextLabel(this, segment, origLabel);
+  return basicTextLabel(this, segment, origLabel);
 }
+
+
+
 
 /**
  * Wrap Ruler.prototype._highlightMeasurementSegment
@@ -528,7 +531,7 @@ function _highlightMeasurementSegment(wrapped, segment) {
   // Adjust the color if this user has selected speed highlighting.
   // Highlight each split in turn, changing highlight color each time.
   if ( Settings.useSpeedHighlighting(this.token) ) {
-    if ( segment.first ) TOKEN_SPEED_SPLITTER.set(this.token, tokenSpeedSegmentSplitter(this, this.token))
+    if ( segment === this.segments[0] ) TOKEN_SPEED_SPLITTER.set(this.token, tokenSpeedSegmentSplitter(this, this.token))
     const splitterFn = TOKEN_SPEED_SPLITTER.get(this.token);
     if ( splitterFn ) {
       const priorColor = this.color;
@@ -590,7 +593,52 @@ async function _animateMovement(wrapped, token) {
     }
     promises.push(wrapped(controlledToken));
   }
+  if ( game.combat?.active && Settings.get(Settings.KEYS.MEASURING.COMBAT_HISTORY) ) {
+    token[MODULE_ID] ??= {};
+    token[MODULE_ID].measurementHistory = this._createMeasurementHistory();
+  }
+
   return Promise.allSettled(promises);
+}
+
+/**
+ * Wrap Ruler.prototype._getMeasurementHistory
+ * Store the history temporarily in the token.
+ * @returns {RulerMeasurementHistory|void}
+ */
+function _getMeasurementHistory(wrapped) {
+  const history = wrapped();
+  const token = this.token;
+  if ( !(token && game.combat?.active) ) return history;
+  if ( !Settings.get(Settings.KEYS.MEASURING.COMBAT_HISTORY) ) return history;
+
+  token[MODULE_ID] ??= {};
+  const tokenHistory = token[MODULE_ID].measurementHistory;
+  if ( !tokenHistory || !tokenHistory.length ) return history;
+  const combatData = token._combatMoveData;
+  if ( combatData.lastRound < game.combat.round ) {
+    token[MODULE_ID].measurementHistory = [];
+    return history;
+  }
+  return token[MODULE_ID].measurementHistory;
+}
+
+/**
+ * Wrap Ruler.prototype._createMeasurementHistory
+ * Store the 3d values for the history
+ * @returns {RulerMeasurementHistory}    The next measurement history
+ */
+function _createMeasurementHistory(wrapped) {
+  const history = wrapped();
+  if ( !history.length ) return history;
+  history[0].z = this.segments[0].ray.A.z;
+  for ( let i = 0, h = 1, n = this.segments.length; i < n; i += 1 ) {
+    const s = this.segments[i];
+    if ( s.ray.distance === 0 ) continue;
+    history[h].z = s.ray.B.z;
+    h += 1;
+  }
+  return history;
 }
 
 /**
@@ -618,13 +666,6 @@ async function _animateSegment(token, segment, destination) {
 //     && !(segment.B.x === this.destination.x && segment.B.y === this.destination.y )
 //     && !this.waypoints.some(w => segment.B.x === w.x && segment.B.y === w.y) ) return;
 
-  // Update elevation before the token move.
-  // Only update drop to ground and user increment changes.
-  // Leave the rest to region elevation from Terrain Mapper or other modules.
-  // const waypoint = this.waypoints[segment.waypointIdx];
-  // const newElevation = waypoint.elevation;
-  // if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
-
   let name;
   if ( segment.animation?.name === undefined ) name = token.animationName;
   else name ||= Symbol(token.animationName);
@@ -642,7 +683,8 @@ async function _animateSegment(token, segment, destination) {
   await token.animate({x, y}, {name, duration: 0});
   await token.document.update(destination, updateOptions);
   await CanvasAnimation.getAnimation(name)?.promise;
-  const newElevation = distanceLabel(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
+  const newElevation = roundMultiple(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
+
   if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
 }
 
@@ -657,6 +699,9 @@ async function _animateSegment(token, segment, destination) {
 function clear(wrapper) {
   log("-----Clearing movePenaltyInstance-----");
   delete this._movePenaltyInstance;
+
+  // Remove the grandchildren, if any. Created by ruler label styles.
+  this.labels.children.forEach(l => l.children.forEach(c => c.destroy()));
   return wrapper();
 }
 
@@ -749,6 +794,8 @@ PATCHES.BASIC.WRAPS = {
   _removeWaypoint,
   _getMeasurementOrigin,
   _getMeasurementDestination,
+  _getMeasurementHistory,
+  _createMeasurementHistory,
 
   // Wraps related to segments
   _getCostFunction,

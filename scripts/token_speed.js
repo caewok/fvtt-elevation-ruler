@@ -44,15 +44,6 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
   let speedCategory = categoryIter.next().value;
   let maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
 
-  // Determine which speed category we are starting with
-  // Add in already moved combat distance and determine the starting category
-  if ( game.combat?.started
-    && Settings.get(Settings.KEYS.SPEED_HIGHLIGHTING.COMBAT_HISTORY) ) {
-
-    totalCombatMoveDistance = token.lastMoveDistance;
-    minDistance = totalCombatMoveDistance;
-  }
-
   return segment => {
     if ( !tokenSpeed ) {
       segment.speed = defaultColor;
@@ -138,7 +129,8 @@ function locateSegmentBreakpoint(segment, splitMoveDistance, { gridless, numPrev
     if ( breakpoint.equals(A) ) breakpoint.z = A.z;
     else if ( breakpoint.equals(B) ) breakpoint.z = B.z;
     else {
-      // Reset elevation to the proportional unit elevation between A.z and B.z if found.
+      // For gridded, we want the unit elevation along the segment.
+      // This creates "steps", where as we move from A to B we step in unit elevations.
       const t = Point3d.distanceBetween(A, breakpoint) / Point3d.distanceBetween(A, B);
       breakpoint.z = A.z + ((B.z - A.z) * t);
       const elevation = GridCoordinates3d.elevationForUnit(breakpoint.k);
@@ -159,39 +151,38 @@ function locateSegmentBreakpoint(segment, splitMoveDistance, { gridless, numPrev
 function targetSplitForSegment(targetCost, a, b, numPrevDiagonal = 0) {
   // Assume linear cost increment.
   // So divide move in half each time.
-  if ( targetDistanceExceeded(targetCost, a, b, 0, numPrevDiagonal) ) return a;
+  if ( splitCost(a, b, 0, numPrevDiagonal) > targetCost ) return a;
   const totalDist = Point3d.distanceBetween(a, b);
-  if ( !targetDistanceExceeded(targetCost, a, b, totalDist, numPrevDiagonal) ) return b;
+  if ( splitCost(a, b, totalDist, numPrevDiagonal) <= targetCost ) return b;
 
-  // Step in decreasing increments.
-  const stepDist = Math.floor(canvas.dimensions.size * 0.25);
-  let nextDist = totalDist;
-  let bestDist = 0;
-  let dir = 1;
-  let iter = 0;
+  // Now increment distance until we exceed the target cost.
+  // Take 1/2 steps. So if the distance is nearly at the end, we would go 1/2 + 1/4 + 1/8...
+  // Use pixel (integer) steps so the points are at integer bounds.
   const MAX_ITER = 100;
-  while ( nextDist > stepDist && iter < MAX_ITER ) {
+  let bestDist = 0;
+  let step = Math.floor(totalDist)
+  let iter = 0;
+  while ( step > 1 && iter < MAX_ITER) {
     iter += 1;
-    nextDist = Math.floor(nextDist * 0.5);
-    bestDist += (nextDist * dir);
-    if ( targetDistanceExceeded(targetCost, a, b, bestDist, numPrevDiagonal) ) dir = -1;
-    else dir = 1;
+    step = Math.floor(step * 0.5);
+    const testDist = bestDist + step;
+    if ( splitCost(a, b, testDist, numPrevDiagonal) <= targetCost ) bestDist = testDist;
   }
   return a.towardsPoint(b, bestDist);
 }
 
 /**
- * For a given segment, step distance, and target cost, determine if the target cost is exceeded or not.
+ * For a given segment, step distance, and target cost, determine if  the target cost is exceeded or not.
  * @param {number} targetCost
  * @param {Point3d} a
  * @param {Point3d} b
  * @param {number} [t0=1]
  * @param {number} [numPrevDiagonal=0]
  */
-function targetDistanceExceeded(targetCost, a, b, stepDist = 1, numPrevDiagonal = 0) {
+function splitCost(a, b, stepDist = 1, numPrevDiagonal = 0) {
   b = a.towardsPoint(b, stepDist, Point3d._tmp);
-  const res = GridCoordinates3d.gridMeasurementForSegment(a, b, numPrevDiagonal);
-  return res.cost <= targetCost;
+  b.roundDecimals(); // Ensure b is on a pixel, so we don't inadvertently exceed the cost at a border.
+  return GridCoordinates3d.gridMeasurementForSegment(a, b, numPrevDiagonal).cost;
 }
 
 /**

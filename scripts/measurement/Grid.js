@@ -1,14 +1,12 @@
 /* globals
 canvas,
-CONFIG,
 CONST
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { GridCoordinates3d, RegionMovementWaypoint3d } from "./grid_coordinates.js";
+import { GridCoordinates3d } from "./grid_coordinates.js";
 import { Point3d } from "../geometry/3d/Point3d.js";
-import { MODULE_ID } from "../const.js";
 
 /**
  * Modify Grid classes to measure in 3d.
@@ -51,7 +49,8 @@ function getDirectPathGridless(wrapped, waypoints) {
   // 1-to-1 relationship between the waypoints and the offsets2d for gridless.
   return offsets2d.map((offset2d, idx) => {
     const offset3d = GridCoordinates3d.fromOffset(offset2d);
-    offset3d.k = GridCoordinates3d.unitElevation(waypoints[idx].elevation);
+    const waypoint = GridCoordinates3d.fromObject(waypoints[idx]);
+    offset3d.k = GridCoordinates3d.unitElevation(waypoint.elevation);
     return offset3d;
   });
 }
@@ -118,12 +117,6 @@ function directPath3dSquare(start, end, path2d) {
     const doDiagonalElevationStep = !is2dDiagonal && diagonalElevationStepsRemaining > 0 && ((diagonalElevationStep + 1) % doDiagonalElevationStepMod) === 0;
     const doAdditionalElevationSteps = additionalElevationStepsRemaining > 0 && ((i + 1) % doAdditionalElevationStepMod) === 0;
 
-    /*
-    console.log(`${i} ${stepsRemaining}`,
-      { doDoubleDiagonalElevationStep, doDiagonalElevationStep, doAdditionalElevationSteps },
-      { doubleDiagonalElevationStepsRemaining, diagonalElevationStepsRemaining, additionalElevationStepsRemaining });
-    */
-
     // Either double or normal diagonals are the same but have separate tracking.
     if ( doDoubleDiagonalElevationStep ) {
       currOffset.k += 1;
@@ -138,7 +131,6 @@ function directPath3dSquare(start, end, path2d) {
 
     if ( doAdditionalElevationSteps ) {
       let elevationSteps =  Math.ceil(additionalElevationStepsRemaining / stepsRemaining);
-      // console.log("\t", { elevationSteps });
       while ( elevationSteps > 0 ) {
         currOffset.k += 1;
         elevationSteps -= 1;
@@ -242,7 +234,6 @@ function directPath3dHex(start, end, path2d) {
 
     const doElevationStep = ((i + 1) % doElevationStepMod) === 0;
     let elevationSteps = doElevationStep && (elevationStepsRemaining > 0) ? Math.ceil(elevationStepsRemaining / stepsRemaining) : 0;
-    console.log(`${i} ${stepsRemaining} | elevationSteps: ${elevationSteps}`)
     elevationStepsRemaining -= elevationSteps
 
     // Apply the first elevation step as a diagonal upwards move in combination with the canvas 2d move.
@@ -311,29 +302,6 @@ function singleOffsetHexDistanceFn(numDiagonals = 0) {
   return fn;
 }
 
-// ----- NOTE: Patches ----- //
-
-PATCHES_GridlessGrid.BASIC.WRAPS = { getDirectPath: getDirectPathGridless };
-PATCHES_SquareGrid.BASIC.WRAPS = { getDirectPath: getDirectPathGridded };
-PATCHES_HexagonalGrid.BASIC.WRAPS = { getDirectPath: getDirectPathGridded };
-
-PATCHES_GridlessGrid.BASIC.MIXES = { _measurePath };
-PATCHES_SquareGrid.BASIC.MIXES = { _measurePath };
-PATCHES_HexagonalGrid.BASIC.MIXES = { _measurePath };
-
-// ----- NOTE: Helper functions ----- //
-
-/**
- * Define certain parameters required in the result object.
- */
-function initializeResultObject(obj) {
-  obj.distance ??= 0;
-  obj.spaces ??= 0;
-  obj.cost ??= 0;
-  obj.diagonals ??= 0;
-  obj.offsetDistance ??= 0;
-}
-
 /**
  * Measure a path for a gridded scene. Handles hex and square grids.
  * @param {GridMeasurePathWaypoint[]} waypoints           The waypoints the path must pass through
@@ -368,9 +336,6 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
       offsetDistanceFn = singleOffsetHexDistanceFn(diagonals);
   }
   const altGridDistanceFn = GridCoordinates3d.alternatingGridDistanceFn();
-  const altGridDistanceOffsetFn = GridCoordinates3d.alternatingGridDistanceFn();
-  const altGridDistanceOffsetFn2 = GridCoordinates3d.alternatingGridDistanceFn();
-
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
     const end = waypoints[i];
     const path3d = canvas.grid.getDirectPath([start, end]);
@@ -382,17 +347,7 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
       const currPathPt = path3d[j];
       const dist = GridCoordinates3d.gridDistanceBetween(prevPathPt, currPathPt, altGridDistanceFn);
       const offsetDistance = offsetDistanceFn(prevPathPt, currPathPt);
-
-      // Debug:
-      // Can we use gridDistanceBetweenOffsets instead of the offsetDistanceFn?
-      // Can we assume dist will already be rounded to the nearest offsetDistance if very close?
-      if ( CONFIG[MODULE_ID].debug ) {
-        const offsetDistanceAlt = GridCoordinates3d.gridDistanceBetweenOffsets(prevPathPt, currPathPt, altGridDistanceOffsetFn2);
-        if ( !offsetDistance.almostEqual(offsetDistanceAlt) ) console.warn(`_measurePath|offset vs alt: ${offsetDistance},  ${offsetDistanceAlt}`, prevPathPt, currPathPt);
-        if ( dist !== offsetDistance && dist.almostEqual(offsetDistance) ) console.warn(`_measurePath| distance vs offset: ${dist}, ${offsetDistance}`, prevPathPt, currPathPt);
-      }
-
-      segment.distance += (dist.almostEqual(offsetDistance) ? offsetDistance : dist);
+      segment.distance += dist;
       segment.offsetDistance += offsetDistance;
       segment.cost += cost(prevPathPt, currPathPt, offsetDistance);
       prevPathPt = currPathPt;
@@ -426,17 +381,17 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
 /**
  * Wrap HexagonalGrid#getDirectPath and SquareGrid#getDirectPath
  * Returns the sequence of grid offsets of a shortest, direct path passing through the given waypoints.
- * @param {GridCoordinates[]} waypoints    The waypoints the path must pass through
+ * @param {Point3d[]} waypoints            The waypoints the path must pass through
  * @returns {GridOffset[]}                 The sequence of grid offsets of a shortest, direct path
  * @abstract
  */
 function getDirectPathGridded(wrapped, waypoints) {
   if ( !(waypoints[0] instanceof Point3d) ) return wrapped(waypoints);
-  let prevWaypoint = waypoints[0];
+  let prevWaypoint = GridCoordinates3d.fromObject(waypoints[0]);
   const path3d = [];
   const path3dFn = canvas.grid.isHexagonal ? directPath3dHex : directPath3dSquare;
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
-    const currWaypoint = waypoints[i];
+    const currWaypoint = GridCoordinates3d.fromObject(waypoints[i]);
     const path2d = wrapped([prevWaypoint, currWaypoint]);
 
     // Keep the exact start and end points, used by _measure to calculate distance.
@@ -451,150 +406,27 @@ function getDirectPathGridded(wrapped, waypoints) {
   return path3d;
 }
 
-// ----- NOTE: Debugging ----- //
+// ----- NOTE: Patches ----- //
+
+PATCHES_GridlessGrid.BASIC.WRAPS = { getDirectPath: getDirectPathGridless };
+PATCHES_SquareGrid.BASIC.WRAPS = { getDirectPath: getDirectPathGridded };
+PATCHES_HexagonalGrid.BASIC.WRAPS = { getDirectPath: getDirectPathGridded };
+
+PATCHES_GridlessGrid.BASIC.MIXES = { _measurePath };
+PATCHES_SquareGrid.BASIC.MIXES = { _measurePath };
+PATCHES_HexagonalGrid.BASIC.MIXES = { _measurePath };
+
+// ----- NOTE: Helper functions ----- //
 
 /**
- * Test gridUnder3dLine.
+ * Define certain parameters required in the result object.
  */
-export function testMeasurePath() {
-  console.group("testMeasurePath");
-  const pixelsToGridUnits = CONFIG.GeometryLib.utils.pixelsToGridUnits;
-  const start = new RegionMovementWaypoint3d(1000, 1200);
-  const startOffset = GridCoordinates3d.fromOffset({i: 10, j: 12});
-  let end, res, baseline;
-
-  // Move north 4 spaces.
-  end = start.add({x: 0, y: 400});
-  res = canvas.grid.measurePath([start, end])
-  baseline = canvas.grid.measurePath([start.to2d(), end.to2d()])
-  logComparison("Move north 400 pixels", baseline, res);
-
-  end = startOffset.add(GridCoordinates3d.fromOffset({ i: 4, j: 0}));
-  res = canvas.grid.measurePath([start, end])
-  baseline = canvas.grid.measurePath([start.to2d(), end.to2d()])
-  logComparison("Move north 4 spaces", baseline, res);
-
-  // Move horizontal 4 spaces.
-  end = start.add({x: 400, y: 0});
-  res = canvas.grid.measurePath([start, end])
-  baseline = canvas.grid.measurePath([start.to2d(), end.to2d()])
-  logComparison("Move east 400 pixels", baseline, res);
-
-  end = startOffset.add(GridCoordinates3d.fromOffset({ i: 0, j: 4}));
-  res = canvas.grid.measurePath([start, end])
-  baseline = canvas.grid.measurePath([start.to2d(), end.to2d()])
-  logComparison("Move east 4 spaces", baseline, res);
-
-  // Move diagonal 4 spaces.
-  end = start.add({x: 400, y: 400});
-  res = canvas.grid.measurePath([start, end])
-  baseline = canvas.grid.measurePath([start.to2d(), end.to2d()])
-  logComparison("Move northeast 400 pixels", baseline, res);
-
-  end = startOffset.add(GridCoordinates3d.fromOffset({ i: 4, j: 4}));
-  res = canvas.grid.measurePath([start, end])
-  baseline = canvas.grid.measurePath([start.to2d(), end.to2d()])
-  logComparison("Move northeast 4 spaces", baseline, res);
-
-  // NOTE: Elevation. Use known values.
-  console.log("\nElevation");
-
-  // Move up 4 spaces.
-  end = start.add({x: 0, y: 0, z: 400});
-  res = canvas.grid.measurePath([start, end])
-  logElevationComparison("Move up 400 pixels", start, end, GridCoordinates3d.unitElevation(pixelsToGridUnits(400)), res);
-
-  end = startOffset.add(GridCoordinates3d.fromOffset({ i: 0, j: 0, k: 4}));
-  res = canvas.grid.measurePath([start, end])
-  logElevationComparison("Move up 4 spaces", start, end, 4, res);
-
-  // Move vertical 4, up 1.
-  end = start.add({x: 0, y: 400, z: 100});
-  res = canvas.grid.measurePath([start, end])
-  logElevationComparison("Move north 400 pixels, up 100 pixels", start, end, GridCoordinates3d.unitElevation(pixelsToGridUnits(400)), res);
-
-  end = startOffset.add(GridCoordinates3d.fromOffset({ i: 4, j: 0, k: 1}));
-  res = canvas.grid.measurePath([start, end])
-  logElevationComparison("Move north 4 spaces, up 1 space", start, end, 4, res);
-
-  // Move horizontal 4, down 1.
-  end = start.add({x: 0, y: 400, z: -100});
-  res = canvas.grid.measurePath([start, end])
-  logElevationComparison("Move east 400 pixels, down 100 pixels", start, end, GridCoordinates3d.unitElevation(pixelsToGridUnits(400)), res);
-
-  end = startOffset.add(GridCoordinates3d.fromOffset({ i: 4, j: 0, k: -1}));
-  res = canvas.grid.measurePath([start, end])
-  logElevationComparison("Move east 4 spaces, down 1 space", start, end, 4, res);
-
-  // Move diagonal 5, up 2.
-  end = start.add({x: 500, y: 500, z: 200});
-  res = canvas.grid.measurePath([start, end])
-  logElevationComparison("Move diagonal 500 pixels, up 200 pixels", start, end, GridCoordinates3d.unitElevation(pixelsToGridUnits(500)), res);
-
-  end = startOffset.add(GridCoordinates3d.fromOffset({ i: 4, j: 0, k: 2}));
-  res = canvas.grid.measurePath([start, end])
-  logElevationComparison("Move diagonal 5 spaces, up 2 spaces", start, end, 5, res);
-
-  // Move diagonal 5, up 3.
-  end = start.add({x: 500, y: 500, z: 300});
-  res = canvas.grid.measurePath([start, end])
-  logElevationComparison("Move diagonal 500 pixels, up 300 pixels", start, end, GridCoordinates3d.unitElevation(pixelsToGridUnits(500)), res);
-
-  end = startOffset.add(GridCoordinates3d.fromOffset({ i: 5, j: 5, k: 3}));
-  res = canvas.grid.measurePath([start, end])
-  logElevationComparison("Move diagonal 5 spaces, up 3 spaces", start, end, 5, res);
-
-  console.groupEnd("testGridUnder3dLine")
-}
-
-function logComparison(description, baseline, res) {
-  const labelFn = bool => bool ? "Ã" : "X";
-  const totalDistanceSame = baseline.distance.almostEqual(res.distance)
-  const totalsSame = movementResultTotalsEqual(baseline, res);
-  const segmentsSame = movementResultSegmentsEqual(baseline, res);
-  const waypointsSame = movementResultWaypointsEqual(baseline, res)
-  console.log(`${description}. distance: ${labelFn(totalDistanceSame)} | totals:  ${labelFn(totalsSame)} | segments: ${labelFn(segmentsSame)} | waypoints: ${labelFn(waypointsSame)}`)
-}
-
-function logElevationComparison(description, a, b, spaces, res) {
-  const pixelsToGridUnits = CONFIG.GeometryLib.utils.pixelsToGridUnits;
-  console.log(`${description}. \
-  distance: ${res.distance.almostEqual(pixelsToGridUnits(Point3d.distanceBetween(a, b))) ? "Ã" : "X"} \
-  spaces: ${res.spaces === spaces ? "Ã" : "X"}`);
+function initializeResultObject(obj) {
+  obj.distance ??= 0;
+  obj.spaces ??= 0;
+  obj.cost ??= 0;
+  obj.diagonals ??= 0;
+  obj.offsetDistance ??= 0;
 }
 
 
-function movementResultObjectsEqual(obj1, obj2) {
-  let allSame = true;
-  allSame &&= obj1.distance.almostEqual(obj2.distance);
-  allSame &&= obj1.spaces.almostEqual(obj2.spaces);
-  allSame &&= obj1.cost.almostEqual(obj2.cost);
-  if ( typeof obj1.diagonals !== "undefined" ) allSame &&= obj1.diagonals.almostEqual(obj2.diagonals);
-  return allSame;
-}
-
-function movementResultTotalsEqual(res1, res2) { return movementResultObjectsEqual(res1, res2); }
-
-function movementResultSegmentsEqual(res1, res2) {
-  const segments1 = res1.segments;
-  const segments2 = res2.segments;
-  if ( segments1.length !== segments2.length ) return false;
-  for ( let i = 0; i < segments1.length; i += 1 ) {
-    const s1 = segments1[i];
-    const s2 = segments2[i];
-    if ( !movementResultObjectsEqual(s1, s2) ) return false;
-  }
-  return true;
-}
-
-function movementResultWaypointsEqual(res1, res2) {
-  const waypoints1 = res1.waypoints;
-  const waypoints2 = res2.waypoints;
-  if ( waypoints1.length !== waypoints2.length ) return false;
-  for ( let i = 0; i < waypoints1.length; i += 1 ) {
-    const w1 = waypoints1[i];
-    const w2 = waypoints2[i];
-    if ( !movementResultObjectsEqual(w1, w2) ) return false;
-  }
-  return true;
-}

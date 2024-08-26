@@ -8,6 +8,7 @@ renderTemplate
 "use strict";
 
 import { MODULE_ID } from "./const.js";
+import { Settings } from "./settings.js";
 
 export function log(...args) {
   try {
@@ -52,7 +53,7 @@ export function gridShape(coords) {
  * @param {GridCoordinates} coords      Grid (i,j) offset or x,y coordinates
  * @returns {PIXI.Rectangle}
  */
-export function squareGridShape(coords) {
+function squareGridShape(coords) {
   const { x, y } = canvas.grid.getTopLeftPoint(coords);
   const sizeX = canvas.grid.sizeX || canvas.grid.size; // V12 || v11
   const sizeY = canvas.grid.sizeY || canvas.grid.size; // V12 || v11
@@ -64,7 +65,7 @@ export function squareGridShape(coords) {
  * @param {GridCoordinates} coords      Grid (i,j) offset or x,y coordinates
  * @returns {PIXI.Polygon}
  */
-export function hexGridShape(coords) {
+function hexGridShape(coords) {
   return new PIXI.Polygon(...canvas.grid.getVertices(coords));
 }
 
@@ -276,5 +277,17 @@ export function renderTemplateSync(path, data) {
     allowProtoMethodsByDefault: true,
     allowProtoPropertiesByDefault: true
   });
+}
+
+/**
+ * Rounds the number to the multiple from the Round Distance to Multiple setting.
+ * Otherwise, returns original number.
+ * @param {number} num The number to round
+ * @returns {number}   The rounded number
+ */
+export function roundMultiple (num) {
+  const multiple = Settings.get(Settings.KEYS.LABELING.ROUND_TO_MULTIPLE);
+  if (multiple) return num.toNearest(multiple);
+  return num;
 }
 

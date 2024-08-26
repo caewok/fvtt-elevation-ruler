@@ -104,7 +104,7 @@
     "elevationruler.controls.pathfinding-control.name": "Trova Percorso",
 
     "elevationruler.drawingconfig.movementPenalty.name": "Bonus/Penalità Movimento",
-    "elevationruler.drawingconfig.movementPenalty.hint": "Impostato a 1 senza penalità. Valori maggiori di uno penalizzano il movimento di quella percentuale; valori inferiori a uno garantiscono effettivamente un bonus al movimento. Ad esempio, impostalo su 2 per raddoppiare il movimento in quest'area.",
+    "elevationruler.drawingconfig.movementPenalty.hint": "Impostato a 1 senza penalità. Valori maggiori di uno penalizzano il movimento di quella percentuale; valori inferiori a uno garantiscono effettivamente un bonus al movimento. Ad esempio, impostalo su 2 per raddoppiare il movimento in quest'area. Il movimento sotto l'elevazione del disegno verrà ignorato.",
     
     "elevationruler.clearMovement": "Cancella Movimento Combattente"
 }

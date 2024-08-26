@@ -3,6 +3,7 @@ canvas,
 CONFIG,
 CONST,
 foundry,
+game,
 PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -10,6 +11,7 @@ PIXI
 
 import { Point3d } from "../geometry/3d/Point3d.js";
 import { isOdd } from "../util.js";
+import { Settings } from "../settings.js";
 
 
 // ----- NOTE: Foundry typedefs  ----- //
@@ -42,6 +44,19 @@ export class GridCoordinates extends PIXI.Point {
     const pt = new this();
     pt.setOffset(offset);
     return pt;
+  }
+
+  /**
+   * Factory function that converts a Foundry GridCoordinates.
+   * If the object has x,y properties, those are favored over i,j.
+   * @param {object}
+   * @returns {GridCoordinates}
+   */
+  static fromObject(obj) {
+    const newObj = super.fromObject(obj);
+    if ( Object.hasOwn(obj, "i") && !Object.hasOwn(obj, "x") ) newObj.i = obj.i;
+    if ( Object.hasOwn(obj, "j") && !Object.hasOwn(obj, "y") ) newObj.j = obj.j;
+    return newObj;
   }
 
   /** @type {number} */
@@ -132,7 +147,7 @@ export class GridCoordinates extends PIXI.Point {
    * @returns {number} Distance, in grid units
    */
   static gridDistanceBetween(a, b, altGridDistFn) {
-    if ( canvas.grid.isGridless ) return this.distanceBetween(a, b);
+    if ( canvas.grid.isGridless ) return CONFIG.GeometryLib.utils.pixelsToGridUnits(this.distanceBetween(a, b));
     const distFn = canvas.grid.isHexagonal ? hexGridDistanceBetween : squareGridDistanceBetween;
     const dist = distFn(a, b, altGridDistFn);
 
@@ -194,8 +209,9 @@ export class GridCoordinates extends PIXI.Point {
  */
 function hexGridDistanceBetween(p0, p1, altGridDistFn) {
   const D = CONST.GRID_DIAGONALS;
-  p0.z ??= 0;
-  p1.z ??= 0;
+  if ( !(p0 instanceof Point3d) ) p0 = Point3d.fromObject(p0);
+  if ( !(p1 instanceof Point3d) ) p1 = Point3d.fromObject(p1);
+
 
   // Translate the 2d movement to cube units. Elevation is in grid size units.
   const d0 = canvas.grid.pointToCube(p0);
@@ -207,14 +223,15 @@ function hexGridDistanceBetween(p0, p1, altGridDistFn) {
 
   // Like with squareGridDistanceBetween, use the maximum axis to avoid Math.max(), Max.min() throughout.
   const [maxAxis, minAxis] = dist2d > distElev ? [dist2d, distElev] : [distElev, dist2d];
-
-  // TODO: Make setting to use Euclidean distance.
-  // exactDistanceFn = setting ? Math.hypot : exactGridDistance;
   let l;
   const diagonals = game.settings.get("core", "gridDiagonals");
   switch ( diagonals ) {
     case D.EQUIDISTANT: l = maxAxis; break; // Max dx, dy, dz
-    case D.EXACT: l = exactGridDistance(maxAxis, minAxis); break;
+    case D.EXACT: {
+      const fn = Settings.get(Settings.KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE) ? Math.hypot : exactGridDistance;
+      l = fn(maxAxis, minAxis);
+      break;
+    }
     case D.APPROXIMATE: l = approxGridDistance(maxAxis, minAxis); break;
     case D.ALTERNATING_1:
     case D.ALTERNATING_2: {
@@ -241,6 +258,7 @@ function exactGridDistance(maxAxis = 0, midAxis = 0, minAxis = 0) {
   // Equivalent to:
   // maxAxis + (A * (midAxis - minAxis)) + (B * minAxis);
 }
+
 
 /**
  * Track the diagonals required for measuring alternating grid distance.
@@ -308,8 +326,8 @@ function _alternatingGridDistance(maxAxis = 0, midAxis = 0, minAxis = 0) {
  */
 function squareGridDistanceBetween(p0, p1, altGridDistFn) {
   const D = CONST.GRID_DIAGONALS;
-  p0.z ??= 0;
-  p1.z ??= 0;
+  if ( !(p0 instanceof Point3d) ) p0 = Point3d.fromObject(p0);
+  if ( !(p1 instanceof Point3d) ) p1 = Point3d.fromObject(p1);
 
   // Normalize so that dx === 1 when traversing 1 grid space.
   const dx = Math.abs(p0.x - p1.x) / canvas.grid.size;
@@ -329,7 +347,11 @@ function squareGridDistanceBetween(p0, p1, altGridDistFn) {
   let l;
   switch ( canvas.grid.diagonals ) {
     case D.EQUIDISTANT: l = maxAxis; break; // Max dx, dy, dz
-    case D.EXACT: l = exactGridDistance(maxAxis, midAxis, minAxis); break;
+    case D.EXACT: {
+      const fn = Settings.get(Settings.KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE) ? Math.hypot : exactGridDistance;
+      l = fn(maxAxis, midAxis, minAxis);
+      break;
+    }
     case D.APPROXIMATE: l = approxGridDistance(maxAxis, midAxis, minAxis); break;
     case D.ALTERNATING_1:
     case D.ALTERNATING_2: {
@@ -342,164 +364,6 @@ function squareGridDistanceBetween(p0, p1, altGridDistFn) {
   }
   return l * canvas.grid.distance;
 }
-
-/**
- * Measure the 2d segment distance for a square grid, accounting for diagonal movement.
- * Original version from HexagonalGrid#_measure for debugging.
- * @param {Point} a
- * @param {Point} b
- * @returns {number} Distance before accounting for grid size.
- */
-function hexGridDistanceBetweenOrig(p0, p1) {
-  // Convert to (fractional) cube coordinates
-  const toCube = coords => {
-    if ( coords.x !== undefined ) return canvas.grid.pointToCube(coords);
-    if ( coords.i !== undefined ) return canvas.grid.offsetToCube(coords);
-    return coords;
-  };
-
-  const d0 = toCube(p0);
-  const d1 = toCube(p1);
-  const d = foundry.grid.HexagonalGrid.cubeDistance(d0, d1);
-  return d * canvas.grid.distance;
-}
-
-/**
- * Measure the 3dd segment distance for a square grid, accounting for diagonal movement.
- * @param {Point} a
- * @param {Point} b
- * @returns {number} Distance before accounting for grid size.
- */
-function hexGridDistance3dBetweenOrig(p0, p1, is3D = true) {
-  // Convert to (fractional) cube coordinates
-  const toCube = coords => {
-    if ( coords.x !== undefined ) return canvas.grid.pointToCube(coords);
-    if ( coords.i !== undefined ) return canvas.grid.offsetToCube(coords);
-    return coords;
-  };
-
-  const d0 = toCube(p0);
-  const d1 = toCube(p1);
-  d0.k = (p0.z / canvas.grid.size) | 0;
-  d1.k = (p1.z / canvas.grid.size) | 0;
-
-  let a = foundry.grid.HexagonalGrid.cubeDistance(d0, d1);
-  let b = 0;
-  if ( is3D ) {
-    b = Math.abs(d0.k - d1.k);
-    if ( a < b ) [a, b] = [b, a];
-  }
-  let l;
-  const D = CONST.GRID_DIAGONALS;
-  const diagonals = game.settings.get("core", "gridDiagonals");
-  let ld = diagonals === D.ALTERNATING_2 ? 1 : 0;
-  switch ( diagonals ) {
-    case D.EQUIDISTANT: l = a; break;
-    case D.EXACT: l = a + ((Math.SQRT2 - 1) * b); break;
-    case D.APPROXIMATE: l = a + (0.5 * b); break;
-    case D.ILLEGAL: l = a + b; break;
-    case D.ALTERNATING_1:
-    case D.ALTERNATING_2:
-      const ld0 = ld;
-      ld += b;
-      l = a + ((Math.abs(((ld - 1) / 2) - Math.floor(ld / 2)) + ((ld - 1) / 2))
-        - (Math.abs(((ld0 - 1) / 2) - Math.floor(ld0 / 2)) + ((ld0 - 1) / 2)));
-      break;
-    case D.RECTILINEAR: l = a + b; break;
-  }
-  return l * canvas.grid.distance;
-}
-
-
-
-/**
- * Measure the 2d segment distance for a square grid, accounting for diagonal movement.
- * Original version from SquareGrid#_measure for debugging.
- * @param {Point} a
- * @param {Point} b
- * @returns {number} Distance in grid units
- */
-function squareGridDistanceBetweenOrig(p0, p1, { da = 0, db = 0, l0 = 0 } = 0) {
-  // From SquareGrid#_measure
-  const dx = Math.abs(p0.x - p1.x) / canvas.grid.size;
-  const dy = Math.abs(p0.y - p1.y) / canvas.grid.size;
-  let l;
-  const D = CONST.GRID_DIAGONALS;
-  switch ( canvas.grid.diagonals ) {
-    case D.EQUIDISTANT: l = Math.max(dx, dy); break;
-    case D.EXACT: l = Math.max(dx, dy) + ((Math.SQRT2 - 1) * Math.min(dx, dy)); break;
-    case D.APPROXIMATE: l = Math.max(dx, dy) + (0.5 * Math.min(dx, dy)); break;
-    case D.ALTERNATING_1:
-    case D.ALTERNATING_2:
-      {
-        const a = da += Math.max(dx, dy);
-        const b = db += Math.min(dx, dy);
-        const c = Math.floor(b / 2);
-        const d = b - (2 * c);
-        const e = Math.min(d, 1);
-        const f = Math.max(d, 1) - 1;
-        const l1 = a - b + (3 * c) + e + f + (canvas.grid.diagonals === D.ALTERNATING_1 ? f : e);
-        l = l1 - l0;
-        l0 = l1;
-      }
-      break;
-    case D.RECTILINEAR:
-    case D.ILLEGAL: l = dx + dy; break;
-  }
-  return l * canvas.grid.distance;
-}
-
-function squareGridDistance3dBetweenOrig(p0, p1, is3D = true) {
-  const D = CONST.GRID_DIAGONALS;
-  let l0 = canvas.grid.diagonals === D.ALTERNATING_2 ? 1.0 : 0.0;
-  let dx0 = l0;
-  let dy0 = l0;
-  let dz0 = l0;
-
-  let dx = Math.abs(p0.x - p1.x) / canvas.grid.size;
-  let dy = Math.abs(p0.y - p1.y) / canvas.grid.size;
-  if ( dx < dy ) [dx, dy] = [dy, dx];
-  let dz = 0;
-  if ( is3D ) {
-    dz = Math.abs(p0.z - p1.z) / canvas.grid.size;
-    if ( dy < dz ) [dy, dz] = [dz, dy];
-    if ( dx < dy ) [dx, dy] = [dy, dx];
-  }
-
-  // From SquareGrid#_measure
-  let l; // The distance of the segment
-  switch ( canvas.grid.diagonals ) {
-    case D.EQUIDISTANT: l = dx; break;
-    case D.EXACT: l = dx + (((Math.SQRT2 - 1) * (dy - dz)) + ((Math.SQRT3 - 1) * dz)); break;
-    case D.APPROXIMATE: l = dx + ((0.5 * (dy - dz)) + (0.75 * dz)); break;
-    case D.RECTILINEAR: l = dx + (dy + dz); break;
-    case D.ALTERNATING_1:
-    case D.ALTERNATING_2:
-      {
-        dx0 += dx;
-        dy0 += dy;
-        dz0 += dz;
-        const fx = Math.floor(dx0);
-        const fy = Math.floor(dy0);
-        const fz = Math.floor(dz0);
-        const a = fx + (0.5 * fy) + (0.25 * fz);
-        const a0 = Math.floor(a);
-        const a1 = Math.floor(a + 1);
-        const a2 = Math.floor(a + 1.5);
-        const a3 = Math.floor(a + 1.75);
-        const mx = dx0 - fx;
-        const my = dy0 - fy;
-        const mz = dz0 - fz;
-        const l1 = (a0 * (1 - mx)) + (a1 * (mx - my)) + (a2 * (my - mz)) + (a3 * mz);
-        l = l1 - l0;
-        l0 = l1;
-      }
-      break;
-    case D.ILLEGAL: l = dx + (dy + dz); break;
-  }
-  return l * canvas.grid.distance;
-}
-
 
 // ----- NOTE: 3d versions of Foundry typedefs ----- //
 
@@ -591,6 +455,23 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
   static gridCenterForPoint(pt) {
     pt = new this(pt.x, pt.y, pt.z);
     return pt.centerToOffset();
+  }
+
+  /**
+   * Factory function that converts a Foundry GridCoordinates.
+   * If the object has x,y,z,elevation properties, those are favored over i,j,k.
+   * @param {object}
+   * @returns {GridCoordinates3d}
+   */
+  static fromObject(obj) {
+    const newObj = super.fromObject(obj);
+    if ( Object.hasOwn(obj, "i") && !Object.hasOwn(obj, "x") ) newObj.i = obj.i;
+    if ( Object.hasOwn(obj, "j") && !Object.hasOwn(obj, "y") ) newObj.j = obj.j;
+    if ( Object.hasOwn(obj, "k")
+      && !(Object.hasOwn(obj, "z")
+        || Object.hasOwn(obj, "elevationZ")
+        || Object.hasOwn(obj, "elevation")) ) newObj.k = obj.k;
+    return newObj;
   }
 
   /** @type {number} */
@@ -732,7 +613,7 @@ export class GridCoordinates3d extends RegionMovementWaypoint3d {
    * @returns {number} Distance, in grid units
    */
   static gridDistanceBetween(a, b, altGridDistFn) {
-    if ( canvas.grid.isGridless ) return this.distanceBetween(a, b);
+    if ( canvas.grid.isGridless ) return CONFIG.GeometryLib.utils.pixelsToGridUnits(this.distanceBetween(a, b));
     const distFn = canvas.grid.isHexagonal ? hexGridDistanceBetween : squareGridDistanceBetween;
     const dist = distFn(a, b, altGridDistFn);
 

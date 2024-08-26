@@ -94,7 +94,7 @@ function dnd5eMovementType(token, position) {
   if ( !token.actor?.statuses ) return MOVEMENT_TYPES.WALK;
   if ( token.actor.statuses.has("flying") ) return MOVEMENT_TYPES.FLY;
   if ( token.actor.statuses.has("burrow") ) return MOVEMENT_TYPES.BURROW;
-  if ( Settings.get(Settings.KEYS.AUTO_MOVEMENT_TYPE) ) return determineMovementType(token, position);
+  if ( Settings.get(Settings.KEYS.MEASURING.AUTO_MOVEMENT_TYPE) ) return determineMovementType(token, position);
   return MOVEMENT_TYPES.WALK;
 }
 

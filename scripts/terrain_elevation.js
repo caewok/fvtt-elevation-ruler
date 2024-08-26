@@ -162,6 +162,7 @@ export function destinationElevation() {
  * @returns {number} Elevation, in grid units.
  */
 export function elevationFromWaypoint(waypoint, location, token) {
+  waypoint.elevation ??= 0; // Issue #166.
   const isTokenRuler = Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED)
     && ui.controls.activeControl === "token"
     && ui.controls.activeTool === "select"
@@ -261,7 +262,7 @@ export function terrainElevationAtLocation(location, startingElevation = 0) {
   if ( isFinite(tmRes) ) return tmRes;
 
   const levelsRes = LevelsElevationAtPoint(location, startingElevation);
-  if ( isFinite(levelsRes) ) return levelsRes;
+  if ( levelsRes !== null && isFinite(levelsRes) ) return levelsRes;
 
   // Default is the scene or location elevation.
   return location.elevation ?? 0;
