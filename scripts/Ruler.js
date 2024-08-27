@@ -39,7 +39,7 @@ import {
 import { tokenSpeedSegmentSplitter } from "./token_speed.js";
 import { log, roundMultiple } from "./util.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
-import { GridCoordinates3d } from "./measurement/grid_coordinates.js";
+import { GridCoordinates3d } from "./geometry/3d/GridCoordinates3d.js";
 
 /**
  * Modified Ruler

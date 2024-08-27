@@ -10,7 +10,7 @@ Ruler
 import { MODULE_ID, FLAGS } from "./const.js";
 import { Settings } from "./settings.js";
 import { log } from "./util.js";
-import { GridCoordinates3d } from "./measurement/grid_coordinates.js";
+import { GridCoordinates3d } from "./geometry/3d/GridCoordinates3d.js";
 
 // Patches for the Token class
 export const PATCHES = {};
