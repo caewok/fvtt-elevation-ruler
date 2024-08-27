@@ -375,7 +375,8 @@ function _getMeasurementSegments(wrapped) {
       const flying = movementTypeStart === MOVEMENT_TYPES.FLY || movementTypeEnd === MOVEMENT_TYPES.FLY;
       const burrowing = movementTypeStart === MOVEMENT_TYPES.BURROW || movementTypeEnd === MOVEMENT_TYPES.BURROW;
       const subPath = ElevationHandler.constructPath(prevPt, nextPt, { flying, burrowing, token });
-      pathPoints.push(...subPath); // PathPoints is a non-dupes array, so duplicate start/ends will be dropped.
+      subPath.shift(); // Remove prevPt from the array.
+      pathPoints.push(...subPath);
     }
     const t1 = performance.now();
     log(`Found terrain path with ${pathPoints.length} points in ${t1-t0} ms.`);
