@@ -13,6 +13,7 @@ import { MODULE_ID } from "../const.js";
 import { Draw } from "../geometry/Draw.js";
 import { WallTracerEdge } from "./WallTracer.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
+import { Settings } from "../Settings.js";
 
 const OTHER_DIRECTION = {
   ccw: "cw",
