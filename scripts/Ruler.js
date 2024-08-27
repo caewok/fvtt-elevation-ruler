@@ -560,11 +560,11 @@ function _highlightMeasurementSegment(wrapped, segment) {
 // ----- NOTE: Token movement ----- //
 
 /**
- * Mixed wrap Ruler.prototype._animateMovement
+ * Wrap Ruler.prototype._animateMovement
  * Add additional controlled tokens to the move, if permitted.
  */
 async function _animateMovement(wrapped, token) {
-  if ( !this.segments || !this.segments.length ) return; // Ruler._animateMovement expects at least one segment.
+  if ( !this.segments || !this.segments.length ) return wrapped(token); // Ruler._animateMovement expects at least one segment.
 
   if ( CONFIG[MODULE_ID].debug ) {
     console.groupCollapsed(`${MODULE_ID}|_animateMovement`);
@@ -651,43 +651,21 @@ function _canMove(wrapper, token) {
 }
 
 /**
- * Override Ruler.prototype._animateSegment
+ * Wrap Ruler.prototype._animateSegment
  * When moving the token along the segments, update the token elevation to the destination + increment
  * for the given segment.
  * Mark the token update if pathfinding for this segment.
  */
 async function _animateSegment(token, segment, destination) {
   log(`Updating ${token.name} destination from ({${token.document.x},${token.document.y}) to (${destination.x},${destination.y}) for segment (${segment.ray.A.x},${segment.ray.A.y})|(${segment.ray.B.x},${segment.ray.B.y})`);
-
-  // If the segment is teleporting and the segment destination is not a waypoint or ruler destination, skip.
-  // Doesn't work because _animateMovement stops the movement if the token does not make it to the
-  // next waypoint.
-//   if ( segment.teleport
-//     && !(segment.B.x === this.destination.x && segment.B.y === this.destination.y )
-//     && !this.waypoints.some(w => segment.B.x === w.x && segment.B.y === w.y) ) return;
-
-  let name;
-  if ( segment.animation?.name === undefined ) name = token.animationName;
-  else name ||= Symbol(token.animationName);
+  destination.elevation = roundMultiple(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
   const updateOptions = {
-    // terrainmapper: { usePath: false },
     rulerSegment: this.segments.length > 1,
     firstRulerSegment: segment.first,
-    lastRulerSegment: segment.last,
-    rulerSegmentOrigin: segment.ray.A,
-    rulerSegmentDestination: segment.ray.B,
-    teleport: segment.teleport,
-    animation: {...segment.animation, name}
+    lastRulerSegment: segment.last
   }
-  const {x, y} = token.document._source;
-  await token.animate({x, y}, {name, duration: 0});
-  await token.document.update(destination, updateOptions);
-  await CanvasAnimation.getAnimation(name)?.promise;
-  const newElevation = roundMultiple(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
-
-  if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
+  return wrapped(token, segment, destination);
 }
-
 
 
 // ----- NOTE: Event handling ----- //
@@ -797,6 +775,10 @@ PATCHES.BASIC.WRAPS = {
   _getMeasurementHistory,
   _createMeasurementHistory,
 
+  // Movement
+  _animateMovement,
+  _animateSegment,
+
   // Wraps related to segments
   _getCostFunction,
   _getSegmentLabel,
@@ -807,9 +789,9 @@ PATCHES.BASIC.WRAPS = {
   _onMoveKeyDown
 };
 
-PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments, _broadcastMeasurement };
+PATCHES.BASIC.MIXES = { _getMeasurementSegments, _broadcastMeasurement };
 
-PATCHES.BASIC.OVERRIDES = { _animateSegment, _addWaypoint, _computeDistance };
+PATCHES.BASIC.OVERRIDES = { _addWaypoint, _computeDistance };
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 
