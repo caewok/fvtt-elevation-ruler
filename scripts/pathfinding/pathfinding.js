@@ -18,7 +18,7 @@ import { cdt2dConstrainedGraph, cdt2dToBorderTriangles } from "../delaunator/cdt
 import { Settings } from "../settings.js";
 import { MODULE_ID } from "../const.js";
 import { MovePenalty } from "../measurement/MovePenalty.js";
-import { GridCoordinates3d } from "../measurement/grid_coordinates.js";
+import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 
 /* Testing
 

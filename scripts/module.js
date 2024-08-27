@@ -16,9 +16,6 @@ import { log, gridShape } from "./util.js";
 import { defaultHPAttribute } from "./system_attributes.js";
 import { registerGeometry } from "./geometry/registration.js";
 
-// Grid coordinates
-import { GridCoordinates, RegionMovementWaypoint3d, GridCoordinates3d } from "./measurement/grid_coordinates.js";
-
 // Move Penalty
 import { MovePenalty } from "./measurement/MovePenalty.js";
 
@@ -152,13 +149,7 @@ Hooks.once("init", function() {
   game.modules.get(MODULE_ID).api = {
     gridShape,
     PATCHER,
-
-    measure: {
-      GridCoordinates,
-      RegionMovementWaypoint3d,
-      GridCoordinates3d,
-      MovePenalty
-    },
+    MovePenalty,
 
     pathfinding: {
       BorderTriangle,

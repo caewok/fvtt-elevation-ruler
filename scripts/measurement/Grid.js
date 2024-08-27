@@ -5,7 +5,7 @@ CONST
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { GridCoordinates3d } from "./grid_coordinates.js";
+import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { Point3d } from "../geometry/3d/Point3d.js";
 
 /**
