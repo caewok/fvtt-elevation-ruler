@@ -1,6 +1,5 @@
 /* globals
 canvas,
-CanvasAnimation,
 CONFIG,
 CONST,
 game,
@@ -32,7 +31,6 @@ import {
   constructPathfindingSegments } from "./segments.js";
 import { movementTypeForTokenAt } from "./token_hud.js";
 import {
-  getPriorDistance,
   highlightLineRectangle,
   basicTextLabel,
   customizedTextLabel } from "./segment_labels_highlighting.js";
@@ -40,6 +38,7 @@ import { tokenSpeedSegmentSplitter } from "./token_speed.js";
 import { log, roundMultiple } from "./util.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
 import { GridCoordinates3d } from "./geometry/3d/GridCoordinates3d.js";
+import { RegionMovementWaypoint3d } from "./geometry/3d/RegionMovementWaypoint3d.js";
 
 /**
  * Modified Ruler
@@ -133,7 +132,9 @@ function update(wrapper, data) {
   if ( !myData ) return wrapper(data); // Just in case.
 
   // Hide GM token ruler
-  if ( data.token && this.user.isGM && !game.user.isGM && Settings.get(Settings.KEYS.TOKEN_RULER.HIDE_GM)) return wrapper(data);
+  if ( data.token
+    && this.user.isGM
+    && !game.user.isGM && Settings.get(Settings.KEYS.TOKEN_RULER.HIDE_GM)) return wrapper(data);
 
   // Fix for displaying user elevation increments as they happen.
   const triggerMeasure = this._userElevationIncrements !== myData._userElevationIncrements;
@@ -175,7 +176,7 @@ function _broadcastMeasurement(wrapped) {
       const elevationChanged = previewToken.document.elevation !== destElevation;
       if ( elevationChanged && isFinite(destElevation) ) {
         previewToken.document.elevation = destElevation;
-        previewToken.renderFlags.set({ "refreshTooltip": true })
+        previewToken.renderFlags.set({ refreshTooltip: true });
       }
     }
   }
@@ -252,8 +253,8 @@ function _getMeasurementOrigin(wrapped, point, {snap=true}={}) {
   const { width, height } = token.getSize();
   const tl = token.document;
   return {
-    x: tl.x + width * 0.5,
-    y: tl.y + height * 0.5
+    x: tl.x + (width * 0.5),
+    y: tl.y + (height * 0.5)
   };
 }
 
@@ -277,8 +278,8 @@ function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
   const { width, height } = token.getSize();
   const tl = snap ? token._preview.getSnappedPosition(token._preview.document) : token._preview.document;
   return {
-    x: tl.x + width * 0.5,
-    y: tl.y + height * 0.5
+    x: tl.x + (width * 0.5),
+    y: tl.y + (height * 0.5)
   };
 }
 
@@ -317,7 +318,7 @@ function _getMeasurementSegments(wrapped) {
 
   // Make sure the style is cloned for each segment b/c we are adjusting the size.
   if ( Settings.get(Settings.KEYS.LABELING.SCALE_TEXT) ) {
-    segments.forEach(segment => segment.label.style = segment.label.style.clone())
+    segments.forEach(segment => segment.label.style = segment.label.style.clone());
   }
 
   const segmentMap = this._pathfindingSegmentMap ??= new Map();
@@ -337,39 +338,63 @@ function _getMeasurementSegments(wrapped) {
   let pathPoints = [];
   const t0 = performance.now();
   const lastSegment = segments.at(-1);
+  if ( CONFIG[MODULE_ID].debug ) console.groupCollapsed(`${MODULE_ID}|_getMeasurementSegments`);
   if ( usePathfinding ) {
     // If currently pathfinding, set path for the last segment, overriding any prior path.
     // Pathfinding when: the pathfinding icon is enabled or the temporary toggle key is held.
     // TODO: Pathfinding should account for region elevation changes and handle flying/burrowing.
     pathPoints = calculatePathPointsForSegment(lastSegment, token);
+  }
 
-  } else if ( MODULES_ACTIVE.TERRAIN_MAPPER ){
+  if ( MODULES_ACTIVE.TERRAIN_MAPPER ) {
+    const t0 = performance.now();
+    // For now, determine movement type for each of the path points. PathPoints are {x, y} objects.
+    // If no path points, use the segments.
+    const initialPath = pathPoints.map(pt => RegionMovementWaypoint3d.fromObject(pt));
+
+    // For now, set the initial path to the elevation of the last segment.
+    if ( initialPath.length ) {
+      initialPath.forEach(pt => pt.z = lastSegment.ray.A.z);
+      initialPath.at(-1).z = lastSegment.ray.B.z;
+    } else initialPath.push(
+      RegionMovementWaypoint3d.fromObject(lastSegment.ray.A),
+      RegionMovementWaypoint3d.fromObject(lastSegment.ray.B)
+    );
+
+
     // Determine the region path.
+    pathPoints.length = 0;
     const ElevationHandler = MODULES_ACTIVE.API.TERRAIN_MAPPER.ElevationHandler;
-    const { gridUnitsToPixels, pixelsToGridUnits } = CONFIG.GeometryLib.utils;
-    const { A, B } = lastSegment.ray;
-    const start = { ...A, elevation: pixelsToGridUnits(A.z) };
-    const end = { ...B, elevation: pixelsToGridUnits(B.z) };
-    const movementTypeStart = movementTypeForTokenAt(token, A);
-    const endGround = terrainElevationAtLocation(end, end.elevation);
-    const movementTypeEnd =  MOVEMENT_TYPES.forCurrentElevation(end.elevation, endGround);
-    const flying = movementTypeStart === MOVEMENT_TYPES.FLY || movementTypeEnd === MOVEMENT_TYPES.FLY;
-    const burrowing = movementTypeStart === MOVEMENT_TYPES.BURROW || movementTypeEnd === MOVEMENT_TYPES.BURROW;
-    const pathPoints = ElevationHandler.constructPath(start, end, { flying, burrowing, token });
-    pathPoints.forEach(pt => pt.z = gridUnitsToPixels(pt.elevation));
+    let prevPt = initialPath[0];
+    pathPoints.push(prevPt);
+    for ( let i = 1, n = initialPath.length; i < n; i += 1 ) {
+      const nextPt = initialPath[i];
+      const movementTypeStart = movementTypeForTokenAt(token, prevPt);
+      const endGround = terrainElevationAtLocation(nextPt, nextPt.elevation);
+      const movementTypeEnd = MOVEMENT_TYPES.forCurrentElevation(nextPt.elevation, endGround);
+      const flying = movementTypeStart === MOVEMENT_TYPES.FLY || movementTypeEnd === MOVEMENT_TYPES.FLY;
+      const burrowing = movementTypeStart === MOVEMENT_TYPES.BURROW || movementTypeEnd === MOVEMENT_TYPES.BURROW;
+      const subPath = ElevationHandler.constructPath(prevPt, nextPt, { flying, burrowing, token });
+      subPath.shift(); // Remove prevPt from the array.
+      pathPoints.push(...subPath);
+      prevPt = nextPt;
+    }
+    const t1 = performance.now();
+    log(`Found terrain path with ${pathPoints.length} points in ${t1-t0} ms.`);
   }
   const t1 = performance.now();
   const key = `${lastSegment.ray.A.key}|${lastSegment.ray.B.key}`;
   if ( pathPoints.length > 2 ) {
     segmentMap.set(key, pathPoints);
-    log(`_getMeasurementSegments|Found path with ${pathPoints.length} points in ${t1-t0} ms.`, pathPoints);
+    log(`Found path with ${pathPoints.length} points in ${t1-t0} ms.`, pathPoints);
   } else segmentMap.delete(key);
 
   // For each segment, replace with path sub-segment if pathfinding or region paths were used for that segment.
   const t2 = performance.now();
   const newSegments = constructPathfindingSegments(segments, segmentMap);
   const t3 = performance.now();
-  log(`_getMeasurementSegments|${newSegments.length} segments processed in ${t3-t2} ms.`);
+  log(`${newSegments.length} segments processed in ${t3-t2} ms.`);
+  if ( CONFIG[MODULE_ID].debug ) console.groupEnd(`${MODULE_ID}|_getMeasurementSegments`);
   return newSegments;
 }
 
@@ -456,8 +481,9 @@ function _computeDistance() {
     segment.waypoint.distance = waypointDistance += segment.distance;
     segment.waypoint.cost = waypointCost += segment.cost;
     segment.waypoint.offsetDistance = waypointOffsetDistance += segment.offsetDistance;
-    if ( ~currWaypointIdx ) segment.waypoint.elevationIncrement = userElevationChangeAtWaypoint(this.waypoints[currWaypointIdx]);
-
+    if ( ~currWaypointIdx ) {
+      segment.waypoint.elevationIncrement = userElevationChangeAtWaypoint(this.waypoints[currWaypointIdx]);
+    }
   }
 }
 
@@ -478,7 +504,7 @@ function _getCostFunction() {
     if ( !(currOffset instanceof GridCoordinates3d) ) currOffset = GridCoordinates3d.fromOffset(currOffset);
     const penalty = movePenaltyInstance.movementPenaltyForSegment(prevOffset, currOffset);
     return offsetDistance * penalty;
-  }
+  };
 }
 
 
@@ -504,7 +530,9 @@ function _getSegmentLabel(wrapped, segment) {
   this.totalDistance = origTotalDistance;
 
   if ( Settings.get(Settings.KEYS.LABELING.SCALE_TEXT) ) {
-    segment.label.style.fontSize = Math.round(CONFIG.canvasTextStyle.fontSize * (canvas.dimensions.size / 100) * CONFIG[MODULE_ID].labeling.textScale);
+    segment.label.style.fontSize = Math.round(CONFIG.canvasTextStyle.fontSize
+      * (canvas.dimensions.size / 100)
+      * CONFIG[MODULE_ID].labeling.textScale);
   }
 
   if ( !segment.label.style.fontFamily.includes("fontAwesome") ) segment.label.style.fontFamily += ",fontAwesome";
@@ -512,9 +540,6 @@ function _getSegmentLabel(wrapped, segment) {
   if ( Settings.get(Settings.KEYS.LABELING.CUSTOMIZED) ) return customizedTextLabel(this, segment, origLabel);
   return basicTextLabel(this, segment, origLabel);
 }
-
-
-
 
 /**
  * Wrap Ruler.prototype._highlightMeasurementSegment
@@ -531,7 +556,9 @@ function _highlightMeasurementSegment(wrapped, segment) {
   // Adjust the color if this user has selected speed highlighting.
   // Highlight each split in turn, changing highlight color each time.
   if ( Settings.useSpeedHighlighting(this.token) ) {
-    if ( segment === this.segments[0] ) TOKEN_SPEED_SPLITTER.set(this.token, tokenSpeedSegmentSplitter(this, this.token))
+    if ( segment === this.segments[0] ) {
+      TOKEN_SPEED_SPLITTER.set(this.token, tokenSpeedSegmentSplitter(this, this.token));
+    }
     const splitterFn = TOKEN_SPEED_SPLITTER.get(this.token);
     if ( splitterFn ) {
       const priorColor = this.color;
@@ -560,11 +587,11 @@ function _highlightMeasurementSegment(wrapped, segment) {
 // ----- NOTE: Token movement ----- //
 
 /**
- * Mixed wrap Ruler.prototype._animateMovement
+ * Wrap Ruler.prototype._animateMovement
  * Add additional controlled tokens to the move, if permitted.
  */
 async function _animateMovement(wrapped, token) {
-  if ( !this.segments || !this.segments.length ) return; // Ruler._animateMovement expects at least one segment.
+  if ( !this.segments || !this.segments.length ) return wrapped(token); // Ruler._animateMovement expects at least one segment.
 
   if ( CONFIG[MODULE_ID].debug ) {
     console.groupCollapsed(`${MODULE_ID}|_animateMovement`);
@@ -583,7 +610,7 @@ async function _animateMovement(wrapped, token) {
 
   this.segments.forEach((s, idx) => s.idx = idx);
 
-  //_recalculateOffset.call(this, token);
+  // _recalculateOffset.call(this, token);
   const promises = [wrapped(token)];
   for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;
@@ -651,43 +678,22 @@ function _canMove(wrapper, token) {
 }
 
 /**
- * Override Ruler.prototype._animateSegment
+ * Wrap Ruler.prototype._animateSegment
  * When moving the token along the segments, update the token elevation to the destination + increment
  * for the given segment.
  * Mark the token update if pathfinding for this segment.
  */
-async function _animateSegment(token, segment, destination) {
+async function _animateSegment(wrapped, token, segment, destination, updateOptions = {}) {
   log(`Updating ${token.name} destination from ({${token.document.x},${token.document.y}) to (${destination.x},${destination.y}) for segment (${segment.ray.A.x},${segment.ray.A.y})|(${segment.ray.B.x},${segment.ray.B.y})`);
-
-  // If the segment is teleporting and the segment destination is not a waypoint or ruler destination, skip.
-  // Doesn't work because _animateMovement stops the movement if the token does not make it to the
-  // next waypoint.
-//   if ( segment.teleport
-//     && !(segment.B.x === this.destination.x && segment.B.y === this.destination.y )
-//     && !this.waypoints.some(w => segment.B.x === w.x && segment.B.y === w.y) ) return;
-
-  let name;
-  if ( segment.animation?.name === undefined ) name = token.animationName;
-  else name ||= Symbol(token.animationName);
-  const updateOptions = {
-    // terrainmapper: { usePath: false },
+  destination.elevation = roundMultiple(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
+  foundry.utils.mergeObject(updateOptions, {
     rulerSegment: this.segments.length > 1,
     firstRulerSegment: segment.first,
-    lastRulerSegment: segment.last,
-    rulerSegmentOrigin: segment.ray.A,
-    rulerSegmentDestination: segment.ray.B,
-    teleport: segment.teleport,
-    animation: {...segment.animation, name}
-  }
-  const {x, y} = token.document._source;
-  await token.animate({x, y}, {name, duration: 0});
-  await token.document.update(destination, updateOptions);
-  await CanvasAnimation.getAnimation(name)?.promise;
-  const newElevation = roundMultiple(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
+    lastRulerSegment: segment.last
+  });
 
-  if ( isFinite(newElevation) && token.elevationE !== newElevation ) await token.document.update({ elevation: newElevation })
+  return wrapped(token, segment, destination, updateOptions);
 }
-
 
 
 // ----- NOTE: Event handling ----- //
@@ -725,7 +731,8 @@ function _onDragStart(wrapped, event, { isTokenDrag = false } = {}) {
  * @param {KeyboardEventContext} context
  */
 function _onMoveKeyDown(wrapped, context) {
-  const teleportKeys = new Set(game.keybindings.get(MODULE_ID, Settings.KEYBINDINGS.TELEPORT).map(binding => binding.key));
+  const teleportKeys = new Set(game.keybindings.get(MODULE_ID, Settings.KEYBINDINGS.TELEPORT).map(binding =>
+    binding.key));
   if ( teleportKeys.intersects(game.keyboard.downKeys) ) this.segments.forEach(s => s.teleport = true);
   wrapped(context);
 }
@@ -770,7 +777,6 @@ function decrementElevation() {
 
   // Broadcast the activity (see ControlsLayer.prototype._onMouseMove)
   this._broadcastMeasurement();
-  // game.user.broadcastActivity({ ruler: ruler.toJSON() });
 }
 
 /**
@@ -797,6 +803,10 @@ PATCHES.BASIC.WRAPS = {
   _getMeasurementHistory,
   _createMeasurementHistory,
 
+  // Movement
+  _animateMovement,
+  _animateSegment,
+
   // Wraps related to segments
   _getCostFunction,
   _getSegmentLabel,
@@ -807,9 +817,9 @@ PATCHES.BASIC.WRAPS = {
   _onMoveKeyDown
 };
 
-PATCHES.BASIC.MIXES = { _animateMovement, _getMeasurementSegments, _broadcastMeasurement };
+PATCHES.BASIC.MIXES = { _getMeasurementSegments, _broadcastMeasurement };
 
-PATCHES.BASIC.OVERRIDES = { _animateSegment, _addWaypoint, _computeDistance };
+PATCHES.BASIC.OVERRIDES = { _addWaypoint, _computeDistance };
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 
