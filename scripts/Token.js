@@ -153,9 +153,6 @@ function _onDragLeftMove(wrapped, event) {
   log("Token#_onDragLeftMove");
   wrapped(event);
 
-  const c = event.interactionData.clones[0];
-  console.log(`_onDragLeftMove|Destination ${event.interactionData.destination.x},${event.interactionData.destination.y}, clone ${c.document.x},${c.document.y}`);
-
   // Continue a Ruler measurement.
   if ( !Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED) ) return;
   const ruler = canvas.controls.ruler;
