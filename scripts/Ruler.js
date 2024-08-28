@@ -248,14 +248,7 @@ function _getMeasurementOrigin(wrapped, point, {snap=true}={}) {
   point = wrapped(point, { snap });
   const token = this.token;
   if ( !this._isTokenRuler || !token ) return point;
-
-  // Shift to token center
-  const { width, height } = token.getSize();
-  const tl = token.document;
-  return {
-    x: tl.x + (width * 0.5),
-    y: tl.y + (height * 0.5)
-  };
+  return token.getCenterPoint();
 }
 
 /**
@@ -269,18 +262,22 @@ function _getMeasurementOrigin(wrapped, point, {snap=true}={}) {
  * @protected
  */
 function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
+  const origPoint = PIXI.Point.fromObject(point);
+
   point = wrapped(point, { snap });
   const token = this.token;
   if ( !this._isTokenRuler || !token ) return point;
   if ( !token._preview ) return point;
 
   // Shift to token center or snapped center
-  const { width, height } = token.getSize();
-  const tl = snap ? token._preview.getSnappedPosition(token._preview.document) : token._preview.document;
-  return {
-    x: tl.x + (width * 0.5),
-    y: tl.y + (height * 0.5)
-  };
+  if ( !snap ) return point;
+
+  // See Token#_onDragLeftMove.
+  const origin = token.getCenterPoint();
+  const delta = origPoint.subtract(origin, PIXI.Point._tmp);
+  let position = PIXI.Point._tmp2.copyFrom(token.document).add(delta, PIXI.Point._tmp2);
+  const tlSnapped  = token._preview.getSnappedPosition(position);
+  return token.getCenterPoint(tlSnapped);
 }
 
 // ----- NOTE: Segments ----- //
