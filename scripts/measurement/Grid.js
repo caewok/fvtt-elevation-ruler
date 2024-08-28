@@ -5,7 +5,7 @@ CONST
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { GridCoordinates3d } from "./grid_coordinates.js";
+import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { Point3d } from "../geometry/3d/Point3d.js";
 
 /**
@@ -327,7 +327,7 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
   cost ??= (prevOffset, currOffset, offsetDistance) => offsetDistance;
   switch ( canvas.grid.type ) {
     case CONST.GRID_TYPES.GRIDLESS:
-      offsetDistanceFn = Point3d.distanceBetween;
+      offsetDistanceFn = (a, b) => CONFIG.GeometryLib.utils.pixelsToGridUnits(Point3d.distanceBetween(a, b));
       break;
     case CONST.GRID_TYPES.SQUARE:
       offsetDistanceFn = singleOffsetSquareDistanceFn(diagonals);

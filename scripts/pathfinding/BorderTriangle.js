@@ -12,7 +12,8 @@ Wall
 import { MODULE_ID } from "../const.js";
 import { Draw } from "../geometry/Draw.js";
 import { WallTracerEdge } from "./WallTracer.js";
-import { GridCoordinates3d } from "../measurement/grid_coordinates.js";
+import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
+import { Settings } from "../settings.js";
 
 const OTHER_DIRECTION = {
   ccw: "cw",
@@ -494,11 +495,14 @@ export class BorderTriangle {
   _calculateMovementCost(fromPoint, toPoint, token) {
     // TODO: Handle 3d distance. Probably Ray3d with measureDistance or measureDistances.
     // TODO: Handle terrain distance.
+    const diagonals = Settings.get(Settings.KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE)
+        ? GridCoordinates3d.GRID_DIAGONALS.EUCLIDEAN : canvas.grid.diagonals;
     if ( CONFIG[MODULE_ID].pathfindingCheckTerrains ) {
-      const res = gridMeasurementForSegment(fromPoint, toPoint);
+
+      const res = GridCoordinates3d.gridMeasurementForSegment(fromPoint, toPoint, 0, undefined, diagonals);
       return CONFIG.GeometryLib.utils.gridUnitsToPixels(res.cost);
     }
-    const distance = GridCoordinates3d.gridDistanceBetween(fromPoint, toPoint);
+    const distance = GridCoordinates3d.gridDistanceBetween(fromPoint, toPoint, undefined, diagonals);
     return CONFIG.GeometryLib.utils.gridUnitsToPixels(distance);
   }
 
