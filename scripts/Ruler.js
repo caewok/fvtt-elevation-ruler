@@ -249,6 +249,8 @@ function _getMeasurementOrigin(wrapped, point, {snap=true}={}) {
   const token = this.token;
   if ( !this._isTokenRuler || !token ) return point;
 
+  console.log(`_getMeasurementOrigin|difference: ${token.document.x - point.x},${token.document.y - point.y}`);
+
   // Shift to token center
   const { width, height } = token.getSize();
   const tl = token.document;
@@ -269,18 +271,31 @@ function _getMeasurementOrigin(wrapped, point, {snap=true}={}) {
  * @protected
  */
 function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
+  console.log(`_getMeasurementDestination|point ${point.x},${point.y}`);
+  const origPoint = PIXI.Point.fromObject(point);
+
   point = wrapped(point, { snap });
   const token = this.token;
   if ( !this._isTokenRuler || !token ) return point;
   if ( !token._preview ) return point;
 
   // Shift to token center or snapped center
-  const { width, height } = token.getSize();
-  const tl = snap ? token._preview.getSnappedPosition(token._preview.document) : token._preview.document;
-  return {
-    x: tl.x + (width * 0.5),
-    y: tl.y + (height * 0.5)
-  };
+  console.log(`_getMeasurementDestination|document: ${token._preview.document.x},${token._preview.document.y} vs point ${point.x},${point.y}`);
+  console.log(`_getMeasurementDestination|difference: ${token._preview.document.x - point.x},${token._preview.document.y - point.y}`);
+  if ( !snap ) return point;
+
+  // See Token#_onDragLeftMove.
+  const origin = token.getCenterPoint();
+  const delta = origPoint.subtract(origin, PIXI.Point._tmp);
+  let position = PIXI.Point._tmp2.copyFrom(token.document).add(delta, PIXI.Point._tmp2);
+  const tlSnapped  = token._preview.getSnappedPosition(position);
+  return token.getCenterPoint(tlSnapped);
+
+
+//   const delta = PIXI.Point._tmp.copyFrom(token.center).subtract(token.document)
+//   const tl = PIXI.Point._tmp2.copyFrom(point).subtract(delta);
+//   const tlSnapped = token._preview.getSnappedPosition(tl); // Snaps to nearest left corner.
+//   return token.getCenterPoint(tlSnapped);
 }
 
 // ----- NOTE: Segments ----- //
