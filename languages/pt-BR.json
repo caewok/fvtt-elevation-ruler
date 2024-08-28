@@ -105,6 +105,15 @@
 
     "elevationruler.settings.automatic-movement-type.name": "Detectar Tipo de Deslocamento",
     "elevationruler.settings.automatic-movement-type.hint": "Detecte automaticamente o tipo de deslocamento com base na posição do token. Defina o efeito de status do token como 'Voar' ou 'Escavar' para substituir.",
+
+    "elevationruler.settings.euclidean-grid-distance.name": "Preferir Distância Euclidiana",
+    "elevationruler.settings.euclidean-grid-distance.hint": "Para cenas em grade, se 'Exato (√2)' for escolhido para a configuração principal 'Diagonais de Grade Quadrada', isso forçará a medição da distância euclidiana em vez da distância em hexágonos/quadrados unitários. Para grades hexagonais, apenas o movimento de elevação diagonal é afetado.",
+
+    "elevationruler.settings.scale-text.name": "Texto da Régua de Escala",
+    "elevationruler.settings.scale-text.hint": "Quando ativado, o texto da régua será dimensionado dependendo do `canvas.dimensions.size`. Ajuste ainda mais a escala usando `CONFIG.elevationruler.textScale`.",
+
+    "elevationruler.settings.customized-labels.name": "Texto da Régua Personalizado",
+    "elevationruler.settings.customized-labels.hint": "Personalize o texto da régua. Altere os estilos usando `CONFIG.elevationruler.labelStyles` e `CONFIG.elevationruler.labelIcons`.",
     
     "elevationruler.controls.prefer-token-elevation.name": "Prefira Elevação do Token",
     "elevationruler.controls.pathfinding-control.name": "Usar Descoberta de Rota",
@@ -112,5 +121,10 @@
     "elevationruler.drawingconfig.movementPenalty.name": "Bônus/Penalidade de Movimento",
     "elevationruler.drawingconfig.movementPenalty.hint": "Defina como 1 para nenhuma penalidade. Valores superiores a um penalizam o movimento nessa percentagem; valores menores que um concedem efetivamente um bônus ao movimento. Por exemplo, defina como 2 para duplicar o movimento nesta área. Movimento abaixo da elevação do desenho será ignorado.",
 
-    "elevationruler.clearMovement": "Limpar Deslocamento do Combatente"
+    "elevationruler.clearMovement": "Limpar Deslocamento do Combatente",
+    "elevationruler.waypoint": "parada",
+    "elevationruler.up": "acima",
+    "elevationruler.down": "abaixo",
+    "elevationruler.added": "adicionado",
+    "elevationruler.prior": "anterior"
 }
