@@ -248,16 +248,9 @@ function _getMeasurementOrigin(wrapped, point, {snap=true}={}) {
   point = wrapped(point, { snap });
   const token = this.token;
   if ( !this._isTokenRuler || !token ) return point;
-
+  return token.getCenterPoint();
   console.log(`_getMeasurementOrigin|difference: ${token.document.x - point.x},${token.document.y - point.y}`);
 
-  // Shift to token center
-  const { width, height } = token.getSize();
-  const tl = token.document;
-  return {
-    x: tl.x + (width * 0.5),
-    y: tl.y + (height * 0.5)
-  };
 }
 
 /**
