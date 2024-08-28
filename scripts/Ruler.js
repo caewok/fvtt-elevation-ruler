@@ -353,8 +353,8 @@ function _getMeasurementSegments(wrapped) {
     const initialPath = pathPoints.map(pt => RegionMovementWaypoint3d.fromObject(pt));
 
     // For now, set the initial path to the elevation of the last segment.
-    if ( pathPoints.length ) {
-      initialPath.forEach(pt => pt.z = lastSement.ray.A.z);
+    if ( initialPath.length ) {
+      initialPath.forEach(pt => pt.z = lastSegment.ray.A.z);
       initialPath.at(-1).z = lastSegment.ray.B.z;
     } else initialPath.push(
       RegionMovementWaypoint3d.fromObject(lastSegment.ray.A),
@@ -368,7 +368,7 @@ function _getMeasurementSegments(wrapped) {
     let prevPt = initialPath[0];
     pathPoints.push(prevPt);
     for ( let i = 1, n = initialPath.length; i < n; i += 1 ) {
-      const nextPt = initialPath[1];
+      const nextPt = initialPath[i];
       const movementTypeStart = movementTypeForTokenAt(token, prevPt);
       const endGround = terrainElevationAtLocation(nextPt, nextPt.elevation);
       const movementTypeEnd = MOVEMENT_TYPES.forCurrentElevation(nextPt.elevation, endGround);
@@ -377,6 +377,7 @@ function _getMeasurementSegments(wrapped) {
       const subPath = ElevationHandler.constructPath(prevPt, nextPt, { flying, burrowing, token });
       subPath.shift(); // Remove prevPt from the array.
       pathPoints.push(...subPath);
+      prevPt = nextPt;
     }
     const t1 = performance.now();
     log(`Found terrain path with ${pathPoints.length} points in ${t1-t0} ms.`);
