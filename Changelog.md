@@ -1,3 +1,9 @@
+# 0.10.4
+Compatibility with Terrain Mapper 0.4.1.
+Update Polish translation. Thanks @Lioheart! Closes #184. Update Brazilian Portugese translation. Thanks @Kharmans!
+Fix for terrain cost measuring in pixel units instead of grid units for gridless maps.
+Fix pathfinding failing for users once the preview token stops moving. Closes #138.
+
 # 0.10.3
 Fix for the ruler label blowing up the font size on gridless and hex scenes.
 Fix for gridless measuring in pixel units instead of grid units.
