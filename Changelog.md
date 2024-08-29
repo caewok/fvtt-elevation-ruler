@@ -1,5 +1,5 @@
 # 0.10.5
-Fix for `_fromPoint3d` not a function.
+Fix for `_fromPoint3d` not a function. Closes #186.
 
 # 0.10.4
 Compatibility with Terrain Mapper 0.4.1.
