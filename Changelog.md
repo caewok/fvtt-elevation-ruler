@@ -1,3 +1,6 @@
+# 0.10.5
+Fix for `_fromPoint3d` not a function.
+
 # 0.10.4
 Compatibility with Terrain Mapper 0.4.1.
 Update Polish translation. Thanks @Lioheart! Closes #184. Update Brazilian Portugese translation. Thanks @Kharmans!
