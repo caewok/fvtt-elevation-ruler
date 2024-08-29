@@ -206,8 +206,6 @@ export class MovePenalty {
     const cutawayIxs = [];
     const terrainAPI = this.constructor.terrainAPI;
     for ( const region of this.pathRegions ) {
-      terrainAPI.ElevationHandler._fromPoint3d(start);
-      terrainAPI.ElevationHandler._fromPoint3d(end);
       const ixs = region.terrainmapper._cutawayIntersections(start, end);
       ixs.forEach(ix => ix.region = region);
       cutawayIxs.push(...ixs);
