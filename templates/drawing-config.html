@@ -4,9 +4,17 @@
     <div class="form-group">
       <label for="elevationruler.movementPenalty">{{ localize "elevationruler.drawingconfig.movementPenalty.name" }}</label>
       <div class="form-fields">
-        {{rangePicker name="flags.elevationruler.movementPenalty" value=object.flags.elevationruler.movementPenalty step=0.1 min=0.1 max=10}}
+        <input type="number" step="0.1" name="flags.elevationruler.movementPenalty" value="{{object.flags.elevationruler.movementPenalty}}">
       </div>
       <p class="hint">{{ localize "elevationruler.drawingconfig.movementPenalty.hint" }}</p>
+    </div>
+
+    <div class="form-group">
+      <label for="elevationruler.flatMovementPenalty">{{ localize "elevationruler.drawingconfig.flatMovementPenalty.name" }}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="flags.elevationruler.flatMovementPenalty" {{checked object.flags.elevationruler.flatMovementPenalty}}/>
+      </div>
+      <p class="hint">{{ localize "elevationruler.drawingconfig.flatMovementPenalty.hint" }}</p>
     </div>
 
   </legend>

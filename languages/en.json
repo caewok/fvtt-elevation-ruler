@@ -121,6 +121,9 @@
     "elevationruler.drawingconfig.movementPenalty.name": "Movement Bonus/Penalty",
     "elevationruler.drawingconfig.movementPenalty.hint": "Set to 1 for no penalty. Values greater than one penalize movement by that percent; values less than one effectively grant a bonus to movement. For example, set to 2 to double movement through this area. Movement under the drawing elevation will be ignored.",
 
+    "elevationruler.drawingconfig.flatMovementPenalty.name": "Use Flat Penalty",
+    "elevationruler.drawingconfig.flatMovementPenalty.hint": "If enabled, treats the penalty as a fixed amount. For example, set to 5 to add +5 to each square of movement. Negative values provide flat bonuses to movement.",
+
     "elevationruler.clearMovement": "Clear Combatant Movement",
     "elevationruler.waypoint": "waypoint",
     "elevationruler.up": "up",
