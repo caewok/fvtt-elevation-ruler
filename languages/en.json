@@ -112,6 +112,11 @@
     "elevationruler.settings.scale-text.name": "Scale Ruler Text",
     "elevationruler.settings.scale-text.hint": "When enabled, ruler text will be scaled depending on `canvas.dimensions.size`. Further adjust scaling by using `CONFIG.elevationruler.textScale`.",
 
+    "elevationruler.settings.force-grid-penalties.name": "Use Grid for Movement Penalties",
+    "elevationruler.settings.force-grid-penalties.hint": "By default, movement penalties are applied proportionally to the move. If a drawing with a x2 move penalty covers 3/4 of a grid square, it will apply to 3/4 of the move through that square (i.e., 1.5x penalty). When enabled, the penalty applies to a move through the entire grid square if, and only if, the penalty applies at the center of the grid. For example, if the drawing does not cover the center of the grid square, no movement through that grid square will be penalized.
+
+    When enabled, ruler text will be scaled depending on `canvas.dimensions.size`. Further adjust scaling by using `CONFIG.elevationruler.textScale`.",
+
     "elevationruler.settings.customized-labels.name": "Customized Ruler Text",
     "elevationruler.settings.customized-labels.hint": "Customize the ruler text. Change styles using `CONFIG.elevationruler.labelStyles` and `CONFIG.elevationruler.labelIcons`.",
 

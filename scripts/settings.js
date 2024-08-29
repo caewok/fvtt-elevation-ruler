@@ -50,6 +50,7 @@ const SETTINGS = {
     EUCLIDEAN_GRID_DISTANCE: "euclidean-grid-distance",
     AUTO_MOVEMENT_TYPE: "automatic-movement-type",
     COMBAT_HISTORY: "token-ruler-combat-history",
+    FORCE_GRID_PENALTIES: "force-grid-penalties"
   },
 
   NO_MODS: "no-modules-message",
@@ -321,6 +322,16 @@ export class Settings extends ModuleSettingsAbstract {
         min: 0,
         step: 0.1
       }
+    });
+
+    register(KEYS.MEASURING.FORCE_GRID_PENALTIES, {
+      name: localize(`${KEYS.MEASURING.FORCE_GRID_PENALTIES}.name`),
+      hint: localize(`${KEYS.MEASURING.FORCE_GRID_PENALTIES}.hint`),
+      scope: "user",
+      config: true,
+      default: true,
+      type: Boolean,
+      requiresReload: false
     });
 
     // ----- NOTE: Grid Terrain Measurement ----- //

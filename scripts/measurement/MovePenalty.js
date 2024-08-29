@@ -67,8 +67,9 @@ export class MovePenalty {
       if ( r.terrainmapper.hasTerrain ) this.regions.add(r);
     });
     canvas.drawings.placeables.forEach(d => {
-      const penalty = d.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY);
-      if ( penalty && penalty !== 1 ) this.drawings.add(d)
+      const penalty = d.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) ?? 1;
+      const useFlatPenalty = d.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY_FLAT);
+      if ( (!useFlatPenalty && penalty !== 1) || (useFlatPenalty && penalty !== 0) ) this.drawings.add(d)
     });
     this.tokens.delete(moveToken);
 
@@ -160,7 +161,7 @@ export class MovePenalty {
    * @param {GridCoordinates3d} endCoords
    * @returns {number} The number used to multiply the move speed along the segment.
    */
-  movementPenaltyForSegment(startCoords, endCoords) {
+  movementPenaltyForSegment(startCoords, endCoords, forceGridPenalty) {
     const start = startCoords.center;
     const end = endCoords.center;
     const key = `${start.key}|${end.key}`;
@@ -169,6 +170,11 @@ export class MovePenalty {
     const t0 = performance.now();
     const cutawayIxs = this._cutawayIntersections(start, end);
     if ( !cutawayIxs.length ) return 1;
+
+    // If forcing to grid, get the grid breaks and the center points.
+    forceGridPenalty ??= Settings.get(Settings.KEYS.FORCE_GRID_PENALTIES);
+
+
     const t1 = performance.now();
     const avgMultiplier = this._penaltiesForIntersections(start, end, cutawayIxs);
     const t2 = performance.now();
