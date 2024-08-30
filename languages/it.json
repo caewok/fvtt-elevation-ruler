@@ -58,6 +58,9 @@
     "elevationruler.settings.token-ruler-combat-history.name": "Traccia movimenti di combattimento",
     "elevationruler.settings.token-ruler-combat-history.hint": "Per l'evidenziare la velocità dei token, somma tutte le mosse dei token durante il round quando abilitato.",
 
+    "elevationruler.settings.combine-prior-with-total.name": "Combina il movimento precedente con il movimento totale",
+    "elevationruler.settings.combine-prior-with-total.hint": "Quando è abilitato il tracciamento dei movimenti di combattimento, combina il movimento precedente del token nel round con il movimento totale. Altrimenti, posiziona il movimento precedente su una riga separata.",
+
     "elevationruler.settings.token-speed-property.name": "Proprietà Camminare Token",
     "elevationruler.settings.token-speed-property.hint": "Per l'evidenziazione della velocità del token, questa è la proprietà che rappresenta la velocità di camminata del token.",
 
@@ -88,6 +91,9 @@
     "elevationruler.settings.pathfinding_limit_token_los.name": "Limita Trova Percorso alle Aree Esplorate",
     "elevationruler.settings.pathfinding_limit_token_los.hint": "Usando Trova Percorso, limita il raggio d'azione del percorso alle aree esplorate a meno che l'utente non sia il DM",
 
+    "elevationruler.settings.pathfinding_snap_to_grid.name": "Trova Percorso agganciato alla griglia",
+    "elevationruler.settings.pathfinding_snap_to_grid.hint": "Durante la ricerca del percorso su una mappa a griglia, aggancia il percorso ai centri della griglia a meno che ciò non provochi il blocco del percorso.",
+
     "elevationruler.settings.grid-terrain-algorithm.name": "Misurazione Griglia Terreno",
     "elevationruler.settings.grid-terrain-algorithm.hint": "Quando sei su una griglia, come tenere conto delle penalità di movimento o dei bonus derivanti dal terreno e dai token? Centro: si applica se il terreno/token si sovrappone al centro della griglia; Area percentuale: si applica se il terreno/token copre almeno questa parte del quadrato/esagono della griglia; Euclideo: ripartizione proporzionale in base alla percentuale del segmento di linea all'interno del terreno/token tra questo quadrato/esagono della griglia e il precedente.",
     "elevationruler.settings.grid-terrain-choice-center-point": "Centro",
@@ -100,11 +106,25 @@
     "elevationruler.settings.automatic-movement-type.name": "Rilevamento automatico del tipo di movimento",
     "elevationruler.settings.automatic-movement-type.hint": "Rileva automaticamente il tipo di movimento in base alla posizione del token. Imposta l'effetto dello stato del token su 'volare' o 'scavare' per sovrascrivere.",
 
+    "elevationruler.settings.euclidean-grid-distance.name": "Preferisci la distanza euclidea",
+    "elevationruler.settings.euclidean-grid-distance.hint": "Per le scene a griglia, se viene scelto 'Esatto (√2)' per l'impostazione principale 'Diagonali griglia quadrata', ciò costringerà a misurare la distanza euclidea invece della distanza in unità esadecimali/quadrate. Per le griglie esagonali, viene influenzato solo il movimento di elevazione diagonale.",
+
+    "elevationruler.settings.scale-text.name": "Testo Scala Righello",
+    "elevationruler.settings.scale-text.hint": "Se abilitato, il testo del righello verrà ridimensionato in base a 'canvas.dimensions.size'. Regola ulteriormente il ridimensionamento utilizzando `CONFIG.elevationruler.textScale`.",
+
+    "elevationruler.settings.customized-labels.name": "Testo Righello Personalizzato",
+    "elevationruler.settings.customized-labels.hint": "Personalizza il testo del righello. Modifica gli stili utilizzando `CONFIG.elevationruler.labelStyles` e `CONFIG.elevationruler.labelIcons`.",
+
     "elevationruler.controls.prefer-token-elevation.name": "Preferisci elevazione token",
     "elevationruler.controls.pathfinding-control.name": "Trova Percorso",
 
     "elevationruler.drawingconfig.movementPenalty.name": "Bonus/Penalità Movimento",
     "elevationruler.drawingconfig.movementPenalty.hint": "Impostato a 1 senza penalità. Valori maggiori di uno penalizzano il movimento di quella percentuale; valori inferiori a uno garantiscono effettivamente un bonus al movimento. Ad esempio, impostalo su 2 per raddoppiare il movimento in quest'area. Il movimento sotto l'elevazione del disegno verrà ignorato.",
     
-    "elevationruler.clearMovement": "Cancella Movimento Combattente"
+    "elevationruler.clearMovement": "Cancella Movimento Combattente",
+    "elevationruler.waypoint": "Punto di passaggio",
+    "elevationruler.up": "Su",
+    "elevationruler.down": "Giù",
+    "elevationruler.added": "Aggiunto",
+    "elevationruler.prior": "Precedente"
 }
