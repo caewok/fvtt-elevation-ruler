@@ -76,8 +76,11 @@
     "elevationruler.settings.round-to-multiple.name": "Round Distance to Multiple",
     "elevationruler.settings.round-to-multiple.hint": "Round the distance displayed to the nearest multiple of the number entered. Set to 0 to disable rounding.",
 
-    "elevationruler.settings.token-terrain-multiplier.name": "Token as Terrain Multiplier",
-    "elevationruler.settings.token-terrain-multiplier.hint": "Multiplier to use to calculate movement speed when moving through other tokens. Set to 1 to ignore. Values less than 1 treat token spaces as faster than normal; values greater than 1 penalize movement through token spaces.",
+    "elevationruler.settings.token-terrain-multiplier.name": "Token Penalty Percent",
+    "elevationruler.settings.token-terrain-multiplier.hint": "Penalize movement through other tokens. Set to 1 for no penalty, less than one to grant a bonus, greater than 1 to impose a penalty multiplier. For example, set to 2 to double movement cost through a token.",
+
+    "elevationruler.settings.token-terrain-multiplier-flat.name": "Flat Token Penalty",
+    "elevationruler.settings.token-terrain-multiplier-flat.hint": "If enabled, treats the token move penalty as a fixed amount of additional distance. For example, set to 5 to add +5 to each square of movement. Negative values provide a flat bonus.",
 
     "elevationruler.settings.pathfinding_enable.name": "Use Pathfinding",
     "elevationruler.settings.pathfinding_enable.hint": "When enabled, adds a pathfinding togglee to the Token controls that will cause the ruler to map a path around walls and tokens, depending on settings. Disable this if pathfinding is causing compatibility issues. Disabling may also result in a small performance increase.",
@@ -126,7 +129,7 @@
     "elevationruler.drawingconfig.movementPenalty.hint": "Set to 1 for no penalty, less than one to grant a bonus, greater than 1 to impose a penalty multiplier. For example, set to 2 to double movement cost through this area. Movement under the drawing elevation will be ignored.",
 
     "elevationruler.drawingconfig.flatMovementPenalty.name": "Use Flat Penalty",
-    "elevationruler.drawingconfig.flatMovementPenalty.hint": "If enabled, treats the penalty as a fixed amount of additional distance. For example, set to 5 to add +5 to each square of movement. Negative values provide flat bonuses to movement.",
+    "elevationruler.drawingconfig.flatMovementPenalty.hint": "If enabled, treats the penalty as a fixed amount of additional distance. For example, set to 5 to add +5 to each square of movement. Negative values provide a flat bonus.",
 
     "elevationruler.clearMovement": "Clear Combatant Movement",
     "elevationruler.waypoint": "waypoint",

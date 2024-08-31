@@ -52,7 +52,7 @@ const SETTINGS = {
     COMBAT_HISTORY: "token-ruler-combat-history",
     FORCE_GRID_PENALTIES: "force-grid-penalties",
     TOKEN_MULTIPLIER: "token-terrain-multiplier",
-    TOKEN_MULTIPLIER_FLAT: "token-terrain-multiplier"
+    TOKEN_MULTIPLIER_FLAT: "token-terrain-multiplier-flat"
   },
 
   NO_MODS: "no-modules-message",
@@ -318,13 +318,10 @@ export class Settings extends ModuleSettingsAbstract {
       scope: "world",
       config: true,
       default: 1,
-      type: Number,
-      range: {
-        step: 0.1
-      }
+      type: Number
     });
 
-    register(KEYS.MEASURING.TOKEN_MULTIPLIER, {
+    register(KEYS.MEASURING.TOKEN_MULTIPLIER_FLAT, {
       name: localize(`${KEYS.MEASURING.TOKEN_MULTIPLIER_FLAT}.name`),
       hint: localize(`${KEYS.MEASURING.TOKEN_MULTIPLIER_FLAT}.hint`),
       scope: "world",
