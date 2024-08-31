@@ -519,9 +519,11 @@ function _getSegmentLabel(wrapped, segment) {
   }
 
   // Force distance to be between waypoints instead of (possibly pathfinding) segments.
+  // Use cost instead of straight distance for the label.
   const origSegmentDistance = segment.distance;
   const origTotalDistance = this.totalDistance;
-  segment.distance = roundMultiple(segment.waypoint.distance);
+  segment.distance = roundMultiple(segment.waypoint.cost);
+  this.totalDistance = this.totalCost;
   const origLabel = wrapped(segment);
   segment.distance = origSegmentDistance;
   this.totalDistance = origTotalDistance;
