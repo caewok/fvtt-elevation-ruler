@@ -165,7 +165,7 @@ export class MovePenalty {
    * @returns {number} The costFreeDistance + cost, in grid units.
    */
   movementCostForSegment(startCoords, endCoords, costFreeDistance = 0, forceGridPenalty) { // eslint-disable-line default-param-last
-    forceGridPenalty ??= Settings.get(Settings.KEYS.FORCE_GRID_PENALTIES);
+    forceGridPenalty ??= Settings.get(Settings.KEYS.MEASURING.FORCE_GRID_PENALTIES);
     forceGridPenalty &&= !canvas.grid.isGridless;
 
     // Did we already test this segment?
@@ -214,11 +214,11 @@ export class MovePenalty {
   movementCostForGridSpace(coords, costFreeDistance = 0) {
     // Determine what regions, tokens, drawings overlap the center point.
     const centerPt = coords.center;
-    const regions = this.regions.filter(r => r.testPoint(centerPt, centerPt.elevation));
-    const tokens = this.tokens.filter(t => t.constrainedTokenBorder.contains(centerPt.x, centerPt.y)
+    const regions = [...this.regions].filter(r => r.testPoint(centerPt, centerPt.elevation));
+    const tokens = [...this.tokens].filter(t => t.constrainedTokenBorder.contains(centerPt.x, centerPt.y)
       && centerPt.elevation.between(t.bottomE, t.topE));
-    const drawings = this.drawings.filter(d => d.contains(centerPt.x, centerPt.y)
-      && d.elevationE >= centerPt.elevation);
+    const drawings = [...this.drawings].filter(d => d.bounds.contains(centerPt.x, centerPt.y)
+      && d.elevationE <= centerPt.elevation);
 
     // Track all speed multipliers and flat penalties for the grid space.
     let flatPenalty = 0;
@@ -232,8 +232,8 @@ export class MovePenalty {
     });
 
     // Tokens
-    const tokenMultiplier = this.tokenMultiplier;
-    const useTokenFlat = this.useFlatTokenMultiplier;
+    const tokenMultiplier = this.constructor.tokenMultiplier;
+    const useTokenFlat = this.constructor.useFlatTokenMultiplier;
     if ( useTokenFlat ) flatPenalty += (tokenMultiplier * tokens.length);
     else currentMultiplier *= (tokenMultiplier * tokens.length);
 
@@ -321,8 +321,8 @@ export class MovePenalty {
     if ( !cutawayIxs.length ) return 1;
 
     // Tokens
-    const tokenMultiplier = this.tokenMultiplier;
-    const useTokenFlat = this.useFlatTokenMultiplier;
+    const tokenMultiplier = this.constructor.tokenMultiplier;
+    const useTokenFlat = this.constructor.useFlatTokenMultiplier;
 
     // Regions
     const testRegions = this.constructor.terrainAPI && this.pathRegions;
@@ -333,6 +333,7 @@ export class MovePenalty {
     // and calculating total time and distance. x meters / y meters/second = x/y seconds
     const { to2d, convertToDistance } = CONFIG.GeometryLib.utils.cutaway;
     let totalDistance = 0;
+    let totalUnmodifiedDistance = 0;
     let totalTime = 0;
     let currentMultiplier = 1;
     let currentFlat = 0;
@@ -366,8 +367,14 @@ export class MovePenalty {
       // Now we have prevIx --> ix.
       prevIx.flat = currentFlat;
       prevIx.multiplier = currentMultiplier;
-      prevIx.dist = PIXI.Point.distanceBetween(prevIx, ix);
-      prevIx.tokenSpeed = ((this.speedFn(tClone) || 1) * prevIx.multiplier) + prevIx.flat;
+      prevIx.dist = CONFIG.GeometryLib.utils.pixelsToGridUnits(PIXI.Point.distanceBetween(prevIx, ix));
+      totalUnmodifiedDistance += prevIx.dist;
+
+      // Speed is adjusted when moving through regions with a multiplier.
+      prevIx.tokenSpeed = ((this.speedFn(tClone) || 1) * prevIx.multiplier);
+
+      // Flat adds extra distance to the grid square. Diagonal is longer, so will have larger penalty.
+      prevIx.dist += (prevIx.dist * currentFlat / canvas.grid.distance);
       totalDistance += prevIx.dist;
       totalTime += (prevIx.dist / prevIx.tokenSpeed);
       prevIx = ix;
@@ -388,9 +395,9 @@ export class MovePenalty {
     }
 
     // Determine the ratio compared to a set speed
-    const totalDefaultTime = totalDistance / startingSpeed;
+    const totalDefaultTime = totalUnmodifiedDistance / startingSpeed;
     const avgMultiplier = (totalDefaultTime / totalTime) || 0;
-    return avgMultiplier;
+    return 1 / avgMultiplier;
   }
 
   /**

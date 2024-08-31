@@ -114,7 +114,7 @@
     "elevationruler.settings.scale-text.hint": "When enabled, ruler text will be scaled depending on `canvas.dimensions.size`. Further adjust scaling by using `CONFIG.elevationruler.textScale`.",
 
     "elevationruler.settings.force-grid-penalties.name": "Use Grid for Movement Penalties",
-    "elevationruler.settings.force-grid-penalties.hint": "By default, movement penalties are applied proportionally to the move. If a drawing with a x2 move penalty covers 3/4 of a grid square, it will apply to 3/4 of the move through that square (i.e., 1.5x penalty). When enabled, the penalty applies to a move through the entire grid square if, and only if, the penalty applies at the center of the grid. For example, if the drawing does not cover the center of the grid square, no movement through that grid square will be penalized.",
+    "elevationruler.settings.force-grid-penalties.hint": "When enabled, move penalties only apply if the token/drawing/region covers the center of the hex/square and penalties are applied per-square or per-hex on gridded maps. When disabled, movement penalties are applied proportionally to the move. For example, if a drawing with a x2 move penalty covers 3/4 of a grid square, it will apply to 3/4 of the move through that square (i.e., 1.5x penalty).",
 
     "elevationruler.settings.customized-labels.name": "Customized Ruler Text",
     "elevationruler.settings.customized-labels.hint": "Customize the ruler text. Change styles using `CONFIG.elevationruler.labelStyles` and `CONFIG.elevationruler.labelIcons`.",
@@ -126,7 +126,7 @@
     "elevationruler.drawingconfig.movementPenalty.hint": "Set to 1 for no penalty, less than one to grant a bonus, greater than 1 to impose a penalty multiplier. For example, set to 2 to double movement cost through this area. Movement under the drawing elevation will be ignored.",
 
     "elevationruler.drawingconfig.flatMovementPenalty.name": "Use Flat Penalty",
-    "elevationruler.drawingconfig.flatMovementPenalty.hint": "If enabled, treats the penalty as a fixed amount. For example, set to 5 to add +5 to each square of movement. Negative values provide flat bonuses to movement.",
+    "elevationruler.drawingconfig.flatMovementPenalty.hint": "If enabled, treats the penalty as a fixed amount of additional distance. For example, set to 5 to add +5 to each square of movement. Negative values provide flat bonuses to movement.",
 
     "elevationruler.clearMovement": "Clear Combatant Movement",
     "elevationruler.waypoint": "waypoint",
