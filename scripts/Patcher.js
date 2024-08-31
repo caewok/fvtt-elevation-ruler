@@ -197,7 +197,7 @@ export class Patcher {
     Object.defineProperty(cl, name, descriptor);
 
     const prototypeName = cl.constructor?.name;
-    const id = `${prototypeName ?? cl.name }.${prototypeName ? "prototype." : ""}${name}`;
+    const id = `${prototypeName ?? cl.name}.${prototypeName ? "prototype." : ""}${name}`;
     return { id, args: { cl, name } };
   }
 
@@ -401,7 +401,9 @@ export class MethodPatch extends AbstractPatch {
     else if ( this.config.isSetter ) this.prevMethod = this.prevMethod?.set;
     else this.prevMethod = this.prevMethod?.value;
 
-    this.regId = Patcher.addClassMethod(this.#cl, this.target, this.patchFn, { getter: this.config.isGetter, setter: this.config.isSetter });
+    this.regId = Patcher.addClassMethod(this.#cl, this.target, this.patchFn, {
+      getter: this.config.isGetter, setter: this.config.isSetter
+    });
   }
 
   /**
@@ -413,7 +415,9 @@ export class MethodPatch extends AbstractPatch {
 
     // Add back the original, if any.
     if ( this.prevMethod ) {
-      Patcher.addClassMethod(this.#cl, this.target, this.prevMethod, { getter: this.config.isGetter, setter: this.config.isSetter });
+      Patcher.addClassMethod(this.#cl, this.target, this.prevMethod, {
+        getter: this.config.isGetter, setter: this.config.isSetter
+      });
       this.prevMethod = undefined;
     }
     this.regId = undefined;

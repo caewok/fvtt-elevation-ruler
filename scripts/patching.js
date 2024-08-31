@@ -32,12 +32,12 @@ const PATCHES = {
   ClientKeybindings: PATCHES_ClientKeybindings,
   ClientSettings: PATCHES_ClientSettings,
   CombatTracker: PATCHES_CombatTracker,
-  ["foundry.canvas.edges.CanvasEdges"]: PATCHES_CanvasEdges,
+  "foundry.canvas.edges.CanvasEdges": PATCHES_CanvasEdges,
   DrawingConfig: PATCHES_DrawingConfig,
-  ["foundry.grid.GridlessGrid"]: PATCHES_GridlessGrid,
-  ["foundry.grid.HexagonalGrid"]: PATCHES_HexagonalGrid,
-  ["foundry.grid.SquareGrid"]: PATCHES_SquareGrid,
-  ["CONFIG.Canvas.rulerClass"]: PATCHES_Ruler,
+  "foundry.grid.GridlessGrid": PATCHES_GridlessGrid,
+  "foundry.grid.HexagonalGrid": PATCHES_HexagonalGrid,
+  "foundry.grid.SquareGrid": PATCHES_SquareGrid,
+  "CONFIG.Canvas.rulerClass": PATCHES_Ruler,
   Token: mergeObject(mergeObject(PATCHES_Token, PATCHES_TokenPF), PATCHES_TokenHUD),
   Wall: PATCHES_Wall
 };

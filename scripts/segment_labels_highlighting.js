@@ -93,7 +93,7 @@ export function segmentElevationLabel(ruler, segment) {
   if ( displayTotalChange ) {
     const segmentArrow = (elevationDelta > 0) ? "↑" :"↓";
     let totalChange = `[${segmentArrow}${Math.abs(roundMultiple(elevationDelta))}`;
-    totalChange += (units ? ` ${units}]` : `]`);
+    totalChange += (units ? ` ${units}]` : "]");
     labelParts.push(totalChange);
   }
   segment.label.style.align = segment.last ? "center" : "right";
@@ -240,7 +240,8 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
     descriptor: game.i18n.localize(`${MODULE_ID}.added`)
   };
 
-  // Align so that the icon is left justified and the value is right justified. This aligns the units label or descriptor.
+  // Align so that the icon is left justified and the value is right justified.
+  // This aligns the units label or descriptor.
   alignLeftAndRight(childLabels);
 
   // Build the string for each.
@@ -313,7 +314,7 @@ function getDefaultLabel(segment) {
 
 function alignChildTextLeft(parent, child, priorChildren = []) {
   parent.anchor = { x: 0.5, y: 0.5 };
-  child.anchor = { x: 0.5, y: 0.5 }
+  child.anchor = { x: 0.5, y: 0.5 };
 
   /* Align relative to center of parent and child.
   -----•----- 11
@@ -337,7 +338,7 @@ function alignChildTextLeft(parent, child, priorChildren = []) {
  */
 const SPACER = "\u200A"; // See https://unicode-explorer.com/articles/space-characters.
 function alignLeftAndRight(childLabels) {
-  const labelStyles =  CONFIG[MODULE_ID].labeling.styles;
+  const labelStyles = CONFIG[MODULE_ID].labeling.styles;
   let targetWidth = 0;
   Object.entries(childLabels).forEach(([name, obj]) => {
     obj.iconValueStr = `${obj.icon} ${roundMultiple(obj.value)}`;

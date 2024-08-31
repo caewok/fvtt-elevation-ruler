@@ -37,7 +37,7 @@ const MaximumSpeedCategory = {
   name: "Maximum",
   color: Color.from(0xff0000),
   multiplier: Number.POSITIVE_INFINITY
-}
+};
 
 Hooks.once("init", function() {
   // Set the default speed parameters for the given system.

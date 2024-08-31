@@ -1,5 +1,6 @@
 /* globals
 canvas,
+CONFIG,
 CONST,
 game,
 PIXI
@@ -54,7 +55,7 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
     }
 
     const processed = [];
-    const unprocessed = [segment]
+    const unprocessed = [segment];
     while ( (segment = unprocessed.pop()) ) {
       // Skip speed categories that do not provide a distance larger than the last.
       while ( speedCategory && maxDistance <= minDistance ) {
@@ -160,7 +161,7 @@ function targetSplitForSegment(targetCost, a, b, numPrevDiagonal = 0) {
   // Use pixel (integer) steps so the points are at integer bounds.
   const MAX_ITER = 100;
   let bestDist = 0;
-  let step = Math.floor(totalDist)
+  let step = Math.floor(totalDist);
   let iter = 0;
   while ( step > 1 && iter < MAX_ITER) {
     iter += 1;
@@ -221,7 +222,7 @@ function _splitSegmentAt(segment, breakpoint, numPrevDiagonal = 0) {
   s0.cumulativeDistance = segment.cumulativeDistance - s1.distance;
   s0.cumulativeOffsetDistance = segment.cumulativeOffsetDistance - s1.offsetDistance;
 
-  // s1 waypoint should equal the segment waypoint.
+  // The s1 waypoint should equal the segment waypoint.
   s0.waypoint.distance = segment.waypoint.distance - s1.distance;
   s0.waypoint.offsetDistance = segment.waypoint.offsetDistance - s1.offsetDistance;
   s0.waypoint.cost = segment.waypoint.cost - s1.cost;

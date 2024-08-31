@@ -59,11 +59,11 @@ export class ModuleSettingsAbstract {
     const cached = this.cache.get(key);
     if ( typeof cached !== "undefined" ) {
     // For debugging, can confirm against what the value should be.
-//       const origValue = game.settings.get(MODULE_ID, key);
-//       if ( origValue !== cached ) {
-//         console.debug(`Settings cache fail: ${origValue} !== ${cached} for key ${key}`);
-//         return origValue;
-//       }
+    //       const origValue = game.settings.get(MODULE_ID, key);
+    //       if ( origValue !== cached ) {
+    //         console.debug(`Settings cache fail: ${origValue} !== ${cached} for key ${key}`);
+    //         return origValue;
+    //       }
 
       return cached;
 

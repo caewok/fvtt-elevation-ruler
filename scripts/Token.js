@@ -1,6 +1,7 @@
 /* globals
 canvas,
 CanvasAnimation,
+CONFIG,
 foundry,
 game,
 Ruler
@@ -96,7 +97,7 @@ function updateToken(document, changed, _options, _userId) {
   const tokenHistory = token[MODULE_ID].measurementHistory ??= [];
   const gridUnitsToPixels = CONFIG.GeometryLib.utils.gridUnitsToPixels;
   const origin = token.getCenterPoint(document);
-  const dest = token.getCenterPoint({ x: changed.x ?? document.x, y: changed.y ?? document.y})
+  const dest = token.getCenterPoint({ x: changed.x ?? document.x, y: changed.y ?? document.y});
   origin.z = gridUnitsToPixels(document.elevation);
   origin.teleport = false;
   origin.cost = 0;
@@ -129,7 +130,7 @@ function _onDragLeftCancel(wrapped, event) {
 
   // Add waypoint on right click
   const ruler = canvas.controls.ruler;
-  if ( event.button === 2 && ruler._isTokenRuler && ruler.active && ruler.state === Ruler.STATES.MEASURING )  {
+  if ( event.button === 2 && ruler._isTokenRuler && ruler.active && ruler.state === Ruler.STATES.MEASURING ) {
     log("Token#_onDragLeftMove|Token ruler active");
     event.preventDefault();
     if ( event.ctrlKey ) ruler._removeWaypoint(event.interactionData.origin, {snap: !event.shiftKey});
@@ -187,7 +188,7 @@ async function _onDragLeftDrop(wrapped, event) {
     return false;
   }
 
-  // ruler._state = Ruler.STATES.MOVING; // Do NOT set state to MOVING here in v12, as it will break the canvas.
+  // NO: ruler._state = Ruler.STATES.MOVING; // Do NOT set state to MOVING here in v12, as it will break the canvas.
   ruler._onMoveKeyDown(event); // Movement is async here but not awaited in _onMoveKeyDown.
 }
 

@@ -2,6 +2,7 @@
 canvas,
 CONFIG,
 CONST,
+foundry,
 game,
 PIXI,
 Ruler,
@@ -276,7 +277,7 @@ function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
   const origin = token.getCenterPoint();
   const delta = origPoint.subtract(origin, PIXI.Point._tmp);
   let position = PIXI.Point._tmp2.copyFrom(token.document).add(delta, PIXI.Point._tmp2);
-  const tlSnapped  = token._preview.getSnappedPosition(position);
+  const tlSnapped = token._preview.getSnappedPosition(position);
   return token.getCenterPoint(tlSnapped);
 }
 

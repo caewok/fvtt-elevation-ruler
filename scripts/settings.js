@@ -73,15 +73,15 @@ const SETTINGS = {
     }
   },
 
-//   GRID_TERRAIN: {
-//     ALGORITHM: "grid-terrain-algorithm",
-//     CHOICES: {
-//       CENTER: "grid-terrain-choice-center-point",
-//       PERCENT: "grid-terrain-choice-percent-area",
-//       EUCLIDEAN: "grid-terrain-choice-euclidean"
-//     },
-//     AREA_THRESHOLD: "grid-terrain-area-threshold"
-//   },
+  //   GRID_TERRAIN: {
+  //     ALGORITHM: "grid-terrain-algorithm",
+  //     CHOICES: {
+  //       CENTER: "grid-terrain-choice-center-point",
+  //       PERCENT: "grid-terrain-choice-percent-area",
+  //       EUCLIDEAN: "grid-terrain-choice-euclidean"
+  //     },
+  //     AREA_THRESHOLD: "grid-terrain-area-threshold"
+  //   },
 
 };
 
@@ -344,33 +344,33 @@ export class Settings extends ModuleSettingsAbstract {
     });
 
     // ----- NOTE: Grid Terrain Measurement ----- //
-//     register(KEYS.GRID_TERRAIN.ALGORITHM, {
-//       name: localize(`${KEYS.GRID_TERRAIN.ALGORITHM}.name`),
-//       hint: localize(`${KEYS.GRID_TERRAIN.ALGORITHM}.hint`),
-//       scope: "world",
-//       config: true,
-//       default: KEYS.GRID_TERRAIN.CHOICES.CENTER,
-//       type: String,
-//       choices: {
-//         [KEYS.GRID_TERRAIN.CHOICES.CENTER]: localize(`${KEYS.GRID_TERRAIN.CHOICES.CENTER}`),
-//         [KEYS.GRID_TERRAIN.CHOICES.PERCENT]: localize(`${KEYS.GRID_TERRAIN.CHOICES.PERCENT}`),
-//         [KEYS.GRID_TERRAIN.CHOICES.EUCLIDEAN]: localize(`${KEYS.GRID_TERRAIN.CHOICES.EUCLIDEAN}`)
-//       }
-//     });
-//
-//     register(KEYS.GRID_TERRAIN.AREA_THRESHOLD, {
-//       name: localize(`${KEYS.GRID_TERRAIN.AREA_THRESHOLD}.name`),
-//       hint: localize(`${KEYS.GRID_TERRAIN.AREA_THRESHOLD}.hint`),
-//       scope: "world",
-//       config: true,
-//       default: 0.5,
-//       type: Number,
-//       range: {
-//         min: 0.1,
-//         max: 1,
-//         step: 0.1
-//       }
-//     });
+    //     register(KEYS.GRID_TERRAIN.ALGORITHM, {
+    //       name: localize(`${KEYS.GRID_TERRAIN.ALGORITHM}.name`),
+    //       hint: localize(`${KEYS.GRID_TERRAIN.ALGORITHM}.hint`),
+    //       scope: "world",
+    //       config: true,
+    //       default: KEYS.GRID_TERRAIN.CHOICES.CENTER,
+    //       type: String,
+    //       choices: {
+    //         [KEYS.GRID_TERRAIN.CHOICES.CENTER]: localize(`${KEYS.GRID_TERRAIN.CHOICES.CENTER}`),
+    //         [KEYS.GRID_TERRAIN.CHOICES.PERCENT]: localize(`${KEYS.GRID_TERRAIN.CHOICES.PERCENT}`),
+    //         [KEYS.GRID_TERRAIN.CHOICES.EUCLIDEAN]: localize(`${KEYS.GRID_TERRAIN.CHOICES.EUCLIDEAN}`)
+    //       }
+    //     });
+    //
+    //     register(KEYS.GRID_TERRAIN.AREA_THRESHOLD, {
+    //       name: localize(`${KEYS.GRID_TERRAIN.AREA_THRESHOLD}.name`),
+    //       hint: localize(`${KEYS.GRID_TERRAIN.AREA_THRESHOLD}.hint`),
+    //       scope: "world",
+    //       config: true,
+    //       default: 0.5,
+    //       type: Number,
+    //       range: {
+    //         min: 0.1,
+    //         max: 1,
+    //         step: 0.1
+    //       }
+    //     });
   }
 
   static registerKeybindings() {
@@ -425,7 +425,7 @@ export class Settings extends ModuleSettingsAbstract {
         { key: "Equal" }
       ],
       onDown: context => {
-         if ( canvas.controls?.ruler._isTokenRuler ) toggleTokenRulerWaypoint(context, true);
+        if ( canvas.controls?.ruler._isTokenRuler ) toggleTokenRulerWaypoint(context, true);
       },
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
@@ -467,7 +467,7 @@ export class Settings extends ModuleSettingsAbstract {
       editable: [
         { key: "KeyG" }
       ],
-      onDown: _context => { // eslint-disable-line no-unused-vars
+      onDown: _context => {
         const ruler = canvas.controls.ruler;
         if ( !ruler.active ) return;
         this.FORCE_TO_GROUND = !this.FORCE_TO_GROUND;
@@ -511,7 +511,7 @@ export class Settings extends ModuleSettingsAbstract {
     const t2 = performance.now();
 
     console.group(`${MODULE_ID}|Initialized scene graph and pathfinding.`);
-    console.debug(`${MODULE_ID}|Constructed scene graph in ${t1 - t0} ms.`)
+    console.debug(`${MODULE_ID}|Constructed scene graph in ${t1 - t0} ms.`);
     console.debug(`${MODULE_ID}|Tracked ${SCENE_GRAPH.wallIds.size} walls.`);
     console.debug(`Tracked ${SCENE_GRAPH.tokenIds.size} tokens.`);
     console.debug(`Located ${SCENE_GRAPH.edges.size} distinct edges.`);
@@ -543,7 +543,7 @@ export class Settings extends ModuleSettingsAbstract {
     Pathfinder.dirty = true;
     const res = SCENE_GRAPH._checkInternalConsistency();
     if ( !res.allConsistent ) {
-      log(`WallTracer|setTokenBlocksPathfinding ${document.id} resulted in inconsistent graph.`, SCENE_GRAPH, res);
+      log("WallTracer|setTokenBlocksPathfinding resulted in inconsistent graph.", SCENE_GRAPH, res);
       SCENE_GRAPH._reset();
     }
   }
