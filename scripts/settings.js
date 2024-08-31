@@ -50,14 +50,16 @@ const SETTINGS = {
     EUCLIDEAN_GRID_DISTANCE: "euclidean-grid-distance",
     AUTO_MOVEMENT_TYPE: "automatic-movement-type",
     COMBAT_HISTORY: "token-ruler-combat-history",
-    FORCE_GRID_PENALTIES: "force-grid-penalties"
+    FORCE_GRID_PENALTIES: "force-grid-penalties",
+    TOKEN_MULTIPLIER: "token-terrain-multiplier",
+    TOKEN_MULTIPLIER_FLAT: "token-terrain-multiplier"
   },
 
   NO_MODS: "no-modules-message",
   TOKEN_RULER: {
     ENABLED: "enable-token-ruler",
     HIDE_GM: "hide-gm-ruler",
-    TOKEN_MULTIPLIER: "token-terrain-multiplier"
+
   },
 
   SPEED_HIGHLIGHTING: {
@@ -310,18 +312,25 @@ export class Settings extends ModuleSettingsAbstract {
       type: Number
     });
 
-    register(KEYS.TOKEN_RULER.TOKEN_MULTIPLIER, {
-      name: localize(`${KEYS.TOKEN_RULER.TOKEN_MULTIPLIER}.name`),
-      hint: localize(`${KEYS.TOKEN_RULER.TOKEN_MULTIPLIER}.hint`),
+    register(KEYS.MEASURING.TOKEN_MULTIPLIER, {
+      name: localize(`${KEYS.MEASURING.TOKEN_MULTIPLIER}.name`),
+      hint: localize(`${KEYS.MEASURING.TOKEN_MULTIPLIER}.hint`),
       scope: "world",
       config: true,
       default: 1,
       type: Number,
       range: {
-        max: 10,
-        min: 0,
         step: 0.1
       }
+    });
+
+    register(KEYS.MEASURING.TOKEN_MULTIPLIER, {
+      name: localize(`${KEYS.MEASURING.TOKEN_MULTIPLIER_FLAT}.name`),
+      hint: localize(`${KEYS.MEASURING.TOKEN_MULTIPLIER_FLAT}.hint`),
+      scope: "world",
+      config: true,
+      default: true,
+      type: Boolean
     });
 
     register(KEYS.MEASURING.FORCE_GRID_PENALTIES, {

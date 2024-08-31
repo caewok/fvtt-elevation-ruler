@@ -303,6 +303,26 @@ function singleOffsetHexDistanceFn(numDiagonals = 0) {
 }
 
 /**
+ * Get the function to measure the offset distance for a given distance with given previous diagonals.
+ * @param {number} [diagonals=0]
+ * @returns {function}
+ */
+export function getOffsetDistanceFn(diagonals = 0) {
+  let offsetDistanceFn;
+  switch ( canvas.grid.type ) {
+    case CONST.GRID_TYPES.GRIDLESS:
+      offsetDistanceFn = (a, b) => CONFIG.GeometryLib.utils.pixelsToGridUnits(Point3d.distanceBetween(a, b));
+      break;
+    case CONST.GRID_TYPES.SQUARE:
+      offsetDistanceFn = singleOffsetSquareDistanceFn(diagonals);
+      break;
+    default: // All hex grids
+      offsetDistanceFn = singleOffsetHexDistanceFn(diagonals);
+  }
+  return offsetDistanceFn;
+}
+
+/**
  * Measure a path for a gridded scene. Handles hex and square grids.
  * @param {GridMeasurePathWaypoint[]} waypoints           The waypoints the path must pass through
  * @param {object} options                                Additional measurement options
@@ -321,20 +341,9 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
   // Movement cost requires knowing the 3d positions.
   // Cannot combine the projected waypoints to measure all at once, b/c they would be misaligned.
   // Copy the waypoint so it can be manipulated.
-  let diagonals = 0;
   let start = waypoints[0];
-  let offsetDistanceFn;
   cost ??= (prevOffset, currOffset, offsetDistance) => offsetDistance;
-  switch ( canvas.grid.type ) {
-    case CONST.GRID_TYPES.GRIDLESS:
-      offsetDistanceFn = (a, b) => CONFIG.GeometryLib.utils.pixelsToGridUnits(Point3d.distanceBetween(a, b));
-      break;
-    case CONST.GRID_TYPES.SQUARE:
-      offsetDistanceFn = singleOffsetSquareDistanceFn(diagonals);
-      break;
-    default: // All hex grids
-      offsetDistanceFn = singleOffsetHexDistanceFn(diagonals);
-  }
+  const offsetDistanceFn = getOffsetDistanceFn(0); // Diagonals = 0.
   const altGridDistanceFn = GridCoordinates3d.alternatingGridDistanceFn();
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
     const end = waypoints[i];

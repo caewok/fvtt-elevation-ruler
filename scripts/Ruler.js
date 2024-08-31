@@ -499,8 +499,7 @@ function _getCostFunction() {
   return (prevOffset, currOffset, offsetDistance) => {
     if ( !(prevOffset instanceof GridCoordinates3d) ) prevOffset = GridCoordinates3d.fromOffset(prevOffset);
     if ( !(currOffset instanceof GridCoordinates3d) ) currOffset = GridCoordinates3d.fromOffset(currOffset);
-    const penalty = movePenaltyInstance.movementPenaltyForSegment(prevOffset, currOffset);
-    return offsetDistance * penalty;
+    return movePenaltyInstance.movementCostForSegment(prevOffset, currOffset, offsetDistance);
   };
 }
 
