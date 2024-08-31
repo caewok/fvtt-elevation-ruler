@@ -105,7 +105,7 @@ Hooks.once("init", function() {
      * Settings related to the ruler text labels.
      */
     labeling: {
-       /**
+      /**
        * Ruler label styles
        */
       styles: {
@@ -170,7 +170,7 @@ Hooks.once("init", function() {
     Settings
   };
 
-  loadTemplates(Object.values(TEMPLATES)).then(_value => log(`Templates loaded.`));
+  loadTemplates(Object.values(TEMPLATES)).then(_value => log("Templates loaded."));
 });
 
 // Setup is after init; before ready.

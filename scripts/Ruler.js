@@ -2,6 +2,7 @@
 canvas,
 CONFIG,
 CONST,
+foundry,
 game,
 PIXI,
 Ruler,
@@ -276,7 +277,7 @@ function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
   const origin = token.getCenterPoint();
   const delta = origPoint.subtract(origin, PIXI.Point._tmp);
   let position = PIXI.Point._tmp2.copyFrom(token.document).add(delta, PIXI.Point._tmp2);
-  const tlSnapped  = token._preview.getSnappedPosition(position);
+  const tlSnapped = token._preview.getSnappedPosition(position);
   return token.getCenterPoint(tlSnapped);
 }
 
@@ -499,8 +500,7 @@ function _getCostFunction() {
   return (prevOffset, currOffset, offsetDistance) => {
     if ( !(prevOffset instanceof GridCoordinates3d) ) prevOffset = GridCoordinates3d.fromOffset(prevOffset);
     if ( !(currOffset instanceof GridCoordinates3d) ) currOffset = GridCoordinates3d.fromOffset(currOffset);
-    const penalty = movePenaltyInstance.movementPenaltyForSegment(prevOffset, currOffset);
-    return offsetDistance * penalty;
+    return movePenaltyInstance.movementCostForSegment(prevOffset, currOffset, offsetDistance);
   };
 }
 
@@ -519,9 +519,11 @@ function _getSegmentLabel(wrapped, segment) {
   }
 
   // Force distance to be between waypoints instead of (possibly pathfinding) segments.
+  // Use cost instead of straight distance for the label.
   const origSegmentDistance = segment.distance;
   const origTotalDistance = this.totalDistance;
-  segment.distance = roundMultiple(segment.waypoint.distance);
+  segment.distance = roundMultiple(segment.waypoint.cost);
+  this.totalDistance = this.totalCost;
   const origLabel = wrapped(segment);
   segment.distance = origSegmentDistance;
   this.totalDistance = origTotalDistance;

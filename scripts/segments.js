@@ -94,7 +94,12 @@ export function constructPathfindingSegments(segments, segmentMap) {
     for ( let i = 1; i < nPoints; i += 1 ) {
       const currPt = pathPoints[i];
       currPt.z ??= A.z;
-      const newSegment = { ray: new Ray3d(prevPt, currPt), waypoint: {}, history: segment.history, teleport: segment.teleport };
+      const newSegment = {
+        ray: new Ray3d(prevPt, currPt),
+        waypoint: {},
+        history: segment.history,
+        teleport: segment.teleport
+      };
       newSegment.waypoint.idx = segment.waypoint.idx;
       newSegments.push(newSegment);
       prevPt = currPt;
@@ -126,7 +131,6 @@ export function elevateSegments(ruler, segments) {  // Add destination as the fi
   const nHistory = ruler.history.length;
   for ( let i = 0, n = segments.length; i < n; i += 1 ) {
     const segment = segments[i];
-    // segment.first = i === 0;
     segment.waypoint = { idx: Math.max(i - nHistory, -1) };
   }
 
@@ -137,7 +141,7 @@ export function elevateSegments(ruler, segments) {  // Add destination as the fi
     _userElevationIncrements: 0,
     _forceToGround: Settings.FORCE_TO_GROUND,
     elevation: ruler.destinationElevation
-  }
+  };
   const waypoints = [...ruler.waypoints, destWaypoint];
   for ( const segment of segments ) {
     if ( segment.history ) {

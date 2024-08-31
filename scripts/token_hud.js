@@ -1,5 +1,6 @@
 /* globals
 CONFIG,
+document,
 game
 */
 "use strict";

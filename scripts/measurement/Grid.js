@@ -1,5 +1,6 @@
 /* globals
 canvas,
+CONFIG,
 CONST
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -81,7 +82,7 @@ function directPath3dSquare(start, end, path2d) {
   prevOffset.i = path2d[0].i;
   prevOffset.j = path2d[0].j;
 
-  // currOffset will be modified in the loop; set to end to get elevation steps now.
+  // The currOffset will be modified in the loop; set to end to get elevation steps now.
   const currOffset = GridCoordinates3d.fromObject(end);
 
   // Do 1 elevation move for each 2d diagonal move. Spread out over the diagonal steps.
@@ -99,12 +100,14 @@ function directPath3dSquare(start, end, path2d) {
 
   // Do 1 elevation move for each 2d non-diagonal move. Spread out over the non-diagonal steps.
   const num2dStraight = num2dMoves - num2dDiagonal;
-  let diagonalElevationStepsRemaining = Math.min(elevationStepsRemaining - doubleDiagonalElevationStepsRemaining, num2dStraight);
+  let diagonalElevationStepsRemaining = Math.min(elevationStepsRemaining
+    - doubleDiagonalElevationStepsRemaining, num2dStraight);
   let diagonalElevationStep = 0;
   const doDiagonalElevationStepMod = Math.ceil(num2dStraight / (diagonalElevationStepsRemaining + 1));
 
   // Rest are all additional elevation-only moves. Spread out evenly.
-  let additionalElevationStepsRemaining = Math.max(0, elevationStepsRemaining - diagonalElevationStepsRemaining - diagonalElevationStepsRemaining);
+  let additionalElevationStepsRemaining = Math.max(0,
+    elevationStepsRemaining - diagonalElevationStepsRemaining - diagonalElevationStepsRemaining);
   const doAdditionalElevationStepMod = Math.ceil(num2dMoves / (additionalElevationStepsRemaining + 1));
 
   currOffset.k = prevOffset.k; // Begin with the starting elevation, incrementing periodically in the loop.
@@ -113,9 +116,13 @@ function directPath3dSquare(start, end, path2d) {
     currOffset.setOffset2d(path2d[i]);
 
     const is2dDiagonal = (currOffset.i !== prevOffset.i) && (currOffset.j !== prevOffset.j);
-    const doDoubleDiagonalElevationStep = is2dDiagonal && doubleDiagonalElevationStepsRemaining > 0 && ((doubleDiagonalElevationStep + 1) % doDoubleDiagonalElevationStepMod) === 0;
-    const doDiagonalElevationStep = !is2dDiagonal && diagonalElevationStepsRemaining > 0 && ((diagonalElevationStep + 1) % doDiagonalElevationStepMod) === 0;
-    const doAdditionalElevationSteps = additionalElevationStepsRemaining > 0 && ((i + 1) % doAdditionalElevationStepMod) === 0;
+    const doDoubleDiagonalElevationStep = is2dDiagonal
+      && doubleDiagonalElevationStepsRemaining > 0
+      && ((doubleDiagonalElevationStep + 1) % doDoubleDiagonalElevationStepMod) === 0;
+    const doDiagonalElevationStep = !is2dDiagonal && diagonalElevationStepsRemaining > 0
+      && ((diagonalElevationStep + 1) % doDiagonalElevationStepMod) === 0;
+    const doAdditionalElevationSteps = additionalElevationStepsRemaining > 0
+      && ((i + 1) % doAdditionalElevationStepMod) === 0;
 
     // Either double or normal diagonals are the same but have separate tracking.
     if ( doDoubleDiagonalElevationStep ) {
@@ -130,7 +137,7 @@ function directPath3dSquare(start, end, path2d) {
     path3d.push(currOffset.clone());
 
     if ( doAdditionalElevationSteps ) {
-      let elevationSteps =  Math.ceil(additionalElevationStepsRemaining / stepsRemaining);
+      let elevationSteps = Math.ceil(additionalElevationStepsRemaining / stepsRemaining);
       while ( elevationSteps > 0 ) {
         currOffset.k += 1;
         elevationSteps -= 1;
@@ -142,9 +149,6 @@ function directPath3dSquare(start, end, path2d) {
   }
   return path3d;
 }
-
-
-
 
 /**
  * Construct a function to determine the offset cost for this canvas for a single 3d move on a square grid.
@@ -161,7 +165,7 @@ function singleOffsetSquareDistanceFn(numDiagonals = 0) {
   if ( canvas.grid.diagonals === D.ALTERNATING_1 || canvas.grid.diagonals === D.ALTERNATING_2 ) {
     const kFn = canvas.grid.diagonals === D.ALTERNATING_1
       ? () => nDiag & 1 ? 2 : 1
-        : () => nDiag & 1 ? 1 : 2;
+      : () => nDiag & 1 ? 1 : 2;
     fn = (prevOffset, currOffset) => {
       const isElevationMove = prevOffset.k !== currOffset.k;
       const isStraight2dMove = (prevOffset.i === currOffset.i) ^ (prevOffset.j === currOffset.j);
@@ -171,16 +175,16 @@ function singleOffsetSquareDistanceFn(numDiagonals = 0) {
       const d2 = isDiagonal2dMove && isElevationMove;
       if ( d1 || d2 ) nDiag++;
       const k = kFn();
-      return (s + k * d1 + k * d2) * canvas.grid.distance;
+      return (s + (k * d1) + (k * d2)) * canvas.grid.distance;
     };
   } else {
     let k = 1;
     let k2 = 1;
     switch ( canvas.grid.diagonals ) {
-        case D.EQUIDISTANT: k = 1; k2 = 1; break;
-        case D.EXACT: k = Math.SQRT2; k2 = Math.SQRT3; break;
-        case D.APPROXIMATE: k = 1.5; k2 = 1.75; break;
-        case D.RECTILINEAR: k = 2; k2 = 3; break;
+      case D.EQUIDISTANT: k = 1; k2 = 1; break;
+      case D.EXACT: k = Math.SQRT2; k2 = Math.SQRT3; break;
+      case D.APPROXIMATE: k = 1.5; k2 = 1.75; break;
+      case D.RECTILINEAR: k = 2; k2 = 3; break;
     }
     fn = (prevOffset, currOffset) => {
       const isElevationMove = prevOffset.k !== currOffset.k;
@@ -189,11 +193,11 @@ function singleOffsetSquareDistanceFn(numDiagonals = 0) {
       const s = isStraight2dMove || (!isDiagonal2dMove && isElevationMove);
       const d1 = isDiagonal2dMove && !isElevationMove;
       const d2 = isDiagonal2dMove && isElevationMove;
-      return (s + k * d1 + k2 * d2) * canvas.grid.distance;
+      return (s + (k * d1) + (k2 * d2)) * canvas.grid.distance;
     };
   }
   Object.defineProperty(fn, "diagonals", {
-    get : () => nDiag
+    get: () => nDiag
   });
   return fn;
 }
@@ -222,7 +226,7 @@ function directPath3dHex(start, end, path2d) {
   startOffset.i = path2d[0].i;
   startOffset.j = path2d[0].j;
 
-  // currOffset will be modified in the loop; set to end to get elevation steps now.
+  // The currOffset will be modified in the loop; set to end to get elevation steps now.
   const currOffset = GridCoordinates3d.fromObject(end);
 
   const path3d = [startOffset.clone()];
@@ -233,8 +237,9 @@ function directPath3dHex(start, end, path2d) {
     currOffset.setOffset2d(path2d[i]);
 
     const doElevationStep = ((i + 1) % doElevationStepMod) === 0;
-    let elevationSteps = doElevationStep && (elevationStepsRemaining > 0) ? Math.ceil(elevationStepsRemaining / stepsRemaining) : 0;
-    elevationStepsRemaining -= elevationSteps
+    let elevationSteps = doElevationStep
+      && (elevationStepsRemaining > 0) ? Math.ceil(elevationStepsRemaining / stepsRemaining) : 0;
+    elevationStepsRemaining -= elevationSteps;
 
     // Apply the first elevation step as a diagonal upwards move in combination with the canvas 2d move.
     if ( elevationSteps ) {
@@ -269,7 +274,7 @@ function singleOffsetHexDistanceFn(numDiagonals = 0) {
   if ( canvas.grid.diagonals === D.ALTERNATING_1 || canvas.grid.diagonals === D.ALTERNATING_2 ) {
     const kFn = canvas.grid.diagonals === D.ALTERNATING_1
       ? () => nDiag & 1 ? 2 : 1
-        : () => nDiag & 1 ? 1 : 2;
+      : () => nDiag & 1 ? 1 : 2;
     fn = (prevOffset, currOffset) => {
       // For hex moves, no diagonal 2d. Just diagonal if both elevating and moving in 2d.
       const isElevationMove = prevOffset.k !== currOffset.k;
@@ -278,28 +283,48 @@ function singleOffsetHexDistanceFn(numDiagonals = 0) {
       const d = !s;
       nDiag += d;
       const k = kFn();
-      return (s + k * d) * canvas.grid.distance;
+      return (s + (k * d)) * canvas.grid.distance;
     };
   } else {
     let k = 1;
     switch ( canvas.grid.diagonals ) {
-        case D.EQUIDISTANT: k = 1; break;
-        case D.EXACT: k = Math.SQRT2; break;
-        case D.APPROXIMATE: k = 1.5;  break;
-        case D.RECTILINEAR: k = 2; break;
+      case D.EQUIDISTANT: k = 1; break;
+      case D.EXACT: k = Math.SQRT2; break;
+      case D.APPROXIMATE: k = 1.5; break;
+      case D.RECTILINEAR: k = 2; break;
     }
     fn = (prevOffset, currOffset) => {
       const isElevationMove = prevOffset.k !== currOffset.k;
       const is2dMove = prevOffset.i !== currOffset.i || prevOffset.j !== currOffset.j;
       const s = isElevationMove ^ is2dMove;
       const d = !s;
-      return (s + k * d) * canvas.grid.distance;
+      return (s + (k * d)) * canvas.grid.distance;
     };
   }
   Object.defineProperty(fn, "diagonals", {
-    get : () => nDiag
+    get: () => nDiag
   });
   return fn;
+}
+
+/**
+ * Get the function to measure the offset distance for a given distance with given previous diagonals.
+ * @param {number} [diagonals=0]
+ * @returns {function}
+ */
+export function getOffsetDistanceFn(diagonals = 0) {
+  let offsetDistanceFn;
+  switch ( canvas.grid.type ) {
+    case CONST.GRID_TYPES.GRIDLESS:
+      offsetDistanceFn = (a, b) => CONFIG.GeometryLib.utils.pixelsToGridUnits(Point3d.distanceBetween(a, b));
+      break;
+    case CONST.GRID_TYPES.SQUARE:
+      offsetDistanceFn = singleOffsetSquareDistanceFn(diagonals);
+      break;
+    default: // All hex grids
+      offsetDistanceFn = singleOffsetHexDistanceFn(diagonals);
+  }
+  return offsetDistanceFn;
 }
 
 /**
@@ -317,24 +342,14 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
   result.segments.forEach(segment => initializeResultObject(segment));
 
   // For each waypoint, project from 3d if the waypoint is a 3d class.
-  // The projected point can be used to determine distance but not movement cost because the passed coordinates will be incorrect.
+  // The projected point can be used to determine distance but not movement cost
+  // because the passed coordinates will be incorrect.
   // Movement cost requires knowing the 3d positions.
   // Cannot combine the projected waypoints to measure all at once, b/c they would be misaligned.
   // Copy the waypoint so it can be manipulated.
-  let diagonals = 0;
   let start = waypoints[0];
-  let offsetDistanceFn;
   cost ??= (prevOffset, currOffset, offsetDistance) => offsetDistance;
-  switch ( canvas.grid.type ) {
-    case CONST.GRID_TYPES.GRIDLESS:
-      offsetDistanceFn = (a, b) => CONFIG.GeometryLib.utils.pixelsToGridUnits(Point3d.distanceBetween(a, b));
-      break;
-    case CONST.GRID_TYPES.SQUARE:
-      offsetDistanceFn = singleOffsetSquareDistanceFn(diagonals);
-      break;
-    default: // All hex grids
-      offsetDistanceFn = singleOffsetHexDistanceFn(diagonals);
-  }
+  const offsetDistanceFn = getOffsetDistanceFn(0); // Diagonals = 0.
   const altGridDistanceFn = GridCoordinates3d.alternatingGridDistanceFn();
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
     const end = waypoints[i];
