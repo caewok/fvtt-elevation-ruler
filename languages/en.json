@@ -76,8 +76,11 @@
     "elevationruler.settings.round-to-multiple.name": "Round Distance to Multiple",
     "elevationruler.settings.round-to-multiple.hint": "Round the distance displayed to the nearest multiple of the number entered. Set to 0 to disable rounding.",
 
-    "elevationruler.settings.token-terrain-multiplier.name": "Token as Terrain Multiplier",
-    "elevationruler.settings.token-terrain-multiplier.hint": "Multiplier to use to calculate movement speed when moving through other tokens. Set to 1 to ignore. Values less than 1 treat token spaces as faster than normal; values greater than 1 penalize movement through token spaces.",
+    "elevationruler.settings.token-terrain-multiplier.name": "Token Penalty Percent",
+    "elevationruler.settings.token-terrain-multiplier.hint": "Penalize movement through other tokens. Set to 1 for no penalty, less than one to grant a bonus, greater than 1 to impose a penalty multiplier. For example, set to 2 to double movement cost through a token.",
+
+    "elevationruler.settings.token-terrain-multiplier-flat.name": "Flat Token Penalty",
+    "elevationruler.settings.token-terrain-multiplier-flat.hint": "If enabled, treats the token move penalty as a fixed amount of additional distance. For example, set to 5 to add +5 to each square of movement. Negative values provide a flat bonus.",
 
     "elevationruler.settings.pathfinding_enable.name": "Use Pathfinding",
     "elevationruler.settings.pathfinding_enable.hint": "When enabled, adds a pathfinding togglee to the Token controls that will cause the ruler to map a path around walls and tokens, depending on settings. Disable this if pathfinding is causing compatibility issues. Disabling may also result in a small performance increase.",
@@ -96,6 +99,7 @@
 
     "elevationruler.settings.grid-terrain-algorithm.name": "Terrain Grid Measurement",
     "elevationruler.settings.grid-terrain-algorithm.hint": "When on a grid, how to account for movement penalties or bonuses from terrain and tokens? Center: apply if the terrain/token overlaps the grid center; Percent Area: apply if the terrain/token covers at least this much of the grid square/hex; Euclidean: prorate based on percent of line segment within the terrain/token between this grid square/hex and the previous.",
+
     "elevationruler.settings.grid-terrain-choice-center-point": "Center Point",
     "elevationruler.settings.grid-terrain-choice-percent-area": "Percent Area",
     "elevationruler.settings.grid-terrain-choice-euclidean": "Euclidean",
@@ -112,14 +116,20 @@
     "elevationruler.settings.scale-text.name": "Scale Ruler Text",
     "elevationruler.settings.scale-text.hint": "When enabled, ruler text will be scaled depending on `canvas.dimensions.size`. Further adjust scaling by using `CONFIG.elevationruler.textScale`.",
 
+    "elevationruler.settings.force-grid-penalties.name": "Use Grid for Movement Penalties",
+    "elevationruler.settings.force-grid-penalties.hint": "When enabled, move penalties only apply if the token/drawing/region covers the center of the hex/square and penalties are applied per-square or per-hex on gridded maps. When disabled, movement penalties are applied proportionally to the move. For example, if a drawing with a x2 move penalty covers 3/4 of a grid square, it will apply to 3/4 of the move through that square (i.e., 1.5x penalty).",
+
     "elevationruler.settings.customized-labels.name": "Customized Ruler Text",
     "elevationruler.settings.customized-labels.hint": "Customize the ruler text. Change styles using `CONFIG.elevationruler.labelStyles` and `CONFIG.elevationruler.labelIcons`.",
 
     "elevationruler.controls.prefer-token-elevation.name": "Prefer Token Elevation",
     "elevationruler.controls.pathfinding-control.name": "Use Pathfinding",
 
-    "elevationruler.drawingconfig.movementPenalty.name": "Movement Bonus/Penalty",
-    "elevationruler.drawingconfig.movementPenalty.hint": "Set to 1 for no penalty. Values greater than one penalize movement by that percent; values less than one effectively grant a bonus to movement. For example, set to 2 to double movement through this area. Movement under the drawing elevation will be ignored.",
+    "elevationruler.drawingconfig.movementPenalty.name": "Movement Penalty Percent",
+    "elevationruler.drawingconfig.movementPenalty.hint": "Set to 1 for no penalty, less than one to grant a bonus, greater than 1 to impose a penalty multiplier. For example, set to 2 to double movement cost through this area. Movement under the drawing elevation will be ignored.",
+
+    "elevationruler.drawingconfig.flatMovementPenalty.name": "Use Flat Penalty",
+    "elevationruler.drawingconfig.flatMovementPenalty.hint": "If enabled, treats the penalty as a fixed amount of additional distance. For example, set to 5 to add +5 to each square of movement. Negative values provide a flat bonus.",
 
     "elevationruler.clearMovement": "Clear Combatant Movement",
     "elevationruler.waypoint": "waypoint",

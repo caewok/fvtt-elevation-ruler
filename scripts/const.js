@@ -16,6 +16,7 @@ export const TEMPLATES = {
 export const FLAGS = {
   MOVEMENT_SELECTION: "selectedMovementType",
   MOVEMENT_PENALTY: "movementPenalty",
+  MOVEMENT_PENALTY_FLAT: "flatMovementPenalty",
   SCENE: {
     BACKGROUND_ELEVATION: "backgroundElevation"
   },
@@ -47,7 +48,9 @@ export const MOVEMENT_TYPES = {
    * @param {number} groundElev   Ground elevation in grid units
    * @returns {MOVEMENT_TYPE}
    */
-  forCurrentElevation: function movementTypeForCurrentElevation(currElev, groundElev = 0) { return Math.sign(currElev - groundElev) + 1; }
+  forCurrentElevation: function(currElev, groundElev = 0) {
+    return Math.sign(currElev - groundElev) + 1;
+  }
 };
 
 

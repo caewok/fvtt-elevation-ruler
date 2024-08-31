@@ -1,3 +1,14 @@
+# 0.10.6
+## New Features
+Setting to apply movement penalties per-grid-space. Defaults to enabled. For gridded scenes, this will (1) count regions/tokens/drawings as imposing movement penalty only if the region/token/drawing overlaps the center point of the grid space and (2) impose the penalty at a grid-space level. If disabled, this will proportionally apply the penalty based on the precise movement path. Closes #181.
+
+Setting to add (or subtract) a flat amount when moving into a grid space with a token penalty. E.g. +5 per grid square. Add parallel setting to drawing configuration. (May add a similar toggle to regions in Terrain Mapper if this cannot be easily handled using active effects.) Closes #125.
+
+## Bug fixes and other updates
+Correct NaN distance when using hex grids. Closes #188.
+Don't treat walls as blocking if the top elevation equals the token elevation. Closes #189.
+Update Italian localization. Thanks @GregoryWarn!
+
 # 0.10.5
 Fix for `_fromPoint3d` not a function. Closes #186.
 

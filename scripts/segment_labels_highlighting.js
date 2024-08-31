@@ -93,7 +93,7 @@ export function segmentElevationLabel(ruler, segment) {
   if ( displayTotalChange ) {
     const segmentArrow = (elevationDelta > 0) ? "↑" :"↓";
     let totalChange = `[${segmentArrow}${Math.abs(roundMultiple(elevationDelta))}`;
-    totalChange += (units ? ` ${units}]` : `]`);
+    totalChange += (units ? ` ${units}]` : "]");
     labelParts.push(totalChange);
   }
   segment.label.style.align = segment.last ? "center" : "right";
@@ -137,13 +137,15 @@ function elevationForRulerLabel(ruler, segment) {
 export function segmentTerrainLabel(s) {
   if ( s.waypoint.cost.almostEqual(s.waypoint.offsetDistance) ) return "";
   const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
-  const moveDistance = roundMultiple(s.waypoint.cost);
+  const addedCost = roundMultiple(s.waypoint.cost - s.waypoint.offsetDistance);
+  const symbol = addedCost > 0 ? "+" : "-";
+
   if ( CONFIG[MODULE_ID].SPEED.useFontAwesome ) {
     const style = s.label.style;
     if ( !style.fontFamily.includes("fontAwesome") ) style.fontFamily += ",fontAwesome";
-    return `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${moveDistance}${units}`;
+    return `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${symbol}${Math.abs(addedCost)}${units}`;
   }
-  return `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${moveDistance}${units}`;
+  return `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${symbol}${Math.abs(addedCost)}${units}`;
 }
 
 
@@ -202,7 +204,7 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
   const childLabels = {};
 
   // (1) Total Distance
-  let totalDistLabel = segment.last ? `${roundMultiple(ruler.totalDistance)}` : `${labelIcons.waypoint} ${roundMultiple(segment.waypoint.distance)}`;
+  let totalDistLabel = segment.last ? `${roundMultiple(ruler.totalCost)}` : `${labelIcons.waypoint} ${roundMultiple(segment.waypoint.cost)}`;
 
   // (2) Extra text
   // Strip out any custom text from the original label.
@@ -212,7 +214,7 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
   // (3) Waypoint
   if ( segment.last && segment.waypoint.idx > 0 ) childLabels.waypoint = {
     icon: `${labelIcons.waypoint}`,
-    value: segment.waypoint.distance,
+    value: segment.waypoint.cost,
     descriptor: game.i18n.localize(`${MODULE_ID}.waypoint`)
   };
 
@@ -240,7 +242,8 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
     descriptor: game.i18n.localize(`${MODULE_ID}.added`)
   };
 
-  // Align so that the icon is left justified and the value is right justified. This aligns the units label or descriptor.
+  // Align so that the icon is left justified and the value is right justified.
+  // This aligns the units label or descriptor.
   alignLeftAndRight(childLabels);
 
   // Build the string for each.
@@ -313,7 +316,7 @@ function getDefaultLabel(segment) {
 
 function alignChildTextLeft(parent, child, priorChildren = []) {
   parent.anchor = { x: 0.5, y: 0.5 };
-  child.anchor = { x: 0.5, y: 0.5 }
+  child.anchor = { x: 0.5, y: 0.5 };
 
   /* Align relative to center of parent and child.
   -----•----- 11
@@ -337,7 +340,7 @@ function alignChildTextLeft(parent, child, priorChildren = []) {
  */
 const SPACER = "\u200A"; // See https://unicode-explorer.com/articles/space-characters.
 function alignLeftAndRight(childLabels) {
-  const labelStyles =  CONFIG[MODULE_ID].labeling.styles;
+  const labelStyles = CONFIG[MODULE_ID].labeling.styles;
   let targetWidth = 0;
   Object.entries(childLabels).forEach(([name, obj]) => {
     obj.iconValueStr = `${obj.icon} ${roundMultiple(obj.value)}`;

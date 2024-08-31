@@ -2,6 +2,7 @@
 canvas
 CONFIG,
 CONST,
+Handlebars,
 PIXI,
 renderTemplate
 */
@@ -13,7 +14,7 @@ import { Settings } from "./settings.js";
 export function log(...args) {
   try {
     if ( CONFIG[MODULE_ID].debug ) console.debug(MODULE_ID, "|", ...args);
-  } catch(e) { // eslint-disable-line no-unused-vars
+  } catch(e) {
     // Empty
   }
 }
@@ -23,7 +24,7 @@ export function log(...args) {
  * @param {number} n
  * @returns {boolean}
  */
-export function isEven(n) { return  ~n & 1; }
+export function isEven(n) { return ~n & 1; }
 
 /**
  * Is this number odd?
@@ -240,7 +241,6 @@ export function * iterateGridUnderLine(origin, destination, { reverse = false } 
     const offset = canvas.grid.getOffset({x, y});
     const r1 = offset.i;
     const c1 = offset.j;
-    // const [r1, c1] = canvas.grid.grid.getGridPositionFromPixels(x, y);
     if ( r0 === r1 && c0 === c1 ) continue;
 
     // Skip the first one
@@ -250,8 +250,6 @@ export function * iterateGridUnderLine(origin, destination, { reverse = false } 
       const {x: xh, y: yh} = origin.projectToward(destination, th);
       const hOffset = canvas.grid.getOffset({ x: xh, y: yh });
       yield [hOffset.i, hOffset.j];
-
-      // yield canvas.grid.grid.getGridPositionFromPixels(xh, yh); // [rh, ch]
     }
 
     // After so the halfway point is done first.
@@ -285,7 +283,7 @@ export function renderTemplateSync(path, data) {
  * @param {number} num The number to round
  * @returns {number}   The rounded number
  */
-export function roundMultiple (num) {
+export function roundMultiple(num) {
   const multiple = Settings.get(Settings.KEYS.LABELING.ROUND_TO_MULTIPLE);
   if (multiple) return num.toNearest(multiple);
   return num;

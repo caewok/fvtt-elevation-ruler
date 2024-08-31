@@ -11,6 +11,7 @@ import { MODULE_ID, FLAGS, MODULES_ACTIVE, SPEED, MOVEMENT_TYPES } from "../cons
 import { Settings } from "../settings.js";
 import { movementType } from "../token_hud.js";
 import { log, keyForValue } from "../util.js";
+import { getOffsetDistanceFn } from "./Grid.js";
 
 /*
 Class to measure penalty, as percentage of distance, between two points.
@@ -56,8 +57,9 @@ export class MovePenalty {
    */
   constructor(moveToken, speedFn) {
     this.moveToken = moveToken;
-    this.speedFn = speedFn ?? (token => foundry.utils.getProperty(token, SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES,  token.movementType)]));
-    this.localTokenClone = this.constructor._constructTokenClone(this.moveToken);
+    this.speedFn = speedFn ?? (token =>
+      foundry.utils.getProperty(token, SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, token.movementType)]));
+    this.#localTokenClone = this.constructor._constructTokenClone(this.moveToken);
     const tokenMultiplier = this.constructor.tokenMultiplier;
     const terrainAPI = this.constructor.terrainAPI;
 
@@ -67,8 +69,9 @@ export class MovePenalty {
       if ( r.terrainmapper.hasTerrain ) this.regions.add(r);
     });
     canvas.drawings.placeables.forEach(d => {
-      const penalty = d.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY);
-      if ( penalty && penalty !== 1 ) this.drawings.add(d)
+      const penalty = d.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY) ?? 1;
+      const useFlatPenalty = d.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY_FLAT);
+      if ( (!useFlatPenalty && penalty !== 1) || (useFlatPenalty && penalty !== 0) ) this.drawings.add(d);
     });
     this.tokens.delete(moveToken);
 
@@ -116,7 +119,7 @@ export class MovePenalty {
    *   - @prop {TokenDocument} document
    *   - @prop {Actor} actor
    */
-  localTokenClone;
+  #localTokenClone;
 
   /**
    * Construct the local token clone.
@@ -124,8 +127,8 @@ export class MovePenalty {
    * @returns {object}
    */
   static _constructTokenClone(token) {
-    const actor = new CONFIG.Actor.documentClass(token.actor.toObject())
-    const document = new CONFIG.Token.documentClass(token.document.toObject())
+    const actor = new CONFIG.Actor.documentClass(token.actor.toObject());
+    const document = new CONFIG.Token.documentClass(token.document.toObject());
     const tClone = { document, actor, _original: token };
 
     // Add the movementType and needed properties to calculate movement type.
@@ -141,7 +144,7 @@ export class MovePenalty {
       },
       elevationE: {
         get: function() {
-          return this.document.elevation
+          return this.document.elevation;
         }
       }
     });
@@ -155,35 +158,118 @@ export class MovePenalty {
   // ----- NOTE: Primary methods ----- //
 
   /**
-   * Determine the movement penalties along a start|end segment.
-   * @param {GridCoordinates3d} startCoords
-   * @param {GridCoordinates3d} endCoords
-   * @returns {number} The number used to multiply the move speed along the segment.
+   * Determine the movement cost for a segment.
+   * @param {GridCoordinates3d} startCoords     Exact starting position
+   * @param {GridCoordinates3d} endCoords       Exact ending position
+   * @param {number} costFreeDistance           Measured distance of the segment (may be offset distance)
+   * @returns {number} The costFreeDistance + cost, in grid units.
    */
-  movementPenaltyForSegment(startCoords, endCoords) {
-    const start = startCoords.center;
-    const end = endCoords.center;
-    const key = `${start.key}|${end.key}`;
+  movementCostForSegment(startCoords, endCoords, costFreeDistance = 0, forceGridPenalty) { // eslint-disable-line default-param-last
+    forceGridPenalty ??= Settings.get(Settings.KEYS.MEASURING.FORCE_GRID_PENALTIES);
+    forceGridPenalty &&= !canvas.grid.isGridless;
+
+    // Did we already test this segment?
+    const startKey = forceGridPenalty ? startCoords.center.key : startCoords.key;
+    const endKey = forceGridPenalty ? endCoords.center.key : endCoords.key;
+    const key = `${startKey}|${endKey}`;
     if ( this.#penaltyCache.has(key) ) return this.#penaltyCache.get(key);
 
-    const t0 = performance.now();
-    const cutawayIxs = this._cutawayIntersections(start, end);
-    if ( !cutawayIxs.length ) return 1;
-    const t1 = performance.now();
-    const avgMultiplier = this._penaltiesForIntersections(start, end, cutawayIxs);
-    const t2 = performance.now();
-    if ( CONFIG[MODULE_ID].debug ) {
-      console.group(`${MODULE_ID}|movementPenaltyForSegment`);
-      console.debug(`${startCoords.x},${startCoords.y},${startCoords.z}(${startCoords.i},${startCoords.j},${startCoords.k}) --> ${endCoords.x},${endCoords.y},${endCoords.z}(${endCoords.i},${endCoords.j},${endCoords.k})`);
-      console.table({
-        _cutawayIntersections: (t1 - t0).toNearest(.01),
-        penaltiesForIntersections: (t2 - t1).toNearest(.01),
-        total: (t2 - t0).toNearest(.01)
-      });
-      console.groupEnd(`${MODULE_ID}|movementPenaltyForSegment`);
+    let res = costFreeDistance;
+    if ( forceGridPenalty ) {
+      // Cost is assigned to each grid square/hex
+      const isOneStep = Math.abs(endCoords.i - startCoords.i) < 2
+        && Math.abs(endCoords.j - startCoords.j) < 2
+        && Math.abs(endCoords.k - startCoords.k) < 2;
+      if ( isOneStep ) return this.movementCostForGridSpace(endCoords, costFreeDistance);
+
+      // Unlikely scenario where endCoords are more than 1 step away from startCoords.
+      let totalCost = 0;
+      const path = canvas.grid.getDirectPath([startCoords, endCoords]);
+      const offsetDistanceFn = getOffsetDistanceFn();
+      let prevOffset = path[0];
+      for ( let i = 1, n = path.length; i < n; i += 1 ) {
+        const currOffset = path[i];
+        const offsetDist = offsetDistanceFn(prevOffset, currOffset);
+        totalCost += (this.movementCostForGridSpace(endCoords, offsetDist) - offsetDist);
+        prevOffset = currOffset;
+      }
+      res = totalCost + costFreeDistance;
+    } else {
+      // Cost is proportional to the distance of the segment covered by each penalty-imposing token,region,drawing.
+      const multiplier = this.proportionalCostForSegment(startCoords, endCoords);
+      res = costFreeDistance * multiplier;
     }
-    this.#penaltyCache.set(key, 1 / avgMultiplier);
-    return 1 / avgMultiplier;
+    this.#penaltyCache.set(key, res);
+    return res;
+  }
+
+
+  /**
+   * Determine the movement cost when in a specific grid space.
+   * Typically used with Settings.KEYS.FORCE_GRID_PENALTIES.
+   * @param {GridCoordinates3d} coords     Exact starting position
+   * @param {number} costFreeDistance           Measured distance of the step
+   * @returns {number} The additional cost, in grid units, plus the costFreeDistance.
+   */
+  movementCostForGridSpace(coords, costFreeDistance = 0) {
+    // Determine what regions, tokens, drawings overlap the center point.
+    const centerPt = coords.center;
+    const regions = [...this.regions].filter(r => r.testPoint(centerPt, centerPt.elevation));
+    const tokens = [...this.tokens].filter(t => t.constrainedTokenBorder.contains(centerPt.x, centerPt.y)
+      && centerPt.elevation.between(t.bottomE, t.topE));
+    const drawings = [...this.drawings].filter(d => d.bounds.contains(centerPt.x, centerPt.y)
+      && d.elevationE <= centerPt.elevation);
+
+    // Track all speed multipliers and flat penalties for the grid space.
+    let flatPenalty = 0;
+    let currentMultiplier = 1;
+
+    // Drawings
+    drawings.forEach(d => {
+      const penalty = d.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY);
+      if ( d.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY_FLAT) ) flatPenalty += penalty;
+      else currentMultiplier *= penalty;
+    });
+
+    // Tokens
+    const tokenMultiplier = this.constructor.tokenMultiplier;
+    const useTokenFlat = this.constructor.useFlatTokenMultiplier;
+    if ( useTokenFlat ) flatPenalty += (tokenMultiplier * tokens.length);
+    else currentMultiplier *= (tokenMultiplier * tokens.length);
+
+    // Regions
+    const testRegions = this.constructor.terrainAPI && regions.length;
+    const tClone = testRegions ? this.#initializeTokenClone() : this.moveToken;
+    const startingSpeed = this.speedFn(tClone) || 1;
+    regions.forEach(r => this.#addTerrainsToToken(tClone, r));
+
+    const speedInGrid = ((this.speedFn(tClone) || 1) * currentMultiplier);
+    const gridMult = startingSpeed / speedInGrid;
+    return (flatPenalty + (gridMult * costFreeDistance));
+
+    /* Example
+      Token has speed 30 and moves 10 grid units.
+      Assume speed is halved plus a +5 flat penalty.
+      30 / 15 = 2 * 10 = 20 grid units + 5 penalty.
+      So instead of moving 10 units, it is as though the token moved 25.
+    */
+  }
+
+
+  /**
+   * Determine the movement penalties along a start|end segment.
+   * By default, the penalty is apportioned based on the exact intersections of the penalty
+   * region to the segment. If `forceGridPenalty=true`, then the penalty is assigned per grid space.
+   *
+   * @param {GridCoordinates3d} startCoords     Exact starting position
+   * @param {GridCoordinates3d} endCoords       Exact ending position
+   * @returns {number} The number used to multiply the move speed along the segment.
+   */
+  proportionalCostForSegment(startCoords, endCoords) {
+    // Intersections for each region, token, drawing.
+    const cutawayIxs = this._cutawayIntersections(startCoords, endCoords);
+    if ( !cutawayIxs.length ) return 1;
+    return this._penaltiesForIntersections(startCoords, endCoords, cutawayIxs);
   }
 
   // ----- NOTE: Secondary methods ----- //
@@ -204,11 +290,12 @@ export class MovePenalty {
    */
   _cutawayIntersections(start, end) {
     const cutawayIxs = [];
-    const terrainAPI = this.constructor.terrainAPI;
-    for ( const region of this.pathRegions ) {
-      const ixs = region.terrainmapper._cutawayIntersections(start, end);
-      ixs.forEach(ix => ix.region = region);
-      cutawayIxs.push(...ixs);
+    if ( this.constructor.terrainAPI ) {
+      for ( const region of this.pathRegions ) {
+        const ixs = region.terrainmapper._cutawayIntersections(start, end);
+        ixs.forEach(ix => ix.region = region);
+        cutawayIxs.push(...ixs);
+      }
     }
     for ( const token of this.pathTokens ) {
       const ixs = this.constructor.tokenCutawayIntersections(start, end, token);
@@ -228,73 +315,89 @@ export class MovePenalty {
    * @param {Point3d} start
    * @param {Point3d} end
    * @param {CutawayIntersection[]} cutawayIxs
-   * @returns {CutawayIntersection[]} Intersections with penalties and intersections converted to distance for x axis.
+   * @returns {number} The penalty multiplier for the given start --> end
    */
   _penaltiesForIntersections(start, end, cutawayIxs) {
     if ( !cutawayIxs.length ) return 1;
 
-    // Set up the token clone to add and subtract terrains.
+    // Tokens
     const tokenMultiplier = this.constructor.tokenMultiplier;
-    let tClone = this.moveToken;
+    const useTokenFlat = this.constructor.useFlatTokenMultiplier;
+
+    // Regions
     const testRegions = this.constructor.terrainAPI && this.pathRegions;
-    if ( testRegions ) {
-      tClone = this.localTokenClone;
-      const Terrain = CONFIG.terrainmapper.Terrain;
-      const tokenTerrains = Terrain.allOnToken(tClone);
-      if ( tokenTerrains.length ) {
-        CONFIG.terrainmapper.Terrain.removeFromTokenLocally(tClone, tokenTerrains, { refresh: false });
-        tClone.actor._initialize(); // This is slow; we really need something more specific to active effects.
-      }
-    }
+    const tClone = testRegions ? this.#initializeTokenClone() : this.moveToken;
     const startingSpeed = this.speedFn(tClone) || 1;
 
     // Traverse each intersection, determining the speed multiplier from starting speed
     // and calculating total time and distance. x meters / y meters/second = x/y seconds
     const { to2d, convertToDistance } = CONFIG.GeometryLib.utils.cutaway;
     let totalDistance = 0;
+    let totalUnmodifiedDistance = 0;
     let totalTime = 0;
     let currentMultiplier = 1;
+    let currentFlat = 0;
     const start2d = convertToDistance(to2d(start, start, end));
     const end2d = convertToDistance(to2d(end, start, end));
     let prevIx = start2d;
-    //const changePts = [];
     cutawayIxs = cutawayIxs.map(ix => convertToDistance(shallowCopyCutawayIntersection(ix))); // Avoid modifying the originals.
     cutawayIxs.push(end2d);
     cutawayIxs.sort((a, b) => a.x - b.x);
     for ( const ix of cutawayIxs ) {
       // Must invert the multiplier to apply them as penalties. So a 2x penalty is 1/2 times speed.
       const multFn = ix.movingInto ? x => 1 / x : x => x;
+      const addFn = ix.movingInto ? x => x : x => -x;
       const terrainFn = ix.movingInto ? this.#addTerrainsToToken.bind(this) : this.#removeTerrainsFromToken.bind(this);
 
       // Handle all intersections at the same point.
       if ( ix.almostEqual(prevIx) ) {
-        if ( ix.token ) currentMultiplier *= multFn(tokenMultiplier);
-        if ( ix.drawing ) currentMultiplier *= multFn(ix.drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY));
+        if ( ix.token ) {
+          if ( useTokenFlat ) currentFlat += addFn(tokenMultiplier);
+          else currentMultiplier *= multFn(tokenMultiplier);
+        }
+        if ( ix.drawing ) {
+          const penalty = ix.drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY);
+          if ( ix.drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY_FLAT) ) currentFlat += addFn(penalty);
+          else currentMultiplier *= multFn(penalty);
+        }
         if ( ix.region ) terrainFn(tClone, ix.region);
         continue;
       }
 
       // Now we have prevIx --> ix.
+      prevIx.flat = currentFlat;
       prevIx.multiplier = currentMultiplier;
-      prevIx.dist = PIXI.Point.distanceBetween(prevIx, ix);
-      prevIx.tokenSpeed = (this.speedFn(tClone) || 1) * prevIx.multiplier;
+      prevIx.dist = CONFIG.GeometryLib.utils.pixelsToGridUnits(PIXI.Point.distanceBetween(prevIx, ix));
+      totalUnmodifiedDistance += prevIx.dist;
+
+      // Speed is adjusted when moving through regions with a multiplier.
+      prevIx.tokenSpeed = ((this.speedFn(tClone) || 1) * prevIx.multiplier);
+
+      // Flat adds extra distance to the grid square. Diagonal is longer, so will have larger penalty.
+      prevIx.dist += (prevIx.dist * currentFlat / canvas.grid.distance);
       totalDistance += prevIx.dist;
       totalTime += (prevIx.dist / prevIx.tokenSpeed);
-      //changePts.push(prevIx);
       prevIx = ix;
 
       if ( ix.almostEqual(end2d) ) break;
 
       // Account for the changes due to ix.
-      if ( ix.token ) currentMultiplier *= multFn(tokenMultiplier);
-      if ( ix.drawing ) currentMultiplier *= multFn(ix.drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY));
+      if ( ix.token ) {
+        if ( useTokenFlat ) currentFlat += addFn(tokenMultiplier);
+        else currentMultiplier *= multFn(tokenMultiplier);
+      }
+      if ( ix.drawing ) {
+        const penalty = ix.drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY);
+        if ( ix.drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY_FLAT) ) currentFlat += addFn(penalty);
+        else currentMultiplier *= multFn(penalty);
+      }
       if ( ix.region ) terrainFn(tClone, ix.region);
     }
 
     // Determine the ratio compared to a set speed
-    const totalDefaultTime = totalDistance / startingSpeed;
+    const totalDefaultTime = totalUnmodifiedDistance / startingSpeed;
     const avgMultiplier = (totalDefaultTime / totalTime) || 0;
-    return avgMultiplier;
+    return 1 / avgMultiplier;
   }
 
   /**
@@ -331,10 +434,28 @@ export class MovePenalty {
     log(`#removeTerrainsFromToken|\tremoveLocally: ${(t1 - t0).toNearest(0.01)} ms\tinitialize: ${(t2 - t1).toNearest(0.01)} ms`);
   }
 
+  /**
+   * Initialize the token clone for testing movement penalty through regions.
+   * @returns {object} Token like object
+   */
+  #initializeTokenClone() {
+    const tClone = this.#localTokenClone;
+    const Terrain = CONFIG.terrainmapper.Terrain;
+    const tokenTerrains = Terrain.allOnToken(tClone);
+    if ( tokenTerrains.length ) {
+      CONFIG.terrainmapper.Terrain.removeFromTokenLocally(tClone, tokenTerrains, { refresh: false });
+      tClone.actor._initialize(); // This is slow; we really need something more specific to active effects.
+    }
+    return tClone;
+  }
+
   // ----- NOTE: Static getters ----- //
 
   /** @type {number} */
-  static get tokenMultiplier() { return Settings.get(Settings.KEYS.TOKEN_RULER.TOKEN_MULTIPLIER); }
+  static get tokenMultiplier() { return Settings.get(Settings.KEYS.MEASURING.TOKEN_MULTIPLIER); }
+
+  /** @type {boolean} */
+  static get useFlatTokenMultiplier() { return Settings.get(Settings.KEYS.MEASURING.TOKEN_MULTIPLIER_FLAT); }
 
   /** @type {object|undefined} */
   static get terrainAPI() { return MODULES_ACTIVE.API?.TERRAIN_MAPPER; }
@@ -373,7 +494,6 @@ export class MovePenalty {
   }
 }
 
-
 /**
  * Duplicate pertinent parts of a CutawayIntersection.
  * @param {CutawayIntersection} ix
@@ -384,8 +504,6 @@ function shallowCopyCutawayIntersection(ix) {
   Object.getOwnPropertyNames(ix).forEach(key => newIx[key] = ix[key]);
   return newIx;
 }
-
-
 
 /**
  * A function that returns the cost for a given move between grid/gridless spaces.

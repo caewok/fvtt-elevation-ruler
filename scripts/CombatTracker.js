@@ -1,5 +1,6 @@
 /* globals
-game
+game,
+ui
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -10,7 +11,7 @@ import { TEMPLATES, MODULE_ID, FLAGS } from "./const.js";
 export const PATCHES = {};
 PATCHES.BASIC = {};
 
-import { injectConfiguration, renderTemplateSync } from "./util.js";
+import { renderTemplateSync } from "./util.js";
 
 // ----- NOTE: Hooks ----- //
 
@@ -31,15 +32,8 @@ function renderCombatTracker(app, html, data) {
   if ( !dividers.length ) return;
 
   const myHtml = renderTemplateSync(TEMPLATES.COMBAT_TRACKER, data);
-  // const aElem = document.createElement("a");
-  // aElem.innerHTML = myHtml;
   dividers[0].insertAdjacentHTML("beforebegin", myHtml);
-
-  // const npcButton = Object.values(combatButtons).findIndex(b => b.dataset.control === "rollNPC");
-  //   const findString = ".combat-button[data-control='rollNPC']";
-  //   await injectConfiguration(app, html, data, template, findString);
-
-   html.find(`.${MODULE_ID}`).click(ev => clearMovement.call(app, ev));
+  html.find(`.${MODULE_ID}`).click(ev => clearMovement.call(app, ev));
 }
 
 PATCHES.BASIC.HOOKS = { renderCombatTracker };

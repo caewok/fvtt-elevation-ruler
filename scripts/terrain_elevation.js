@@ -18,7 +18,8 @@ Path endpoint is adjusted such that it goes up/down.
 Elevation increments here are relative to ground position. To avoid recursion and infinite loops:
 - Get the ground at the destination based on starting elevation ± user increments.
 - Measure a path from start to destination at the ending elevation. May or may not be at the end elevation.
-- Each waypoint has a set elevation, based on its measured path. Only the destination waypoint can change, and only it is measured.
+- Each waypoint has a set elevation, based on its measured path.
+  Only the destination waypoint can change, and only it is measured.
 
 
 Ruler Foundry default display:
@@ -76,12 +77,7 @@ segment 0:
 • moveDistance
 • numDiagonal
 • numPrevDiagonalf
-
-
 */
-
-
-
 
 /* When dragging tokens
 Origin: each token elevation
@@ -185,13 +181,16 @@ export function elevationFromWaypoint(waypoint, location, token) {
 
     // For normal ruler, if hovering over a token, use that token's elevation.
     // Use the maximum token elevation unless terrain is above us (e.g., tile above).
-    if ( !Settings.FORCE_TO_GROUND ) maxTokenE = maxTokenElevationAtLocation(location, terrainE > waypoint.elevation ? terrainE : undefined);
+    if ( !Settings.FORCE_TO_GROUND ) {
+      maxTokenE = maxTokenElevationAtLocation(location, terrainE > waypoint.elevation ? terrainE : undefined);
+    }
     if ( maxTokenE ) locationElevation = maxTokenE;
 
     // If the starting elevation is on the ground or force-to-ground is enabled, use the ground elevation.
     else locationElevation = elevationAtLocation(location, {
       startE: waypoint.elevation,
-      forceToGround: Settings.FORCE_TO_GROUND || waypoint.elevation.almostEqual(terrainElevationAtLocation(waypoint, waypoint.elevation))
+      forceToGround: Settings.FORCE_TO_GROUND
+        || waypoint.elevation.almostEqual(terrainElevationAtLocation(waypoint, waypoint.elevation))
     });
   } else locationElevation = tokenElevationForMovement(waypoint, location, {
     token,
@@ -205,7 +204,8 @@ export function elevationFromWaypoint(waypoint, location, token) {
  * @param {Point} location                              Location for which elevation is desired
  * @param {number} startE                               Elevation at the starting point
  * @param {object} [opts]
- * @param {boolean} [opts.forceToGround=false]          If true, override the end elevation with nearest ground to that 3d point.
+ * @param {boolean} [opts.forceToGround=false]          If true, override the end elevation with
+ *                                                      nearest ground to that 3d point
  * @returns {number} The destination elevation, in grid units
  */
 function elevationAtLocation(location, { startE = 0, forceToGround = false } ) {
@@ -218,7 +218,8 @@ function elevationAtLocation(location, { startE = 0, forceToGround = false } ) {
  * @param {RegionMovementWaypoint} start                Start location with elevation property
  * @param {Point} location                              Desired end location
  * @param {object} [opts]
- * @param {boolean} [opts.forceToGround=false]          If true, override the end elevation with nearest ground to that 3d point.
+ * @param {boolean} [opts.forceToGround=false]          If true, override the end elevation
+ *                                                      with nearest ground to that 3d point
  * @returns {number} The destination elevation, in grid units
  */
 function tokenElevationForMovement(start, location, opts = {}) {
@@ -310,7 +311,7 @@ function retrieveVisibleTokens() {
  * @returns {Number|undefined} Point elevation or null if module not active or no region at location.
  */
 function TMElevationAtPoint(location, startingElevation = Number.POSITIVE_INFINITY) {
-  const api = MODULES_ACTIVE.API.TERRAIN_MAPPER
+  const api = MODULES_ACTIVE.API.TERRAIN_MAPPER;
   if ( !api || !api.ElevationHandler ) return undefined;
   const waypoint = { ...location, elevation: startingElevation };
   const res = api.ElevationHandler.nearestGroundElevation(waypoint);
@@ -326,7 +327,7 @@ function TMElevationAtPoint(location, startingElevation = Number.POSITIVE_INFINI
  * @returns {number|undefined} Elevation, in grid units
  */
 function TMElevationForMovement(start, end, opts) {
-  const api = MODULES_ACTIVE.API.TERRAIN_MAPPER
+  const api = MODULES_ACTIVE.API.TERRAIN_MAPPER;
   if ( !api || !api.ElevationHandler ) return undefined;
   return TMPathForMovement(start, end, opts).at(-1)?.elevation;
 }
@@ -342,7 +343,7 @@ function TMElevationForMovement(start, end, opts) {
 function TMPathForMovement(start, end, opts) {
   start.elevation ??= CONFIG.GeometryLib.utils.pixelsToGridUnits(start.z);
   end.elevation ??= CONFIG.GeometryLib.utils.pixelsToGridUnits(end.z);
-  const api = MODULES_ACTIVE.API.TERRAIN_MAPPER
+  const api = MODULES_ACTIVE.API.TERRAIN_MAPPER;
   if ( !api || !api.ElevationHandler ) return [start, end];
   return api.ElevationHandler.constructPath(start, end, opts);
 }
@@ -387,7 +388,7 @@ export function LevelsElevationAtPoint(p, startingElevation = 0) {
  */
 function levelsTilesAtPoint({x, y}) {
   const bounds = new PIXI.Rectangle(x, y, 1, 1);
-  const collisionTest = (o, rect) => { // eslint-disable-line no-unused-vars
+  const collisionTest = (o, rect) => {
     // The object o constains n (Quadtree node), r (rect), t (object to test)
     const flags = o.t.document?.flags?.levels;
     if ( !flags ) return false;
