@@ -360,7 +360,7 @@ export class WallTracerEdge extends GraphEdge {
    * Tested "live" and not cached so door or wall orientation changes need not be tracked.
    * @param {Wall} wall         Wall to test
    * @param {Point} origin      Measure wall blocking from perspective of this origin point.
-   * @param {number} [elevation=0]  Elevation of the point or origin to test.
+   * @param {number} [elevation=0]  Elevation of the point or origin to test, in pixel units.
    * @returns {boolean}
    */
   static wallBlocks(wall, origin, elevation = 0) {
@@ -379,7 +379,7 @@ export class WallTracerEdge extends GraphEdge {
       && side === wall.document.dir ) return false;
 
     // Test for wall height.
-    if ( !elevation.between(wall.bottomZ, wall.topZ) ) return false;
+    if ( !elevation.between(wall.bottomZ, wall.topZ, false) ) return false;
 
     return true;
   }
