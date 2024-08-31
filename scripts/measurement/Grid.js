@@ -1,13 +1,15 @@
 /* globals
 canvas,
 CONFIG,
-CONST
+CONST,
+game
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { Point3d } from "../geometry/3d/Point3d.js";
+import { Settings } from "../settings.js";
 
 /**
  * Modify Grid classes to measure in 3d.
@@ -351,6 +353,9 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
   cost ??= (prevOffset, currOffset, offsetDistance) => offsetDistance;
   const offsetDistanceFn = getOffsetDistanceFn(0); // Diagonals = 0.
   const altGridDistanceFn = GridCoordinates3d.alternatingGridDistanceFn();
+  let diagonals = canvas.grid.diagonals ?? game.settings.get("core", "gridDiagonals");
+  const D = GridCoordinates3d.GRID_DIAGONALS;
+  if ( diagonals === D.EXACT && Settings.get(Settings.KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE) ) diagonals = D.EUCLIDEAN;
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
     const end = waypoints[i];
     const path3d = canvas.grid.getDirectPath([start, end]);
@@ -360,7 +365,7 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
     const prevDiagonals = offsetDistanceFn.diagonals;
     for ( let j = 1, n = path3d.length; j < n; j += 1 ) {
       const currPathPt = path3d[j];
-      const dist = GridCoordinates3d.gridDistanceBetween(prevPathPt, currPathPt, altGridDistanceFn);
+      const dist = GridCoordinates3d.gridDistanceBetween(prevPathPt, currPathPt, { altGridDistanceFn, diagonals });
       const offsetDistance = offsetDistanceFn(prevPathPt, currPathPt);
       segment.distance += dist;
       segment.offsetDistance += offsetDistance;
