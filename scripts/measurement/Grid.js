@@ -8,6 +8,7 @@ game
 "use strict";
 
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
+import { HexGridCoordinates3d } from "../geometry/3d/HexGridCoordinates3d.js";
 import { Point3d } from "../geometry/3d/Point3d.js";
 import { Settings } from "../settings.js";
 
@@ -71,84 +72,17 @@ function getDirectPathGridless(wrapped, waypoints) {
  * @param {GridOffset[]} [path2d]             Optional path2d for the start and end waypoints.
  * @returns {GridCoordinates3d[]}
  */
-function directPath3dSquare(start, end, path2d) {
-  path2d ??= canvas.grid.getDirectPath([start.to2d(), end.to2d()]);
-  if ( start.z.almostEqual(end.z) ) {
-    const elev = start.elevation;
-    return path2d.map(pt => GridCoordinates3d.fromOffset(pt, elev));
-  }
-
-  const num2dMoves = path2d.length - 1;
-  const prevOffset = GridCoordinates3d.fromObject(start);
-  prevOffset.centerToOffset();
-  prevOffset.i = path2d[0].i;
-  prevOffset.j = path2d[0].j;
-
-  // The currOffset will be modified in the loop; set to end to get elevation steps now.
-  const currOffset = GridCoordinates3d.fromObject(end);
-
-  // Do 1 elevation move for each 2d diagonal move. Spread out over the diagonal steps.
-  let num2dDiagonal = 0;
-  let prev = path2d[0];
-  for ( let i = 1, n = path2d.length; i < n; i += 1 ) {
-    const curr = path2d[i];
-    num2dDiagonal += ((prev.i !== curr.i) && (prev.j !== curr.j));
-    prev = curr;
-  }
-  const elevationStepsRemaining = Math.abs(prevOffset.k - currOffset.k);
-  let doubleDiagonalElevationStepsRemaining = Math.min(num2dDiagonal, elevationStepsRemaining);
-  let doubleDiagonalElevationStep = 0;
-  const doDoubleDiagonalElevationStepMod = Math.ceil(num2dDiagonal / (doubleDiagonalElevationStepsRemaining + 1));
-
-  // Do 1 elevation move for each 2d non-diagonal move. Spread out over the non-diagonal steps.
-  const num2dStraight = num2dMoves - num2dDiagonal;
-  let diagonalElevationStepsRemaining = Math.min(elevationStepsRemaining
-    - doubleDiagonalElevationStepsRemaining, num2dStraight);
-  let diagonalElevationStep = 0;
-  const doDiagonalElevationStepMod = Math.ceil(num2dStraight / (diagonalElevationStepsRemaining + 1));
-
-  // Rest are all additional elevation-only moves. Spread out evenly.
-  let additionalElevationStepsRemaining = Math.max(0,
-    elevationStepsRemaining - diagonalElevationStepsRemaining - diagonalElevationStepsRemaining);
-  const doAdditionalElevationStepMod = Math.ceil(num2dMoves / (additionalElevationStepsRemaining + 1));
-
-  currOffset.k = prevOffset.k; // Begin with the starting elevation, incrementing periodically in the loop.
-  const path3d = [prevOffset.clone()];
-  for ( let i = 1, stepsRemaining = num2dMoves, n = num2dMoves + 1; i < n; i += 1, stepsRemaining -= 1 ) {
-    currOffset.setOffset2d(path2d[i]);
-
-    const is2dDiagonal = (currOffset.i !== prevOffset.i) && (currOffset.j !== prevOffset.j);
-    const doDoubleDiagonalElevationStep = is2dDiagonal
-      && doubleDiagonalElevationStepsRemaining > 0
-      && ((doubleDiagonalElevationStep + 1) % doDoubleDiagonalElevationStepMod) === 0;
-    const doDiagonalElevationStep = !is2dDiagonal && diagonalElevationStepsRemaining > 0
-      && ((diagonalElevationStep + 1) % doDiagonalElevationStepMod) === 0;
-    const doAdditionalElevationSteps = additionalElevationStepsRemaining > 0
-      && ((i + 1) % doAdditionalElevationStepMod) === 0;
-
-    // Either double or normal diagonals are the same but have separate tracking.
-    if ( doDoubleDiagonalElevationStep ) {
-      currOffset.k += 1;
-      doubleDiagonalElevationStepsRemaining -= 1;
-      doubleDiagonalElevationStep += 1;
-    } else if ( doDiagonalElevationStep ) {
-      currOffset.k += 1;
-      diagonalElevationStepsRemaining -= 1;
-      diagonalElevationStep += 1;
-    }
-    path3d.push(currOffset.clone());
-
-    if ( doAdditionalElevationSteps ) {
-      let elevationSteps = Math.ceil(additionalElevationStepsRemaining / stepsRemaining);
-      while ( elevationSteps > 0 ) {
-        currOffset.k += 1;
-        elevationSteps -= 1;
-        additionalElevationStepsRemaining -= 1;
-        path3d.push(currOffset.clone());
-      }
-    }
-    prevOffset.setOffset(currOffset);
-  }
+function directPath3dSquare(start, end) {
+  start = GridCoordinates3d.fromObject(start);
+  end = GridCoordinates3d.fromObject(end);
+  const points = CONFIG.GeometryLib.utils.bresenhamLine3d(start.i, start.j, start.k, end.i, end.j, end.k);
+  const path3d = [start];
+  // Convert points to GridCoordinates3d. Start and end repeat; skip.
+  for ( let i = 3, n = points.length - 3; i < n; i += 3 ) path3d.push(GridCoordinates3d.fromOffset({
+    i: points[i],
+    j: points[i + 1],
+    k: points[i + 2] }));
+  path3d.push(end);
   return path3d;
 }
 
@@ -213,50 +147,22 @@ function singleOffsetSquareDistanceFn(numDiagonals = 0) {
  * @param {RegionMovementWaypoint3d} start
  * @param {RegionMovementWaypoint3d} end
  * @param {GridOffset[]} [path2d]             Optional path2d for the start and end waypoints.
- * @returns {GridCoordinates3d[]}
+ * @returns {HexGridCoordinates3d[]}
  */
-function directPath3dHex(start, end, path2d) {
-  path2d ??= canvas.grid.getDirectPath([start.to2d(), end.to2d()]);
-  if ( start.z.almostEqual(end.z) ) {
-    const elev = start.elevation;
-    return path2d.map(pt => GridCoordinates3d.fromOffset(pt, elev));
-  }
-
-  const num2dMoves = path2d.length - 1;
-  const startOffset = GridCoordinates3d.fromObject(start);
-  startOffset.centerToOffset();
-  startOffset.i = path2d[0].i;
-  startOffset.j = path2d[0].j;
-
-  // The currOffset will be modified in the loop; set to end to get elevation steps now.
-  const currOffset = GridCoordinates3d.fromObject(end);
-
-  const path3d = [startOffset.clone()];
-  let elevationStepsRemaining = Math.abs(startOffset.k - currOffset.k);
-  const doElevationStepMod = Math.ceil((num2dMoves) / (elevationStepsRemaining + 1));
-  currOffset.k = startOffset.k; // Begin with the starting elevation, incrementing periodically in the loop.
-  for ( let i = 1, stepsRemaining = num2dMoves, n = num2dMoves + 1; i < n; i += 1, stepsRemaining -= 1 ) {
-    currOffset.setOffset2d(path2d[i]);
-
-    const doElevationStep = ((i + 1) % doElevationStepMod) === 0;
-    let elevationSteps = doElevationStep
-      && (elevationStepsRemaining > 0) ? Math.ceil(elevationStepsRemaining / stepsRemaining) : 0;
-    elevationStepsRemaining -= elevationSteps;
-
-    // Apply the first elevation step as a diagonal upwards move in combination with the canvas 2d move.
-    if ( elevationSteps ) {
-      currOffset.k += 1;
-      elevationSteps -= 1;
-    }
-    path3d.push(currOffset.clone());
-
-    // Add additional elevation-only moves as necessary.
-    while ( elevationSteps > 0 ) {
-      currOffset.k += 1;
-      elevationSteps -= 1;
-      path3d.push(currOffset.clone());
-    }
-  }
+function directPath3dHex(start, end) {
+  start = HexGridCoordinates3d.fromObject(start);
+  end = HexGridCoordinates3d.fromObject(end);
+  const points = CONFIG.GeometryLib.utils.bresenhamLine4d(
+    start.q, start.r, start.s, start.k,
+    end.q, end.r, end.s, end.k);
+  const path3d = [start];
+  // Convert points to GridCoordinates3d. Start and end repeat; skip.
+  for ( let i = 4, n = points.length - 4; i < n; i += 4 ) path3d.push(HexGridCoordinates3d.fromHexCube({
+    q: points[i],
+    r: points[i + 1],
+    s: points[i + 2],
+    k: points[i + 3] }));
+  path3d.push(end);
   return path3d;
 }
 
@@ -412,14 +318,7 @@ function getDirectPathGridded(wrapped, waypoints) {
   const path3dFn = canvas.grid.isHexagonal ? directPath3dHex : directPath3dSquare;
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
     const currWaypoint = GridCoordinates3d.fromObject(waypoints[i]);
-    const path2d = wrapped([prevWaypoint, currWaypoint]);
-
-    // Keep the exact start and end points, used by _measure to calculate distance.
-    const segments3d = path3dFn(prevWaypoint, currWaypoint, path2d);
-    segments3d[0].x = prevWaypoint.x;
-    segments3d[0].y = prevWaypoint.y;
-    segments3d.at(-1).x = currWaypoint.x;
-    segments3d.at(-1).y = currWaypoint.y;
+    const segments3d = path3dFn(prevWaypoint, currWaypoint);
     path3d.push(...segments3d);
     prevWaypoint = currWaypoint;
   }
