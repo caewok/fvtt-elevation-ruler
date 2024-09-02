@@ -234,8 +234,8 @@ export class MovePenalty {
     // Tokens
     const tokenMultiplier = this.constructor.tokenMultiplier;
     const useTokenFlat = this.constructor.useFlatTokenMultiplier;
-    if ( useTokenFlat ) flatPenalty += (tokenMultiplier * tokens.length);
-    else currentMultiplier *= (tokenMultiplier * tokens.length);
+    if ( useTokenFlat ) flatPenalty += (tokenMultiplier * tokens.length); // Default to 0.
+    else currentMultiplier *= (tokens.length ? (tokenMultiplier * tokens.length) : 1); // Default to 1.
 
     // Regions
     const testRegions = this.constructor.terrainAPI && regions.length;
