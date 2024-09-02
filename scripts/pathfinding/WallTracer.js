@@ -378,8 +378,8 @@ export class WallTracerEdge extends GraphEdge {
     if ( wall.document.dir
       && side === wall.document.dir ) return false;
 
-    // Test for wall height.
-    if ( !elevation.between(wall.bottomZ, wall.topZ, false) ) return false;
+    // Test for wall height. If elevation at the wall bottom, wall blocks; if at wall top it does not.
+    if ( !elevation.between(wall.bottomZ, wall.topZ, false) && elevation !== wall.bottomZ ) return false;
 
     return true;
   }
