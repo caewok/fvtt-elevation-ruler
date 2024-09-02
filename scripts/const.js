@@ -25,7 +25,7 @@ export const FLAGS = {
 
 // Track certain modules that complement features of this module.
 export const OTHER_MODULES = {
-  TERRAIN_MAPPER: { KEY: "elevatedvision"  },
+  TERRAIN_MAPPER: { KEY: "terrainmapper"  },
   LEVELS: { KEY: "levels" },
   WALL_HEIGHT: { KEY: "wall-height", FLAGS: { VAULTING: "blockSightMovement" } }
 }
