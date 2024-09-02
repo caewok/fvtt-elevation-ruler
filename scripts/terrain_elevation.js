@@ -115,7 +115,7 @@ elevationAtLocation -- all ruler types
 Used by ruler to get elevation at waypoints and at the end of the ruler.
 */
 
-import { MODULES_ACTIVE, MODULE_ID, FLAGS, MOVEMENT_TYPES } from "./const.js";
+import { OTHER_MODULES, MODULE_ID, FLAGS, MOVEMENT_TYPES } from "./const.js";
 import { Settings } from "./settings.js";
 import { movementTypeForTokenAt } from "./token_hud.js";
 
@@ -311,7 +311,7 @@ function retrieveVisibleTokens() {
  * @returns {Number|undefined} Point elevation or null if module not active or no region at location.
  */
 function TMElevationAtPoint(location, startingElevation = Number.POSITIVE_INFINITY) {
-  const api = MODULES_ACTIVE.API.TERRAIN_MAPPER;
+  const api = OTHER_MODULES.TERRAIN_MAPPER.API;
   if ( !api || !api.ElevationHandler ) return undefined;
   const waypoint = { ...location, elevation: startingElevation };
   const res = api.ElevationHandler.nearestGroundElevation(waypoint);
@@ -327,7 +327,7 @@ function TMElevationAtPoint(location, startingElevation = Number.POSITIVE_INFINI
  * @returns {number|undefined} Elevation, in grid units
  */
 function TMElevationForMovement(start, end, opts) {
-  const api = MODULES_ACTIVE.API.TERRAIN_MAPPER;
+  const api = OTHER_MODULES.TERRAIN_MAPPER.API;
   if ( !api || !api.ElevationHandler ) return undefined;
   return TMPathForMovement(start, end, opts).at(-1)?.elevation;
 }
@@ -343,7 +343,7 @@ function TMElevationForMovement(start, end, opts) {
 function TMPathForMovement(start, end, opts) {
   start.elevation ??= CONFIG.GeometryLib.utils.pixelsToGridUnits(start.z);
   end.elevation ??= CONFIG.GeometryLib.utils.pixelsToGridUnits(end.z);
-  const api = MODULES_ACTIVE.API.TERRAIN_MAPPER;
+  const api = OTHER_MODULES.TERRAIN_MAPPER.API;
   if ( !api || !api.ElevationHandler ) return [start, end];
   return api.ElevationHandler.constructPath(start, end, opts);
 }
@@ -365,7 +365,7 @@ function TMPathForMovement(start, end, opts) {
  * @return {Number|undefined} Levels elevation or undefined if levels is inactive or no levels found.
  */
 export function LevelsElevationAtPoint(p, startingElevation = 0) {
-  if ( !MODULES_ACTIVE.LEVELS ) return undefined;
+  if ( !OTHER_MODULES.LEVELS.ACTIVE ) return undefined;
 
   let tiles = [...levelsTilesAtPoint(p)];
   if ( !tiles.length ) return null;

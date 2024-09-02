@@ -7,7 +7,7 @@ ui
 */
 "use strict";
 
-import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
+import { MODULE_ID, OTHER_MODULES } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { log } from "./util.js";
 import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
@@ -123,7 +123,7 @@ export class Settings extends ModuleSettingsAbstract {
       name: localize(`${KEYS.LABELING.USE_LEVELS_LABEL}.name`),
       hint: localize(`${KEYS.LABELING.USE_LEVELS_LABEL}.hint`),
       scope: "world",
-      config: MODULES_ACTIVE.LEVELS,
+      config: OTHER_MODULES.LEVELS.ACTIVE,
       default: KEYS.LABELING.LEVELS_LABELS.ALWAYS,
       type: String,
       choices: {

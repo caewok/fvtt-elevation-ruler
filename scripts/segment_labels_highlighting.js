@@ -7,7 +7,7 @@ PreciseText
 */
 "use strict";
 
-import { MODULE_ID, MODULES_ACTIVE } from "./const.js";
+import { MODULE_ID, OTHER_MODULES } from "./const.js";
 import { Settings } from "./settings.js";
 import { perpendicularPoints, roundMultiple } from "./util.js";
 
@@ -37,7 +37,7 @@ export function highlightLineRectangle(segment, color, name) {
  * @returns {boolean}
  */
 function useLevelsLabels() {
-  if ( !MODULES_ACTIVE.LEVELS ) return false;
+  if ( !OTHER_MODULES.LEVELS.ACTIVE ) return false;
   const labelOpt = Settings.get(Settings.KEYS.LABELING.USE_LEVELS_LABEL);
   return labelOpt === Settings.KEYS.LABELING.LEVELS_LABELS.ALWAYS
     || (labelOpt === Settings.KEYS.LABELING.LEVELS_LABELS.UI_ONLY && CONFIG.Levels.UI.rendered);

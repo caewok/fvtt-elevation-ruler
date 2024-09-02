@@ -23,18 +23,24 @@ export const FLAGS = {
   MOVEMENT_HISTORY: "movementHistory"
 };
 
-export const MODULES_ACTIVE = { API: {} };
+// Track certain modules that complement features of this module.
+export const OTHER_MODULES = {
+  TERRAIN_MAPPER: { KEY: "elevatedvision"  },
+  LEVELS: { KEY: "levels" },
+  WALL_HEIGHT: { KEY: "wall-height", FLAGS: { VAULTING: "blockSightMovement" } }
+}
 
 // Hook init b/c game.modules is not initialized at start.
 Hooks.once("init", function() {
-  MODULES_ACTIVE.LEVELS = game.modules.get("levels")?.active;
-  MODULES_ACTIVE.TERRAIN_MAPPER = game.modules.get("terrainmapper")?.active;
+  for ( const obj of Object.values(OTHER_MODULES) ) obj.ACTIVE = game.modules.get(obj.KEY)?.active
 });
 
 // API not necessarily available until ready hook. (Likely added at init.)
 Hooks.once("ready", function() {
-  if ( MODULES_ACTIVE.TERRAIN_MAPPER ) MODULES_ACTIVE.API.TERRAIN_MAPPER = game.modules.get("terrainmapper").api;
-});
+  const tm = OTHER_MODULES.TERRAIN_MAPPER;
+  if ( tm.ACTIVE ) tm.API = game.modules.get(tm.KEY).api;
+})
+
 
 export const MOVEMENT_TYPES = {
   AUTO: -1,
