@@ -1,3 +1,11 @@
+# 0.10.7
+Switch to using Bresenham 3d algorithm to determine 3d grid path for square grids. Use Bresenham 4d algorithm to determine 3d grid path for hex grids (hex-cube dimensions + elevation dimension). Closes #194.
+For pathfinding, don't consider walls blocking if the wall top elevation equals the token elevation (but still blocks if wall bottom elevation equals token elevation).
+If Wall Height module is active and vaulting is enabled, ignore walls within the vaulting height.
+Update Italian localization. Thanks @GregoryWarn!
+Update Brazilian Portugese translation. Thanks @Kharmans!
+Update libGeometry to v0.3.11.
+
 # 0.10.6
 ## New Features
 Setting to apply movement penalties per-grid-space. Defaults to enabled. For gridded scenes, this will (1) count regions/tokens/drawings as imposing movement penalty only if the region/token/drawing overlaps the center point of the grid space and (2) impose the penalty at a grid-space level. If disabled, this will proportionally apply the penalty based on the precise movement path. Closes #181.
