@@ -15,7 +15,7 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 PATCHES.SPEED_HIGHLIGHTING = {};
 
-import { SPEED, MODULE_ID, MODULES_ACTIVE, MOVEMENT_TYPES } from "./const.js";
+import { SPEED, MODULE_ID, OTHER_MODULES, MOVEMENT_TYPES } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import {
@@ -344,7 +344,7 @@ function _getMeasurementSegments(wrapped) {
     pathPoints = calculatePathPointsForSegment(lastSegment, token);
   }
 
-  if ( MODULES_ACTIVE.TERRAIN_MAPPER ) {
+  if ( OTHER_MODULES.TERRAIN_MAPPER.ACTIVE ) {
     const t0 = performance.now();
     // For now, determine movement type for each of the path points. PathPoints are {x, y} objects.
     // If no path points, use the segments.
@@ -362,7 +362,7 @@ function _getMeasurementSegments(wrapped) {
 
     // Determine the region path.
     pathPoints.length = 0;
-    const ElevationHandler = MODULES_ACTIVE.API.TERRAIN_MAPPER.ElevationHandler;
+    const ElevationHandler = OTHER_MODULES.TERRAIN_MAPPER.API.ElevationHandler;
     let prevPt = initialPath[0];
     pathPoints.push(prevPt);
     for ( let i = 1, n = initialPath.length; i < n; i += 1 ) {

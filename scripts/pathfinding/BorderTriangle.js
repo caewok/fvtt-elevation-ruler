@@ -198,7 +198,7 @@ export class BorderEdge {
 
     const { moveToken, tokenBlockType } = this.constructor;
     return this.objects.some(obj => {
-      if ( obj instanceof Wall ) return WallTracerEdge.wallBlocks(obj, origin, elevation);
+      if ( obj instanceof Wall ) return WallTracerEdge.wallBlocks(obj, origin, moveToken, elevation);
       if ( obj instanceof Token ) return WallTracerEdge.tokenEdgeBlocks(obj, moveToken, tokenBlockType, elevation);
       return false;
     });

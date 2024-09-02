@@ -7,7 +7,7 @@ PIXI
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { MODULE_ID, FLAGS, MODULES_ACTIVE, SPEED, MOVEMENT_TYPES } from "../const.js";
+import { MODULE_ID, FLAGS, OTHER_MODULES, SPEED, MOVEMENT_TYPES } from "../const.js";
 import { Settings } from "../settings.js";
 import { movementType } from "../token_hud.js";
 import { log, keyForValue } from "../util.js";
@@ -234,8 +234,8 @@ export class MovePenalty {
     // Tokens
     const tokenMultiplier = this.constructor.tokenMultiplier;
     const useTokenFlat = this.constructor.useFlatTokenMultiplier;
-    if ( useTokenFlat ) flatPenalty += (tokenMultiplier * tokens.length);
-    else currentMultiplier *= (tokenMultiplier * tokens.length);
+    if ( useTokenFlat ) flatPenalty += (tokenMultiplier * tokens.length); // Default to 0.
+    else currentMultiplier *= (tokens.length ? (tokenMultiplier * tokens.length) : 1); // Default to 1.
 
     // Regions
     const testRegions = this.constructor.terrainAPI && regions.length;
@@ -458,7 +458,7 @@ export class MovePenalty {
   static get useFlatTokenMultiplier() { return Settings.get(Settings.KEYS.MEASURING.TOKEN_MULTIPLIER_FLAT); }
 
   /** @type {object|undefined} */
-  static get terrainAPI() { return MODULES_ACTIVE.API?.TERRAIN_MAPPER; }
+  static get terrainAPI() { return OTHER_MODULES.TERRAIN_MAPPER.API; }
 
   // ----- NOTE: Static methods ----- //
 

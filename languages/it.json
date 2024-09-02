@@ -76,9 +76,12 @@
     "elevationruler.settings.round-to-multiple.name": "Arrotonda Distanza ad un multiplo",
     "elevationruler.settings.round-to-multiple.hint": "Per la misurazione della distanza senza griglia, arrotondare la distanza visualizzata al multiplo più vicino del numero immesso. Impostare su 0 per disabilitare l'arrotondamento.",
 
-    "elevationruler.settings.token-terrain-multiplier.name": "Token come moltiplicatore terreno",
-    "elevationruler.settings.token-terrain-multiplier.hint": "Moltiplicatore da utilizzare per calcolare la velocità di movimento quando ci si sposta attraverso altri token. Impostato su 1 per ignorare. I valori inferiori a 1 trattano gli spazi dei segnalini come più veloci del normale; valori maggiori di 1 penalizzano il movimento attraverso gli spazi dei token.",
+    "elevationruler.settings.token-terrain-multiplier.name": "Percentuale Penalità Token",
+    "elevationruler.settings.token-terrain-multiplier.hint": "Penalizza il movimento attraverso altri token. Impostato a 1 per nessuna penalità, inferiore a 1 per garantire un bonus, maggiore di 1 per imporre un moltiplicatore di penalità. Ad esempio, imposta su 2 per raddoppiare il costo di movimento attraverso un token.",
 
+    "elevationruler.settings.token-terrain-multiplier-flat.name": "Penalità Token Fissa",
+    "elevationruler.settings.token-terrain-multiplier-flat.hint": "Se abilitato, considera la penalità di movimento del token come una quantità fissa di distanza aggiuntiva. Ad esempio, imposta su 5 per aggiungere +5 a ciascun quadrato di movimento. I valori negativi forniscono un bonus fisso.",
+    
     "elevationruler.settings.pathfinding_enable.name": "Usa Trova Percorso",
     "elevationruler.settings.pathfinding_enable.hint": "Quando abilitato, aggiunge un tasto Trova percorso al controllo Token che farà sì che il righello mappi un percorso attorno a muri e token a seconda delle impostazioni. Disabilita se Trova Percorso causa problemi di compatibilità. La disabilitazione può anche comportare un piccolo aumento delle prestazioni.",
     
@@ -96,6 +99,7 @@
 
     "elevationruler.settings.grid-terrain-algorithm.name": "Misurazione Griglia Terreno",
     "elevationruler.settings.grid-terrain-algorithm.hint": "Quando sei su una griglia, come tenere conto delle penalità di movimento o dei bonus derivanti dal terreno e dai token? Centro: si applica se il terreno/token si sovrappone al centro della griglia; Area percentuale: si applica se il terreno/token copre almeno questa parte del quadrato/esagono della griglia; Euclideo: ripartizione proporzionale in base alla percentuale del segmento di linea all'interno del terreno/token tra questo quadrato/esagono della griglia e il precedente.",
+    
     "elevationruler.settings.grid-terrain-choice-center-point": "Centro",
     "elevationruler.settings.grid-terrain-choice-percent-area": "Area Percentuale",
     "elevationruler.settings.grid-terrain-choice-euclidean": "Euclideo",
@@ -112,15 +116,21 @@
     "elevationruler.settings.scale-text.name": "Testo Scala Righello",
     "elevationruler.settings.scale-text.hint": "Se abilitato, il testo del righello verrà ridimensionato in base a 'canvas.dimensions.size'. Regola ulteriormente il ridimensionamento utilizzando `CONFIG.elevationruler.textScale`.",
 
+    "elevationruler.settings.force-grid-penalties.name": "Usa Griglia per Penalità Movimento",
+    "elevationruler.settings.force-grid-penalties.hint": "Se abilitate, le penalità di movimento si applicano solo se il token/disegno/regione copre il centro dell'esagono/quadrato e le penalità vengono applicate per quadrato o per esagono sulle mappe a griglia. Quando disabilitato, le penalità al movimento vengono applicate proporzionalmente al movimento. Ad esempio, se un disegno con una penalità di movimento x2 copre 3/4 di un quadrato della griglia, si applicherà a 3/4 del movimento attraverso quel quadrato (ovvero penalità 1,5x).",
+
     "elevationruler.settings.customized-labels.name": "Testo Righello Personalizzato",
     "elevationruler.settings.customized-labels.hint": "Personalizza il testo del righello. Modifica gli stili utilizzando `CONFIG.elevationruler.labelStyles` e `CONFIG.elevationruler.labelIcons`.",
 
     "elevationruler.controls.prefer-token-elevation.name": "Preferisci elevazione token",
     "elevationruler.controls.pathfinding-control.name": "Trova Percorso",
 
-    "elevationruler.drawingconfig.movementPenalty.name": "Bonus/Penalità Movimento",
+    "elevationruler.drawingconfig.movementPenalty.name": "Percentuale Penalità Movimento",
     "elevationruler.drawingconfig.movementPenalty.hint": "Impostato a 1 senza penalità. Valori maggiori di uno penalizzano il movimento di quella percentuale; valori inferiori a uno garantiscono effettivamente un bonus al movimento. Ad esempio, impostalo su 2 per raddoppiare il movimento in quest'area. Il movimento sotto l'elevazione del disegno verrà ignorato.",
-    
+
+    "elevationruler.drawingconfig.flatMovementPenalty.name": "Usa Penalità Fissa",
+    "elevationruler.drawingconfig.flatMovementPenalty.hint": "Se abilitato, considera la penalità come un importo fisso di distanza aggiuntiva. Ad esempio, imposta su 5 per aggiungere +5 a ciascun quadrato di movimento. I valori negativi forniscono un bonus fisso.",
+
     "elevationruler.clearMovement": "Cancella Movimento Combattente",
     "elevationruler.waypoint": "Punto di passaggio",
     "elevationruler.up": "Su",

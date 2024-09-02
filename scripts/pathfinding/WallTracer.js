@@ -19,7 +19,7 @@ import { Draw } from "../geometry/Draw.js";
 import { Graph, GraphVertex, GraphEdge } from "../geometry/Graph.js";
 import { Settings } from "../settings.js";
 import { doSegmentsOverlap, IX_TYPES, segmentCollision } from "../geometry/util.js";
-import { MODULE_ID } from "../const.js";
+import { MODULE_ID, OTHER_MODULES, FLAGS } from "../const.js";
 
 /* WallTracerVertex
 
@@ -350,7 +350,7 @@ export class WallTracerEdge extends GraphEdge {
    */
   edgeBlocks(origin, moveToken, tokenBlockType, elevation = 0) {
     return this.objects.some(obj =>
-        (obj instanceof Wall) ? this.constructor.wallBlocks(obj, origin, elevation)
+        (obj instanceof Wall) ? this.constructor.wallBlocks(obj, origin, moveToken, elevation)
           : (obj instanceof Token) ? this.constructor.tokenEdgeBlocks(obj, moveToken, tokenBlockType, elevation)
             : false);
   }
@@ -363,7 +363,7 @@ export class WallTracerEdge extends GraphEdge {
    * @param {number} [elevation=0]  Elevation of the point or origin to test, in pixel units.
    * @returns {boolean}
    */
-  static wallBlocks(wall, origin, elevation = 0) {
+  static wallBlocks(wall, origin, moveToken, elevation = 0) {
     if ( !wall.document.move || wall.isOpen ) return false;
 
     // Ignore one-directional walls which are facing away from the center
@@ -378,9 +378,12 @@ export class WallTracerEdge extends GraphEdge {
     if ( wall.document.dir
       && side === wall.document.dir ) return false;
 
-    // Test for wall height.
-    if ( !elevation.between(wall.bottomZ, wall.topZ, false) ) return false;
+    // Test for wall height. If elevation at the wall bottom, wall blocks; if at wall top it does not.
+    if ( !elevation.between(wall.bottomZ, wall.topZ, false) && elevation !== wall.bottomZ ) return false;
 
+    // If Wall Height vaulting is enabled, walls less than token vision height do not block.
+    const wh = OTHER_MODULES.WALL_HEIGHT;
+    if ( wh.ACTIVE && game.settings.get(wh.KEY, wh.FLAGS.VAULTING) && moveToken.visionZ >= wall.topZ ) return false;
     return true;
   }
 
