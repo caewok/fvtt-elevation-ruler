@@ -218,12 +218,21 @@ export class Patcher {
         : className;
 
     const configObj = CONFIG[baseClass];
+    if ( isConfig && configObj && configObj.sheetClasses?.base ) {
+      // Attempt to locate a base sheet class.
+      for ( const [key, obj] of Object.entries(configObj.sheetClasses.base) ) {
+        if ( !(obj.default && obj.cls) ) continue;
+        return returnPathString ? `CONFIG.${baseClass}.sheetClasses.base["${key}"].cls` : obj.cls;
+      }
+    }
+
     if ( !configObj || isConfig ) return returnPathString ? className : eval?.(`"use strict";(${className})`);
 
     // Do this the hard way to catch inconsistencies
     switch ( className ) {
       case "Actor":
       case "ActiveEffect":
+      case "RegionBehavior":
       case "Item":
         isDoc = true; break;
     }

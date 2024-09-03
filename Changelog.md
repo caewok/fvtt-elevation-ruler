@@ -1,3 +1,7 @@
+# 0.10.8
+Fix for 5-10-5 using 10-5-10 and vice versa. Closes #195.
+Update libGeometry to v0.3.12.
+
 # 0.10.7
 Switch to using Bresenham 3d algorithm to determine 3d grid path for square grids. Use Bresenham 4d algorithm to determine 3d grid path for hex grids (hex-cube dimensions + elevation dimension). Closes #194.
 For pathfinding, don't consider walls blocking if the wall top elevation equals the token elevation (but still blocks if wall bottom elevation equals token elevation).
