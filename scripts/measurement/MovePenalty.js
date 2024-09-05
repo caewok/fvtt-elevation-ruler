@@ -243,8 +243,9 @@ export class MovePenalty {
     const startingSpeed = this.speedFn(tClone) || 1;
     regions.forEach(r => this.#addTerrainsToToken(tClone, r));
 
-    const speedInGrid = ((this.speedFn(tClone) || 1) * currentMultiplier);
-    const gridMult = startingSpeed / speedInGrid;
+    currentMultiplier ||= 1; // Don't let it divide by 0.
+    const speedInGrid = ((this.speedFn(tClone) || 1) / currentMultiplier);
+    const gridMult = startingSpeed / speedInGrid; // If currentMultiplier > 1, gridMult should be > 1.
     return (flatPenalty + (gridMult * costFreeDistance));
 
     /* Example
