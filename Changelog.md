@@ -1,3 +1,10 @@
+# 0.10.9
+Additional fix for 5-10-5 using 10-5-10 (the offset distance was not fixed previously). Closes #195, #196.
+If the movement cost is rounded to 0, don't display the label. Closes #196.
+Update Polish translation. Closes #199. Thanks @Lioheart!
+Fix for movement penalty getting inverted for grid measurement option. Closes #198.
+Fix right-click to add waypoints. Closes #197, #192.
+
 # 0.10.8
 Fix for 5-10-5 using 10-5-10 and vice versa. Closes #195.
 Update libGeometry to v0.3.12.
