@@ -95,11 +95,12 @@ function directPath3dSquare(start, end) {
  *   - @returns {number}
  */
 function singleOffsetSquareDistanceFn(numDiagonals = 0) {
+  const diagonals = canvas.grid.diagonals ?? game.settings.get("core", "gridDiagonals");
   const D = CONST.GRID_DIAGONALS;
   let nDiag = numDiagonals;
   let fn;
-  if ( canvas.grid.diagonals === D.ALTERNATING_1 || canvas.grid.diagonals === D.ALTERNATING_2 ) {
-    const kFn = canvas.grid.diagonals === D.ALTERNATING_1
+  if ( diagonals === D.ALTERNATING_1 || diagonals === D.ALTERNATING_2 ) {
+    const kFn = diagonals === D.ALTERNATING_2
       ? () => nDiag & 1 ? 2 : 1
       : () => nDiag & 1 ? 1 : 2;
     fn = (prevOffset, currOffset) => {
@@ -116,7 +117,7 @@ function singleOffsetSquareDistanceFn(numDiagonals = 0) {
   } else {
     let k = 1;
     let k2 = 1;
-    switch ( canvas.grid.diagonals ) {
+    switch ( diagonals ) {
       case D.EQUIDISTANT: k = 1; k2 = 1; break;
       case D.EXACT: k = Math.SQRT2; k2 = Math.SQRT3; break;
       case D.APPROXIMATE: k = 1.5; k2 = 1.75; break;
@@ -176,11 +177,12 @@ function directPath3dHex(start, end) {
  *   - @returns {number}
  */
 function singleOffsetHexDistanceFn(numDiagonals = 0) {
+  const diagonals = canvas.grid.diagonals ?? game.settings.get("core", "gridDiagonals");
   const D = CONST.GRID_DIAGONALS;
   let nDiag = numDiagonals;
   let fn;
-  if ( canvas.grid.diagonals === D.ALTERNATING_1 || canvas.grid.diagonals === D.ALTERNATING_2 ) {
-    const kFn = canvas.grid.diagonals === D.ALTERNATING_1
+  if ( diagonals === D.ALTERNATING_1 || diagonals === D.ALTERNATING_2 ) {
+    const kFn = diagonals === D.ALTERNATING_2
       ? () => nDiag & 1 ? 2 : 1
       : () => nDiag & 1 ? 1 : 2;
     fn = (prevOffset, currOffset) => {
@@ -195,7 +197,7 @@ function singleOffsetHexDistanceFn(numDiagonals = 0) {
     };
   } else {
     let k = 1;
-    switch ( canvas.grid.diagonals ) {
+    switch ( diagonals ) {
       case D.EQUIDISTANT: k = 1; break;
       case D.EXACT: k = Math.SQRT2; break;
       case D.APPROXIMATE: k = 1.5; break;

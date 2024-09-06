@@ -133,8 +133,8 @@ function _onDragLeftCancel(wrapped, event) {
   if ( event.button === 2 && ruler._isTokenRuler && ruler.active && ruler.state === Ruler.STATES.MEASURING ) {
     log("Token#_onDragLeftMove|Token ruler active");
     event.preventDefault();
-    if ( event.ctrlKey ) ruler._removeWaypoint(event.interactionData.origin, {snap: !event.shiftKey});
-    else ruler._addWaypoint(event.interactionData.origin, {snap: !event.shiftKey});
+    if ( event.ctrlKey ) ruler._removeWaypoint(event.interactionData.destination, {snap: !event.shiftKey});
+    else ruler._addWaypoint(event.interactionData.destination, {snap: !event.shiftKey});
     return false;
   }
 

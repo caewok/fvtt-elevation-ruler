@@ -138,6 +138,7 @@ export function segmentTerrainLabel(s) {
   if ( s.waypoint.cost.almostEqual(s.waypoint.offsetDistance) ) return "";
   const units = (canvas.scene.grid.units) ? ` ${canvas.scene.grid.units}` : "";
   const addedCost = roundMultiple(s.waypoint.cost - s.waypoint.offsetDistance);
+  if ( addedCost.almostEqual(0) ) return "";
   const symbol = addedCost > 0 ? "+" : "-";
 
   if ( CONFIG[MODULE_ID].SPEED.useFontAwesome ) {
