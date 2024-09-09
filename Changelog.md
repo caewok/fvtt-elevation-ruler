@@ -1,3 +1,8 @@
+# 0.10.10
+Improve how the pathfinding path is cleaned when snapping to grids to avoid weird backstepping issues. Should be a bit more aggressive in finding a viable grid-center path.
+Don't pathfind around hidden tokens. Closes #200.
+Fix for error re clone function not found when tracking combat move history. Closes #201.
+
 # 0.10.9
 Additional fix for 5-10-5 using 10-5-10 (the offset distance was not fixed previously). Closes #195, #196.
 If the movement cost is rounded to 0, don't display the label. Closes #196.
