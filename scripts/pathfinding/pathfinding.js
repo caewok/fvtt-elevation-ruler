@@ -18,7 +18,7 @@ import { cdt2dConstrainedGraph, cdt2dToBorderTriangles } from "../delaunator/cdt
 import { Settings } from "../settings.js";
 import { MODULE_ID } from "../const.js";
 import { MovePenalty } from "../measurement/MovePenalty.js";
-import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
+
 
 /* Testing
 
@@ -304,7 +304,7 @@ export class Pathfinder {
    * @param {PathNode} current
    */
   _heuristic(goal, current) {
-    const distance = GridCoordinates3d.gridDistanceBetween(goal.entryPoint, current.entryPoint);
+    const distance = CONFIG.GeometryLib.threeD.GridCoordinates3d.gridDistanceBetween(goal.entryPoint, current.entryPoint);
     return CONFIG.GeometryLib.utils.gridUnitsToPixels(distance);
   }
 
@@ -578,7 +578,7 @@ function alignPathToGrid(pathPoints, token) {
   }
 
   // Check dropping the connections between segments.
-  gridPoints = cleanSegmentConnections(gridPoints, token);
+  cleanSegmentGridConnections(gridPoints, token);
 
   // Deduplicate the remaining points, combining into single array.
   const deDupedPoints = new NoDupePointsArray();
@@ -589,13 +589,13 @@ function alignPathToGrid(pathPoints, token) {
 
 /**
  * Shorten connections between segments.
- * Grid points are [a, gridPt0,... gridPt1, b].
- * Next grid points are [b, gridPt0, ... gridPt1, c]
- * If gridPt1 equals gridPt0, then can connect the two segments.
+ * Grid points are [gridPt0,... gridPt1, a].
+ * Next grid points are [a, gridPt0, ... gridPt1]
+ * Connect the b's, dropping all duplicates and converting to grid centers unles.
  * @param {PIXI.Point[][]} gridPoints
  * @returns {PIXI.Point[][]}
  */
-function cleanSegmentConnections(gridPoints, token) {
+function cleanSegmentGridConnections(gridPoints, token) {
   // Drop empty arrays.
   gridPoints = gridPoints.filter(arr => arr.length);
 
@@ -603,26 +603,34 @@ function cleanSegmentConnections(gridPoints, token) {
   let prevPts = gridPoints[0];
   for ( let i = 1, n = gridPoints.length; i < n; i += 1 ) {
     const nextPts = gridPoints[i];
-    const a = prevPts.at(-2);
-    const b = prevPts.at(-1);
-    const c = nextPts.at(0);
-    const d = nextPts.at(1);
-    if ( !(b && c) ) {
+
+    // Examine 3 points into the segment at the linked ends.
+    const a0 = prevPts.at(-1);
+    const b0 = prevPts.at(-2); // 1, -2 may be undefined.
+    const a1 = nextPts.at(0);
+    const b1 = nextPts.at(1);
+
+    // If a0 and a1 are equal, can remove a0.
+    if ( !a0.x.almostEqual(a1.x) || !a0.y.almostEqual(a1.y) ) {
       prevPts = nextPts;
       continue;
     }
+    prevPts.pop(); // Remove a0.
 
-    // previous: [...a, b]
-    // next: [c, d, ...]
-    // Implicitly all below must have b && c.
-    if ( a && d && b.isEndpoint && c.isEndpoint && !hasCollision(a, d, token) ) {
-      // If b and c are endpoints, can drop both if there is no collision between a and d.
-      prevPts.pop();
-      nextPts.shift();
-    } else if ((b.x === c.x && b.y === c.y)  // Either b or c is not an endpoint; drop b as both are equal.
-            || (a && b.isEndpoint && !hasCollision(a, c, token)) ) prevPts.pop(); // Drop endpoint b.
-    else if ( d && c.isEndpoint && !hasCollision(b, d, token) ) nextPts.shift(); // Drop endpoint c.
+    // If no collision between the next two points, can remove a1.
+    if ( !b0 || !b1 || hasCollision(b0, b1, token) ) {
+      prevPts = nextPts;
+      continue;
+    }
+    nextPts.shift(); // Remove a1.
+
+    if ( !b0.x.almostEqual(b1.x) || !b0.y.almostEqual(b1.y) ) {
+      prevPts = nextPts;
+      continue;
+    }
+    prevPts.pop(); // Remove b1.
     prevPts = nextPts;
+
   }
   return gridPoints;
 }
@@ -634,28 +642,42 @@ function cleanSegmentConnections(gridPoints, token) {
  */
 function alignSegmentToGrid(a, b, token) {
   if ( hasCollision(a, b, token) ) return [a, b];
+
+  const GridCoordinates = CONFIG.GeometryLib.GridCoordinates;
   const gridPoints = canvas.grid.getDirectPath([a, b]);
-  const allPoints = [a, ...gridPoints.map(pt => canvas.grid.getCenterPoint(pt)), b];
+  const allPoints = [GridCoordinates.fromObject(a), ...gridPoints.map(offset => GridCoordinates.fromOffset(offset)), GridCoordinates.fromObject(b)];
+  const nPts = allPoints.length;
+  if ( nPts < 3 ) return allPoints;
 
-  // Test if a --> b has collision. If so, change b to the line.
-  const testedSet = new Set();
-  let currA = allPoints[0];
-  for ( let i = 1, n = allPoints.length - 1; i < n; i += 1 ) {
-    const currB = allPoints[i];
-    if ( hasCollision(currA, currB, token) ) allPoints[i] = foundry.utils.closestPointToSegment(currB, a, b);
-    else  testedSet.add(`${key(currA)}|${key(currB)}`);
-  }
-
+  // To maximize grid spaces, move from outside in at both ends of the segment.
+  // Adjust points at either end, and walk to middle.
   // Test if a --> b has collision. If so, change a to the line.
-  currA = allPoints[1];
-  for ( let i = 2, n = allPoints.length; i < n; i += 1 ) {
-    const currB = allPoints[i];
-    const keyAB = `${key(currA)}|${key(currB)}`
-    if ( testedSet.has(keyAB) ) continue;
-    if ( hasCollision(currA, currB, token) ) allPoints[i - 1] = foundry.utils.closestPointToSegment(currA, a, b);
-    // else  testedSet.add(`${key(currA)}|${key(currB)}`);
+  for ( let i = 1, j = nPts - 2; i <= j; i += 1, j -= 1 ) {
+    const a0 = allPoints[i - 1];
+    const a1 = allPoints[i];
+    const a2 = allPoints[i + 1];
+    if ( hasCollision(a0, a1, token)
+      || hasCollision(a1, a2, token) ) allPoints[i] = GridCoordinates.fromObject(foundry.utils.closestPointToSegment(a1, a, b));
+
+    if ( i === j ) break;
+    const b0 = allPoints[j + 1];
+    const b1 = allPoints[j];
+    const b2 = allPoints[j - 1];
+    if ( hasCollision(b0, b1, token)
+      || hasCollision(b1, b2, token) ) allPoints[j] = GridCoordinates.fromObject(foundry.utils.closestPointToSegment(b1, a, b));
   }
 
+  // For any non-centered points, check if we can move to an adjacent grid square. (Skip start and end.)
+  for ( let i = 1, n = nPts - 2; i < n; i += 1 ) {
+    const a1 = allPoints[i];
+    const center = a1.center;
+    if ( a1.almostEqual(center) ) continue;
+
+    const a0 = allPoints[i - 1];
+    const a2 = allPoints[i + 1];
+    if ( hasCollision(a0, center, token) || hasCollision(a2, center, token) ) continue;
+    allPoints[i] = center;
+  }
   return allPoints;
 }
 
