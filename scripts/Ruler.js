@@ -437,10 +437,11 @@ function _computeDistance() {
   // - 3d path.
   // - Add the offsetDistance property for determining changes due to terrain.
   // - Calculate distance properties from nearest waypoint, for labeling.
+  const Point3d = CONFIG.GeometryLib.threeD.Point3d;
   let path = [];
-  if ( this.segments.length ) path.push(this.segments[0].ray.A.clone());
+  if ( this.segments.length ) path.push(Point3d.fromObject(this.segments[0].ray.A));
   for ( const segment of this.segments ) {
-    const B = segment.ray.B.clone();
+    const B = Point3d.fromObject(segment.ray.B);
     B.teleport = segment.teleport;
     path.push(B);
   }
