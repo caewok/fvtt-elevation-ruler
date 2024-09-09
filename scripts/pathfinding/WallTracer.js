@@ -396,7 +396,13 @@ export class WallTracerEdge extends GraphEdge {
    * @returns {boolean}
    */
   static tokenEdgeBlocks(token, moveToken, tokenBlockType, elevation = 0) {
+    // Don't block hidden tokens.
+    if ( token.document.hidden ) return false;
+
+    // Don't block oneself.
     if ( !moveToken || moveToken === token ) return false;
+
+    // Must be within the elevation bounds.
     if ( !elevation.between(token.topZ, token.bottomZ) ) return false;
 
     // Don't block dead tokens (HP <= 0).
