@@ -75,6 +75,11 @@ export class MovePenalty {
     });
     this.tokens.delete(moveToken);
 
+    // Remove certain hidden tokens.
+    // Note this is done only at beginning, but the MoveInstance only intended to last through a ruler measure.
+    this.tokens = this.tokens.filter(t => !(t.document.hidden
+        || t.actor.statuses.intersects(CONFIG[MODULE_ID].pathfindingIgnoreStatuses)));
+
     // Initially set the path sets to the full set of placeables.
     this.tokens.forEach(t => this.pathTokens.add(t));
     this.drawings.forEach(d => this.pathDrawings.add(d));
