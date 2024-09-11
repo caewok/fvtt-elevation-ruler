@@ -71,14 +71,16 @@ Hooks.once("init", function() {
      * @type {Set<string>}
      */
     pathfindingIgnoreStatuses: new Set([
-      "sleeping",
-      "unconscious",
       "dead",
       "ethereal",
       "incapacitated",
+      "invisible",
       "paralyzed",
       "petrified",
-      "restrained"]),
+      "restrained",
+      "sleeping",
+      "unconscious"
+    ]),
 
     /**
      * Adjust the width of the highlighting in gridless maps.
