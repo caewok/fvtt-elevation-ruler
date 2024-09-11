@@ -495,9 +495,11 @@ function _getCostFunction() {
 
   // Construct a move penalty instance that covers all the segments.
   const movePenaltyInstance = this._movePenaltyInstance ??= new MovePenalty(this.token);
-  const path = this.segments.map(s => GridCoordinates3d.fromObject(s.ray.A));
-  path.push(GridCoordinates3d.fromObject(this.segments.at(-1).ray.B));
-  movePenaltyInstance.restrictToPath(path);
+  if ( this.segments.length ) {
+    const path = this.segments.map(s => GridCoordinates3d.fromObject(s.ray.A));
+    path.push(GridCoordinates3d.fromObject(this.segments.at(-1).ray.B));
+    movePenaltyInstance.restrictToPath(path);
+  }
   return (prevOffset, currOffset, offsetDistance) => {
     if ( !(prevOffset instanceof GridCoordinates3d) ) prevOffset = GridCoordinates3d.fromOffset(prevOffset);
     if ( !(currOffset instanceof GridCoordinates3d) ) currOffset = GridCoordinates3d.fromOffset(currOffset);
