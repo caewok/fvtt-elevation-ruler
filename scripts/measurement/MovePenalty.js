@@ -2,6 +2,7 @@
 canvas,
 CONFIG,
 foundry,
+game,
 PIXI
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -11,7 +12,6 @@ import { MODULE_ID, FLAGS, OTHER_MODULES, SPEED, MOVEMENT_TYPES } from "../const
 import { Settings } from "../settings.js";
 import { movementType } from "../token_hud.js";
 import { log, keyForValue } from "../util.js";
-import { getOffsetDistanceFn } from "./Grid.js";
 
 /*
 Class to measure penalty, as percentage of distance, between two points.
@@ -163,6 +163,31 @@ export class MovePenalty {
   // ----- NOTE: Primary methods ----- //
 
   /**
+   * Determine movement distance, offset, cost, for a segment.
+   * @param {GridCoordinates3d} a         Exact starting position
+   * @param {GridCoordinates3d} b           Exact ending position
+   * @param {boolean} forceGridPenalty          Use the force grid penalty setting
+   * @returns {object}
+   *  - @prop {number} distance
+   *  - @prop {number} offsetDistance
+   *  - @prop {number} cost
+   *  - @prop {number} numDiagonals
+   */
+  measureSegment(a, b, { numPrevDiagonal = 0, forceGridPenalty, diagonals } = {}) {
+    const GridCoordinates3d = CONFIG.GeometryLib.threeD.GridCoordinates3d;
+    if ( !(a instanceof GridCoordinates3d) ) a = GridCoordinates3d.fromObject(a);
+    if ( !(b instanceof GridCoordinates3d) ) b = GridCoordinates3d.fromObject(b);
+    const D = GridCoordinates3d.GRID_DIAGONALS;
+    diagonals ??= canvas.grid.diagonals ?? game.settings.get("core", "gridDiagonals");
+    if ( diagonals === D.EXACT
+      && Settings.get(Settings.KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE) ) diagonals = D.EUCLIDEAN;
+    const res = GridCoordinates3d.gridMeasurementForSegment(a, b, { numPrevDiagonal, diagonals });
+    this.restrictToPath([a, b]);
+    res.cost = this.movementCostForSegment(a, b, res.offsetDistance, forceGridPenalty);
+    return res;
+  }
+
+  /**
    * Determine the movement cost for a segment.
    * @param {GridCoordinates3d} startCoords     Exact starting position
    * @param {GridCoordinates3d} endCoords       Exact ending position
@@ -190,7 +215,7 @@ export class MovePenalty {
       // Unlikely scenario where endCoords are more than 1 step away from startCoords.
       let totalCost = 0;
       const path = canvas.grid.getDirectPath([startCoords, endCoords]);
-      const offsetDistanceFn = getOffsetDistanceFn();
+      const offsetDistanceFn = CONFIG.GeometryLib.threeD.GridCoordinates3d.getOffsetDistanceFn();
       let prevOffset = path[0];
       for ( let i = 1, n = path.length; i < n; i += 1 ) {
         const currOffset = path[i];
@@ -338,7 +363,6 @@ export class MovePenalty {
     // Traverse each intersection, determining the speed multiplier from starting speed
     // and calculating total time and distance. x meters / y meters/second = x/y seconds
     const { to2d, convertToDistance } = CONFIG.GeometryLib.utils.cutaway;
-    let totalDistance = 0;
     let totalUnmodifiedDistance = 0;
     let totalTime = 0;
     let currentMultiplier = 1;
@@ -381,7 +405,6 @@ export class MovePenalty {
 
       // Flat adds extra distance to the grid square. Diagonal is longer, so will have larger penalty.
       prevIx.dist += (prevIx.dist * currentFlat / canvas.grid.distance);
-      totalDistance += prevIx.dist;
       totalTime += (prevIx.dist / prevIx.tokenSpeed);
       prevIx = ix;
 
