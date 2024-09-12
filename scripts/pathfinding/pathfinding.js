@@ -220,6 +220,9 @@ export class Pathfinder {
   /** @type {number} */
   startElevation = 0;
 
+  /** @type {MovePenalty} */
+  movePenaltyInstance;
+
   /**
    * Optional token to associate with this path.
    * Used for path spacing near obstacles.
@@ -227,6 +230,7 @@ export class Pathfinder {
    */
   constructor(token) {
     this.token = token;
+    this.movePenaltyInstance = new MovePenalty(token);
   }
 
   /** @type {number} */
@@ -378,14 +382,16 @@ export class Pathfinder {
     if ( pathNode.entryTriangle === goal.entryTriangle ) {
       // Need a copy so we can modify cost for this goal node only.
       const newNode = {...goal};
-      newNode.cost = goal.entryTriangle._calculateMovementCost(pathNode.entryPoint, goal.entryPoint, this.token);
+      newNode.cost = goal.entryTriangle._calculateMovementCost(
+        pathNode.entryPoint, goal.entryPoint, this.token, this.movePenaltyInstance);
       newNode.priorTriangle = pathNode.priorTriangle;
       newNode.fromPoint = pathNode.entryPoint;
       return [newNode];
     }
 
     const destinations = pathNode.entryTriangle.getValidDestinationsWithCost(
-      pathNode.priorTriangle, this.startElevation, this.spacer, pathNode.entryPoint, this.token);
+      pathNode.priorTriangle, this.startElevation, this.spacer,
+      pathNode.entryPoint, this.token, this.movePenaltyInstance);
     return this.#filterDestinationsbyExploration(destinations);
   }
 

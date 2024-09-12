@@ -45,6 +45,7 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
   let speedCategory = categoryIter.next().value;
   let maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
 
+  const mp = ruler._movePenaltyInstance ??= new MovePenalty(token);
   return segment => {
     if ( !tokenSpeed ) {
       segment.speed = defaultColor;
@@ -71,7 +72,7 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
         if ( newDistance > maxDistance ) {
           // Split the segment, inserting the latter portion in the queue for future iteration.
           const splitDistance = maxDistance - totalCombatMoveDistance;
-          const breakpoint = locateSegmentBreakpoint(segment, splitDistance, { token, gridless, numPrevDiagonal });
+          const breakpoint = locateSegmentBreakpoint(segment, splitDistance, { mp, token, gridless, numPrevDiagonal });
           if ( breakpoint ) {
             if ( breakpoint.almostEqual(segment.ray.A) ) {
               // Switch to next category.
@@ -82,7 +83,7 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
               // Do nothing.
             } else {
               // Split the segment
-              const segments = _splitSegmentAt(segment, breakpoint, numPrevDiagonal);
+              const segments = _splitSegmentAt(segment, breakpoint, mp, numPrevDiagonal);
               unprocessed.push(segments[1]);
               segment = segments[0];
             }
@@ -116,17 +117,18 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
  *   If the incrementalMoveDistance is greater than segment move distance, returns null
  *   Otherwise returns the point at which to break the segment.
  */
-function locateSegmentBreakpoint(segment, splitMoveDistance, { gridless, numPrevDiagonal } = {}) {
+function locateSegmentBreakpoint(segment, splitMoveDistance, { mp, gridless, numPrevDiagonal } = {}) {
   if ( splitMoveDistance <= 0 ) return null;
   if ( !segment.cost || splitMoveDistance > segment.cost ) return null;
 
   // Attempt to move the split distance and determine the split location.
   const { A, B } = segment.ray;
-  let breakpoint = targetSplitForSegment(splitMoveDistance, A, B, numPrevDiagonal);
+  let breakpoint = targetSplitForSegment(splitMoveDistance, A, B, mp, numPrevDiagonal);
   if ( !gridless ) {
     // We can get the end grid.
     // Use halfway between the intersection points for this grid shape.
-    breakpoint = GridCoordinates3d.fromObject(segmentGridHalfIntersection(breakpoint, A, B) ?? A);
+    const halfIx = segmentGridHalfIntersection(breakpoint, A, B) ?? A;
+    breakpoint = GridCoordinates3d.fromObject(halfIx);
     if ( breakpoint.equals(A) ) breakpoint.z = A.z;
     else if ( breakpoint.equals(B) ) breakpoint.z = B.z;
     else {
@@ -149,12 +151,12 @@ function locateSegmentBreakpoint(segment, splitMoveDistance, { gridless, numPrev
  * @param {Point3d} b
  * @param {number} [numPrevDiagonal=0]
  */
-function targetSplitForSegment(targetCost, a, b, numPrevDiagonal = 0) {
+function targetSplitForSegment(targetCost, a, b, mp, numPrevDiagonal = 0) {
   // Assume linear cost increment.
   // So divide move in half each time.
-  if ( splitCost(a, b, 0, numPrevDiagonal) > targetCost ) return a;
+  if ( splitCost(a, b, mp, 0, numPrevDiagonal) > targetCost ) return a;
   const totalDist = Point3d.distanceBetween(a, b);
-  if ( splitCost(a, b, totalDist, numPrevDiagonal) <= targetCost ) return b;
+  if ( splitCost(a, b, mp, totalDist, numPrevDiagonal) <= targetCost ) return b;
 
   // Now increment distance until we exceed the target cost.
   // Take 1/2 steps. So if the distance is nearly at the end, we would go 1/2 + 1/4 + 1/8...
@@ -167,9 +169,9 @@ function targetSplitForSegment(targetCost, a, b, numPrevDiagonal = 0) {
     iter += 1;
     step = Math.floor(step * 0.5);
     const testDist = bestDist + step;
-    if ( splitCost(a, b, testDist, numPrevDiagonal) <= targetCost ) bestDist = testDist;
+    if ( splitCost(a, b, mp, testDist, numPrevDiagonal) <= targetCost ) bestDist = testDist;
   }
-  return a.towardsPoint(b, bestDist);
+  return a.towardsPoint(b, bestDist).roundDecimals();
 }
 
 /**
@@ -180,10 +182,10 @@ function targetSplitForSegment(targetCost, a, b, numPrevDiagonal = 0) {
  * @param {number} [t0=1]
  * @param {number} [numPrevDiagonal=0]
  */
-function splitCost(a, b, stepDist = 1, numPrevDiagonal = 0) {
+function splitCost(a, b, mp, stepDist = 1, numPrevDiagonal = 0) {
   b = a.towardsPoint(b, stepDist, Point3d._tmp);
   b.roundDecimals(); // Ensure b is on a pixel, so we don't inadvertently exceed the cost at a border.
-  return GridCoordinates3d.gridMeasurementForSegment(a, b, numPrevDiagonal).cost;
+  return mp.measureSegment(a, b, { numPrevDiagonal }).cost;
 }
 
 /**
@@ -193,7 +195,7 @@ function splitCost(a, b, stepDist = 1, numPrevDiagonal = 0) {
  * @param {Point3d} breakpoint                    Point to use when splitting the segments
  * @returns [RulerMeasurementSegment, RulerMeasurementSegment]
  */
-function _splitSegmentAt(segment, breakpoint, numPrevDiagonal = 0) {
+function _splitSegmentAt(segment, breakpoint, mp, numPrevDiagonal = 0) {
   const { A, B } = segment.ray;
 
   // Split the segment into two at the break point.
@@ -203,8 +205,8 @@ function _splitSegmentAt(segment, breakpoint, numPrevDiagonal = 0) {
   s0.ray = new Ray3d(A, breakpoint);
   s1.ray = new Ray3d(breakpoint, B);
 
-  const res0 = GridCoordinates3d.gridMeasurementForSegment(s0.ray.A, s0.ray.B, numPrevDiagonal);
-  const res1 = GridCoordinates3d.gridMeasurementForSegment(s1.ray.A, s1.ray.B, numPrevDiagonal + res0.numDiagonal);
+  const res0 = mp.measureSegment(s0.ray.A, s0.ray.B, { numPrevDiagonal });
+  const res1 = mp.measureSegment(s1.ray.A, s1.ray.B, { numPrevDiagonal: numPrevDiagonal + res0.numDiagonal });
 
   s0.distance = res0.distance;
   s0.offsetDistance = res0.offsetDistance;

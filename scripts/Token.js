@@ -51,7 +51,8 @@ function preUpdateToken(document, changes, _options, _userId) {
   } else {
     // Some other move; likely arrow keys.
     const numPrevDiagonal = game.combat?.started ? (token._combatMoveData?.numDiagonal ?? 0) : 0;
-    const res = GridCoordinates3d.gridMeasurementForSegment(token.position, token.document._source, numPrevDiagonal);
+    const mp = new MovePenalty(token);
+    const res = mp.measureSegment(token.position, token.document._source, { numPrevDiagonal });
     lastMoveDistance = res.cost;
     numDiagonal = res.numDiagonal;
   }
