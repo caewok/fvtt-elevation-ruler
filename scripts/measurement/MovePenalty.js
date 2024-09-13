@@ -29,9 +29,6 @@ export class MovePenalty {
   /** @type {Token} */
   moveToken;
 
-  /** @type {function} */
-  speedFn;
-
   /** @type {Set<Region>} */
   regions = new Set();
 
@@ -50,16 +47,25 @@ export class MovePenalty {
   /** @type {Set<Token>} */
   pathTokens = new Set();
 
+  /**
+   * Local clone of a token.
+   * Currently clones the actor and the token document but makes no effort to clone the other token properties.
+   * @param {Token} token
+   * @returns {object}
+   *   - @prop {TokenDocument} document
+   *   - @prop {Actor} actor
+   */
+  #localTokenClone;
+
+  /** @type {string} */
+  speedAttribute = "";
 
   /**
    * @param {Token} moveToken               The token doing the movement
-   * @param {function} [speedFn]            Function used to determine speed of the token
    */
-  constructor(moveToken, speedFn) {
+  constructor(moveToken) {
     this.moveToken = moveToken;
-    this.speedFn = speedFn ?? (token =>
-      foundry.utils.getProperty(token, SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, token.movementType)]));
-    this.#localTokenClone = this.constructor._constructTokenClone(this.moveToken);
+    this.speedAttribute = SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, moveToken.movementType)];
     const tokenMultiplier = this.constructor.tokenMultiplier;
     const terrainAPI = this.constructor.terrainAPI;
 
@@ -84,6 +90,10 @@ export class MovePenalty {
     this.tokens.forEach(t => this.pathTokens.add(t));
     this.drawings.forEach(d => this.pathDrawings.add(d));
     this.regions.forEach(r => this.pathRegions.add(r));
+
+    // Set up a token clone without any terrains to use in estimating movement.
+    this.#localTokenClone = this.constructor._constructTokenClone(this.moveToken);
+    this.#initializeTokenClone();
   }
 
   /**
@@ -115,16 +125,6 @@ export class MovePenalty {
 
   /** @type {boolean} */
   get anyPotentialObstacles() { return this.pathTokens.size || this.pathRegions.size || this.pathDrawings.size; }
-
-  /**
-   * Local clone of a token.
-   * Currently clones the actor and the token document but makes no effort to clone the other token properties.
-   * @param {Token} token
-   * @returns {object}
-   *   - @prop {TokenDocument} document
-   *   - @prop {Actor} actor
-   */
-  #localTokenClone;
 
   /**
    * Construct the local token clone.
@@ -198,7 +198,7 @@ export class MovePenalty {
     forceGridPenalty ??= Settings.get(Settings.KEYS.MEASURING.FORCE_GRID_PENALTIES);
     forceGridPenalty &&= !canvas.grid.isGridless;
     console.groupCollapsed("movementCostForSegment");
-    log(`${startCoords.x},${startCoords.y},${startCoords.z} -> ${endCoords.x},${endCoords.y},${endCoords.z}`)
+    log(`${startCoords.x},${startCoords.y},${startCoords.z} -> ${endCoords.x},${endCoords.y},${endCoords.z}`);
 
     // Did we already test this segment?
     const startKey = forceGridPenalty ? startCoords.center.key : startCoords.key;
@@ -270,6 +270,7 @@ export class MovePenalty {
     // Track all speed multipliers and flat penalties for the grid space.
     let flatPenalty = 0;
     let currentMultiplier = 1;
+    const startingSpeed = foundry.utils.getProperty(this.moveToken, this.speedAttribute) || 1;
 
     // Drawings
     drawings.forEach(d => {
@@ -286,12 +287,14 @@ export class MovePenalty {
 
     // Regions
     const testRegions = this.constructor.terrainAPI && regions.length;
-    const tClone = testRegions ? this.#initializeTokenClone() : this.moveToken;
-    const startingSpeed = this.speedFn(tClone) || 1;
-    regions.forEach(r => this.#addTerrainsToToken(tClone, r));
-
+    let speed = startingSpeed;
+    if ( testRegions ) {
+      const speedFn = this.#tokenCloneSpeedFn();
+      regions.forEach(r => this.#addTerrainsToTokenClone(r));
+      speed = speedFn() || 1;
+    }
     currentMultiplier ||= 1; // Don't let it divide by 0.
-    const speedInGrid = ((this.speedFn(tClone) || 1) / currentMultiplier);
+    const speedInGrid = (speed / currentMultiplier);
     const gridMult = startingSpeed / speedInGrid; // If currentMultiplier > 1, gridMult should be > 1.
     const res = (flatPenalty + (gridMult * costFreeDistance));
     this.#penaltyCache.set(key, res);
@@ -376,8 +379,7 @@ export class MovePenalty {
 
     // Regions
     const testRegions = this.constructor.terrainAPI && this.pathRegions;
-    const tClone = testRegions ? this.#initializeTokenClone() : this.moveToken;
-    const startingSpeed = this.speedFn(tClone) || 1;
+    const startingSpeed = foundry.utils.getProperty(this.moveToken, this.speedAttribute) || 1;
 
     // Traverse each intersection, determining the speed multiplier from starting speed
     // and calculating total time and distance. x meters / y meters/second = x/y seconds
@@ -392,11 +394,16 @@ export class MovePenalty {
     cutawayIxs = cutawayIxs.map(ix => convertToDistance(shallowCopyCutawayIntersection(ix))); // Avoid modifying the originals.
     cutawayIxs.push(end2d);
     cutawayIxs.sort((a, b) => a.x - b.x);
+
+    const addTerrainFn = this.#addTerrainsToTokenClone.bind(this);
+    const removeTerrainFn = this.#removeTerrainsFromTokenClone.bind(this);
+    const speedFn = this.#tokenCloneSpeedFn();
+
     for ( const ix of cutawayIxs ) {
       // Must invert the multiplier to apply them as penalties. So a 2x penalty is 1/2 times speed.
       const multFn = ix.movingInto ? x => 1 / x : x => x;
       const addFn = ix.movingInto ? x => x : x => -x;
-      const terrainFn = ix.movingInto ? this.#addTerrainsToToken.bind(this) : this.#removeTerrainsFromToken.bind(this);
+      const terrainFn = ix.movingInto ? addTerrainFn : removeTerrainFn;
 
       // Handle all intersections at the same point.
       if ( ix.almostEqual(prevIx) ) {
@@ -409,7 +416,7 @@ export class MovePenalty {
           if ( ix.drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY_FLAT) ) currentFlat += addFn(penalty);
           else currentMultiplier *= multFn(penalty);
         }
-        if ( ix.region ) terrainFn(tClone, ix.region);
+        if ( testRegions && ix.region ) terrainFn(ix.region);
         continue;
       }
 
@@ -420,7 +427,8 @@ export class MovePenalty {
       totalUnmodifiedDistance += prevIx.dist;
 
       // Speed is adjusted when moving through regions with a multiplier.
-      prevIx.tokenSpeed = ((this.speedFn(tClone) || 1) * prevIx.multiplier);
+      const currSpeed = testRegions ? (speedFn() || 1) : startingSpeed;
+      prevIx.tokenSpeed = (currSpeed * prevIx.multiplier);
 
       // Flat adds extra distance to the grid square. Diagonal is longer, so will have larger penalty.
       prevIx.dist += (prevIx.dist * currentFlat / canvas.grid.distance);
@@ -439,8 +447,10 @@ export class MovePenalty {
         if ( ix.drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY_FLAT) ) currentFlat += addFn(penalty);
         else currentMultiplier *= multFn(penalty);
       }
-      if ( ix.region ) terrainFn(tClone, ix.region);
+      if ( testRegions && ix.region ) terrainFn(ix.region);
     }
+    // Make sure the token clone speed is reset.
+    if ( testRegions ) speedFn();
 
     // Determine the ratio compared to a set speed
     const totalDefaultTime = totalUnmodifiedDistance / startingSpeed;
@@ -450,36 +460,23 @@ export class MovePenalty {
 
   /**
    * Add region terrains to a token (clone). Requires Terrain Mapper to be active.
-   * @param {Token|object} token    Token or token clone
    * @param {Region} region         Terrain region to use
    */
-  #addTerrainsToToken(token, region) {
+  #addTerrainsToTokenClone(region) {
     const terrains = region.terrainmapper.terrains;
     if ( !terrains.size ) return;
-
-    const t0 = performance.now();
-    CONFIG.terrainmapper.Terrain.addToTokenLocally(token, [...terrains.values()], { refresh: false });
-    const t1 = performance.now();
-    token.actor._initialize(); // This is slow; we really need something more specific to active effects.
-    const t2 = performance.now();
-    log(`#addTerrainsToToken|\taddLocally: ${(t1 - t0).toNearest(0.01)} ms\tinitialize: ${(t2 - t1).toNearest(0.01)} ms`);
+    CONFIG.terrainmapper.Terrain.addToTokenLocally(this.#localTokenClone, [...terrains.values()], { refresh: false });
   }
 
   /**
    * Remove region terrains from a token (clone). Requires Terrain Mapper to be active.
-   * @param {Token|object} token    Token or token clone
    * @param {Region} region         Terrain region to use
    */
-  #removeTerrainsFromToken(token, region) {
+  #removeTerrainsFromTokenClone(region) {
     const terrains = region.terrainmapper.terrains;
     if ( !terrains.size ) return;
-
-    const t0 = performance.now();
-    CONFIG.terrainmapper.Terrain.removeFromTokenLocally(token, [...terrains.values()], { refresh: false });
-    const t1 = performance.now();
-    token.actor._initialize(); // This is slow; we really need something more specific to active effects.
-    const t2 = performance.now();
-    log(`#removeTerrainsFromToken|\tremoveLocally: ${(t1 - t0).toNearest(0.01)} ms\tinitialize: ${(t2 - t1).toNearest(0.01)} ms`);
+    CONFIG.terrainmapper.Terrain.removeFromTokenLocally(this.#localTokenClone,
+      [...terrains.values()], { refresh: false });
   }
 
   /**
@@ -492,9 +489,25 @@ export class MovePenalty {
     const tokenTerrains = Terrain.allOnToken(tClone);
     if ( tokenTerrains.length ) {
       CONFIG.terrainmapper.Terrain.removeFromTokenLocally(tClone, tokenTerrains, { refresh: false });
-      tClone.actor._initialize(); // This is slow; we really need something more specific to active effects.
+      tClone.actor._initialize(); // This is slow
     }
     return tClone;
+  }
+
+  /**
+   * Set up the token clone for measurement and return a function that can get the token speed.
+   * @returns {function}
+   *   - @param {boolean} [reset=true] Should the token speed be reset after measuring the speed?
+   *   - @returns {number} Current speed of the token prior to reset
+   */
+  #tokenCloneSpeedFn() {
+    const initialSpeed = foundry.utils.getProperty(this.#localTokenClone, this.speedAttribute);
+    return (reset = true) => {
+      this.#localTokenClone.actor.applyActiveEffects();
+      const currSpeed = foundry.utils.getProperty(this.#localTokenClone, this.speedAttribute);
+      if ( reset ) foundry.utils.setProperty(this.#localTokenClone, this.speedAttribute, initialSpeed);
+      return currSpeed;
+    };
   }
 
   // ----- NOTE: Static getters ----- //
