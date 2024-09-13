@@ -197,13 +197,21 @@ export class MovePenalty {
   movementCostForSegment(startCoords, endCoords, costFreeDistance = 0, forceGridPenalty) { // eslint-disable-line default-param-last
     forceGridPenalty ??= Settings.get(Settings.KEYS.MEASURING.FORCE_GRID_PENALTIES);
     forceGridPenalty &&= !canvas.grid.isGridless;
+    console.groupCollapsed("movementCostForSegment");
+    log(`${startCoords.x},${startCoords.y},${startCoords.z} -> ${endCoords.x},${endCoords.y},${endCoords.z}`)
 
     // Did we already test this segment?
     const startKey = forceGridPenalty ? startCoords.center.key : startCoords.key;
     const endKey = forceGridPenalty ? endCoords.center.key : endCoords.key;
     const key = `${startKey}|${endKey}`;
-    if ( this.#penaltyCache.has(key) ) return this.#penaltyCache.get(key);
+    if ( this.#penaltyCache.has(key) ) {
+      const res = this.#penaltyCache.get(key);
+      log(`Using key ${key}: ${res}`);
+      console.groupEnd("movementCostForSegment");
+      return res;
+    }
 
+    const t0 = performance.now();
     let res = costFreeDistance;
     if ( forceGridPenalty ) {
       // Cost is assigned to each grid square/hex
@@ -230,6 +238,9 @@ export class MovePenalty {
       res = costFreeDistance * multiplier;
     }
     this.#penaltyCache.set(key, res);
+    const t1 = performance.now();
+    log(`Found cost ${res} in ${Math.round(t1 - t0)} ms`);
+    console.groupEnd("movementCostForSegment");
     return res;
   }
 
@@ -244,6 +255,12 @@ export class MovePenalty {
   movementCostForGridSpace(coords, costFreeDistance = 0) {
     // Determine what regions, tokens, drawings overlap the center point.
     const centerPt = coords.center;
+
+    // Did we already test this coordinate?
+    const key = centerPt.key;
+    if ( this.#penaltyCache.has(key) ) return this.#penaltyCache.get(key);
+
+
     const regions = [...this.regions].filter(r => r.testPoint(centerPt, centerPt.elevation));
     const tokens = [...this.tokens].filter(t => t.constrainedTokenBorder.contains(centerPt.x, centerPt.y)
       && centerPt.elevation.between(t.bottomE, t.topE));
@@ -276,7 +293,9 @@ export class MovePenalty {
     currentMultiplier ||= 1; // Don't let it divide by 0.
     const speedInGrid = ((this.speedFn(tClone) || 1) / currentMultiplier);
     const gridMult = startingSpeed / speedInGrid; // If currentMultiplier > 1, gridMult should be > 1.
-    return (flatPenalty + (gridMult * costFreeDistance));
+    const res = (flatPenalty + (gridMult * costFreeDistance));
+    this.#penaltyCache.set(key, res);
+    return res;
 
     /* Example
       Token has speed 30 and moves 10 grid units.
