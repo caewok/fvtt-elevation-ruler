@@ -195,10 +195,14 @@ export class MovePenalty {
    * @returns {number} The costFreeDistance + cost, in grid units.
    */
   movementCostForSegment(startCoords, endCoords, costFreeDistance = 0, forceGridPenalty) { // eslint-disable-line default-param-last
+    if ( startCoords.almostEqual(endCoords) ) return costFreeDistance;
+
     forceGridPenalty ??= Settings.get(Settings.KEYS.MEASURING.FORCE_GRID_PENALTIES);
     forceGridPenalty &&= !canvas.grid.isGridless;
-    console.groupCollapsed("movementCostForSegment");
-    log(`${startCoords.x},${startCoords.y},${startCoords.z} -> ${endCoords.x},${endCoords.y},${endCoords.z}`);
+    if ( CONFIG[MODULE_ID].debug ) {
+      console.groupCollapsed("movementCostForSegment");
+      log(`${startCoords.x},${startCoords.y},${startCoords.z} -> ${endCoords.x},${endCoords.y},${endCoords.z}`);
+    }
 
     // Did we already test this segment?
     const startKey = forceGridPenalty ? startCoords.center.key : startCoords.key;
@@ -270,7 +274,7 @@ export class MovePenalty {
     // Track all speed multipliers and flat penalties for the grid space.
     let flatPenalty = 0;
     let currentMultiplier = 1;
-    const startingSpeed = foundry.utils.getProperty(this.moveToken, this.speedAttribute) || 1;
+    let startingSpeed = this._tokenCloneSpeed;
 
     // Drawings
     drawings.forEach(d => {
@@ -289,7 +293,12 @@ export class MovePenalty {
     const testRegions = this.constructor.terrainAPI && regions.length;
     let speed = startingSpeed;
     if ( testRegions ) {
+      // Add on all the current terrains from the token but use the non-terrain token as baseline.
       const speedFn = this.#tokenCloneSpeedFn();
+      startingSpeed = speedFn();
+      // The regions should apply all the terrains needed.
+      // const currTerrains = this.moveToken.getAllTerrains();
+      // CONFIG.terrainmapper.Terrain.addToTokenLocally(this.#localTokenClone, [...currTerrains], { refresh: false });
       regions.forEach(r => this.#addTerrainsToTokenClone(r));
       speed = speedFn() || 1;
     }
@@ -379,7 +388,7 @@ export class MovePenalty {
 
     // Regions
     const testRegions = this.constructor.terrainAPI && this.pathRegions;
-    const startingSpeed = foundry.utils.getProperty(this.moveToken, this.speedAttribute) || 1;
+    let startingSpeed = this._tokenCloneSpeed;
 
     // Traverse each intersection, determining the speed multiplier from starting speed
     // and calculating total time and distance. x meters / y meters/second = x/y seconds
@@ -390,54 +399,32 @@ export class MovePenalty {
     let currentFlat = 0;
     const start2d = convertToDistance(to2d(start, start, end));
     const end2d = convertToDistance(to2d(end, start, end));
-    let prevIx = start2d;
+    let ix = start2d;
     cutawayIxs = cutawayIxs.map(ix => convertToDistance(shallowCopyCutawayIntersection(ix))); // Avoid modifying the originals.
     cutawayIxs.push(end2d);
     cutawayIxs.sort((a, b) => a.x - b.x);
 
     const addTerrainFn = this.#addTerrainsToTokenClone.bind(this);
     const removeTerrainFn = this.#removeTerrainsFromTokenClone.bind(this);
-    const speedFn = this.#tokenCloneSpeedFn();
+    let speedFn;
+    // Add terrains currently on the token but keep the speed based on the non-terrain token.
+    if ( testRegions ) {
+      speedFn = this.#tokenCloneSpeedFn();
+      startingSpeed = speedFn();
+      // The cutaway intersections should apply the terrains.
+      // const currTerrains = this.moveToken.getAllTerrains();
+      // CONFIG.terrainmapper.Terrain.addToTokenLocally(this.#localTokenClone, [...currTerrains], { refresh: false });
+    }
 
-    for ( const ix of cutawayIxs ) {
+    // For debugging, track the iterative steps.
+    const calcSteps = [];
+    for ( const nextIx of cutawayIxs ) {
       // Must invert the multiplier to apply them as penalties. So a 2x penalty is 1/2 times speed.
       const multFn = ix.movingInto ? x => 1 / x : x => x;
       const addFn = ix.movingInto ? x => x : x => -x;
       const terrainFn = ix.movingInto ? addTerrainFn : removeTerrainFn;
 
-      // Handle all intersections at the same point.
-      if ( ix.almostEqual(prevIx) ) {
-        if ( ix.token ) {
-          if ( useTokenFlat ) currentFlat += addFn(tokenMultiplier);
-          else currentMultiplier *= multFn(tokenMultiplier);
-        }
-        if ( ix.drawing ) {
-          const penalty = ix.drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY);
-          if ( ix.drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY_FLAT) ) currentFlat += addFn(penalty);
-          else currentMultiplier *= multFn(penalty);
-        }
-        if ( testRegions && ix.region ) terrainFn(ix.region);
-        continue;
-      }
-
-      // Now we have prevIx --> ix.
-      prevIx.flat = currentFlat;
-      prevIx.multiplier = currentMultiplier;
-      prevIx.dist = CONFIG.GeometryLib.utils.pixelsToGridUnits(PIXI.Point.distanceBetween(prevIx, ix));
-      totalUnmodifiedDistance += prevIx.dist;
-
-      // Speed is adjusted when moving through regions with a multiplier.
-      const currSpeed = testRegions ? (speedFn() || 1) : startingSpeed;
-      prevIx.tokenSpeed = (currSpeed * prevIx.multiplier);
-
-      // Flat adds extra distance to the grid square. Diagonal is longer, so will have larger penalty.
-      prevIx.dist += (prevIx.dist * currentFlat / canvas.grid.distance);
-      totalTime += (prevIx.dist / prevIx.tokenSpeed);
-      prevIx = ix;
-
-      if ( ix.almostEqual(end2d) ) break;
-
-      // Account for the changes due to ix.
+      // Add in the penalties or multipliers at the current position.
       if ( ix.token ) {
         if ( useTokenFlat ) currentFlat += addFn(tokenMultiplier);
         else currentMultiplier *= multFn(tokenMultiplier);
@@ -448,7 +435,30 @@ export class MovePenalty {
         else currentMultiplier *= multFn(penalty);
       }
       if ( testRegions && ix.region ) terrainFn(ix.region);
+
+      // Process all intersections at this same point (e.g., multiple regions with same border).
+      if ( ix.almostEqual(nextIx) ) {
+        ix = nextIx;
+        continue;
+      }
+
+      // Now we have ix --> nextIx where effects due to ix have been processed.
+      const calcStep = { ix, nextIx };
+      calcSteps.push(calcStep);
+      calcStep.flat = currentFlat;
+      calcStep.multiplier = currentMultiplier;
+      calcStep.dist = CONFIG.GeometryLib.utils.pixelsToGridUnits(PIXI.Point.distanceBetween(ix, nextIx));
+      totalUnmodifiedDistance += calcStep.dist;
+
+      const currSpeed = testRegions ? (speedFn() || 1) : startingSpeed;
+      calcStep.tokenSpeed = (currSpeed * calcStep.multiplier);
+
+      // Flat adds extra distance to the grid square. Diagonal is longer, so will have larger penalty.
+      calcStep.dist += (calcStep.dist * currentFlat / canvas.grid.distance);
+      totalTime += (calcStep.dist / calcStep.tokenSpeed);
+      ix = nextIx;
     }
+
     // Make sure the token clone speed is reset.
     if ( testRegions ) speedFn();
 
@@ -494,6 +504,11 @@ export class MovePenalty {
     return tClone;
   }
 
+  /** @type {number} */
+  get _tokenCloneSpeed() { return foundry.utils.getProperty(this.#localTokenClone, this.speedAttribute) || 1; }
+
+  set _tokenCloneSpeed(value) { foundry.utils.setProperty(this.#localTokenClone, this.speedAttribute, value); }
+
   /**
    * Set up the token clone for measurement and return a function that can get the token speed.
    * @returns {function}
@@ -501,11 +516,11 @@ export class MovePenalty {
    *   - @returns {number} Current speed of the token prior to reset
    */
   #tokenCloneSpeedFn() {
-    const initialSpeed = foundry.utils.getProperty(this.#localTokenClone, this.speedAttribute);
+    const initialSpeed = this._tokenCloneSpeed;
     return (reset = true) => {
       this.#localTokenClone.actor.applyActiveEffects();
-      const currSpeed = foundry.utils.getProperty(this.#localTokenClone, this.speedAttribute);
-      if ( reset ) foundry.utils.setProperty(this.#localTokenClone, this.speedAttribute, initialSpeed);
+      const currSpeed = this._tokenCloneSpeed;
+      if ( reset ) this._tokenCloneSpeed = initialSpeed;
       return currSpeed;
     };
   }
