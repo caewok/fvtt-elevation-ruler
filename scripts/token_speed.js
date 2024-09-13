@@ -38,14 +38,15 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
   let numPrevDiagonal = game.combat?.started ? (token?._combatMoveData?.numDiagonal ?? 0) : 0;
 
   // Precalculate the token speed.
-  const tokenSpeed = SPEED.tokenSpeed(token);
+  // We need the speed without the terrains. Use the MovePenalty to determine.
+  const mp = ruler._movePenaltyInstance ??= new MovePenalty(token);
+  const tokenSpeed = mp._tokenCloneSpeed; // SPEED.tokenSpeed(token);
 
   // Progress through each speed attribute in turn.
   const categoryIter = [...SPEED.CATEGORIES].values();
   let speedCategory = categoryIter.next().value;
   let maxDistance = SPEED.maximumCategoryDistance(token, speedCategory, tokenSpeed);
 
-  const mp = ruler._movePenaltyInstance ??= new MovePenalty(token);
   return segment => {
     if ( !tokenSpeed ) {
       segment.speed = defaultColor;
