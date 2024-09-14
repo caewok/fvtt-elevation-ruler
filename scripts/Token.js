@@ -11,7 +11,7 @@ Ruler
 import { MODULE_ID, FLAGS } from "./const.js";
 import { Settings } from "./settings.js";
 import { log } from "./util.js";
-import { GridCoordinates3d } from "./geometry/3d/GridCoordinates3d.js";
+import { MovePenalty } from "./measurement/MovePenalty.js";
 
 // Patches for the Token class
 export const PATCHES = {};
