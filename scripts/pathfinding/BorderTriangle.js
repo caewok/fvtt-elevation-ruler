@@ -11,7 +11,7 @@ Wall
 
 import { MODULE_ID } from "../const.js";
 import { Draw } from "../geometry/Draw.js";
-import { WallTracerEdge } from "./WallTracer.js";
+import { ERSceneGraph } from "./WallTracer.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { Settings } from "../settings.js";
 
@@ -168,10 +168,10 @@ export class BorderEdge {
    */
   get isOpenDoor() {
     if ( !this.objects.size ) return false;
-    const { moveToken, tokenBlockType } = this.constructor;
+    const { moveToken } = this.constructor;
     return this.objects.every(obj =>
       (obj instanceof Wall) ? obj.isOpen
-        : (obj instanceof Token ) ? !WallTracerEdge.tokenEdgeBlocks(obj, moveToken, tokenBlockType)
+        : (obj instanceof Token ) ? !ERSceneGraph.tokenEdgeBlocks(obj, moveToken, moveToken.elevationZ, this.tokenBlockType)
           : true);
   }
 
@@ -187,10 +187,10 @@ export class BorderEdge {
       return ccwBlocks || cwBlocks;
     }
 
-    const { moveToken, tokenBlockType } = this.constructor;
+    const { moveToken } = this.constructor;
     return this.objects.some(obj => {
-      if ( obj instanceof Wall ) return WallTracerEdge.wallBlocks(obj, origin, moveToken, elevation);
-      if ( obj instanceof Token ) return WallTracerEdge.tokenEdgeBlocks(obj, moveToken, tokenBlockType, elevation);
+      if ( obj instanceof Wall ) return ERSceneGraph.wallBlocks(obj, origin, moveToken, elevation);
+      if ( obj instanceof Token ) return ERSceneGraph.tokenEdgeBlocks(obj, moveToken, elevation, this.tokenBlockType);
       return false;
     });
   }

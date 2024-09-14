@@ -10,11 +10,11 @@ ui
 import { MODULE_ID, OTHER_MODULES } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { log } from "./util.js";
-import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
 import { PATCHER } from "./patching.js";
 import { BorderEdge } from "./pathfinding/BorderTriangle.js";
 import { updatePathfindingControl } from "./module.js";
+import { registerSceneGraph, deRegisterSceneGraph } from "./geometry/registration.js";
 
 const SETTINGS = {
   CONTROLS: {
@@ -495,10 +495,9 @@ export class Settings extends ModuleSettingsAbstract {
   }
 
   static #enablePathfinding() {
-    PATCHER.registerGroup("PATHFINDING");
-
     const t0 = performance.now();
-    SCENE_GRAPH._reset();
+    registerSceneGraph(MODULE_ID, { tokens: this.useTokensInPathfinding });
+    PATCHER.registerGroup("PATHFINDING");
     this.setTokenBlocksPathfinding();
     const t1 = performance.now();
 
@@ -519,30 +518,19 @@ export class Settings extends ModuleSettingsAbstract {
   static #disablePathfinding() {
     PATCHER.deregisterGroup("PATHFINDING_TOKENS");
     PATCHER.deregisterGroup("PATHFINDING");
-    SCENE_GRAPH.clear();
+    deRegisterSceneGraph(MODULE_ID);
     Pathfinder.dirty = true;
   }
-
 
   static setTokenBlocksPathfinding(blockSetting) {
     blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
     BorderEdge.tokenBlockType = this._tokenBlockType(blockSetting);
     if ( !Settings.get(Settings.KEYS.PATHFINDING.ENABLE) ) return;
 
-    if ( this.useTokensInPathfinding ) {
-      PATCHER.registerGroup("PATHFINDING_TOKENS");
-      for ( const token of canvas.tokens.placeables ) SCENE_GRAPH.addToken(token);
-    } else {
-      PATCHER.deregisterGroup("PATHFINDING_TOKENS");
-      SCENE_GRAPH.tokenIds.forEach(id => SCENE_GRAPH.removeToken(id));
-    }
-
+    registerSceneGraph(MODULE_ID, { tokensOnly: this.useTokensInPathfinding });
+    if ( this.useTokensInPathfinding ) PATCHER.registerGroup("PATHFINDING_TOKENS");
+    else PATCHER.deregisterGroup("PATHFINDING_TOKENS");
     Pathfinder.dirty = true;
-    const res = SCENE_GRAPH._checkInternalConsistency();
-    if ( !res.allConsistent ) {
-      log("WallTracer|setTokenBlocksPathfinding resulted in inconsistent graph.", SCENE_GRAPH, res);
-      SCENE_GRAPH._reset();
-    }
   }
 
   static get useTokensInPathfinding() {

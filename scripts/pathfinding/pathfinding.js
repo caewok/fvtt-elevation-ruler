@@ -13,7 +13,7 @@ import { BorderTriangle, BorderEdge } from "./BorderTriangle.js";
 import { boundsForPoint, segmentBounds, log } from "../util.js";
 import { Draw } from "../geometry/Draw.js";
 import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./algorithms.js";
-import { SCENE_GRAPH } from "./WallTracer.js";
+import { ERSceneGraph } from "./WallTracer.js";
 import { cdt2dConstrainedGraph, cdt2dToBorderTriangles } from "../delaunator/cdt2d_access_functions.js";
 import { Settings } from "../settings.js";
 import { MODULE_ID } from "../const.js";
@@ -192,7 +192,7 @@ export class Pathfinder {
 
   static _buildTriangles() {
     const { borderTriangles, quadtree, triangleEdges } = this;
-    const triCoords = cdt2dConstrainedGraph(SCENE_GRAPH);
+    const triCoords = cdt2dConstrainedGraph(CONFIG.GeometryLib.SceneGraph.SCENE_GRAPH);
     cdt2dToBorderTriangles(triCoords, borderTriangles);
     BorderTriangle.linkTriangleEdges(borderTriangles);
     borderTriangles.forEach(tri => quadtree.insert({ r: tri.bounds, t: tri }));
@@ -209,7 +209,7 @@ export class Pathfinder {
   static _linkObjectsToEdges() {
     // Set the placeable objects, if any, for each triangle edge
     for ( const triEdge of this.triangleEdges.values() ) {
-      const graphEdge = SCENE_GRAPH.getEdgeByKeys(triEdge.a.key, triEdge.b.key);
+      const graphEdge = CONFIG.GeometryLib.SceneGraph.SCENE_GRAPH.getEdgeByKeys(triEdge.a.key, triEdge.b.key);
       graphEdge.forEach(edge => edge.objects.forEach(obj => triEdge.objects.add(obj)));
     }
   }
@@ -788,16 +788,17 @@ function hasAnyCollisions(a, b, token) {
  * @param {PIXI.Point} a          Origin point for the move
  * @param {PIXI.Point} b          Destination point for the move
  * @param {Token} token           Token that is moving
+ * @param {CONST.TOKEN_DISPOSITIONS} tokenBlockType
  * @returns {boolean}
  */
 export function hasCollision(a, b, token) {
+  tokenBlockType ??= CONST.TOKEN_DISPOSITIONS.SECRET;
   const lineSegmentIntersects = foundry.utils.lineSegmentIntersects;
-  const tokenBlockType = Settings._tokenBlockType();
   // SCENE_GRAPH has way less edges than Pathfinder and has quadtree for the edges.
   // Edges are WallTracerEdge
-  const edges = SCENE_GRAPH.edgesQuadtree.getObjects(segmentBounds(a, b));
+  const edges = CONFIG.GeometryLib.SceneGraph.SCENE_GRAPH.edgesQuadtree.getObjects(segmentBounds(a, b));
   return edges.some(edge => lineSegmentIntersects(a, b, edge.A, edge.B)
-    && edge.edgeBlocks(a, token, tokenBlockType, token.elevationZ));
+    && ERSceneGraph.edgeBlocks(edge, a, token, token.elevationZ));
 }
 
 /**
