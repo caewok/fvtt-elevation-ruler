@@ -359,7 +359,6 @@ function _getMeasurementSegments(wrapped) {
       RegionMovementWaypoint3d.fromObject(lastSegment.ray.B)
     );
 
-
     // Determine the region path.
     pathPoints.length = 0;
     const ElevationHandler = OTHER_MODULES.TERRAIN_MAPPER.API.ElevationHandler;
@@ -373,12 +372,13 @@ function _getMeasurementSegments(wrapped) {
       const flying = movementTypeStart === MOVEMENT_TYPES.FLY || movementTypeEnd === MOVEMENT_TYPES.FLY;
       const burrowing = movementTypeStart === MOVEMENT_TYPES.BURROW || movementTypeEnd === MOVEMENT_TYPES.BURROW;
       const subPath = ElevationHandler.constructPath(prevPt, nextPt, { flying, burrowing, token });
+      log(`Subpath ${prevPt.x},${prevPt.y},${prevPt.z} -> ${nextPt.x},${nextPt.y},${nextPt.z}. Flying: ${flying}; burrowing: ${burrowing}.`, subPath);
       subPath.shift(); // Remove prevPt from the array.
       pathPoints.push(...subPath);
       prevPt = nextPt;
     }
     const t1 = performance.now();
-    log(`Found terrain path with ${pathPoints.length} points in ${t1-t0} ms.`);
+    log(`Found terrain path with ${pathPoints.length} points in ${t1-t0} ms.`, initialPath, pathPoints);
   }
   const t1 = performance.now();
   const key = `${lastSegment.ray.A.key}|${lastSegment.ray.B.key}`;
