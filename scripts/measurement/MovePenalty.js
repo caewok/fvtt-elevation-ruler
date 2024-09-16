@@ -552,7 +552,10 @@ export class MovePenalty {
     const bottomElevationFn = _pt => bottomZ;
     const topElevationFn = _pt => MAX_ELEV;
     const centeredShape = CONFIG.GeometryLib.utils.centeredPolygonFromDrawing(drawing);
-    return centeredShape.cutawayIntersections(start, end, { bottomElevationFn, topElevationFn });
+
+    // Multiple cutaways are possible for polygons.
+    const cutaways = centeredShape.cutaway(start, end, { bottomElevationFn, topElevationFn });
+    return cutaways.flatMap(cutaway => cutaway.intersectSegment3d(start, end));
   }
 
   /**
@@ -564,9 +567,12 @@ export class MovePenalty {
    * @returns {PIXI.Polygon[]} Null if no intersection
    */
   static tokenCutawayIntersections(start, end, token) {
-    const bottomElevationFn = _pt => token.bottomZ;
-    const topElevationFn = _pt => token.topZ;
-    return token.constrainedTokenBorder.cutawayIntersections(start, end, { bottomElevationFn, topElevationFn });
+    const bottomElevationFn = () => token.bottomZ;
+    const topElevationFn = () => token.topZ;
+
+    // Multiple cutaways are possible if the token is constrained (e.g., inset edge).
+    const cutaways = token.constrainedTokenBorder.cutaway(start, end, { bottomElevationFn, topElevationFn });
+    return cutaways.flatMap(cutaway => cutaway.intersectSegment3d(start, end));
   }
 }
 
