@@ -1,3 +1,11 @@
+# 0.10.11
+When snapping pathfinding to grid, avoid two waypoints within the same space when snapping is possible.
+Fix for ray undefined in cost measurement.
+Add invisibility to the default ignored statuses for pathfinding. Closes #202.
+Don't show movement penalty in the ruler labels if token has certain statuses, like hidden. Closes #200.
+Faster measurement of movement penalty through regions in conjunction with improvements added in Terrain Mapper v0.4.6.
+Update libGeometry to v0.3.14.
+
 # 0.10.10
 Improve how the pathfinding path is cleaned when snapping to grids to avoid weird backstepping issues. Should be a bit more aggressive in finding a viable grid-center path.
 Don't pathfind around hidden tokens. Closes #200.
