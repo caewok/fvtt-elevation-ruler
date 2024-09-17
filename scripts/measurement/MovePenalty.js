@@ -132,7 +132,7 @@ export class MovePenalty {
    * @returns {object}
    */
   static _constructTokenClone(token) {
-    const actor = new CONFIG.Actor.documentClass(token.actor.toObject());
+    const actor = new CONFIG.Actor.documentClass(token.actor.toObject(), {});
     const document = new CONFIG.Token.documentClass(token.document.toObject());
     const tClone = { document, actor, _original: token };
 
@@ -495,11 +495,13 @@ export class MovePenalty {
    */
   #initializeTokenClone() {
     const tClone = this.#localTokenClone;
-    const Terrain = CONFIG.terrainmapper.Terrain;
-    const tokenTerrains = Terrain.allOnToken(tClone);
-    if ( tokenTerrains.length ) {
-      CONFIG.terrainmapper.Terrain.removeFromTokenLocally(tClone, tokenTerrains, { refresh: false });
-      tClone.actor._initialize(); // This is slow
+    const Terrain = CONFIG.terrainmapper?.Terrain;
+    if ( Terrain ) {
+      const tokenTerrains = Terrain.allOnToken(tClone);
+      if ( tokenTerrains.length ) {
+        CONFIG.terrainmapper.Terrain.removeFromTokenLocally(tClone, tokenTerrains, { refresh: false });
+        tClone.actor._initialize(); // This is slow
+      }
     }
     return tClone;
   }
