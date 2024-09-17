@@ -20,11 +20,6 @@ const OTHER_DIRECTION = {
   cw: "ccw"
 };
 
-const OTHER_TRIANGLE = {
-  cwTriangle: "ccwTriangle",
-  ccwTriangle: "cwTriangle"
-};
-
 /**
  * An edge that makes up the triangle-shaped polygon
  */
@@ -187,10 +182,6 @@ export class BorderEdge {
    */
   edgeBlocks(origin, elevation = 0) {
     if ( !origin ) {
-//       if ( !this.ccwTriangle || !this.cwTriangle || !this.ccwTriangle.center || !this.cwTriangle.center) {
-//         console.warn("edgeBlocks|Triangle centers not defined.");
-//         return false;
-//       }
       const ccwBlocks = this.ccwTriangle ? this.edgeBlocks(this.ccwTriangle.center, elevation) : false;
       const cwBlocks = this.cwTriangle ? this.edgeBlocks(this.cwTriangle.center, elevation) : false;
       return ccwBlocks || cwBlocks;
@@ -243,7 +234,6 @@ export class BorderEdge {
   vertexBlocks(vertexKey, elevation = 0) {
     const iter = this.sharedVertexEdges(vertexKey);
     for ( const edge of iter ) {
-      // if ( !edge.ccwTriangle || !edge.cwTriangle ) console.warn("vertexBlocks|Edge triangles not defined."); // Debugging.
       if ( edge === this ) continue; // Could break here b/c this edge implicitly is always last.
       if ( edge.edgeBlocks(undefined, elevation) ) return true;
     }
@@ -473,10 +463,10 @@ export class BorderTriangle {
    * @param {Token} [token]                         Token doing the movement
    * @returns {PathNode[]}
    */
-  getValidDestinationsWithCost(priorTriangle, elevation, spacer, fromPoint, token) {
+  getValidDestinationsWithCost(priorTriangle, elevation, spacer, fromPoint, token, movePenaltyInstance) {
     const destinations = this.getValidDestinations(priorTriangle, elevation, spacer);
     destinations.forEach(d => {
-      d.cost = this._calculateMovementCost(fromPoint, d.entryPoint, token);
+      d.cost = this._calculateMovementCost(fromPoint, d.entryPoint, token, movePenaltyInstance);
 
       // NaN is bad--results in infinite loop; probably don't want to set NaN to 0 cost.
       if ( !Number.isFinite(d.cost) ) d.cost = 1e06;
@@ -492,17 +482,16 @@ export class BorderTriangle {
    * @param {Token} [token]                           Token doing the movement
    * @returns {number} Cost value
    */
-  _calculateMovementCost(fromPoint, toPoint, token) {
+  _calculateMovementCost(fromPoint, toPoint, token, movePenaltyInstance) {
     // TODO: Handle 3d distance. Probably Ray3d with measureDistance or measureDistances.
     // TODO: Handle terrain distance.
     const diagonals = Settings.get(Settings.KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE)
-        ? GridCoordinates3d.GRID_DIAGONALS.EUCLIDEAN : canvas.grid.diagonals;
+      ? GridCoordinates3d.GRID_DIAGONALS.EUCLIDEAN : canvas.grid.diagonals;
+    let distance;
     if ( CONFIG[MODULE_ID].pathfindingCheckTerrains ) {
-
-      const res = GridCoordinates3d.gridMeasurementForSegment(fromPoint, toPoint, 0, undefined, diagonals);
-      return CONFIG.GeometryLib.utils.gridUnitsToPixels(res.cost);
-    }
-    const distance = GridCoordinates3d.gridDistanceBetween(fromPoint, toPoint, undefined, diagonals);
+      const res = movePenaltyInstance.measureSegment(fromPoint, toPoint, { numPrevDiagonal: 0, diagonals });
+      distance = res.cost;
+    } else distance = GridCoordinates3d.gridDistanceBetween(fromPoint, toPoint, { diagonals });
     return CONFIG.GeometryLib.utils.gridUnitsToPixels(distance);
   }
 

@@ -359,7 +359,6 @@ function _getMeasurementSegments(wrapped) {
       RegionMovementWaypoint3d.fromObject(lastSegment.ray.B)
     );
 
-
     // Determine the region path.
     pathPoints.length = 0;
     const ElevationHandler = OTHER_MODULES.TERRAIN_MAPPER.API.ElevationHandler;
@@ -373,12 +372,13 @@ function _getMeasurementSegments(wrapped) {
       const flying = movementTypeStart === MOVEMENT_TYPES.FLY || movementTypeEnd === MOVEMENT_TYPES.FLY;
       const burrowing = movementTypeStart === MOVEMENT_TYPES.BURROW || movementTypeEnd === MOVEMENT_TYPES.BURROW;
       const subPath = ElevationHandler.constructPath(prevPt, nextPt, { flying, burrowing, token });
+      log(`Subpath ${prevPt.x},${prevPt.y},${prevPt.z} -> ${nextPt.x},${nextPt.y},${nextPt.z}. Flying: ${flying}; burrowing: ${burrowing}.`, subPath);
       subPath.shift(); // Remove prevPt from the array.
       pathPoints.push(...subPath);
       prevPt = nextPt;
     }
     const t1 = performance.now();
-    log(`Found terrain path with ${pathPoints.length} points in ${t1-t0} ms.`);
+    log(`Found terrain path with ${pathPoints.length} points in ${t1-t0} ms.`, initialPath, pathPoints);
   }
   const t1 = performance.now();
   const key = `${lastSegment.ray.A.key}|${lastSegment.ray.B.key}`;
@@ -495,9 +495,11 @@ function _getCostFunction() {
 
   // Construct a move penalty instance that covers all the segments.
   const movePenaltyInstance = this._movePenaltyInstance ??= new MovePenalty(this.token);
-  const path = this.segments.map(s => GridCoordinates3d.fromObject(s.ray.A));
-  path.push(GridCoordinates3d.fromObject(this.segments.at(-1).ray.B));
-  movePenaltyInstance.restrictToPath(path);
+  if ( this.segments.length ) {
+    const path = this.segments.map(s => GridCoordinates3d.fromObject(s.ray.A));
+    path.push(GridCoordinates3d.fromObject(this.segments.at(-1).ray.B));
+    movePenaltyInstance.restrictToPath(path);
+  }
   return (prevOffset, currOffset, offsetDistance) => {
     if ( !(prevOffset instanceof GridCoordinates3d) ) prevOffset = GridCoordinates3d.fromOffset(prevOffset);
     if ( !(currOffset instanceof GridCoordinates3d) ) currOffset = GridCoordinates3d.fromOffset(currOffset);

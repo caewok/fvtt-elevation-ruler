@@ -1,14 +1,11 @@
 /* globals
 canvas,
 CONFIG,
-CONST,
 game
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
-import { HexGridCoordinates3d } from "../geometry/3d/HexGridCoordinates3d.js";
 import { Point3d } from "../geometry/3d/Point3d.js";
 import { Settings } from "../settings.js";
 
@@ -25,19 +22,6 @@ PATCHES_GridlessGrid.BASIC = {};
 PATCHES_SquareGrid.BASIC = {};
 PATCHES_HexagonalGrid.BASIC = {};
 
-// Store the flipped key/values. And lock the keys.
-const CHANGE = {
-  NONE: 0,
-  V: 1,
-  H: 2,
-  D: 3,
-  E: 4
-};
-Object.entries(CHANGE).forEach(([key, value]) => CHANGE[value] = key);
-Object.freeze(CHANGE);
-
-
-// ----- NOTE: GridlessGrid ----- //
 
 /**
  * Wrap GridlessGrid#getDirectPath
@@ -51,6 +35,7 @@ function getDirectPathGridless(wrapped, waypoints) {
   if ( !(waypoints[0] instanceof Point3d) ) return offsets2d;
 
   // 1-to-1 relationship between the waypoints and the offsets2d for gridless.
+  const GridCoordinates3d = CONFIG.GeometryLib.threeD.GridCoordinates3d;
   return offsets2d.map((offset2d, idx) => {
     const offset3d = GridCoordinates3d.fromOffset(offset2d);
     const waypoint = GridCoordinates3d.fromObject(waypoints[idx]);
@@ -59,183 +44,29 @@ function getDirectPathGridless(wrapped, waypoints) {
   });
 }
 
-
-// ----- NOTE: SquareGrid ----- //
-
 /**
- * Constructs a direct path for a square grid, accounting for elevation and diagonal elevation
- * in a quasi-optimal manner. Spreads out the elevation moves over the course of the path.
- * Double-diagonals are slightly favored for some diagonal measurement
- * types, so this accounts for those by preferring to move elevation when moving 2d diagonally.
- * @param {RegionMovementWaypoint3d} start
- * @param {RegionMovementWaypoint3d} end
- * @param {GridOffset[]} [path2d]             Optional path2d for the start and end waypoints.
- * @returns {GridCoordinates3d[]}
+ * Wrap HexagonalGrid#getDirectPath and SquareGrid#getDirectPath
+ * Returns the sequence of grid offsets of a shortest, direct path passing through the given waypoints.
+ * @param {Point3d[]} waypoints            The waypoints the path must pass through
+ * @returns {GridOffset[]}                 The sequence of grid offsets of a shortest, direct path
+ * @abstract
  */
-function directPath3dSquare(start, end) {
-  start = GridCoordinates3d.fromObject(start);
-  end = GridCoordinates3d.fromObject(end);
-  const points = CONFIG.GeometryLib.utils.bresenhamLine3d(start.i, start.j, start.k, end.i, end.j, end.k);
-  const path3d = [start];
-  // Convert points to GridCoordinates3d. Start and end repeat; skip.
-  for ( let i = 3, n = points.length - 3; i < n; i += 3 ) path3d.push(GridCoordinates3d.fromOffset({
-    i: points[i],
-    j: points[i + 1],
-    k: points[i + 2] }));
-  path3d.push(end);
+function getDirectPathGridded(wrapped, waypoints) {
+  const { HexGridCoordinates3d, GridCoordinates3d } = CONFIG.GeometryLib.threeD;
+
+  if ( !(waypoints[0] instanceof Point3d) ) return wrapped(waypoints);
+  let prevWaypoint = GridCoordinates3d.fromObject(waypoints[0]);
+  const path3d = [];
+  const path3dFn = canvas.grid.isHexagonal ? HexGridCoordinates3d._directPathHex : GridCoordinates3d._directPathSquare;
+  for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
+    const currWaypoint = GridCoordinates3d.fromObject(waypoints[i]);
+    const segments3d = path3dFn(prevWaypoint, currWaypoint);
+    path3d.push(...segments3d);
+    prevWaypoint = currWaypoint;
+  }
   return path3d;
 }
 
-/**
- * Construct a function to determine the offset cost for this canvas for a single 3d move on a square grid.
- * @param {number} numDiagonals
- * @returns {function}
- *   - @param {GridCoordinates3d} prevOffset
- *   - @param {GridCoordinates3d} currOffset
- *   - @returns {number}
- */
-function singleOffsetSquareDistanceFn(numDiagonals = 0) {
-  const diagonals = canvas.grid.diagonals ?? game.settings.get("core", "gridDiagonals");
-  const D = CONST.GRID_DIAGONALS;
-  let nDiag = numDiagonals;
-  let fn;
-  if ( diagonals === D.ALTERNATING_1 || diagonals === D.ALTERNATING_2 ) {
-    const kFn = diagonals === D.ALTERNATING_2
-      ? () => nDiag & 1 ? 2 : 1
-      : () => nDiag & 1 ? 1 : 2;
-    fn = (prevOffset, currOffset) => {
-      const isElevationMove = prevOffset.k !== currOffset.k;
-      const isStraight2dMove = (prevOffset.i === currOffset.i) ^ (prevOffset.j === currOffset.j);
-      const isDiagonal2dMove = (prevOffset.i !== currOffset.i) && (prevOffset.j !== currOffset.j);
-      const s = isStraight2dMove || (!isDiagonal2dMove && isElevationMove);
-      const d1 = isDiagonal2dMove && !isElevationMove;
-      const d2 = isDiagonal2dMove && isElevationMove;
-      if ( d1 || d2 ) nDiag++;
-      const k = kFn();
-      return (s + (k * d1) + (k * d2)) * canvas.grid.distance;
-    };
-  } else {
-    let k = 1;
-    let k2 = 1;
-    switch ( diagonals ) {
-      case D.EQUIDISTANT: k = 1; k2 = 1; break;
-      case D.EXACT: k = Math.SQRT2; k2 = Math.SQRT3; break;
-      case D.APPROXIMATE: k = 1.5; k2 = 1.75; break;
-      case D.RECTILINEAR: k = 2; k2 = 3; break;
-    }
-    fn = (prevOffset, currOffset) => {
-      const isElevationMove = prevOffset.k !== currOffset.k;
-      const isStraight2dMove = (prevOffset.i === currOffset.i) ^ (prevOffset.j === currOffset.j);
-      const isDiagonal2dMove = (prevOffset.i !== currOffset.i) && (prevOffset.j !== currOffset.j);
-      const s = isStraight2dMove || (!isDiagonal2dMove && isElevationMove);
-      const d1 = isDiagonal2dMove && !isElevationMove;
-      const d2 = isDiagonal2dMove && isElevationMove;
-      return (s + (k * d1) + (k2 * d2)) * canvas.grid.distance;
-    };
-  }
-  Object.defineProperty(fn, "diagonals", {
-    get: () => nDiag
-  });
-  return fn;
-}
-
-// ----- NOTE: HexagonalGrid ----- //
-
-/**
- * Constructs a direct path for a hex grid, accounting for elevation and diagonal elevation.
- * Spreads out the elevation moves over the course of the path.
- * For a hex grid, there is no "double diagonal" to worry about.
- * @param {RegionMovementWaypoint3d} start
- * @param {RegionMovementWaypoint3d} end
- * @param {GridOffset[]} [path2d]             Optional path2d for the start and end waypoints.
- * @returns {HexGridCoordinates3d[]}
- */
-function directPath3dHex(start, end) {
-  start = HexGridCoordinates3d.fromObject(start);
-  end = HexGridCoordinates3d.fromObject(end);
-  const points = CONFIG.GeometryLib.utils.bresenhamLine4d(
-    start.q, start.r, start.s, start.k,
-    end.q, end.r, end.s, end.k);
-  const path3d = [start];
-  // Convert points to GridCoordinates3d. Start and end repeat; skip.
-  for ( let i = 4, n = points.length - 4; i < n; i += 4 ) path3d.push(HexGridCoordinates3d.fromHexCube({
-    q: points[i],
-    r: points[i + 1],
-    s: points[i + 2],
-    k: points[i + 3] }));
-  path3d.push(end);
-  return path3d;
-}
-
-/**
- * Construct a function to determine the offset cost for this canvas for a single 3d move on a hex grid.
- * For hexes, the diagonal only occurs with an elevation + hex move.
- * @param {number} numDiagonals
- * @returns {function}
- *   - @param {GridCoordinates3d} prevOffset
- *   - @param {GridCoordinates3d} currOffset
- *   - @returns {number}
- */
-function singleOffsetHexDistanceFn(numDiagonals = 0) {
-  const diagonals = canvas.grid.diagonals ?? game.settings.get("core", "gridDiagonals");
-  const D = CONST.GRID_DIAGONALS;
-  let nDiag = numDiagonals;
-  let fn;
-  if ( diagonals === D.ALTERNATING_1 || diagonals === D.ALTERNATING_2 ) {
-    const kFn = diagonals === D.ALTERNATING_2
-      ? () => nDiag & 1 ? 2 : 1
-      : () => nDiag & 1 ? 1 : 2;
-    fn = (prevOffset, currOffset) => {
-      // For hex moves, no diagonal 2d. Just diagonal if both elevating and moving in 2d.
-      const isElevationMove = prevOffset.k !== currOffset.k;
-      const is2dMove = prevOffset.i !== currOffset.i || prevOffset.j !== currOffset.j;
-      const s = isElevationMove ^ is2dMove;
-      const d = !s;
-      nDiag += d;
-      const k = kFn();
-      return (s + (k * d)) * canvas.grid.distance;
-    };
-  } else {
-    let k = 1;
-    switch ( diagonals ) {
-      case D.EQUIDISTANT: k = 1; break;
-      case D.EXACT: k = Math.SQRT2; break;
-      case D.APPROXIMATE: k = 1.5; break;
-      case D.RECTILINEAR: k = 2; break;
-    }
-    fn = (prevOffset, currOffset) => {
-      const isElevationMove = prevOffset.k !== currOffset.k;
-      const is2dMove = prevOffset.i !== currOffset.i || prevOffset.j !== currOffset.j;
-      const s = isElevationMove ^ is2dMove;
-      const d = !s;
-      return (s + (k * d)) * canvas.grid.distance;
-    };
-  }
-  Object.defineProperty(fn, "diagonals", {
-    get: () => nDiag
-  });
-  return fn;
-}
-
-/**
- * Get the function to measure the offset distance for a given distance with given previous diagonals.
- * @param {number} [diagonals=0]
- * @returns {function}
- */
-export function getOffsetDistanceFn(diagonals = 0) {
-  let offsetDistanceFn;
-  switch ( canvas.grid.type ) {
-    case CONST.GRID_TYPES.GRIDLESS:
-      offsetDistanceFn = (a, b) => CONFIG.GeometryLib.utils.pixelsToGridUnits(Point3d.distanceBetween(a, b));
-      break;
-    case CONST.GRID_TYPES.SQUARE:
-      offsetDistanceFn = singleOffsetSquareDistanceFn(diagonals);
-      break;
-    default: // All hex grids
-      offsetDistanceFn = singleOffsetHexDistanceFn(diagonals);
-  }
-  return offsetDistanceFn;
-}
 
 /**
  * Measure a path for a gridded scene. Handles hex and square grids.
@@ -247,6 +78,7 @@ export function getOffsetDistanceFn(diagonals = 0) {
  */
 function _measurePath(wrapped, waypoints, { cost }, result) {
   if ( !(waypoints[0] instanceof Point3d) ) return wrapped(waypoints, { cost }, result);
+  const GridCoordinates3d = CONFIG.GeometryLib.threeD.GridCoordinates3d;
   initializeResultObject(result);
   result.waypoints.forEach(waypoint => initializeResultObject(waypoint));
   result.segments.forEach(segment => initializeResultObject(segment));
@@ -259,7 +91,7 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
   // Copy the waypoint so it can be manipulated.
   let start = waypoints[0];
   cost ??= (prevOffset, currOffset, offsetDistance) => offsetDistance;
-  const offsetDistanceFn = getOffsetDistanceFn(0); // Diagonals = 0.
+  const offsetDistanceFn = GridCoordinates3d.getOffsetDistanceFn(0); // Diagonals = 0.
   const altGridDistanceFn = GridCoordinates3d.alternatingGridDistanceFn();
   let diagonals = canvas.grid.diagonals ?? game.settings.get("core", "gridDiagonals");
   const D = GridCoordinates3d.GRID_DIAGONALS;
@@ -304,27 +136,6 @@ function _measurePath(wrapped, waypoints, { cost }, result) {
 
 
   return result;
-}
-
-/**
- * Wrap HexagonalGrid#getDirectPath and SquareGrid#getDirectPath
- * Returns the sequence of grid offsets of a shortest, direct path passing through the given waypoints.
- * @param {Point3d[]} waypoints            The waypoints the path must pass through
- * @returns {GridOffset[]}                 The sequence of grid offsets of a shortest, direct path
- * @abstract
- */
-function getDirectPathGridded(wrapped, waypoints) {
-  if ( !(waypoints[0] instanceof Point3d) ) return wrapped(waypoints);
-  let prevWaypoint = GridCoordinates3d.fromObject(waypoints[0]);
-  const path3d = [];
-  const path3dFn = canvas.grid.isHexagonal ? directPath3dHex : directPath3dSquare;
-  for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
-    const currWaypoint = GridCoordinates3d.fromObject(waypoints[i]);
-    const segments3d = path3dFn(prevWaypoint, currWaypoint);
-    path3d.push(...segments3d);
-    prevWaypoint = currWaypoint;
-  }
-  return path3d;
 }
 
 // ----- NOTE: Patches ----- //
