@@ -4,6 +4,7 @@ Fix for ray undefined in cost measurement.
 Add invisibility to the default ignored statuses for pathfinding. Closes #202.
 Don't show movement penalty in the ruler labels if token has certain statuses, like hidden. Closes #200.
 Faster measurement of movement penalty through regions in conjunction with improvements added in Terrain Mapper v0.4.6.
+Fix for ruler not functioning in sfrpg. Closes #206.
 Update libGeometry to v0.3.14.
 
 # 0.10.10
