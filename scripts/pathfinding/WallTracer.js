@@ -407,7 +407,16 @@ export class WallTracerEdge extends GraphEdge {
 
     // Don't block dead tokens (HP <= 0).
     const { tokenHPAttribute, pathfindingIgnoreStatuses } = CONFIG[MODULE_ID];
-    const tokenHP = Number(foundry.utils.getProperty(token, tokenHPAttribute));
+    let tokenHP = Number(foundry.utils.getProperty(token, tokenHPAttribute));
+    
+    //DemonLord using damage system
+    if ( game.system.id === 'demonlord')
+       {
+        let health = Number(foundry.utils.getProperty(token, "actor.system.characteristics.health.max"));
+        let damage = Number(foundry.utils.getProperty(token, "actor.system.characteristics.health.value"));
+        tokenHP = health - damage;
+       }
+
     if ( Number.isFinite(tokenHP) && tokenHP <= 0 ) return false;
 
     // Don't block tokens with certain status.
