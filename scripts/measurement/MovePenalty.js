@@ -132,7 +132,8 @@ export class MovePenalty {
    * @returns {object}
    */
   static _constructTokenClone(token) {
-    const actor = new CONFIG.Actor.documentClass(token.actor.toObject(), {});
+    // const actor = new CONFIG.Actor.documentClass(token.actor.toObject(), {});
+    const actor = token.actor.clone();
     const document = new CONFIG.Token.documentClass(token.document.toObject());
     const tClone = { document, actor, _original: token };
 
