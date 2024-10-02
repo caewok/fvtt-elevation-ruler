@@ -187,7 +187,7 @@ function _broadcastMeasurement(wrapped) {
     && this.token
     && (this.token.document.disposition === CONST.TOKEN_DISPOSITIONS.SECRET
      || this.token.document.hasStatusEffect(CONFIG.specialStatusEffects.INVISIBLE)
-     || this.token.document.isHidden) ) return;
+     || this.token.document.hidden) ) return;
 
   wrapped();
 }

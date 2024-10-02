@@ -210,7 +210,9 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
   // (2) Extra text
   // Strip out any custom text from the original label.
   // Format for Foundry Default: '0 ft [0 ft]'
+  const tmpLabel = origLabel;
   origLabel = origLabel.replace(getDefaultLabel(segment), "");
+  if ( origLabel !== "" ) console.debug(`Ruler original label: ${origLabel}`);
 
   // (3) Waypoint
   if ( segment.last && segment.waypoint.idx > 0 ) childLabels.waypoint = {
@@ -305,10 +307,12 @@ function getDefaultLabel(segment) {
   // Label based on Foundry default _getSegmentLabel.
   if ( segment.teleport ) return "";
   const units = canvas.grid.units;
-  let label = `${Math.round(roundMultiple(segment.waypoint.distance) * 100) / 100}`;
+
+  // As modified in _getSegmentLabel wrap.
+  let label = `${Math.round(roundMultiple(segment.waypoint.cost) * 100) / 100}`;
   if ( units ) label += ` ${units}`;
   if ( segment.last ) {
-    label += ` [${Math.round(canvas.controls.ruler.totalDistance * 100) / 100}`;
+    label += ` [${Math.round(canvas.controls.ruler.totalCost * 100) / 100}`;
     if ( units ) label += ` ${units}`;
     label += "]";
   }

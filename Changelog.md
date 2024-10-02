@@ -1,3 +1,9 @@
+# 0.10.12
+Fixes for calculating movement penalty in drawings.
+Avoid displaying the default ruler label in some situations when using the custom label. Closes issue #212.
+Fix for PF2e speed not displaying correctly. Closes issue #211.
+Fix for user seeing the GM ruler when moving hidden tokens. Closes issue #207.
+
 # 0.10.11
 When snapping pathfinding to grid, avoid two waypoints within the same space when snapping is possible.
 Fix for ray undefined in cost measurement.

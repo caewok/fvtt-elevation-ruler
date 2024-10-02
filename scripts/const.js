@@ -128,13 +128,27 @@ function keyForValue(object, value) {
 
 /**
  * Given a token, retrieve its base speed.
- * @param {Token} token                   Token whose speed is required
+ * @param {Token} token                     Token whose speed is required
+ * @param {MOVEMENT_TYPES} [movementType]   Type of movement; if omitted automatically determined
  * @returns {number|null} Distance, in grid units. Null if no speed provided for that category.
  *   (Null will disable speed highlighting.)
  */
-SPEED.tokenSpeed = function(token) {
-  const moveType = token.movementType;
-  const speed = foundry.utils.getProperty(token, SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, moveType)]);
+SPEED.tokenSpeed = function(token, movementType) {
+  movementType ??= token.movementType;
+  const speed = foundry.utils.getProperty(token, SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, movementType)]);
   if ( speed === null ) return null;
   return Number(speed);
 };
+
+/**
+ * Temporarily set the speed attribute for a token. Only sets locally; does not hit the database.
+ * @param {number} value                    Speed to set
+ * @param {Token} token                     Token on which to set the speed property
+ * @param {MOVEMENT_TYPES} [movementType]   Type of movement; if omitted automatically determined
+ */
+SPEED.setTokenSpeed = function(value, token, movementType) {
+  movementType ??= token.movementType;
+  const key = SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, movementType)];
+  if ( !key ) return
+  foundry.utils.setProperty(token, key, value);
+}

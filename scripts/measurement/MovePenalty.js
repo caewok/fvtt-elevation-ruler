@@ -1,7 +1,6 @@
 /* globals
 canvas,
 CONFIG,
-foundry,
 game,
 PIXI
 */
@@ -11,7 +10,7 @@ PIXI
 import { MODULE_ID, FLAGS, OTHER_MODULES, SPEED, MOVEMENT_TYPES } from "../const.js";
 import { Settings } from "../settings.js";
 import { movementType } from "../token_hud.js";
-import { log, keyForValue } from "../util.js";
+import { log } from "../util.js";
 
 /*
 Class to measure penalty, as percentage of distance, between two points.
@@ -57,15 +56,15 @@ export class MovePenalty {
    */
   #localTokenClone;
 
-  /** @type {string} */
-  speedAttribute = "";
+  /** @type {MOVEMENT_TYPES} */
+  movementType = MOVEMENT_TYPES.WALK;
 
   /**
    * @param {Token} moveToken               The token doing the movement
    */
   constructor(moveToken) {
     this.moveToken = moveToken;
-    this.speedAttribute = SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, moveToken.movementType)];
+    this.movementType = moveToken.movementType;
     const tokenMultiplier = this.constructor.tokenMultiplier;
     const terrainAPI = this.constructor.terrainAPI;
 
@@ -132,7 +131,8 @@ export class MovePenalty {
    * @returns {object}
    */
   static _constructTokenClone(token) {
-    const actor = new CONFIG.Actor.documentClass(token.actor.toObject(), {});
+    // Alternative to clone(): const actor = new CONFIG.Actor.documentClass(token.actor.toObject(), {});
+    const actor = token.actor.clone();
     const document = new CONFIG.Token.documentClass(token.document.toObject());
     const tClone = { document, actor, _original: token };
 
@@ -459,6 +459,8 @@ export class MovePenalty {
       ix = nextIx;
     }
 
+    // console.debug(`_penaltiesForIntersections|${start.x},${start.y},${start.z} -> ${end.x},${end.y},${end.z}`, calcSteps, cutawayIxs);
+
     // Make sure the token clone speed is reset.
     if ( testRegions ) speedFn();
 
@@ -507,9 +509,9 @@ export class MovePenalty {
   }
 
   /** @type {number} */
-  get _tokenCloneSpeed() { return foundry.utils.getProperty(this.#localTokenClone, this.speedAttribute) || 1; }
+  get _tokenCloneSpeed() { return SPEED.tokenSpeed(this.#localTokenClone, this.movementType) || 1; }
 
-  set _tokenCloneSpeed(value) { foundry.utils.setProperty(this.#localTokenClone, this.speedAttribute, value); }
+  set _tokenCloneSpeed(value) { SPEED.setTokenSpeed(value, this.#localTokenClone, this.movementType); }
 
   /**
    * Set up the token clone for measurement and return a function that can get the token speed.
@@ -556,8 +558,21 @@ export class MovePenalty {
     const centeredShape = CONFIG.GeometryLib.utils.centeredPolygonFromDrawing(drawing);
 
     // Multiple cutaways are possible for polygons.
-    const cutaways = centeredShape.cutaway(start, end, { bottomElevationFn, topElevationFn });
-    return cutaways.flatMap(cutaway => cutaway.intersectSegment3d(start, end));
+    // Use the full drawing shape b/c we need to test for actual intersections with the shape.
+    // Can get by extending the start and end points to the canvas edge.
+    const dist = -canvas.dimensions.maxR;
+    const a = start.towardsPoint(end, dist);
+    const b = end.towardsPoint(start, dist);
+    const cutaways = centeredShape.cutaway(a, b, { start, end, bottomElevationFn, topElevationFn });
+    return cutaways.flatMap(cutaway => {
+      const ixs = cutaway.intersectSegment3d(start, end);
+      if ( cutaway.contains3d(start) ) {
+        const pt = cutaway._to2d(start);
+        pt.movingInto = true;
+        ixs.push(pt);
+      }
+      return ixs;
+    });
   }
 
   /**
@@ -573,8 +588,21 @@ export class MovePenalty {
     const topElevationFn = () => token.topZ;
 
     // Multiple cutaways are possible if the token is constrained (e.g., inset edge).
-    const cutaways = token.constrainedTokenBorder.cutaway(start, end, { bottomElevationFn, topElevationFn });
-    return cutaways.flatMap(cutaway => cutaway.intersectSegment3d(start, end));
+    // Use the full token shape b/c we need to test for actual intersections with the shape.
+    // Can get by extending the start and end points to the canvas edge.
+    const dist = -canvas.dimensions.maxR;
+    const a = start.towardsPoint(end, dist);
+    const b = end.towardsPoint(start, dist);
+    const cutaways = token.constrainedTokenBorder.cutaway(a, b, { start, end, bottomElevationFn, topElevationFn });
+    return cutaways.flatMap(cutaway => {
+      const ixs = cutaway.intersectSegment3d(start, end);
+      if ( cutaway.contains3d(start) ) {
+        const pt = cutaway._to2d(start);
+        pt.movingInto = true;
+        ixs.push(pt);
+      }
+      return ixs;
+    });
   }
 }
 
