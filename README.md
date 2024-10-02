@@ -23,16 +23,16 @@ Elevation can be changed while using the ruler (default: '[' to increment and ']
 When dragging a token, the ruler will automatically appear if you have enabled "Token Ruler" in the module settings. To set waypoints when dragging a token, hit the specified hotkey (default '=' to add and '-' to remove). To adjust the colors that appear for designated speeds see [Setting speed colors](#setting-speed-colors). If you would like specific system support, please feel free to submit a git issue.
 
 ## Movement speed / history
-Elevation Ruler supports coloring the ruler highlighting to represent token speeds based on various systems. The user can also control whether the speed for walking, burrowing, or flying should be used by changing the setting on the token hud. Settings determine, on a per-user basis, whether the speed highlighting should always be used, only during combat, or never. The GM can also from users the speeds of hostile tokens. Movement history during combat can also be tracked. 
+Elevation Ruler supports coloring the ruler highlighting to represent token speeds based on various systems. The user can also control whether the speed for walking, burrowing, or flying should be used by changing the setting on the token hud. Settings determine, on a per-user basis, whether the speed highlighting should always be used, only during combat, or never. The GM can also from users the speeds of hostile tokens. Movement history during combat can also be tracked.
 
 ## Pathfinding
 [Screen Recording 2024-06-04 at 4.26.31 PM.webm](https://github.com/caewok/fvtt-elevation-ruler/assets/1267134/1efca6e2-41b1-4cdb-87a3-2fb5e48be5cd)
 
-As of version 0.8.0, a button in the Token controls enables pathfinding for the ruler (or Token Ruler, when enabled). Pathfinding works on gridded (both hex and square) and gridless maps. If using the ruler, start a measurement at a token in order to start pathfinding. 
+As of version 0.8.0, a button in the Token controls enables pathfinding for the ruler (or Token Ruler, when enabled). Pathfinding works on gridded (both hex and square) and gridless maps. If using the ruler, start a measurement at a token in order to start pathfinding.
 
-Settings allow you to designate all tokens or hostile tokens as spaces to be avoided. 
+Settings allow you to designate all tokens or hostile tokens as spaces to be avoided.
 
-To enable/disable pathfinding, toggle the pathfinding icon in the token controls (upper left controls in Foundry). You can also hold the specified hotkey (default 'P').  
+To enable/disable pathfinding, toggle the pathfinding icon in the token controls (upper left controls in Foundry). You can also hold the specified hotkey (default 'P').
 
 ## Module history
 As of v0.7, Elevation Ruler adds a setting to display the Foundry ruler when dragging tokens.
@@ -53,7 +53,6 @@ Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/
 ## Modules that add functionality
 - [Wall Height](https://github.com/erithtotl/FVTT-Wall-Height). For defining limited-height walls.
 - [Terrain Mapper](https://github.com/caewok/fvtt-terrain-mapper). In v12, use Terrain Mapper to define elevation for regions.
-- [PF2E Elevation Ruler](https://github.com/7H3LaughingMan/pf2e-elevation-ruler). Defines token speed colors for the PF2e system.
 - [TDE5/DSA5 Elevation Ruler](https://github.com/Rapunzel77/dsa5-elevation-ruler-integration). Defines token speeds and colors for Das Schwarze Auge (TDE/DSA)
 - [Lancer Ruler Integration](https://foundryvtt.com/packages/lancer-speed-provider). Defines token speeds and colors and handles speed changes based on conditions for LANCER
 
@@ -61,6 +60,8 @@ Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/
 - [Terrain Ruler](https://github.com/manuelVo/foundryvtt-terrain-ruler)
 - [Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer)
 - [Drag Ruler](https://github.com/manuelVo/foundryvtt-drag-ruler). Elevation ruler v0.6 series worked with Drag Ruler, but v0.7+ no longer supports Drag Ruler.
+- [Dynamic Active Effects](https://gitlab.com/tposney/dae). DAE interferes with the  active effects used by Terrain Mapper from being calculated for movement penalties in Elevation Ruler. The effect appears to be applied but the movement penalty when moving over the region will not be calculated correctly. Elevation Ruler should otherwise work with DAE.
+- Pathfinder 2e system. The movement penalty calculation for Terrain Mapper regions may not be correctly calculated because PF2e does not use the Foundry active effects system (and current workarounds are limited). Other speed calculations for tokens should work, and Elevation Ruler should otherwise work with PF2e.
 
 In general, modules that overwrite or extend the Ruler Class may cause the elevation ruler module to fail to display or calculate correctly.
 
@@ -195,7 +196,7 @@ const MaximumSpeedCategory = {
   multiplier: Number.POSITIVE_INFINITY
 };
 ```
-Categories are processed in order in the `SPEED.CATEGORIES` array. Usually (unless you modify the `SPEED.maximumCategoryDistance` function per below) you would want the categories sorted from smallest to largest multiplier. For example, a token with speed 30 could walk for 30 * 1 grid units, and dash for 30 * 2 = 60 grid units. So the first 30 grid units would be highlighted for walk, the next 30 highlighted for dash, and everything beyond that highlighted with the maximum color. 
+Categories are processed in order in the `SPEED.CATEGORIES` array. Usually (unless you modify the `SPEED.maximumCategoryDistance` function per below) you would want the categories sorted from smallest to largest multiplier. For example, a token with speed 30 could walk for 30 * 1 grid units, and dash for 30 * 2 = 60 grid units. So the first 30 grid units would be highlighted for walk, the next 30 highlighted for dash, and everything beyond that highlighted with the maximum color.
 
 If you have a specific system that you would like supported by default, please open a Git issue and explain how the system measures speed and, preferably, what properties need to be changed.
 
