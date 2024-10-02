@@ -3,6 +3,7 @@ Fixes for calculating movement penalty in drawings.
 Avoid displaying the default ruler label in some situations when using the custom label. Closes issue #212.
 Fix for PF2e speed not displaying correctly. Closes issue #211.
 Fix for user seeing the GM ruler when moving hidden tokens. Closes issue #207.
+Add support for Shadow of the Demon Lord. Thanks @sasquach45932!
 
 # 0.10.11
 When snapping pathfinding to grid, avoid two waypoints within the same space when snapping is possible.
