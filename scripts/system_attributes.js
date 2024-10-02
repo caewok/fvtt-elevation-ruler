@@ -114,6 +114,7 @@ export function defaultWalkAttribute() {
     case "twodsix":       return "actor.system.movement.walk";
     case "worldofdarkness": return "actor.system.movement.walk";
     case "TheWitcherTRPG": return "actor.system.stats.spd.current";
+    case "demonlord":     return "actor.system.characteristics.speed";
     default:              return "";
   }
 }
@@ -169,6 +170,7 @@ export function defaultDashMultiplier() {
     case "dragonbane":
     case "twodsix":
     case "a5e":
+    case "demonlord":
     case "ds4":           return 2;
 
     case "CoC7":          return 5;
