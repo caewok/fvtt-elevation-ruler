@@ -1,7 +1,6 @@
 /* globals
 canvas,
 CONFIG,
-foundry,
 game,
 PIXI
 */
@@ -11,7 +10,7 @@ PIXI
 import { MODULE_ID, FLAGS, OTHER_MODULES, SPEED, MOVEMENT_TYPES } from "../const.js";
 import { Settings } from "../settings.js";
 import { movementType } from "../token_hud.js";
-import { log, keyForValue } from "../util.js";
+import { log } from "../util.js";
 
 /*
 Class to measure penalty, as percentage of distance, between two points.
@@ -57,15 +56,15 @@ export class MovePenalty {
    */
   #localTokenClone;
 
-  /** @type {string} */
-  speedAttribute = "";
+  /** @type {MOVEMENT_TYPES} */
+  movementType = MOVEMENT_TYPES.WALK;
 
   /**
    * @param {Token} moveToken               The token doing the movement
    */
   constructor(moveToken) {
     this.moveToken = moveToken;
-    this.speedAttribute = SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, moveToken.movementType)];
+    this.movementType = moveToken.movementType;
     const tokenMultiplier = this.constructor.tokenMultiplier;
     const terrainAPI = this.constructor.terrainAPI;
 
@@ -352,7 +351,6 @@ export class MovePenalty {
    * @returns {CutawayIntersection[]} Polygon with an associated object.
    */
   _cutawayIntersections(start, end) {
-    const start2d = CONFIG.GeometryLib.utils.cutaway.to2d(start, start, end);
     const cutawayIxs = [];
     if ( this.constructor.terrainAPI ) {
       for ( const region of this.pathRegions ) {
@@ -511,9 +509,9 @@ export class MovePenalty {
   }
 
   /** @type {number} */
-  get _tokenCloneSpeed() { return foundry.utils.getProperty(this.#localTokenClone, this.speedAttribute) || 1; }
+  get _tokenCloneSpeed() { return SPEED.tokenSpeed(this.#localTokenClone, this.movementType) || 1; }
 
-  set _tokenCloneSpeed(value) { foundry.utils.setProperty(this.#localTokenClone, this.speedAttribute, value); }
+  set _tokenCloneSpeed(value) { SPEED.setTokenSpeed(value, this.#localTokenClone, this.movementType); }
 
   /**
    * Set up the token clone for measurement and return a function that can get the token speed.
@@ -569,7 +567,7 @@ export class MovePenalty {
     return cutaways.flatMap(cutaway => {
       const ixs = cutaway.intersectSegment3d(start, end);
       if ( cutaway.contains3d(start) ) {
-        const pt = cutaway._to2d(start)
+        const pt = cutaway._to2d(start);
         pt.movingInto = true;
         ixs.push(pt);
       }
@@ -599,7 +597,7 @@ export class MovePenalty {
     return cutaways.flatMap(cutaway => {
       const ixs = cutaway.intersectSegment3d(start, end);
       if ( cutaway.contains3d(start) ) {
-        const pt = cutaway._to2d(start)
+        const pt = cutaway._to2d(start);
         pt.movingInto = true;
         ixs.push(pt);
       }
