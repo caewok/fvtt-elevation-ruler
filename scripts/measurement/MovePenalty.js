@@ -522,7 +522,12 @@ export class MovePenalty {
   #tokenCloneSpeedFn() {
     const initialSpeed = this._tokenCloneSpeed;
     return (reset = true) => {
+//       console.time("applyActiveEffects")
       this.#localTokenClone.actor.applyActiveEffects();
+//       console.timeEnd("applyActiveEffects")
+//       console.time("prepareActorData")
+//       this.#localTokenClone.actor.prepareData();
+//       console.timeEnd("prepareActorData")
       const currSpeed = this._tokenCloneSpeed;
       if ( reset ) this._tokenCloneSpeed = initialSpeed;
       return currSpeed;
