@@ -1,6 +1,6 @@
 # 0.10.13
-Use a cached map to track move penalties for different region combinations. Improves compatibility with DAE. Addresses #209.
-
+Use a cached map to track move penalties for different region combinations. Improves compatibility with DAE while not severely impacting performance. Addresses #209.
+Use a mixed wrap instead of override for `Ruler#_computeDistance`, which improves compatibility with some systems, like dnd4e. Closes #213.
 
 # 0.10.12
 Fixes for calculating movement penalty in drawings.
