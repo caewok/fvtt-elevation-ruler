@@ -40,7 +40,7 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
   // Precalculate the token speed.
   // We need the speed without the terrains. Use the MovePenalty to determine.
   const mp = ruler._movePenaltyInstance ??= new MovePenalty(token);
-  const tokenSpeed = mp._tokenCloneSpeed; // SPEED.tokenSpeed(token);
+  const tokenSpeed = mp.baseTokenSpeed;
 
   // Progress through each speed attribute in turn.
   const categoryIter = [...SPEED.CATEGORIES].values();
