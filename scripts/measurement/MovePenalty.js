@@ -169,6 +169,28 @@ export class MovePenalty {
 
   // ----- NOTE: Region move penalties ----- //
 
+  /**
+   * Token speed without any region terrains. Cached.
+   * @type @{number}
+   */
+  #baseTokenSpeed = 0;
+
+  get baseTokenSpeed() {
+    return this.#baseTokenSpeed
+      || (this.#baseTokenSpeed = SPEED.tokenSpeed(this.#localTokenClone, this.movementType) || 1);
+  }
+
+  /**
+   * Token speed of the movement token as is. Cached.
+   * @type {number}
+   */
+  #moveTokenSpeed = 0;
+
+   get moveTokenSpeed() {
+    return this.#moveTokenSpeed
+      || (this.#moveTokenSpeed = SPEED.tokenSpeed(this.moveToken, this.movementType) || 1);
+  }
+
   _regionPenaltyMap = new Map();
 
   /**
@@ -179,11 +201,11 @@ export class MovePenalty {
   moveSpeedWithinRegions(regions) {
     // Confirm Terrain Mapper is active; otherwise return the current token speed
     const Terrain = CONFIG.terrainmapper?.Terrain;
-    if ( !Terrain ) return SPEED.tokenSpeed(this.moveToken, this.movementType) || 1;
+    if ( !Terrain ) return this.moveTokenSpeed;
 
-    // If no terrains in the regions, return the current token speed.
+    // If no terrains in the regions, return the current token speed without regions.
     const terrains = regions.flatMap(region => [...region.terrainmapper.terrains]);
-    if ( !terrains.length ) return SPEED.tokenSpeed(this.#localTokenClone, this.movementType) || 1;
+    if ( !terrains.length ) return this.baseTokenSpeed;
 
     // If these regions already encountered, return the cached token speed.
     const key = regions.map(region => region.id).join("|");
@@ -323,7 +345,7 @@ export class MovePenalty {
     // Track all speed multipliers and flat penalties for the grid space.
     let flatPenalty = 0;
     let currentMultiplier = 1;
-    let startingSpeed = SPEED.tokenSpeed(this.#localTokenClone, this.movementType) || 1;
+    let startingSpeed = this.baseTokenSpeed;
 
     // Drawings
     drawings.forEach(d => {
@@ -343,7 +365,7 @@ export class MovePenalty {
     let speed = startingSpeed;
     if ( testRegions ) {
       // Add on all the current terrains from the token but use the non-terrain token as baseline.
-      startingSpeed = SPEED.tokenSpeed(this.#localTokenClone, this.movementType);
+      startingSpeed = this.baseTokenSpeed;
       speed = this.moveSpeedWithinRegions(regions);
     }
     currentMultiplier ||= 1; // Don't let it divide by 0.
@@ -432,7 +454,7 @@ export class MovePenalty {
 
     // Regions
     const testRegions = this.constructor.terrainAPI && this.pathRegions;
-    let startingSpeed = SPEED.tokenSpeed(this.#localTokenClone, this.movementType);
+    let startingSpeed = this.baseTokenSpeed;
 
     // Traverse each intersection, determining the speed multiplier from starting speed
     // and calculating total time and distance. x meters / y meters/second = x/y seconds
