@@ -473,7 +473,7 @@ export class MovePenalty {
 
     let speedFn;
     // Add terrains currently on the token but keep the speed based on the non-terrain token.
-    let currRegions;
+    let currRegions = [];
     if ( testRegions ) {
       const regions = [...this.regions].filter(r => r.testPoint(this.moveToken.center, this.moveToken.elevationE));
       currRegions = new Set(regions);
