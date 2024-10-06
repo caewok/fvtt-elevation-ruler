@@ -454,7 +454,6 @@ export class MovePenalty {
     let currRegions;
     if ( testRegions ) {
       const regions = [...this.regions].filter(r => r.testPoint(this.moveToken.center, this.moveToken.elevationE));
-      startingSpeed = this.moveSpeedWithinRegions(regions);
       currRegions = new Set(regions);
     }
 
@@ -506,9 +505,6 @@ export class MovePenalty {
     }
 
     // console.debug(`_penaltiesForIntersections|${start.x},${start.y},${start.z} -> ${end.x},${end.y},${end.z}`, calcSteps, cutawayIxs);
-
-    // Make sure the token clone speed is reset.
-    if ( testRegions ) speedFn();
 
     // Determine the ratio compared to a set speed
     const totalDefaultTime = totalUnmodifiedDistance / startingSpeed;
