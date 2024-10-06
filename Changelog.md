@@ -1,3 +1,7 @@
+# 0.10.13
+Use a cached map to track move penalties for different region combinations. Improves compatibility with DAE. Addresses #209.
+
+
 # 0.10.12
 Fixes for calculating movement penalty in drawings.
 Avoid displaying the default ruler label in some situations when using the custom label. Closes issue #212.
