@@ -397,46 +397,22 @@ function _getMeasurementSegments(wrapped) {
 }
 
 /**
- * Override Ruler.prototype._computeDistance
+ * Mixed wrap Ruler.prototype._computeDistance
  * Pass 3d coordinates to measure.
  * Determine the distance with and without the cost function so movement due to terrain can be calculated.
  * If token not present or Terrain Mapper not active, this will be the same as segment distance.
  */
-function _computeDistance() {
+function _computeDistance(wrapped) {
+  log("_computeDistance");
+
   // If not this ruler's user, use the segments already calculated and passed via socket.
   if ( this.user !== game.user ) return;
 
-  log("_computeDistance");
+  wrapped();
 
-  // Debugging
-  const debug = CONFIG[MODULE_ID].debug;
-  if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
-
-  // Determine the distance of each segment.
-  // _computeSegmentDistances.call(this);
-
-  if ( debug ) {
-    switch ( this.segments.length ) {
-      case 1: break;
-      case 2: break;
-      case 3: break;
-      case 4: break;
-      case 5: break;
-      case 6: break;
-      case 7: break;
-      case 8: break;
-      case 9: break;
-    }
-  }
-
-  // Debugging
-  if ( debug && this.segments.some(s => !s) ) console.error("Segment is undefined.");
-
-  // From Ruler#_computeDistance
-  // Changes:
-  // - 3d path.
-  // - Add the offsetDistance property for determining changes due to terrain.
-  // - Calculate distance properties from nearest waypoint, for labeling.
+  // Unfortunately, need to redo the measurement.
+  // Primarily b/c the cost and labeling needs the offsetDistance from the measurement.
+  // Add in the 3d points.
   const Point3d = CONFIG.GeometryLib.threeD.Point3d;
   let path = [];
   if ( this.segments.length ) path.push(Point3d.fromObject(this.segments[0].ray.A));
@@ -446,6 +422,8 @@ function _computeDistance() {
     path.push(B);
   }
   const measurements = canvas.grid.measurePath(path, {cost: this._getCostFunction()}).segments;
+
+  // Redo the properties for the segments.
   this.totalDistance = 0;
   this.totalCost = 0;
   this.totalOffsetDistance = 0;
@@ -819,9 +797,9 @@ PATCHES.BASIC.WRAPS = {
   _onMoveKeyDown
 };
 
-PATCHES.BASIC.MIXES = { _getMeasurementSegments, _broadcastMeasurement };
+PATCHES.BASIC.MIXES = { _getMeasurementSegments, _broadcastMeasurement, _computeDistance };
 
-PATCHES.BASIC.OVERRIDES = { _addWaypoint, _computeDistance };
+PATCHES.BASIC.OVERRIDES = { _addWaypoint };
 
 PATCHES.SPEED_HIGHLIGHTING.WRAPS = { _highlightMeasurementSegment };
 
