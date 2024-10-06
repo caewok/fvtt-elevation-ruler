@@ -139,16 +139,3 @@ SPEED.tokenSpeed = function(token, movementType) {
   if ( speed === null ) return null;
   return Number(speed);
 };
-
-/**
- * Temporarily set the speed attribute for a token. Only sets locally; does not hit the database.
- * @param {number} value                    Speed to set
- * @param {Token} token                     Token on which to set the speed property
- * @param {MOVEMENT_TYPES} [movementType]   Type of movement; if omitted automatically determined
- */
-SPEED.setTokenSpeed = function(value, token, movementType) {
-  movementType ??= token.movementType;
-  const key = SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, movementType)];
-  if ( !key ) return
-  foundry.utils.setProperty(token, key, value);
-}

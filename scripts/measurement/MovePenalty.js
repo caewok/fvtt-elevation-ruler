@@ -9,10 +9,65 @@ PIXI
 
 import { MODULE_ID, FLAGS, OTHER_MODULES, SPEED, MOVEMENT_TYPES } from "../const.js";
 import { Settings } from "../settings.js";
-import { movementType } from "../token_hud.js";
 import { log } from "../util.js";
 
-/*
+/**
+ * Class that represents a fake token with a cloned actor
+ */
+class TokenClone {
+  /** @type {Actor} */
+  actor;
+
+  /** @type {TokenDocument} */
+  document;
+
+  /** @type {Token} */
+  _original;
+
+  constructor(token) {
+    this.actor = token.actor.clone();
+    this._original = token;
+  }
+
+  static fromToken(token) {
+    const tClone = new this(token);
+    tClone.document = new CONFIG.Token.documentClass(token.document.toObject());
+    return tClone;
+  }
+
+  duplicate() {
+    const newTClone = new this.constructor(this);
+    newTClone.document = this.document;
+    return newTClone;
+  }
+
+  get movementType() {
+    const {x, y} = this._original.getCenterPoint(this.document);
+    return new PIXI.Point(x, y);
+  }
+
+  get center() {
+    const {x, y} = this._original.getCenterPoint(this.document);
+    return new PIXI.Point(x, y);
+  }
+
+  get elevationE() { return this.document.elevation; }
+
+  /**
+   * Clear terrains from the token clone
+   */
+  clearTerrains() {
+    const Terrain = CONFIG.terrainmapper?.Terrain;
+    if ( !Terrain ) return;
+    const tokenTerrains = Terrain.allOnToken(this);
+    if ( !tokenTerrains.length ) return;
+    Terrain.removeFromTokenLocally(this, tokenTerrains, { refresh: false });
+    this.actor._initialize(); // This is slow
+  }
+
+}
+
+/**
 Class to measure penalty, as percentage of distance, between two points.
 Accounts for token movement through terrain.
 Type of penalties:
@@ -22,7 +77,6 @@ Type of penalties:
 
 Instantiate the class for a given measurement, which then identifies the bounds of potential obstacles.
 */
-
 export class MovePenalty {
 
   /** @type {Token} */
@@ -46,18 +100,11 @@ export class MovePenalty {
   /** @type {Set<Token>} */
   pathTokens = new Set();
 
-  /**
-   * Local clone of a token.
-   * Currently clones the actor and the token document but makes no effort to clone the other token properties.
-   * @param {Token} token
-   * @returns {object}
-   *   - @prop {TokenDocument} document
-   *   - @prop {Actor} actor
-   */
-  #localTokenClone;
-
   /** @type {MOVEMENT_TYPES} */
   movementType = MOVEMENT_TYPES.WALK;
+
+  /** @type {object} */
+  #localTokenClone;
 
   /**
    * @param {Token} moveToken               The token doing the movement
@@ -91,8 +138,8 @@ export class MovePenalty {
     this.regions.forEach(r => this.pathRegions.add(r));
 
     // Set up a token clone without any terrains to use in estimating movement.
-    this.#localTokenClone = this.constructor._constructTokenClone(this.moveToken);
-    this.#initializeTokenClone();
+    this.#localTokenClone = TokenClone.fromToken(this.moveToken);
+    this.#localTokenClone.clearTerrains();
   }
 
   /**
@@ -120,41 +167,66 @@ export class MovePenalty {
     }
   }
 
+  // ----- NOTE: Region move penalties ----- //
+
+  /**
+   * Token speed without any region terrains. Cached.
+   * @type @{number}
+   */
+  #baseTokenSpeed = 0;
+
+  get baseTokenSpeed() {
+    return this.#baseTokenSpeed
+      || (this.#baseTokenSpeed = SPEED.tokenSpeed(this.#localTokenClone, this.movementType) || 1);
+  }
+
+  /**
+   * Token speed of the movement token as is. Cached.
+   * @type {number}
+   */
+  #moveTokenSpeed = 0;
+
+   get moveTokenSpeed() {
+    return this.#moveTokenSpeed
+      || (this.#moveTokenSpeed = SPEED.tokenSpeed(this.moveToken, this.movementType) || 1);
+  }
+
+  _regionPenaltyMap = new Map();
+
+  /**
+   * Get the move speed for 1+ regions
+   * @param {Region[]} regions
+   * @returns {number} The move speed of the move token when in the region(s).
+   */
+  moveSpeedWithinRegions(regions) {
+    // Confirm Terrain Mapper is active; otherwise return the current token speed
+    const Terrain = CONFIG.terrainmapper?.Terrain;
+    if ( !Terrain ) return this.moveTokenSpeed;
+
+    // If no terrains in the regions, return the current token speed without regions.
+    const terrains = regions.flatMap(region => [...region.terrainmapper.terrains]);
+    if ( !terrains.length ) return this.baseTokenSpeed;
+
+    // If these regions already encountered, return the cached token speed.
+    const key = regions.map(region => region.id).join("|");
+    if ( this._regionPenaltyMap.has(key) ) return this._regionPenaltyMap.get(key);
+
+    // Duplicate the token clone and add the region terrain(s).
+    const tClone = this.#localTokenClone.duplicate();
+    Terrain.addToTokenLocally(tClone, [...terrains.values()], { refresh: false });
+    // Does not work for DAE: tClone.actor.applyActiveEffects();
+    tClone.actor.prepareData(); // Slower but works with DAE.
+
+    // Determine the speed of the token clone and cache for future reference.
+    const speed = SPEED.tokenSpeed(tClone, this.movementType);
+    this._regionPenaltyMap.set(key, speed);
+    return speed || 1;
+  }
+
   // ----- NOTE: Getters ------ //
 
   /** @type {boolean} */
   get anyPotentialObstacles() { return this.pathTokens.size || this.pathRegions.size || this.pathDrawings.size; }
-
-  /**
-   * Construct the local token clone.
-   * This takes some time.
-   * @returns {object}
-   */
-  static _constructTokenClone(token) {
-    // Alternative to clone(): const actor = new CONFIG.Actor.documentClass(token.actor.toObject(), {});
-    const actor = token.actor.clone();
-    const document = new CONFIG.Token.documentClass(token.document.toObject());
-    const tClone = { document, actor, _original: token };
-
-    // Add the movementType and needed properties to calculate movement type.
-    Object.defineProperties(tClone, {
-      movementType: {
-        get: movementType
-      },
-      center: {
-        get: function() {
-          const {x, y} = this._original.getCenterPoint(this.document);
-          return new PIXI.Point(x, y);
-        }
-      },
-      elevationE: {
-        get: function() {
-          return this.document.elevation;
-        }
-      }
-    });
-    return tClone;
-  }
 
   #penaltyCache = new Map();
 
@@ -264,7 +336,6 @@ export class MovePenalty {
     const key = centerPt.key;
     if ( this.#penaltyCache.has(key) ) return this.#penaltyCache.get(key);
 
-
     const regions = [...this.regions].filter(r => r.testPoint(centerPt, centerPt.elevation));
     const tokens = [...this.tokens].filter(t => t.constrainedTokenBorder.contains(centerPt.x, centerPt.y)
       && centerPt.elevation.between(t.bottomE, t.topE));
@@ -274,7 +345,7 @@ export class MovePenalty {
     // Track all speed multipliers and flat penalties for the grid space.
     let flatPenalty = 0;
     let currentMultiplier = 1;
-    let startingSpeed = this._tokenCloneSpeed;
+    let startingSpeed = this.baseTokenSpeed;
 
     // Drawings
     drawings.forEach(d => {
@@ -294,13 +365,8 @@ export class MovePenalty {
     let speed = startingSpeed;
     if ( testRegions ) {
       // Add on all the current terrains from the token but use the non-terrain token as baseline.
-      const speedFn = this.#tokenCloneSpeedFn();
-      startingSpeed = speedFn();
-      // The regions should apply all the terrains needed.
-      // const currTerrains = this.moveToken.getAllTerrains();
-      // CONFIG.terrainmapper.Terrain.addToTokenLocally(this.#localTokenClone, [...currTerrains], { refresh: false });
-      regions.forEach(r => this.#addTerrainsToTokenClone(r));
-      speed = speedFn() || 1;
+      startingSpeed = this.baseTokenSpeed;
+      speed = this.moveSpeedWithinRegions(regions);
     }
     currentMultiplier ||= 1; // Don't let it divide by 0.
     const speedInGrid = (speed / currentMultiplier);
@@ -388,7 +454,7 @@ export class MovePenalty {
 
     // Regions
     const testRegions = this.constructor.terrainAPI && this.pathRegions;
-    let startingSpeed = this._tokenCloneSpeed;
+    let startingSpeed = this.baseTokenSpeed;
 
     // Traverse each intersection, determining the speed multiplier from starting speed
     // and calculating total time and distance. x meters / y meters/second = x/y seconds
@@ -404,17 +470,17 @@ export class MovePenalty {
     cutawayIxs.push(end2d);
     cutawayIxs.sort((a, b) => a.x - b.x);
 
-    const addTerrainFn = this.#addTerrainsToTokenClone.bind(this);
-    const removeTerrainFn = this.#removeTerrainsFromTokenClone.bind(this);
+
     let speedFn;
     // Add terrains currently on the token but keep the speed based on the non-terrain token.
+    let currRegions = [];
     if ( testRegions ) {
-      speedFn = this.#tokenCloneSpeedFn();
-      startingSpeed = speedFn();
-      // The cutaway intersections should apply the terrains.
-      // const currTerrains = this.moveToken.getAllTerrains();
-      // CONFIG.terrainmapper.Terrain.addToTokenLocally(this.#localTokenClone, [...currTerrains], { refresh: false });
+      const regions = [...this.regions].filter(r => r.testPoint(this.moveToken.center, this.moveToken.elevationE));
+      currRegions = new Set(regions);
     }
+
+    const addRegionFn = region => currRegions.add(region);
+    const removeRegionFn = region => currRegions.delete(region);
 
     // For debugging, track the iterative steps.
     const calcSteps = [];
@@ -422,7 +488,7 @@ export class MovePenalty {
       // Must invert the multiplier to apply them as penalties. So a 2x penalty is 1/2 times speed.
       const multFn = ix.movingInto ? x => 1 / x : x => x;
       const addFn = ix.movingInto ? x => x : x => -x;
-      const terrainFn = ix.movingInto ? addTerrainFn : removeTerrainFn;
+      const regionFn = ix.movingInto ? addRegionFn : removeRegionFn;
 
       // Add in the penalties or multipliers at the current position.
       if ( ix.token ) {
@@ -434,7 +500,7 @@ export class MovePenalty {
         if ( ix.drawing.document.getFlag(MODULE_ID, FLAGS.MOVEMENT_PENALTY_FLAT) ) currentFlat += addFn(penalty);
         else currentMultiplier *= multFn(penalty);
       }
-      if ( testRegions && ix.region ) terrainFn(ix.region);
+      if ( testRegions && ix.region ) regionFn(ix.region);
 
       // Process all intersections at this same point (e.g., multiple regions with same border).
       if ( ix.almostEqual(nextIx) ) {
@@ -443,14 +509,15 @@ export class MovePenalty {
       }
 
       // Now we have ix --> nextIx where effects due to ix have been processed.
-      const calcStep = { ix, nextIx };
+      const calcStep = { ix, nextIx, currRegions: [...currRegions] };
       calcSteps.push(calcStep);
       calcStep.flat = currentFlat;
       calcStep.multiplier = currentMultiplier;
       calcStep.dist = CONFIG.GeometryLib.utils.pixelsToGridUnits(PIXI.Point.distanceBetween(ix, nextIx));
       totalUnmodifiedDistance += calcStep.dist;
 
-      const currSpeed = testRegions ? (speedFn() || 1) : startingSpeed;
+      const currSpeed = (testRegions && currRegions.size)
+        ? this.moveSpeedWithinRegions([...currRegions]) : startingSpeed;
       calcStep.tokenSpeed = (currSpeed * calcStep.multiplier);
 
       // Flat adds extra distance to the grid square. Diagonal is longer, so will have larger penalty.
@@ -461,72 +528,10 @@ export class MovePenalty {
 
     // console.debug(`_penaltiesForIntersections|${start.x},${start.y},${start.z} -> ${end.x},${end.y},${end.z}`, calcSteps, cutawayIxs);
 
-    // Make sure the token clone speed is reset.
-    if ( testRegions ) speedFn();
-
     // Determine the ratio compared to a set speed
     const totalDefaultTime = totalUnmodifiedDistance / startingSpeed;
     const avgMultiplier = (totalDefaultTime / totalTime) || 0;
     return 1 / avgMultiplier;
-  }
-
-  /**
-   * Add region terrains to a token (clone). Requires Terrain Mapper to be active.
-   * @param {Region} region         Terrain region to use
-   */
-  #addTerrainsToTokenClone(region) {
-    const terrains = region.terrainmapper.terrains;
-    if ( !terrains.size ) return;
-    CONFIG.terrainmapper.Terrain.addToTokenLocally(this.#localTokenClone, [...terrains.values()], { refresh: false });
-  }
-
-  /**
-   * Remove region terrains from a token (clone). Requires Terrain Mapper to be active.
-   * @param {Region} region         Terrain region to use
-   */
-  #removeTerrainsFromTokenClone(region) {
-    const terrains = region.terrainmapper.terrains;
-    if ( !terrains.size ) return;
-    CONFIG.terrainmapper.Terrain.removeFromTokenLocally(this.#localTokenClone,
-      [...terrains.values()], { refresh: false });
-  }
-
-  /**
-   * Initialize the token clone for testing movement penalty through regions.
-   * @returns {object} Token like object
-   */
-  #initializeTokenClone() {
-    const tClone = this.#localTokenClone;
-    const Terrain = CONFIG.terrainmapper?.Terrain;
-    if ( Terrain ) {
-      const tokenTerrains = Terrain.allOnToken(tClone);
-      if ( tokenTerrains.length ) {
-        CONFIG.terrainmapper.Terrain.removeFromTokenLocally(tClone, tokenTerrains, { refresh: false });
-        tClone.actor._initialize(); // This is slow
-      }
-    }
-    return tClone;
-  }
-
-  /** @type {number} */
-  get _tokenCloneSpeed() { return SPEED.tokenSpeed(this.#localTokenClone, this.movementType) || 1; }
-
-  set _tokenCloneSpeed(value) { SPEED.setTokenSpeed(value, this.#localTokenClone, this.movementType); }
-
-  /**
-   * Set up the token clone for measurement and return a function that can get the token speed.
-   * @returns {function}
-   *   - @param {boolean} [reset=true] Should the token speed be reset after measuring the speed?
-   *   - @returns {number} Current speed of the token prior to reset
-   */
-  #tokenCloneSpeedFn() {
-    const initialSpeed = this._tokenCloneSpeed;
-    return (reset = true) => {
-      this.#localTokenClone.actor.applyActiveEffects();
-      const currSpeed = this._tokenCloneSpeed;
-      if ( reset ) this._tokenCloneSpeed = initialSpeed;
-      return currSpeed;
-    };
   }
 
   // ----- NOTE: Static getters ----- //
