@@ -58,10 +58,6 @@ Hooks.once("init", function() {
   // Add specialized token speed function
   const tokenSpeedFn = SPECIALIZED_TOKEN_SPEED[game.system.id];
   if ( tokenSpeedFn ) SPEED.tokenSpeed = tokenSpeedFn;
-
-  // Add specialized token speed setting function
-  const setTokenSpeedFn = SPECIALIZED_SET_TOKEN_SPEED[game.system.id];
-  if ( setTokenSpeedFn ) SPEED.setTokenSpeed = setTokenSpeedFn;
 });
 
 // ----- NOTE: Attributes ----- //
@@ -313,60 +309,6 @@ const SPECIALIZED_TOKEN_SPEED = {
   sfrpg: sfrpgTokenSpeed,
   pf2e: pf2eTokenSpeed
 };
-
-// ----- Specialized set token speed by system ----- //
-
-/**
- * sfrpg
- * Temporarily set the speed attribute for a token. Only sets locally; does not hit the database.
- * @param {number} value                    Speed to set
- * @param {Token} token                     Token on which to set the speed property
- * @param {MOVEMENT_TYPES} [movementType]   Type of movement; if omitted automatically determined
- */
-function sfrpgSetTokenSpeed(value, token, movementType) {
-  movementType ??= token.movementType;
-  switch ( token.actor?.type ) {
-    case "starship": speed = foundry.utils.setProperty(token, "actor.system.attributes.speed.value", value); break;
-    case "vehicle": speed = foundry.utils.setProperty(token, "actor.system.attributes.speed.drive", value); break;
-    default: foundry.utils.setProperty(token, SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, movementType)], value);
-  }
-}
-
-/**
- * pf2e
- * See https://github.com/7H3LaughingMan/pf2e-elevation-ruler/blob/main/scripts/module.js
- * Finds walk, fly, burrow values.
- * Temporarily set the speed attribute for a token. Only sets locally; does not hit the database.
- * @param {number} value                    Speed to set
- * @param {Token} token                     Token on which to set the speed property
- * @param {MOVEMENT_TYPES} [movementType]   Type of movement; if omitted automatically determined
- */
-function pf2eSetTokenSpeed(value, token, movementType) {
-
-  /* Cannot set token speed in pf2e this way.
-  movementType ??= token.movementType;
-  const tokenSpeed = token.actor.system.attributes.speed;
-  switch (movementType) {
-    case MOVEMENT_TYPES.WALK: tokenSpeed.total = value; break;
-    case MOVEMENT_TYPES.FLY: {
-      const flySpeed = tokenSpeed.otherSpeeds.find(x => x.type == "fly");
-      if ( typeof flySpeed !== "undefined" ) flySpeed.total = value;
-      break;
-    }
-    case MOVEMENT_TYPES.BURROW: {
-      const burrowSpeed = tokenSpeed.otherSpeeds.find(x => x.type == "burrow");
-      if ( typeof burrowSpeed !== "undefined" ) burrowSpeed.total = value;
-      break;
-    }
-  };
-  */
-}
-
-const SPECIALIZED_SET_TOKEN_SPEED = {
-  sfrpg: sfrpgSetTokenSpeed,
-  pf2e: pf2eSetTokenSpeed
-};
-
 
 // ----- Specialized category distances by system ----- //
 
