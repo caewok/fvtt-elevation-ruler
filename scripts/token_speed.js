@@ -9,7 +9,6 @@ PIXI
 
 import { SPEED } from "./const.js";
 import { Settings } from "./settings.js";
-import { Point3d } from "./geometry/3d/Point3d.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
 import { gridShape } from "./util.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
@@ -123,6 +122,7 @@ function locateSegmentBreakpoint(segment, splitMoveDistance, { mp, gridless, num
   if ( !segment.cost || splitMoveDistance > segment.cost ) return null;
 
   // Attempt to move the split distance and determine the split location.
+  const Point3d = CONFIG.GeometryLib.threeD.Point3d;
   const { A, B } = segment.ray;
   let breakpoint = targetSplitForSegment(splitMoveDistance, A, B, mp, numPrevDiagonal);
   if ( !gridless ) {
@@ -156,7 +156,7 @@ function targetSplitForSegment(targetCost, a, b, mp, numPrevDiagonal = 0) {
   // Assume linear cost increment.
   // So divide move in half each time.
   if ( splitCost(a, b, mp, 0, numPrevDiagonal) > targetCost ) return a;
-  const totalDist = Point3d.distanceBetween(a, b);
+  const totalDist = CONFIG.GeometryLib.threeD.Point3d.distanceBetween(a, b);
   if ( splitCost(a, b, mp, totalDist, numPrevDiagonal) <= targetCost ) return b;
 
   // Now increment distance until we exceed the target cost.
@@ -184,7 +184,7 @@ function targetSplitForSegment(targetCost, a, b, mp, numPrevDiagonal = 0) {
  * @param {number} [numPrevDiagonal=0]
  */
 function splitCost(a, b, mp, stepDist = 1, numPrevDiagonal = 0) {
-  b = a.towardsPoint(b, stepDist, Point3d._tmp);
+  b = a.towardsPoint(b, stepDist, CONFIG.GeometryLib.threeD.Point3d._tmp);
   b.roundDecimals(); // Ensure b is on a pixel, so we don't inadvertently exceed the cost at a border.
   return mp.measureSegment(a, b, { numPrevDiagonal }).cost;
 }

@@ -7,7 +7,6 @@ CONFIG
 import { MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { Ray3d } from "./geometry/3d/Ray3d.js";
-import { Point3d } from "./geometry/3d/Point3d.js";
 import { log } from "./util.js";
 import { Pathfinder, hasCollision } from "./pathfinding/pathfinding.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
@@ -18,6 +17,7 @@ import { MovePenalty } from "./measurement/MovePenalty.js";
  * @returns {PIXI.Point[]}
  */
 export function calculatePathPointsForSegment(segment, token) {
+  const Point3d = CONFIG.GeometryLib.threeD.Point3d;
   const A = Point3d.fromObject(segment.ray.A);
   const B = Point3d.fromObject(segment.ray.B);
 
@@ -79,6 +79,7 @@ export function constructPathfindingSegments(segments, segmentMap) {
   // Make sure to keep the label for the last segment piece only
   if ( !segmentMap.size ) return segments;
   const newSegments = [];
+  const Point3d = CONFIG.GeometryLib.threeD.Point3d;
   for ( const segment of segments ) {
     const key = `${segment.ray.A.key}|${segment.ray.B.key}`;
     const pathPoints = segmentMap.get(key);
