@@ -505,7 +505,9 @@ function _getSegmentLabel(wrapped, segment) {
   const origTotalDistance = this.totalDistance;
   segment.distance = roundMultiple(segment.waypoint.cost);
   this.totalDistance = this.totalCost;
-  const origLabel = wrapped(segment);
+
+  // Issue #214 and GURPS PR.
+  const origLabel = game.system.id === "gurps" ? wrapped(segment, this.totalDistance) : wrapped(segment);
   segment.distance = origSegmentDistance;
   this.totalDistance = origTotalDistance;
 

@@ -6,8 +6,8 @@ game
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { Point3d } from "../geometry/3d/Point3d.js";
 import { Settings } from "../settings.js";
+import { log } from "../util.js";
 
 /**
  * Modify Grid classes to measure in 3d.
@@ -32,7 +32,7 @@ PATCHES_HexagonalGrid.BASIC = {};
  */
 function getDirectPathGridless(wrapped, waypoints) {
   const offsets2d = wrapped(waypoints);
-  if ( !(waypoints[0] instanceof Point3d) ) return offsets2d;
+  if ( !(waypoints[0] instanceof CONFIG.GeometryLib.threeD.Point3d) ) return offsets2d;
 
   // 1-to-1 relationship between the waypoints and the offsets2d for gridless.
   const GridCoordinates3d = CONFIG.GeometryLib.threeD.GridCoordinates3d;
@@ -54,13 +54,16 @@ function getDirectPathGridless(wrapped, waypoints) {
 function getDirectPathGridded(wrapped, waypoints) {
   const { HexGridCoordinates3d, GridCoordinates3d } = CONFIG.GeometryLib.threeD;
 
-  if ( !(waypoints[0] instanceof Point3d) ) return wrapped(waypoints);
+  if ( !(waypoints[0] instanceof CONFIG.GeometryLib.threeD.Point3d) ) return wrapped(waypoints);
   let prevWaypoint = GridCoordinates3d.fromObject(waypoints[0]);
   const path3d = [];
   const path3dFn = canvas.grid.isHexagonal ? HexGridCoordinates3d._directPathHex : GridCoordinates3d._directPathSquare;
+  log(`getDirectPathGridded|${waypoints.length} waypoints`);
   for ( let i = 1, n = waypoints.length; i < n; i += 1 ) {
     const currWaypoint = GridCoordinates3d.fromObject(waypoints[i]);
+    log(`getDirectPathGridded|Path from ${prevWaypoint.x},${prevWaypoint.y},${prevWaypoint.z} to ${currWaypoint.x},${currWaypoint.y},${currWaypoint.z}`);
     const segments3d = path3dFn(prevWaypoint, currWaypoint);
+    log(`getDirectPathGridded|Adding ${segments3d.length} segments`, segments3d);
     path3d.push(...segments3d);
     prevWaypoint = currWaypoint;
   }
@@ -77,7 +80,7 @@ function getDirectPathGridded(wrapped, waypoints) {
  * @param {GridMeasurePathResult} result    The measurement result that the measurements need to be written to
  */
 function _measurePath(wrapped, waypoints, { cost }, result) {
-  if ( !(waypoints[0] instanceof Point3d) ) return wrapped(waypoints, { cost }, result);
+  if ( !(waypoints[0] instanceof CONFIG.GeometryLib.threeD.Point3d) ) return wrapped(waypoints, { cost }, result);
   const GridCoordinates3d = CONFIG.GeometryLib.threeD.GridCoordinates3d;
   initializeResultObject(result);
   result.waypoints.forEach(waypoint => initializeResultObject(waypoint));
