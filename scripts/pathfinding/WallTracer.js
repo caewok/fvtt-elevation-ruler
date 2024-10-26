@@ -383,7 +383,7 @@ export class WallTracerEdge extends GraphEdge {
 
     // If Wall Height vaulting is enabled, walls less than token vision height do not block.
     const wh = OTHER_MODULES.WALL_HEIGHT;
-    if ( wh.ACTIVE && game.settings.get(wh.KEY, wh.FLAGS.VAULTING) && moveToken.visionZ >= wall.topZ ) return false;
+    if ( wh.ACTIVE && moveToken.visionZ >= wall.topZ ) return false;
     return true;
   }
 
