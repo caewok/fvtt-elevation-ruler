@@ -27,12 +27,13 @@ PATCHES_HexagonalGrid.BASIC = {};
  * Wrap GridlessGrid#getDirectPath
  * Returns the sequence of grid offsets of a shortest, direct path passing through the given waypoints.
  * @param {RegionMovementWaypoint3d|GridCoordinates3d[]} waypoints    The waypoints the path must pass through
- * @returns {GridOffset[]}                 The sequence of grid offsets of a shortest, direct path
+ * @returns {GridCoordinates|GridCoordinates3d[]}                 The sequence of grid offsets of a shortest, direct path
  * @abstract
  */
 function getDirectPathGridless(wrapped, waypoints) {
+  const GridCoordinates = CONFIG.GeometryLib.GridCoordinates;
   const offsets2d = wrapped(waypoints);
-  if ( !(waypoints[0] instanceof CONFIG.GeometryLib.threeD.Point3d) ) return offsets2d;
+  if ( !(waypoints[0] instanceof CONFIG.GeometryLib.threeD.Point3d) ) return offsets2d.map(o => GridCoordinates.fromOffset(o));
 
   // 1-to-1 relationship between the waypoints and the offsets2d for gridless.
   const GridCoordinates3d = CONFIG.GeometryLib.threeD.GridCoordinates3d;
@@ -48,13 +49,14 @@ function getDirectPathGridless(wrapped, waypoints) {
  * Wrap HexagonalGrid#getDirectPath and SquareGrid#getDirectPath
  * Returns the sequence of grid offsets of a shortest, direct path passing through the given waypoints.
  * @param {Point3d[]} waypoints            The waypoints the path must pass through
- * @returns {GridOffset[]}                 The sequence of grid offsets of a shortest, direct path
+ * @returns {GridCoordinates|GridCoordinates3d[]}                 The sequence of grid offsets of a shortest, direct path
  * @abstract
  */
 function getDirectPathGridded(wrapped, waypoints) {
-  const { HexGridCoordinates3d, GridCoordinates3d } = CONFIG.GeometryLib.threeD;
+  const { HexGridCoordinates3d, GridCoordinates3d, Point3d } = CONFIG.GeometryLib.threeD;
+  const GridCoordinates = CONFIG.GeometryLib.GridCoordinates;
+  if ( !(waypoints[0] instanceof Point3d) ) return wrapped(waypoints).map(o => GridCoordinates.fromObject(o));
 
-  if ( !(waypoints[0] instanceof CONFIG.GeometryLib.threeD.Point3d) ) return wrapped(waypoints);
   let prevWaypoint = GridCoordinates3d.fromObject(waypoints[0]);
   const path3d = [];
   const path3dFn = canvas.grid.isHexagonal ? HexGridCoordinates3d._directPathHex : GridCoordinates3d._directPathSquare;
