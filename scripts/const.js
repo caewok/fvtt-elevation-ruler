@@ -25,21 +25,21 @@ export const FLAGS = {
 
 // Track certain modules that complement features of this module.
 export const OTHER_MODULES = {
-  TERRAIN_MAPPER: { KEY: "terrainmapper"  },
+  TERRAIN_MAPPER: { KEY: "terrainmapper" },
   LEVELS: { KEY: "levels" },
-  WALL_HEIGHT: { KEY: "wall-height", FLAGS: { VAULTING: "blockSightMovement" } }
-}
+  WALL_HEIGHT: { KEY: "wall-height" }
+};
 
 // Hook init b/c game.modules is not initialized at start.
 Hooks.once("init", function() {
-  for ( const obj of Object.values(OTHER_MODULES) ) obj.ACTIVE = game.modules.get(obj.KEY)?.active
+  for ( const obj of Object.values(OTHER_MODULES) ) obj.ACTIVE = game.modules.get(obj.KEY)?.active;
 });
 
 // API not necessarily available until ready hook. (Likely added at init.)
 Hooks.once("ready", function() {
   const tm = OTHER_MODULES.TERRAIN_MAPPER;
   if ( tm.ACTIVE ) tm.API = game.modules.get(tm.KEY).api;
-})
+});
 
 
 export const MOVEMENT_TYPES = {
