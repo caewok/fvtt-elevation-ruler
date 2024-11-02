@@ -596,7 +596,7 @@ async function _animateMovement(wrapped, token) {
   const promises = [wrapped(token)];
   for ( const controlledToken of canvas.tokens.controlled ) {
     if ( controlledToken === token ) continue;
-    if ( !(this.user.isGM || this._canMove(controlledToken)) ) {
+    if ( !(this.user.isGM || testMovement.call(this, controlledToken)) ) {
       ui.notifications.error(`${game.i18n.localize("RULER.MovementNotAllowed")} for ${controlledToken.name}`);
       continue;
     }
@@ -608,6 +608,23 @@ async function _animateMovement(wrapped, token) {
   }
 
   return Promise.allSettled(promises);
+}
+
+/**
+ * Helper to catch movement errors. Must use "call" or "bind" to bind it to the Ruler instance.
+ */
+function testMovement(token) {
+  let error;
+  try {
+    if ( !this._canMove(token) ) error = "RULER.MovementNotAllowed";
+  } catch(err) {
+    error = err.message;
+  }
+  if ( error ) {
+    ui.notifications.error(error, {localize: true});
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -656,6 +673,29 @@ function _createMeasurementHistory(wrapped) {
  */
 function _canMove(wrapper, token) {
   if ( this.user.isGM ) return true;
+  if ( !wrapper(token) ) return false;
+
+  // Adjust each segment for the difference from the original token position.
+  // Important when dragging multiple tokens.
+  // See Ruler#_animateMovement
+  const origin = this.segments[this.history.length].ray.A;
+  const dx = token.document.x - origin.x;
+  const dy = token.document.y - origin.y;
+  let {x, y} = token.document._source;
+  for ( const segment of this.segments ) {
+    if ( segment.history || (segment.ray.distance === 0) ) continue;
+    const r = segment.ray;
+    const adjustedDestination = {x: Math.round(r.B.x + dx), y: Math.round(r.B.y + dy)};
+    const a = token.getCenterPoint({x, y});
+    const b = token.getCenterPoint(adjustedDestination);
+    if ( token.checkCollision(b, {origin: a, type: "move", mode: "any"}) ) {
+      throw new Error("RULER.MovementCollision");
+      return false;
+    }
+    x = adjustedDestination.x;
+    y = adjustedDestination.y;
+  }
+
   return wrapper(token);
 }
 
