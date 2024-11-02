@@ -297,7 +297,7 @@ function _getMeasurementSegments(wrapped) {
     this.segments ??= [];
     for ( const s of this.segments ) {
       if ( !s.label ) continue; // Not every segment has a label.
-      s.label = this.labels.children[labelIndex++];
+      s.label = this.labels.children[labelIndex++] ?? this.labels.addChild(new PreciseText("", CONFIG.canvasTextStyle));
     }
     return this.segments;
   }
