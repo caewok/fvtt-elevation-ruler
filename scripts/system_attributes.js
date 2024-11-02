@@ -278,8 +278,9 @@ function dnd5eTokenSpeed(token, movementType) {
   let speed = null;
   switch ( token.actor?.type ) {
     case "group": {
-      if ( movementType === MOVEMENT_TYPES.WALK ) speed = foundry.utils.getProperty(token, "actor.system.attributes.speed.land");
-      else if ( movementType === MOVEMENT_TYPES.FLY ) speed = foundry.utils.getProperty(token, "actor.system.attributes.speed.air");
+      if ( movementType === MOVEMENT_TYPES.WALK ) speed = foundry.utils.getProperty(token, "actor.system.attributes.movement.land");
+      else if ( movementType === MOVEMENT_TYPES.FLY ) speed = foundry.utils.getProperty(token, "actor.system.attributes.movement.air");
+      break;
     }
     default: speed = foundry.utils.getProperty(token, SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, movementType)]);
   }
