@@ -283,7 +283,7 @@ export class MovePenalty {
     if ( this.#penaltyCache.has(key) ) {
       const res = this.#penaltyCache.get(key);
       log(`Using key ${key}: ${res}`);
-      console.groupEnd("movementCostForSegment");
+      if ( CONFIG[MODULE_ID].debug ) console.groupEnd("movementCostForSegment");
       return res;
     }
 
@@ -294,7 +294,10 @@ export class MovePenalty {
       const isOneStep = Math.abs(endCoords.i - startCoords.i) < 2
         && Math.abs(endCoords.j - startCoords.j) < 2
         && Math.abs(endCoords.k - startCoords.k) < 2;
-      if ( isOneStep ) return this.movementCostForGridSpace(endCoords, costFreeDistance);
+      if ( isOneStep ) {
+        if ( CONFIG[MODULE_ID].debug ) console.groupEnd("movementCostForSegment");
+        return this.movementCostForGridSpace(endCoords, costFreeDistance);
+      }
 
       // Unlikely scenario where endCoords are more than 1 step away from startCoords.
       let totalCost = 0;
@@ -316,7 +319,7 @@ export class MovePenalty {
     this.#penaltyCache.set(key, res);
     const t1 = performance.now();
     log(`Found cost ${res} in ${Math.round(t1 - t0)} ms`);
-    console.groupEnd("movementCostForSegment");
+    if ( CONFIG[MODULE_ID].debug ) console.groupEnd("movementCostForSegment");
     return res;
   }
 
