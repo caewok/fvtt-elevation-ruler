@@ -266,6 +266,28 @@ const SPECIALIZED_SPEED_CATEGORIES = {
 // ----- Specialized token speed by system ----- //
 
 /**
+ * dnd5e
+ * Handles group tokens.
+ * @param {Token} token                     Token whose speed is required
+ * @param {MOVEMENT_TYPES} [movementType]   Type of movement; if omitted automatically determined
+ * @returns {number|null} Distance, in grid units. Null if no speed provided for that category.
+ *   (Null will disable speed highlighting.)
+ */
+function dnd5eTokenSpeed(token, movementType) {
+  movementType ??= token.movementType;
+  let speed = null;
+  switch ( token.actor?.type ) {
+    case "group": {
+      if ( movementType === MOVEMENT_TYPES.WALK ) speed = foundry.utils.getProperty(token, "actor.system.attributes.speed.land");
+      else if ( movementType === MOVEMENT_TYPES.FLY ) speed = foundry.utils.getProperty(token, "actor.system.attributes.speed.air");
+    }
+    default: speed = foundry.utils.getProperty(token, SPEED.ATTRIBUTES[keyForValue(MOVEMENT_TYPES, movementType)]);
+  }
+  if ( speed == null ) return null;
+  return Number(speed);
+}
+
+/**
  * sfrpg
  * Given a token, retrieve its base speed.
  * @param {Token} token                     Token whose speed is required
@@ -315,6 +337,7 @@ function pf2eTokenSpeed(token, movementType) {
 }
 
 const SPECIALIZED_TOKEN_SPEED = {
+  dnd5e: dnd5eTokenSpeed,
   sfrpg: sfrpgTokenSpeed,
   pf2e: pf2eTokenSpeed
 };
