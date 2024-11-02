@@ -1,3 +1,10 @@
+# 0.10.15
+Fix for multiple token dragging resulting in token moving through a wall. Closes #224.
+Correct error with Pathfinding when Wall Height 6.1.0 is active. Pathfinding will now assume vaulting is enabled if Wall Height is present. Closes #223. Thanks @drcormier!
+Add speed method to handle dnd5e group actor speed (air, land). Closes #221.
+Correct ruler measurement in gridless scenes after waypoint is placed. Closes #220.
+Fix display of other user's ruler distances. Closes #219.
+
 # 0.10.14
 Fix for NaN in the move penalty calculation when moving over regions.
 
