@@ -71,16 +71,18 @@ Hooks.once("init", function() {
  * @returns {string}
  */
 export function defaultHPAttribute() {
+  /* eslint-disable no-multi-spaces */
   switch ( game.system.id ) {
-    case "dnd5e":         return "actor.system.attributes.hp.value";
-    case "dragonbane":    return "actor.system.hitpoints.value";
-    case "twodsix":       return "actor.system.hits.value";
-    case "ars":           return "actor.system.attributes.hp.value";
-    case "a5e":           return "actor.system.attributes.hp.value";
-    case "TheWitcherTRPG": return "actor.system.derivedStats.hp.value";
-    case "gurps":         return "actor.system.HP.value";
-    default:              return "actor.system.attributes.hp.value";
+    case "dnd5e":           return "actor.system.attributes.hp.value";
+    case "dragonbane":      return "actor.system.hitpoints.value";
+    case "twodsix":         return "actor.system.hits.value";
+    case "ars":             return "actor.system.attributes.hp.value";
+    case "a5e":             return "actor.system.attributes.hp.value";
+    case "TheWitcherTRPG":  return "actor.system.derivedStats.hp.value";
+    case "gurps":           return "actor.system.HP.value";
+    default:                return "actor.system.attributes.hp.value";
   }
+  /* eslint-enable no-multi-spaces */
 }
 
 /**
@@ -88,31 +90,33 @@ export function defaultHPAttribute() {
  * @returns {string}
  */
 export function defaultWalkAttribute() {
+  /* eslint-disable no-multi-spaces */
   switch ( game.system.id ) {
-    case "a5e":           return "actor.system.attributes.movement.walk.distance";
-    case "ars":           return "actor.movement";
-    case "CoC7":          return "actor.system.attribs.mov.value";
-    case "dcc":           return "actor.system.attributes.speed.value";
-    case "sfrpg":         return "actor.system.attributes.speed.value";
-    case "dnd4e":         return "actor.system.movement.walk.value";
-    case "dnd5e":         return "actor.system.attributes.movement.walk";
-    case "lancer":        return "actor.system.speed";
-    case "gurps":         return "actor.system.currentmove";
+    case "a5e":             return "actor.system.attributes.movement.walk.distance";
+    case "ars":             return "actor.movement";
+    case "CoC7":            return "actor.system.attribs.mov.value";
+    case "dcc":             return "actor.system.attributes.speed.value";
+    case "sfrpg":           return "actor.system.attributes.speed.value";
+    case "dnd4e":           return "actor.system.movement.walk.value";
+    case "dnd5e":           return "actor.system.attributes.movement.walk";
+    case "lancer":          return "actor.system.speed";
+    case "gurps":           return "actor.system.currentmove";
     case "pf1":
-    case "D35E":          return "actor.system.attributes.speed.land.total";
-    case "shadowrun5e":   return "actor.system.movement.walk.value";
-    case "swade":         return "actor.system.stats.speed.adjusted";
-    case "ds4":           return "actor.system.combatValues.movement.total";
-    case "splittermond":  return "actor.derivedValues.speed.value";
-    case "wfrp4e":        return "actor.system.details.move.walk";
-    case "crucible":      return "actor.system.movement.stride";
-    case "dragonbane":    return "actor.system.movement.value";
-    case "twodsix":       return "actor.system.movement.walk";
+    case "D35E":            return "actor.system.attributes.speed.land.total";
+    case "shadowrun5e":     return "actor.system.movement.walk.value";
+    case "swade":           return "actor.system.stats.speed.adjusted";
+    case "ds4":             return "actor.system.combatValues.movement.total";
+    case "splittermond":    return "actor.derivedValues.speed.value";
+    case "wfrp4e":          return "actor.system.details.move.walk";
+    case "crucible":        return "actor.system.movement.stride";
+    case "dragonbane":      return "actor.system.movement.value";
+    case "twodsix":         return "actor.system.movement.walk";
     case "worldofdarkness": return "actor.system.movement.walk";
-    case "TheWitcherTRPG": return "actor.system.stats.spd.current";
-    case "demonlord":     return "actor.system.characteristics.speed";
-    default:              return "";
+    case "TheWitcherTRPG":  return "actor.system.stats.spd.current";
+    case "demonlord":       return "actor.system.characteristics.speed";
+    default:                return "";
   }
+  /* eslint-enable no-multi-spaces */
 }
 
 /**
@@ -120,17 +124,19 @@ export function defaultWalkAttribute() {
  * @returns {string}
  */
 export function defaultFlyAttribute() {
+  /* eslint-disable no-multi-spaces */
   switch ( game.system.id ) {
-    case "a5e":           return "actor.system.attributes.movement.fly.distance";
-    case "sfrpg":         return "actor.system.attributes.flying.value";
-    case "dnd5e":         return "actor.system.attributes.movement.fly";
+    case "a5e":             return "actor.system.attributes.movement.fly.distance";
+    case "sfrpg":           return "actor.system.attributes.flying.value";
+    case "dnd5e":           return "actor.system.attributes.movement.fly";
     case "pf1":
-    case "D35E":          return "actor.system.attributes.speed.fly.total";
-    case "twodsix":       return "actor.system.movement.fly";
+    case "D35E":            return "actor.system.attributes.speed.fly.total";
+    case "twodsix":         return "actor.system.movement.fly";
     case "worldofdarkness": return "actor.system.movement.fly";
-    case "gurps":         return "actor.system.currentflight";
-    default:              return "";
+    case "gurps":           return "actor.system.currentflight";
+    default:                return "";
   }
+  /* eslint-enable no-multi-spaces */
 }
 
 /**
@@ -138,6 +144,7 @@ export function defaultFlyAttribute() {
  * @returns {string}
  */
 export function defaultBurrowAttribute() {
+  /* eslint-disable no-multi-spaces */
   switch ( game.system.id ) {
     case "a5e":           return "actor.system.attributes.movement.burrow.distance";
     case "sfrpg":         return "actor.system.attributes.burrowing.value";
@@ -147,6 +154,7 @@ export function defaultBurrowAttribute() {
     case "twodsix":       return "actor.system.movement.burrow";
     default:              return "";
   }
+  /* eslint-enable no-multi-spaces */
 }
 
 /**
@@ -154,6 +162,7 @@ export function defaultBurrowAttribute() {
  * @returns {number}
  */
 export function defaultDashMultiplier() {
+  /* eslint-disable no-multi-spaces */
   switch ( game.system.id ) {
     case "dcc":
     case "dnd4e":
@@ -167,18 +176,18 @@ export function defaultDashMultiplier() {
     case "twodsix":
     case "a5e":
     case "demonlord":
-    case "ds4":           return 2;
-
-    case "CoC7":          return 5;
-    case "splittermond":  return 3;
-    case "wfrp4e":        return 2;
-    case "gurps":         return 1.2;
+    case "ds4":             return 2;
+    case "CoC7":            return 5;
+    case "splittermond":    return 3;
+    case "wfrp4e":          return 2;
+    case "gurps":           return 1.2;
 
     case "crucible":
-    case "swade":         return 0;
-    case "TheWitcherTRPG": return 3;
-    default:              return 0;
+    case "swade":           return 0;
+    case "TheWitcherTRPG":  return 3;
+    default:                return 0;
   }
+  /* eslint-enable no-multi-spaces */
 }
 
 // ----- Specialized move categories by system ----- //
@@ -191,12 +200,12 @@ function a5eSpeedCategories() {
     name: "Bonus Dash",
     color: Color.from(0xf77926),
     multiplier: 4
-  }
+  };
   SPEED.CATEGORIES = [WalkSpeedCategory, DashSpeedCategory, BonusDashCategory, MaximumSpeedCategory];
 }
 
 /**
- * sfrpg
+ * SFRPG
  */
 function sfrpgSpeedCategories() {
   WalkSpeedCategory.name = "sfrpg.speeds.walk";
@@ -205,44 +214,44 @@ function sfrpgSpeedCategories() {
     name: "sfrpg.speeds.run",
     color: Color.from(0xff8000),
     multiplier: 4
-  }
+  };
   SPEED.CATEGORIES = [WalkSpeedCategory, DashSpeedCategory, RunSpeedCategory, MaximumSpeedCategory];
 }
 
 /**
- * pf2e
+ * PF2E
  * See https://github.com/7H3LaughingMan/pf2e-elevation-ruler/blob/main/scripts/module.js
  */
 function pf2eSpeedCategories() {
   const SingleAction = {
-      name: "Single Action",
-      color: Color.from("#3222C7"),
-      multiplier: 1
-  }
+    name: "Single Action",
+    color: Color.from("#3222C7"),
+    multiplier: 1
+  };
 
   const DoubleAction = {
-      name: "Double Action",
-      color: Color.from("#FFEC07"),
-      multiplier: 2
-  }
+    name: "Double Action",
+    color: Color.from("#FFEC07"),
+    multiplier: 2
+  };
 
   const TripleAction = {
-      name: "Triple Action",
-      color: Color.from("#C033E0"),
-      multiplier: 3
-  }
+    name: "Triple Action",
+    color: Color.from("#C033E0"),
+    multiplier: 3
+  };
 
   const QuadrupleAction = {
-      name: "Quadruple Action",
-      color: Color.from("#1BCAD8"),
-      multiplier: 4
-  }
+    name: "Quadruple Action",
+    color: Color.from("#1BCAD8"),
+    multiplier: 4
+  };
 
   const Unreachable = {
-      name: "Unreachable",
-      color: Color.from("#FF0000"),
-      multiplier: Number.POSITIVE_INFINITY
-  }
+    name: "Unreachable",
+    color: Color.from("#FF0000"),
+    multiplier: Number.POSITIVE_INFINITY
+  };
 
   SPEED.CATEGORIES = [SingleAction, DoubleAction, TripleAction, QuadrupleAction, Unreachable];
 }
@@ -276,7 +285,7 @@ function sfrpgTokenSpeed(token, movementType) {
 }
 
 /**
- * pf2e
+ * PF2E
  * See https://github.com/7H3LaughingMan/pf2e-elevation-ruler/blob/main/scripts/module.js
  * Finds walk, fly, burrow values.
  * @param {Token} token                     Token whose speed is required
@@ -291,16 +300,16 @@ function pf2eTokenSpeed(token, movementType) {
   switch (movementType) {
     case MOVEMENT_TYPES.WALK: speed = tokenSpeed.total; break;
     case MOVEMENT_TYPES.FLY: {
-      const flySpeed = tokenSpeed.otherSpeeds.find(x => x.type == "fly");
+      const flySpeed = tokenSpeed.otherSpeeds.find(x => x.type === "fly");
       if ( typeof flySpeed !== "undefined" ) speed = flySpeed.total;
       break;
     }
     case MOVEMENT_TYPES.BURROW: {
-      const burrowSpeed = tokenSpeed.otherSpeeds.find(x => x.type == "burrow");
+      const burrowSpeed = tokenSpeed.otherSpeeds.find(x => x.type === "burrow");
       if ( typeof burrowSpeed !== "undefined" ) speed = burrowSpeed.total;
       break;
     }
-  };
+  }
   if (speed === null) return null;
   return Number(speed);
 }
@@ -410,7 +419,7 @@ function getActionCount(token) {
   // Check to see if there is an encounter, if that encounter is active, and if the token is in that encounter
   if ( game.combat == null
     || !game.combat.active
-    || (game.combat.turns.find(x => x.tokenId == token.id) == null) ) return maxActions;
+    || (game.combat.turns.find(x => x.tokenId == token.id) == null) ) return maxActions; // eslint-disable-line eqeqeq
 
   // Check to see if the actor is stunned or slowed, and if so the value
   const stunned = actor.getCondition("stunned")?.value ?? 0;
@@ -420,15 +429,15 @@ function getActionCount(token) {
   // Check to see if PF2e Workbench is active and if Auto Reduce Stunned is enabled
   let reduction = 0;
   if ( game.modules.get("xdy-pf2e-workbench")?.active && game.settings.get("xdy-pf2e-workbench", "autoReduceStunned") ) {
-      const stunReduction = actor.getFlag("xdy-pf2e-workbench", "stunReduction");
+    const stunReduction = actor.getFlag("xdy-pf2e-workbench", "stunReduction");
 
-      // Make sure we actually got something and the combat matches.
-      if ( stunReduction &&  stunReduction.combat == game.combat.id ) {
-        // We are going to check to see if the combatant's last round matches the stun reduction round
-        // Note - A combatant's last round is updated at the start of their turn
-        const combatant = game.combat.turns.find(x => x.tokenId == token.id);
-        if ( combatant && combatant.roundOfLastTurn == stunReduction.round ) reduction = stunReduction.reducedBy;
-      }
+    // Make sure we actually got something and the combat matches.
+    if ( stunReduction && stunReduction.combat === game.combat.id ) {
+      // We are going to check to see if the combatant's last round matches the stun reduction round
+      // Note - A combatant's last round is updated at the start of their turn
+      const combatant = game.combat.turns.find(x => x.tokenId === token.id);
+      if ( combatant && combatant.roundOfLastTurn === stunReduction.round ) reduction = stunReduction.reducedBy;
+    }
   }
 
   // Return the token's maximum number of actions minus the greater of their stunned, slowed, or stun reduction.
