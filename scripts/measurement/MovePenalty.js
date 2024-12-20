@@ -15,6 +15,9 @@ import { log } from "../util.js";
  * Class that represents a fake token with a cloned actor
  */
 class TokenClone {
+  /** @type {object|undefined} */
+  static get terrainAPI() { return OTHER_MODULES.TERRAIN_MAPPER.API; }
+
   /** @type {Actor} */
   actor;
 
@@ -24,8 +27,16 @@ class TokenClone {
   /** @type {Token} */
   _original;
 
+  /** @type {boolean} */
+  _useTerrain = true;
+
   constructor(token) {
-    this.actor = token.actor.clone();
+    const terrainAPI = OTHER_MODULES.TERRAIN_MAPPER.API;
+
+    // See issue #230.
+    this._useTerrain = this.constructor.terrainAPI
+      && canvas.regions.placeables.some(r => r.terrainmapper.hasTerrain);
+    this.actor = this._useTerrain ? token.actor : token.actor.clone();
     this._original = token;
   }
 
@@ -57,8 +68,7 @@ class TokenClone {
    * Clear terrains from the token clone
    */
   clearTerrains() {
-    const Terrain = CONFIG.terrainmapper?.Terrain;
-    if ( !Terrain ) return;
+    if ( !this._useTerrain ) return;
     const tokenTerrains = Terrain.allOnToken(this);
     if ( !tokenTerrains.length ) return;
     Terrain.removeFromTokenLocally(this, tokenTerrains, { refresh: false });
