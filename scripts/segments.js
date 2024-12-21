@@ -37,8 +37,14 @@ export function calculatePathPointsForSegment(segment, token) {
   const t0 = performance.now();
   token[MODULE_ID] ??= {};
   const pf = token[MODULE_ID].pathfinder ??= new Pathfinder(token);
-  const path = pf.runPath(A, B);
-  let pathPoints = Pathfinder.getPathPoints(path);
+  let pathPoints = [];
+  try {
+    const path = pf.runPath(A, B);
+    pathPoints = Pathfinder.getPathPoints(path);
+  } catch (error) {
+    log(`calculatePathPointsForSegment|Error using pathfinding.`, path, error);
+    return [];
+  }
   const t1 = performance.now();
   log(`Found ${pathPoints.length} path points between ${A.x},${A.y} -> ${B.x},${B.y} in ${t1 - t0} ms.`, pathPoints);
 

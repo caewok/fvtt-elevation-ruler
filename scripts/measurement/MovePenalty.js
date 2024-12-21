@@ -186,7 +186,7 @@ export class MovePenalty {
    */
   #moveTokenSpeed = 0;
 
-   get moveTokenSpeed() {
+  get moveTokenSpeed() {
     return this.#moveTokenSpeed
       || (this.#moveTokenSpeed = SPEED.tokenSpeed(this.moveToken, this.movementType) || 1);
   }
@@ -214,8 +214,10 @@ export class MovePenalty {
     // Duplicate the token clone and add the region terrain(s).
     const tClone = this.#localTokenClone.duplicate();
     Terrain.addToTokenLocally(tClone, [...terrains.values()], { refresh: false });
-    // Does not work for DAE: tClone.actor.applyActiveEffects();
-    tClone.actor.prepareData(); // Slower but works with DAE.
+    if ( game.system.id === "dnd5e"
+      && OTHER_MODULES.DAE.ACTIVE
+      && !foundry.utils.isNewerVersion(game.system.version, "4") ) tClone.actor.prepareData(); // Slower; fails in v4.
+    else tClone.actor.applyActiveEffects(); // Does not work for DAE (at least in dnd5e v3).
 
     // Determine the speed of the token clone and cache for future reference.
     const speed = SPEED.tokenSpeed(tClone, this.movementType);
@@ -337,7 +339,10 @@ export class MovePenalty {
 
     // Did we already test this coordinate?
     const key = centerPt.key;
-    if ( this.#penaltyCache.has(key) ) return this.#penaltyCache.get(key);
+    if ( this.#penaltyCache.has(key) ) {
+      const { flatPenalty, gridMult } = this.#penaltyCache.get(key);
+      return (flatPenalty + (gridMult * costFreeDistance));
+    }
 
     const regions = [...this.regions].filter(r => r.testPoint(centerPt, centerPt.elevation));
     const tokens = [...this.tokens].filter(t => t.constrainedTokenBorder.contains(centerPt.x, centerPt.y)
@@ -375,7 +380,7 @@ export class MovePenalty {
     const speedInGrid = (speed / currentMultiplier);
     const gridMult = startingSpeed / speedInGrid; // If currentMultiplier > 1, gridMult should be > 1.
     const res = (flatPenalty + (gridMult * costFreeDistance));
-    this.#penaltyCache.set(key, res);
+    this.#penaltyCache.set(key, { flatPenalty, gridMult });
     return res;
 
     /* Example
@@ -473,8 +478,6 @@ export class MovePenalty {
     cutawayIxs.push(end2d);
     cutawayIxs.sort((a, b) => a.x - b.x);
 
-
-    let speedFn;
     // Add terrains currently on the token but keep the speed based on the non-terrain token.
     let currRegions = [];
     if ( testRegions ) {
@@ -529,7 +532,10 @@ export class MovePenalty {
       ix = nextIx;
     }
 
-    // console.debug(`_penaltiesForIntersections|${start.x},${start.y},${start.z} -> ${end.x},${end.y},${end.z}`, calcSteps, cutawayIxs);
+    /* Debug
+    console.debug(`_penaltiesForIntersections|${start.x},${start.y},${start.z}
+      -> ${end.x},${end.y},${end.z}`, calcSteps, cutawayIxs);
+    */
 
     // Determine the ratio compared to a set speed
     const totalDefaultTime = totalUnmodifiedDistance / startingSpeed;

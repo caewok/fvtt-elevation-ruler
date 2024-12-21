@@ -287,18 +287,17 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
 function constructSecondaryLabel(segment, text, name) {
   const labelStyles = CONFIG[MODULE_ID].labeling.styles;
   const secondaryTextScale = CONFIG[MODULE_ID].labeling.secondaryTextScale;
-
+  const defaultStyle = labelStyles[name] ?? labelStyles.waypoint;
   let textLabel = segment.label.getChildByName(name);
   if ( !textLabel ) {
-    const style = labelStyles[name] ?? labelStyles.waypoint;
-    textLabel = new PreciseText("", style);
+    textLabel = new PreciseText("", defaultStyle.clone());
     textLabel.name = name;
     segment.label.addChild(textLabel);
     if ( !textLabel.style.fontFamily.includes("fontAwesome") ) textLabel.style.fontFamily += ",fontAwesome";
   }
   textLabel.visible = true;
   textLabel.text = text;
-  textLabel.style.fontSize = Math.round(segment.label.style.fontSize * secondaryTextScale);
+  textLabel.style.fontSize = Math.round(defaultStyle.fontSize * secondaryTextScale);
   textLabel.anchor = { x: 0.5, y: 0.5 };
   return textLabel;
 }
