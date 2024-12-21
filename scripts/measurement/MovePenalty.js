@@ -214,8 +214,10 @@ export class MovePenalty {
     // Duplicate the token clone and add the region terrain(s).
     const tClone = this.#localTokenClone.duplicate();
     Terrain.addToTokenLocally(tClone, [...terrains.values()], { refresh: false });
-    // Does not work for DAE: tClone.actor.applyActiveEffects();
-    tClone.actor.prepareData(); // Slower but works with DAE.
+    if ( game.system.id === "dnd5e"
+      && OTHER_MODULES.DAE.ACTIVE
+      && !foundry.utils.isNewerVersion(game.system.version, "4") ) tClone.actor.prepareData(); // Slower; fails in v4.
+    else tClone.actor.applyActiveEffects(); // Does not work for DAE (at least in dnd5e v3).
 
     // Determine the speed of the token clone and cache for future reference.
     const speed = SPEED.tokenSpeed(tClone, this.movementType);
