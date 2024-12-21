@@ -31,8 +31,6 @@ class TokenClone {
   _useTerrain = true;
 
   constructor(token) {
-    const terrainAPI = OTHER_MODULES.TERRAIN_MAPPER.API;
-
     // See issue #230.
     this._useTerrain = this.constructor.terrainAPI
       && canvas.regions.placeables.some(r => r.terrainmapper.hasTerrain);
@@ -69,6 +67,7 @@ class TokenClone {
    */
   clearTerrains() {
     if ( !this._useTerrain ) return;
+    const Terrain = CONFIG.terrainmapper.Terrain;
     const tokenTerrains = Terrain.allOnToken(this);
     if ( !tokenTerrains.length ) return;
     Terrain.removeFromTokenLocally(this, tokenTerrains, { refresh: false });
@@ -196,7 +195,7 @@ export class MovePenalty {
    */
   #moveTokenSpeed = 0;
 
-   get moveTokenSpeed() {
+  get moveTokenSpeed() {
     return this.#moveTokenSpeed
       || (this.#moveTokenSpeed = SPEED.tokenSpeed(this.moveToken, this.movementType) || 1);
   }
@@ -225,7 +224,8 @@ export class MovePenalty {
     const tClone = this.#localTokenClone.duplicate();
     Terrain.addToTokenLocally(tClone, [...terrains.values()], { refresh: false });
     // Does not work for DAE: tClone.actor.applyActiveEffects();
-    tClone.actor.prepareData(); // Slower but works with DAE.
+    if ( !(game.system.id === "dnd5e"
+      && foundry.utils.isNewerVersion(game.system.version, "4")) ) tClone.actor.prepareData(); // Slower but works with DAE.
 
     // Determine the speed of the token clone and cache for future reference.
     const speed = SPEED.tokenSpeed(tClone, this.movementType);
@@ -483,8 +483,6 @@ export class MovePenalty {
     cutawayIxs.push(end2d);
     cutawayIxs.sort((a, b) => a.x - b.x);
 
-
-    let speedFn;
     // Add terrains currently on the token but keep the speed based on the non-terrain token.
     let currRegions = [];
     if ( testRegions ) {
