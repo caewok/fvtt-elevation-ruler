@@ -1,5 +1,6 @@
 # 0.10.16
 Potential fix for undefined when using `toNearest`. Closes #229.
+Fix for incorrect move penalty displaying for 1:2:1 diagonals with Use Grid for Movement Penalties enabled. Closes #226, #218.
 
 
 # 0.10.15
