@@ -503,7 +503,7 @@ function _getSegmentLabel(wrapped, segment) {
   // Use cost instead of straight distance for the label.
   const origSegmentDistance = segment.distance;
   const origTotalDistance = this.totalDistance;
-  segment.distance = roundMultiple(segment.waypoint.cost);
+  segment.distance = roundMultiple(segment.waypoint.cost || 0);
   this.totalDistance = this.totalCost;
 
   // Issue #214 and GURPS PR.
