@@ -503,6 +503,7 @@ function _getSegmentLabel(wrapped, segment) {
   // Use cost instead of straight distance for the label.
   const origSegmentDistance = segment.distance;
   const origTotalDistance = this.totalDistance;
+  segment.waypoint.cost ??= segment.distance || 0;
   segment.distance = roundMultiple(segment.waypoint.cost);
   this.totalDistance = this.totalCost;
 
