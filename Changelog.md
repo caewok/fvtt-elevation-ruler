@@ -1,3 +1,7 @@
+# 0.10.16
+Potential fix for undefined when using `toNearest`. Closes #229.
+
+
 # 0.10.15
 Fix for multiple token dragging resulting in token moving through a wall. Closes #224.
 Correct error with Pathfinding when Wall Height 6.1.0 is active. Pathfinding will now assume vaulting is enabled if Wall Height is present. Closes #223. Thanks @drcormier!
