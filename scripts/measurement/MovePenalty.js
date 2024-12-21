@@ -186,7 +186,7 @@ export class MovePenalty {
    */
   #moveTokenSpeed = 0;
 
-   get moveTokenSpeed() {
+  get moveTokenSpeed() {
     return this.#moveTokenSpeed
       || (this.#moveTokenSpeed = SPEED.tokenSpeed(this.moveToken, this.movementType) || 1);
   }
@@ -476,8 +476,6 @@ export class MovePenalty {
     cutawayIxs.push(end2d);
     cutawayIxs.sort((a, b) => a.x - b.x);
 
-
-    let speedFn;
     // Add terrains currently on the token but keep the speed based on the non-terrain token.
     let currRegions = [];
     if ( testRegions ) {
@@ -532,7 +530,10 @@ export class MovePenalty {
       ix = nextIx;
     }
 
-    // console.debug(`_penaltiesForIntersections|${start.x},${start.y},${start.z} -> ${end.x},${end.y},${end.z}`, calcSteps, cutawayIxs);
+    /* Debug
+    console.debug(`_penaltiesForIntersections|${start.x},${start.y},${start.z}
+      -> ${end.x},${end.y},${end.z}`, calcSteps, cutawayIxs);
+    */
 
     // Determine the ratio compared to a set speed
     const totalDefaultTime = totalUnmodifiedDistance / startingSpeed;
