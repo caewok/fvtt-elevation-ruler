@@ -337,7 +337,10 @@ export class MovePenalty {
 
     // Did we already test this coordinate?
     const key = centerPt.key;
-    if ( this.#penaltyCache.has(key) ) return this.#penaltyCache.get(key);
+    if ( this.#penaltyCache.has(key) ) {
+      const { flatPenalty, gridMult } = this.#penaltyCache.get(key);
+      return (flatPenalty + (gridMult * costFreeDistance));
+    }
 
     const regions = [...this.regions].filter(r => r.testPoint(centerPt, centerPt.elevation));
     const tokens = [...this.tokens].filter(t => t.constrainedTokenBorder.contains(centerPt.x, centerPt.y)
@@ -375,7 +378,7 @@ export class MovePenalty {
     const speedInGrid = (speed / currentMultiplier);
     const gridMult = startingSpeed / speedInGrid; // If currentMultiplier > 1, gridMult should be > 1.
     const res = (flatPenalty + (gridMult * costFreeDistance));
-    this.#penaltyCache.set(key, res);
+    this.#penaltyCache.set(key, { flatPenalty, gridMult });
     return res;
 
     /* Example
