@@ -2,7 +2,7 @@
 Potential fix for undefined when using `toNearest`. Closes #229.
 Fix for incorrect move penalty displaying for 1:2:1 diagonals with Use Grid for Movement Penalties enabled. Closes #226, #218.
 Wrap pathfinding in try/catch to avoid crashing the ruler. Closes #146.
-
+Possible fix for tiny ruler labels. #205.
 
 # 0.10.15
 Fix for multiple token dragging resulting in token moving through a wall. Closes #224.
