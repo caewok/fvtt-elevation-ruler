@@ -27,7 +27,8 @@ export const FLAGS = {
 export const OTHER_MODULES = {
   TERRAIN_MAPPER: { KEY: "terrainmapper" },
   LEVELS: { KEY: "levels" },
-  WALL_HEIGHT: { KEY: "wall-height" }
+  WALL_HEIGHT: { KEY: "wall-height" },
+  DAE: { KEY: "dae" }
 };
 
 // Hook init b/c game.modules is not initialized at start.
