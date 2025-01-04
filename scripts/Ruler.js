@@ -709,13 +709,24 @@ function _canMove(wrapper, token) {
 async function _animateSegment(wrapped, token, segment, destination, updateOptions = {}) {
   log(`Updating ${token.name} destination from ({${token.document.x},${token.document.y}) to (${destination.x},${destination.y}) for segment (${segment.ray.A.x},${segment.ray.A.y})|(${segment.ray.B.x},${segment.ray.B.y})`);
   destination.elevation = roundMultiple(CONFIG.GeometryLib.utils.pixelsToGridUnits(segment.ray.B.z));
+
+  // If moving multiple tokens, take into account the current token's elevation differential.
+  const origE = this.waypoints[0].elevation || 0;
+  let diffE = 0;
+  if ( this.token !== token ) diffE = token.elevationE - origE;
+  destination.elevation += diffE;
+
   foundry.utils.mergeObject(updateOptions, {
     rulerSegment: this.segments.length > 1,
     firstRulerSegment: segment.first,
     lastRulerSegment: segment.last
   });
 
-  return wrapped(token, segment, destination, updateOptions);
+  const res = await wrapped(token, segment, destination, updateOptions);
+
+  // Revert to the original destination.
+  destination.elevation -= diffE;
+  return res;
 }
 
 
