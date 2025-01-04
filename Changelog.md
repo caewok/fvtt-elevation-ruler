@@ -1,3 +1,8 @@
+# 0.10.17
+Correct measurement of diagonals in grids, due to offsets getting counted as straight instead of diagonal. Closes #227.
+When moving multiple tokens, use the elevation of each token as the start for the move, so that tokens at different elevations are not set to the same elevation. Closes #231.
+Update libGeometry to v0.3.19.
+
 # 0.10.16
 Potential fix for undefined when using `toNearest`. Closes #229.
 Fix for incorrect move penalty displaying for 1:2:1 diagonals with Use Grid for Movement Penalties enabled. Closes #226, #218.
