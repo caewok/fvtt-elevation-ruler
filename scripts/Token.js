@@ -154,7 +154,18 @@ function _onDragLeftCancel(wrapped, event) {
  */
 function _onDragLeftMove(wrapped, event) {
   log("Token#_onDragLeftMove");
-  // gridlessSnapping(this, event);
+
+  // Gridless snapping: pause the mouse position at the token speed boundary.
+  const er = this[MODULE_ID] ??= {};
+  const gridlessSnap = gridlessSnapping(this, event);
+  // console.log(`GridlessSnap ${gridlessSnap}| ${event.interactionData.destination.x},${event.interactionData.destination.y} | cached ${er.gridless?.x},${er.gridless?.y}`);
+  if (  gridlessSnap ) {
+    er.gridless ??= { ...event.interactionData.destination };
+    event.interactionData.destination.x = er.gridless.x;
+    event.interactionData.destination.y = er.gridless.y;
+  } else er.gridless = null;
+
+  // Default token drag move.
   wrapped(event);
 
   // Continue a Ruler measurement.
@@ -191,37 +202,67 @@ SOFTWARE.
 
  */
 function gridlessSnapping(token, event) {
-  if ( !canvas.grid.isGridless ) return;
-  if ( !Settings.useSpeedHighlighting(token) ) return;
+  if ( !canvas.grid.isGridless ) return false;
+  if ( !Settings.useSpeedHighlighting(token) ) return false;
 
   const ruler = canvas.controls.ruler;
-  if ( !ruler.state === Ruler.STATES.MEASURING ) return;
+  if ( !ruler.state === Ruler.STATES.MEASURING ) return false;
+
+  const snapDistance = CONFIG[MODULE_ID]?.gridlessSnapDistance();
+  if ( !snapDistance ) return false;
+
+  // Add the new destination and check the segments.
+  let res = true;
+  const oldDestination = { ...ruler.destination};
+  const snap = !event.shiftKey;
+  const newDest = ruler._getMeasurementDestination(event.interactionData.destination, { snap });
+  // console.log(`eventDest ${event.interactionData.destination.x},${event.interactionData.destination.y}; newDest: ${newDest.x},${newDest.y}`);
+  ruler.destination = newDest;
+  ruler.segments = ruler._getMeasurementSegments();
+  ruler._computeDistance();
 
   // Test if we just passed the prior speed category limit.
   const splitterFn = tokenSpeedSegmentSplitter(canvas.controls.ruler, token);
   const segments = [];
-  for ( const segment of ruler.segments ) {
-    segments.push(...splitterFn(segment));
-  }
-  if ( segments.length < 2 ) return;
-  const targetDistance = segments.at(-2).maxSpeedCategoryDistance;
-  const distance = segments.at(-1).cumulativeCost;
+  for ( const segment of ruler.segments ) segments.push(...splitterFn(segment));
+  if ( segments.length < 2 ) res = false;
+  if ( res ) {
+    res = false;
+    const targetDistance = segments.at(-2).maxSpeedCategoryDistance;
+    const distance = segments.at(-1).cumulativeCost;
+    // console.log(`${distance} < (${targetDistance} + ${snapDistance}) ? ${distance < (targetDistance + rasterWidth)}`);
 
-  // Determine how to adjust the mouse movement.
-  const rasterWidth = 35 / canvas.stage.scale.x;
-	const tokenX = event.interactionData.destination.x;
-	const tokenY = event.interactionData.destination.y;
-  // const origin = segments[0].ray.A;
-  const origin = event.interactionData.origin;
-  const deltaX = tokenX - origin.x;
-	const deltaY = tokenY - origin.y;
-
-  // If just past the target distance, make the mouse movement "sticky".
-  if (distance < targetDistance + rasterWidth) {
-    event.interactionData.destination.x = origin.x + (deltaX * targetDistance) / distance;
-    event.interactionData.destination.y = origin.y + (deltaY * targetDistance) / distance;
+    // Determine how to adjust the mouse movement.
+    // If just past the target distance, make the mouse movement "sticky".
+    if ( distance < (targetDistance + snapDistance)) res = true;
   }
+  ruler.destination = oldDestination;
+  return res;
 }
+
+/**
+ * Reverse the calculation to get the destination for the ruler position.
+ * Used with gridless snapping to set the destination.
+ */
+function invertMeasurementDestination(point, { snap = true } = {}) {
+  const origPoint = PIXI.Point.fromObject(point);
+
+  point = wrapped(point, { snap });
+  const token = this.token;
+  if ( !this._isTokenRuler || !token ) return point;
+  if ( !token._preview ) return point;
+
+  // Shift to token center or snapped center
+  if ( !snap ) return point;
+
+  // See Token#_onDragLeftMove.
+  const origin = token.getCenterPoint();
+  const delta = origPoint.subtract(origin, PIXI.Point._tmp);
+  let position = PIXI.Point._tmp2.copyFrom(token.document).add(delta, PIXI.Point._tmp2);
+  const tlSnapped = token._preview.getSnappedPosition(position);
+  return token.getCenterPoint(tlSnapped);
+}
+
 
 /**
  * Wrap Token.prototype._onUpdate to remove easing for pathfinding segments.

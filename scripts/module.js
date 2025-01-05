@@ -104,6 +104,13 @@ Hooks.once("init", function() {
     debug: false,
 
     /**
+     * When on gridless scenes, define a distance within which the ruler will snap to the previous
+     * token speed limit. Delete or set to zero to disable.
+     * @type {function}
+     */
+    gridlessSnapDistance: () => canvas.grid.distance * 0.1,
+
+    /**
      * Settings related to the ruler text labels.
      */
     labeling: {
