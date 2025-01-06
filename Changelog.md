@@ -3,6 +3,7 @@ Correct measurement of diagonals in grids, due to offsets getting counted as str
 When moving multiple tokens, use the elevation of each token as the start for the move, so that tokens at different elevations are not set to the same elevation. Closes #231.
 On gridless maps, pause the mouse at the token speed boundaries. Defaults to pausing when the distance is no more than `canvas.grid.distance * 0.1` beyond the speed boundary. Adjust using `CONFIG.elevationruler.gridlessSnapDistance`. May pause just slightly beyond the speed distance point, e.g., at 10.03 instead of exactly 10.0. Closes #131.
 Update the references to `CONFIG.elevationruler.labeling` in the english language file.
+Rework how ruler default and custom labels are defined to improve performance and reduce bugs related to infinite scaling. Corrects issue with font size going to 1. May address text growing larger in #225.
 Update libGeometry to v0.3.19.
 
 # 0.10.16
