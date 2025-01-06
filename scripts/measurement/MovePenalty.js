@@ -1,6 +1,7 @@
 /* globals
 canvas,
 CONFIG,
+foundry,
 game,
 PIXI
 */
@@ -24,8 +25,13 @@ class TokenClone {
   /** @type {Token} */
   _original;
 
+  /** @type {boolean} */
+  useTerrains = false;
+
   constructor(token) {
-    this.actor = token.actor.clone();
+    this.useTerrains = OTHER_MODULES.TERRAIN_MAPPER.ACTIVE
+      && canvas.regions.placeables.some(r => r.terrainmapper.hasTerrain);
+    this.actor = this.useTerrains ? token.actor.clone() : token.actor;
     this._original = token;
   }
 
@@ -57,8 +63,8 @@ class TokenClone {
    * Clear terrains from the token clone
    */
   clearTerrains() {
-    const Terrain = CONFIG.terrainmapper?.Terrain;
-    if ( !Terrain ) return;
+    if ( !this.useTerrains ) return;
+    const Terrain = CONFIG.terrainmapper.Terrain;
     const tokenTerrains = Terrain.allOnToken(this);
     if ( !tokenTerrains.length ) return;
     Terrain.removeFromTokenLocally(this, tokenTerrains, { refresh: false });

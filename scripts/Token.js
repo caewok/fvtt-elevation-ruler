@@ -12,6 +12,7 @@ import { MODULE_ID, FLAGS } from "./const.js";
 import { Settings } from "./settings.js";
 import { log } from "./util.js";
 import { MovePenalty } from "./measurement/MovePenalty.js";
+import { tokenSpeedSegmentSplitter } from "./token_speed.js";
 
 // Patches for the Token class
 export const PATCHES = {};
@@ -153,6 +154,18 @@ function _onDragLeftCancel(wrapped, event) {
  */
 function _onDragLeftMove(wrapped, event) {
   log("Token#_onDragLeftMove");
+
+  // Gridless snapping: pause the mouse position at the token speed boundary.
+  const er = this[MODULE_ID] ??= {};
+  const gridlessSnap = gridlessSnapping(this, event);
+  // console.log(`GridlessSnap ${gridlessSnap}| ${event.interactionData.destination.x},${event.interactionData.destination.y} | cached ${er.gridless?.x},${er.gridless?.y}`);
+  if (  gridlessSnap ) {
+    er.gridless ??= { ...event.interactionData.destination };
+    event.interactionData.destination.x = er.gridless.x;
+    event.interactionData.destination.y = er.gridless.y;
+  } else er.gridless = null;
+
+  // Default token drag move.
   wrapped(event);
 
   // Continue a Ruler measurement.
@@ -160,6 +173,96 @@ function _onDragLeftMove(wrapped, event) {
   const ruler = canvas.controls.ruler;
   if ( ruler._state > 0 ) ruler._onMouseMove(event);
 }
+
+/**
+ * Gridless snapping.
+ * Snap to the dragged token's movement limit.
+ * Inspired by Drag Ruler's version.
+MIT License
+
+Copyright (c) 2021 Manuel Vögele
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+ */
+function gridlessSnapping(token, event) {
+  if ( !canvas.grid.isGridless ) return false;
+  if ( !Settings.useSpeedHighlighting(token) ) return false;
+
+  const ruler = canvas.controls.ruler;
+  if ( !ruler.state === Ruler.STATES.MEASURING ) return false;
+
+  const snapDistance = CONFIG[MODULE_ID]?.gridlessSnapDistance();
+  if ( !snapDistance ) return false;
+
+  // Add the new destination and check the segments.
+  let res = true;
+  const oldDestination = { ...ruler.destination};
+  const snap = !event.shiftKey;
+  const newDest = ruler._getMeasurementDestination(event.interactionData.destination, { snap });
+  // console.log(`eventDest ${event.interactionData.destination.x},${event.interactionData.destination.y}; newDest: ${newDest.x},${newDest.y}`);
+  ruler.destination = newDest;
+  ruler.segments = ruler._getMeasurementSegments();
+  ruler._computeDistance();
+
+  // Test if we just passed the prior speed category limit.
+  const splitterFn = tokenSpeedSegmentSplitter(canvas.controls.ruler, token);
+  const segments = [];
+  for ( const segment of ruler.segments ) segments.push(...splitterFn(segment));
+  if ( segments.length < 2 ) res = false;
+  if ( res ) {
+    res = false;
+    const targetDistance = segments.at(-2).maxSpeedCategoryDistance;
+    const distance = segments.at(-1).cumulativeCost;
+    // console.log(`${distance} < (${targetDistance} + ${snapDistance}) ? ${distance < (targetDistance + rasterWidth)}`);
+
+    // Determine how to adjust the mouse movement.
+    // If just past the target distance, make the mouse movement "sticky".
+    if ( distance < (targetDistance + snapDistance)) res = true;
+  }
+  ruler.destination = oldDestination;
+  return res;
+}
+
+/**
+ * Reverse the calculation to get the destination for the ruler position.
+ * Used with gridless snapping to set the destination.
+ */
+function invertMeasurementDestination(point, { snap = true } = {}) {
+  const origPoint = PIXI.Point.fromObject(point);
+
+  point = wrapped(point, { snap });
+  const token = this.token;
+  if ( !this._isTokenRuler || !token ) return point;
+  if ( !token._preview ) return point;
+
+  // Shift to token center or snapped center
+  if ( !snap ) return point;
+
+  // See Token#_onDragLeftMove.
+  const origin = token.getCenterPoint();
+  const delta = origPoint.subtract(origin, PIXI.Point._tmp);
+  let position = PIXI.Point._tmp2.copyFrom(token.document).add(delta, PIXI.Point._tmp2);
+  const tlSnapped = token._preview.getSnappedPosition(position);
+  return token.getCenterPoint(tlSnapped);
+}
+
 
 /**
  * Wrap Token.prototype._onUpdate to remove easing for pathfinding segments.

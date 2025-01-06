@@ -65,6 +65,7 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
       }
       if ( !speedCategory ) speedCategory = SPEED.CATEGORIES.at(-1);
       segment.speed = speedCategory;
+      segment.maxSpeedCategoryDistance = maxDistance;
 
       // If we have exceeded maxDistance, determine if a split is required.
       const newDistance = totalCombatMoveDistance + segment.cost;
