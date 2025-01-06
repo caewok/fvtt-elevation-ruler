@@ -118,7 +118,6 @@ Hooks.once("init", function() {
        * Ruler label styles
        */
       styles: {
-        total: CONFIG.canvasTextStyle.clone(),
         other: CONFIG.canvasTextStyle.clone(),
         waypoint: CONFIG.canvasTextStyle.clone(),
         elevation: CONFIG.canvasTextStyle.clone(),

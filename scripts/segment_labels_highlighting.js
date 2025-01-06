@@ -140,12 +140,6 @@ export function segmentTerrainLabel(s) {
   const addedCost = roundMultiple(s.waypoint.cost - s.waypoint.offsetDistance);
   if ( addedCost.almostEqual(0) ) return "";
   const symbol = addedCost > 0 ? "+" : "-";
-
-  if ( CONFIG[MODULE_ID].SPEED.useFontAwesome ) {
-    const style = s.label.style;
-    if ( !style.fontFamily.includes("fontAwesome") ) style.fontFamily += ",fontAwesome";
-    return `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${symbol}${Math.abs(addedCost)}${units}`;
-  }
   return `\n${CONFIG[MODULE_ID].SPEED.terrainSymbol} ${symbol}${Math.abs(addedCost)}${units}`;
 }
 
@@ -212,7 +206,6 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
   // Format for Foundry Default: '0 ft [0 ft]'
   const tmpLabel = origLabel;
   origLabel = origLabel.replace(getDefaultLabel(segment), "");
-  if ( origLabel !== "" ) console.debug(`Ruler original label: ${origLabel}`);
 
   // (3) Waypoint
   if ( segment.last && segment.waypoint.idx > 0 ) childLabels.waypoint = {
@@ -220,7 +213,6 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
     value: segment.waypoint.cost,
     descriptor: game.i18n.localize(`${MODULE_ID}.waypoint`)
   };
-
 
   // (4) Elevation
   const displayElevation = !Settings.get(Settings.KEYS.LABELING.HIDE_ELEVATION)
@@ -249,6 +241,8 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
   // This aligns the units label or descriptor.
   alignLeftAndRight(childLabels);
 
+
+
   // Build the string for each.
   // icon value unit description
   const units = canvas.grid.units;
@@ -260,46 +254,24 @@ export function customizedTextLabel(ruler, segment, origLabel = "") {
   if ( units ) totalDistLabel += ` ${units}`;
 
   // Construct a label style for each.
-  const childTextContainers = [];
   if ( origLabel !== "" ) {
-    const textLabel = constructSecondaryLabel(segment, origLabel, "other");
-    alignChildTextLeft(segment.label, textLabel, childTextContainers);
-    childTextContainers.push(textLabel);
-  } else {
-    const textLabel = segment.label.getChildByName("other");
-    if ( textLabel ) textLabel.visible = false;
+    childLabels.other = { label: origLabel };
+    // console.debug(`Ruler original label: ${origLabel}`);
   }
-
-  for ( const name of ["waypoint", "elevation", "terrain"] ) {
+  const childTextContainers = [];
+  for ( const name of ["other", "waypoint", "elevation", "terrain"] ) {
+    const textLabel = segment.label.getChildByName(name);
     const obj = childLabels[name];
     if ( obj ) {
-      const textLabel = constructSecondaryLabel(segment, obj.label, name);
+      textLabel.text = obj.label;
+      textLabel.visible = true;
       alignChildTextLeft(segment.label, textLabel, childTextContainers);
       childTextContainers.push(textLabel);
     } else {
-      const textLabel = segment.label.getChildByName(name);
-      if ( textLabel ) textLabel.visible = false;
+      textLabel.visible = false;
     }
   }
   return totalDistLabel;
-}
-
-function constructSecondaryLabel(segment, text, name) {
-  const labelStyles = CONFIG[MODULE_ID].labeling.styles;
-  const secondaryTextScale = CONFIG[MODULE_ID].labeling.secondaryTextScale;
-  const defaultStyle = labelStyles[name] ?? labelStyles.waypoint;
-  let textLabel = segment.label.getChildByName(name);
-  if ( !textLabel ) {
-    textLabel = new PreciseText("", defaultStyle.clone());
-    textLabel.name = name;
-    segment.label.addChild(textLabel);
-    if ( !textLabel.style.fontFamily.includes("fontAwesome") ) textLabel.style.fontFamily += ",fontAwesome";
-  }
-  textLabel.visible = true;
-  textLabel.text = text;
-  textLabel.style.fontSize = Math.round(defaultStyle.fontSize * secondaryTextScale);
-  textLabel.anchor = { x: 0.5, y: 0.5 };
-  return textLabel;
 }
 
 function getDefaultLabel(segment) {

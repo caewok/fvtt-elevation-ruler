@@ -284,24 +284,31 @@ function _getMeasurementDestination(wrapped, point, {snap=true}={}) {
 // ----- NOTE: Segments ----- //
 
 /**
+ * Helper to build text label for customized labeling.
+ * @param {string} name   What name/style category to give the label
+ * @returns {PIXI.Text}
+ */
+function constructSecondaryLabel(name) {
+  const labelStyles = CONFIG[MODULE_ID].labeling.styles;
+  const secondaryTextScale = CONFIG[MODULE_ID].labeling.secondaryTextScale;
+  const defaultStyle = labelStyles[name] ?? labelStyles.waypoint;
+  const newLabel = new PreciseText("", defaultStyle.clone());
+  newLabel.name = name;
+  newLabel.visible = false;
+  newLabel.style.fontSize = Math.round(defaultStyle.fontSize * secondaryTextScale);
+  newLabel.anchor = { x: 0.5, y: 0.5 };
+  if ( CONFIG[MODULE_ID].SPEED.useFontAwesome
+    && !newLabel.style.fontFamily.includes("fontAwesome") ) newLabel.style.fontFamily += ",fontAwesome";
+  return newLabel;
+}
+
+/**
  * Mixed wrap of  Ruler.prototype._getMeasurementSegments
  * Add elevation information to the segments.
  * Add pathfinding segments.
  * Add segments for traversing regions.
  */
 function _getMeasurementSegments(wrapped) {
-  // If not the user's ruler, segments calculated by original user and copied via socket.
-  if ( this.user !== game.user ) {
-    // Reconstruct labels if necessary.
-    let labelIndex = 0;
-    this.segments ??= [];
-    for ( const s of this.segments ) {
-      if ( !s.label ) continue; // Not every segment has a label.
-      s.label = this.labels.children[labelIndex++] ?? this.labels.addChild(new PreciseText("", CONFIG.canvasTextStyle));
-    }
-    return this.segments;
-  }
-
   // Remove the grandchildren of labels for which the segment is no longer valid.
   const nSegments = this.history.length + this.waypoints.length + 1;
   if ( this.labels.children.length > nSegments ) {
@@ -311,13 +318,38 @@ function _getMeasurementSegments(wrapped) {
     });
   }
 
+  // Create labels as needed. Clone style for further modifications.
+  // See Foundry _getMeasurementSegments.
+  for (let i = this.labels.children.length; i < nSegments; i += 1 ) {
+    const newLabel = new PreciseText("", CONFIG.canvasTextStyle.clone());
+    if ( CONFIG[MODULE_ID].SPEED.useFontAwesome
+      && !newLabel.style.fontFamily.includes("fontAwesome") ) newLabel.style.fontFamily += ",fontAwesome";
+
+    // Add in additional containers for customized labels.
+    if ( Settings.get(Settings.KEYS.LABELING.CUSTOMIZED) ) {
+      for ( const name of Object.keys(CONFIG[MODULE_ID].labeling.styles) ) {
+        const secondaryLabel = constructSecondaryLabel(name);
+        newLabel.addChild(secondaryLabel);
+      }
+    }
+    this.labels.addChild(newLabel);
+  }
+
+  // If not the user's ruler, segments calculated by original user and copied via socket.
+  if ( this.user !== game.user ) {
+    // Reconstruct labels if necessary.
+    let labelIndex = 0;
+    this.segments ??= [];
+    for ( const s of this.segments ) {
+      if ( !s.label ) continue; // Not every segment has a label.
+      s.label = this.labels.children[labelIndex++];
+      if ( !s.label ) console.error(`${MODULE_ID}|_getMeasurementSegments label not found.`);
+    }
+    return this.segments;
+  }
+
   // No segments are present if dragging back to the origin point.
   const segments = wrapped();
-
-  // Make sure the style is cloned for each segment b/c we are adjusting the size.
-  if ( Settings.get(Settings.KEYS.LABELING.SCALE_TEXT) ) {
-    segments.forEach(segment => segment.label.style = segment.label.style.clone());
-  }
 
   const segmentMap = this._pathfindingSegmentMap ??= new Map();
   if ( !segments.length ) {
