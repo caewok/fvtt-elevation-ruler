@@ -91,25 +91,6 @@ Elevation can be changed while using the ruler :
 
 The distance calculation updates based on the distance measured, assuming a straight line in three dimensions between origin and destination, taking into account elevation change. If you add a waypoint, elevation will be tracked at each waypoint. If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint.
 
-## Measuring diagonals
-Nearly every elevation measurement creates a diagonal path from the origin to the elevated or decremented altitude. Elevation Ruler attempts to use the default system measurement to measure these diagonals. For dnd5e, the total distance along the diagonal will follow the chosen dnd5e measurement rule: 5-5-5, 5-10-5, or Euclidean.
-
-For example, here is the measurement that is displayed in DnD 5e with the 5-5-5 rule, where a diagonal move counts as 5 feet:
-
-![Screenshot DnD 5e 5-5-5 Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/measurement_dnd_5-5-5.jpg)
-
-The token would move two squares left and two squares "up".  This first move can be accomplished by moving diagonally up and to the left twice. This totals 10 feet under the DnD 5e 5-5-5 rule (same as if moving two squares left). Moving down two squares then adds a
-
-The token would then moves two squares down in 2-D and down one square in elevation. Similarly to the first move, the second can be accomplished by moving diagonally down 1 square and then down one more square in 2-D, or 10 feet total.
-
-In contrast, using the 5-10-5 rule, the first move incurs an extra 5-foot penalty because moving twice diagonally costs 15 feet.
-
-![Screenshot DnD 5e 5-10-5 Measurement](https://github.com/caewok/fvtt-elevation-ruler/raw/feature/media/media/measurement_dnd_5-10-5.jpg)
-
-Finally, the DnD Euclidean rule relies on Pythagorean's Theorem, rounded to the nearsest foot. Here the token is first elevated 10 feet (14 feet of movement total along the diagonal in 3-D) and then lowered 5 feet (11 feet of movement total).
-
-![Screenshot DnD 5e Euclidean Measurement](https://raw.githubusercontent.com/caewok/fvtt-elevation-ruler/feature/media/media/measurement_dnd_euclidean.jpg)
-
 ## Token measurement
 
 When measuring, the ruler will stay at the origin elevation (or originating token elevation) unless manually changed. But if you drag the ruler over a token that has been elevated or lowered, the ruler will reflect the elevation of that token (plus or minus manually incremented values). (This does not happen if you are dragging tokens; you must use the ruler tool.)
