@@ -114,13 +114,13 @@
     "elevationruler.settings.euclidean-grid-distance.hint": "W przypadku scen siatkowych, jeśli wybrano „Dokładne (√2)” dla głównych ustawień „Przekątne siatki kwadratowej”, wymusi to pomiar odległości euklidesowej zamiast odległości w jednostkach heksów/kwadratów. W przypadku siatki heksów ma to wpływ tylko na ruch po przekątnej.",
 
     "elevationruler.settings.scale-text.name": "Skala tekstu linijki",
-    "elevationruler.settings.scale-text.hint": "Po włączeniu, tekst linijki będzie skalowany w zależności od `canvas.dimensions.size`. Dalsze dostosowanie skalowania za pomocą `CONFIG.elevationruler.textScale`.",
+    "elevationruler.settings.scale-text.hint": "Po włączeniu, tekst linijki będzie skalowany w zależności od `canvas.dimensions.size`. Dalsze dostosowanie skalowania za pomocą `CONFIG.elevationruler.labeling.textScale`.",
 
     "elevationruler.settings.force-grid-penalties.name": "Użycie siatki dla kar za ruch",
     "elevationruler.settings.force-grid-penalties.hint": "Gdy opcja ta jest włączona, kary za ruch są naliczane tylko wtedy, gdy token/rysunek/region pokrywa środek heksu/kwadratu, a kary są naliczane za kwadrat lub heks na mapach z siatką. Gdy opcja ta jest wyłączona, kary za ruch są naliczane proporcjonalnie do ruchu. Na przykład, jeśli rysunek z karą ruchu x2 obejmuje 3/4 pola siatki, będzie ona stosowana do 3/4 ruchu przez to pole (tj. kara 1,5x).",
 
     "elevationruler.settings.customized-labels.name": "Niestandardowy tekst linijki",
-    "elevationruler.settings.customized-labels.hint": "Dostosuj tekst linijki. Zmień style używając `CONFIG.elevationruler.labelStyles` i `CONFIG.elevationruler.labelIcons`.",
+    "elevationruler.settings.customized-labels.hint": "Dostosuj tekst linijki. Zmień style używając `CONFIG.elevationruler.labeling.styles` i `CONFIG.elevationruler.labeling.icons`.",
 
     "elevationruler.controls.prefer-token-elevation.name": "Preferuj wysokość tokena",
     "elevationruler.controls.pathfinding-control.name": "Użyj wyszukiwania ścieżek",
