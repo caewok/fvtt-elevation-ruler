@@ -104,7 +104,7 @@ export function defaultWalkAttribute() {
     case "pf1":
     case "D35E":            return "actor.system.attributes.speed.land.total";
     case "shadowrun5e":     return "actor.system.movement.walk.value";
-    case "swade":           return "actor.system.stats.speed.adjusted";
+    case "swade":           return "actor.system.pace.ground";
     case "ds4":             return "actor.system.combatValues.movement.total";
     case "splittermond":    return "actor.derivedValues.speed.value";
     case "wfrp4e":          return "actor.system.details.move.walk";
@@ -131,6 +131,7 @@ export function defaultFlyAttribute() {
     case "dnd5e":           return "actor.system.attributes.movement.fly";
     case "pf1":
     case "D35E":            return "actor.system.attributes.speed.fly.total";
+    case "swade":           return "actor.system.pace.fly";
     case "twodsix":         return "actor.system.movement.fly";
     case "worldofdarkness": return "actor.system.movement.fly";
     case "gurps":           return "actor.system.currentflight";
@@ -151,6 +152,7 @@ export function defaultBurrowAttribute() {
     case "dnd5e":         return "actor.system.attributes.movement.burrow";
     case "pf1":
     case "D35E":          return "actor.system.attributes.speed.burrow.total";
+    case "swade":         return "actor.system.pace.burrow";
     case "twodsix":       return "actor.system.movement.burrow";
     default:              return "";
   }
