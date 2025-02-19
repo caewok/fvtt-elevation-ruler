@@ -230,11 +230,11 @@ function gridlessSnapping(token, event) {
     res = false;
     const targetDistance = segments.at(-2).maxSpeedCategoryDistance;
     const distance = segments.at(-1).cumulativeCost;
-    // console.log(`${distance} < (${targetDistance} + ${snapDistance}) ? ${distance < (targetDistance + rasterWidth)}`);
+    // console.log(`distance ${distance} | targetDistance ${targetDistance} | ${snapDistance} | ${distance < (targetDistance + snapDistance) && distance >= targetDistance}`);
 
     // Determine how to adjust the mouse movement.
     // If just past the target distance, make the mouse movement "sticky".
-    if ( distance < (targetDistance + snapDistance)) res = true;
+    if ( distance >= targetDistance && distance < (targetDistance + snapDistance) ) res = true;
   }
   ruler.destination = oldDestination;
   return res;
