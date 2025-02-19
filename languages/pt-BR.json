@@ -114,13 +114,13 @@
     "elevationruler.settings.euclidean-grid-distance.hint": "Para cenas em grade, se 'Exato (√2)' for escolhido para a configuração principal 'Diagonais de Grade Quadrada', isso forçará a medição da distância euclidiana em vez da distância em hexágonos/quadrados unitários. Para grades hexagonais, apenas o movimento de elevação diagonal é afetado.",
 
     "elevationruler.settings.scale-text.name": "Texto da Régua de Escala",
-    "elevationruler.settings.scale-text.hint": "Quando ativado, o texto da régua será dimensionado dependendo do `canvas.dimensions.size`. Ajuste ainda mais a escala usando `CONFIG.elevationruler.textScale`.",
+    "elevationruler.settings.scale-text.hint": "Quando ativado, o texto da régua será dimensionado dependendo do `canvas.dimensions.size`. Ajuste ainda mais a escala usando `CONFIG.elevationruler.labeling.textScale`.",
 
     "elevationruler.settings.force-grid-penalties.name": "Usar Grade para Penalidades de Movimento",
     "elevationruler.settings.force-grid-penalties.hint": "Quando ativado, as penalidades de movimento só se aplicam se o token/desenho/região cobrir o centro do hexágono/quadrado e as penalidades são aplicadas por quadrado ou por hexágono em mapas com grade. Quando desativado, as penalidades de movimento são aplicadas proporcionalmente ao movimento. Por exemplo, se um desenhor com uma penalidade de movimento x2 cobrir 3/4 de um quadrado da grade, ele será aplicado a 3/4 do movimento através desse quadrado (ou seja, penalidade de 1,5x).",
 
     "elevationruler.settings.customized-labels.name": "Texto da Régua Personalizado",
-    "elevationruler.settings.customized-labels.hint": "Personalize o texto da régua. Altere os estilos usando `CONFIG.elevationruler.labelStyles` e `CONFIG.elevationruler.labelIcons`.",
+    "elevationruler.settings.customized-labels.hint": "Personalize o texto da régua. Altere os estilos usando `CONFIG.elevationruler.labeling.styles` e `CONFIG.elevationruler.labeling.icons`.",
     
     "elevationruler.controls.prefer-token-elevation.name": "Prefira Elevação do Token",
     "elevationruler.controls.pathfinding-control.name": "Usar Descoberta de Rota",
