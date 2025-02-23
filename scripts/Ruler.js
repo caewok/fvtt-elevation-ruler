@@ -706,7 +706,9 @@ function _createMeasurementHistory(wrapped) {
  */
 function _canMove(wrapper, token) {
   if ( this.user.isGM ) return true;
-  if ( !wrapper(token) ) return false;
+  if ( token.document?.allowPlayerMove && token.document.allowPlayerMove() ) return true; // Move-that-for-you module. See issue #241.
+  const baseCanMove = wrapper(token);
+  if ( !baseCanMove) return false;
 
   // Adjust each segment for the difference from the original token position.
   // Important when dragging multiple tokens.
@@ -729,7 +731,7 @@ function _canMove(wrapper, token) {
     y = adjustedDestination.y;
   }
 
-  return wrapper(token);
+  return baseCanMove;
 }
 
 /**
