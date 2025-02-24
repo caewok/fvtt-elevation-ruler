@@ -1,3 +1,13 @@
+# 0.10.18
+Rework Bresenham algorithm for grid 3d and hex 3d, to fix skipping of hexes and to ensure
+that the algorithm uses double-diagonals when moving in 3d. Use preallocated array to increase speed. Closes #247.
+Fix for gridless ruler freezing when movement history is present. Closes #248.
+Add check to allow user to drag token when Move-that-for-you module is present and token move is enabled. Closes #241.
+Update Polish translation. Thanks @Liohart!
+Update Brazilian Portuguese translation. Thanks @Kharmans!
+Update SWADE 4.2.0 system attributes. Thanks @roth-michael!
+Update libGeometry to v0.3.20.
+
 # 0.10.17
 Correct measurement of diagonals in grids, due to offsets getting counted as straight instead of diagonal. Closes #227.
 When moving multiple tokens, use the elevation of each token as the start for the move, so that tokens at different elevations are not set to the same elevation. Closes #231.
