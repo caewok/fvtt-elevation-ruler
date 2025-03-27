@@ -72,7 +72,7 @@ export function tokenSpeedSegmentSplitter(ruler, token) {
       if ( newDistance > maxDistance || newDistance.almostEqual(maxDistance ) ) {
         if ( newDistance > maxDistance ) {
           // Split the segment, inserting the latter portion in the queue for future iteration.
-          const splitDistance = maxDistance - totalCombatMoveDistance;
+          const splitDistance = maxDistance - totalCombatMoveDistance - (segment.cost - segment.distance);
           const breakpoint = locateSegmentBreakpoint(segment, splitDistance, { mp, token, gridless, numPrevDiagonal });
           if ( breakpoint ) {
             if ( breakpoint.almostEqual(segment.ray.A) ) {

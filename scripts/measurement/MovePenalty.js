@@ -226,7 +226,7 @@ export class MovePenalty {
     else tClone.actor.applyActiveEffects(); // Does not work for DAE (at least in dnd5e v3).
 
     // Determine the speed of the token clone and cache for future reference.
-    const speed = SPEED.tokenSpeed(tClone, this.movementType);
+    const speed = (SPEED.tokenSpeed(tClone, this.movementType))/this.constructor.tokenMultiplier;
     this._regionPenaltyMap.set(key, speed);
     return speed || 1;
   }
