@@ -566,23 +566,95 @@ class GPUPathfinder {
 
                 @compute @workgroup_size(8, 8)
                 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-                    let x = id.x; let y = id.y;
-                    if (x >= grid.width || y >= grid.height) { return; }
+                    let x = id.x;
+                    let y = id.y;
+                    if ( x >= grid.width || y >= grid.height ) { return; }
                     let idx = get_idx(x, y);
 
+                    // Wall check
                     // 1u represents a WALL.
-                    if (mapState[idx] == 1u) { outputDist[idx] = 0xFFFFFFFFu; return; }
+                    if ( mapState[idx] == 1u ) {
+                      outputDist[idx] = 0xFFFFFFFFu;
+                      return;
+                    }
 
                     let current = inputDist[idx];
                     var best = 0xFFFFFFFFu;
 
-                    if (x > 0u) { best = min(best, inputDist[get_idx(x - 1u, y)]); }
-                    if (x < grid.width - 1u) { best = min(best, inputDist[get_idx(x + 1u, y)]); }
-                    if (y > 0u) { best = min(best, inputDist[get_idx(x, y - 1u)]); }
-                    if (y < grid.height - 1u) { best = min(best, inputDist[get_idx(x, y + 1u)]); }
+                    // Costs
+                    let COST_STRAIGHT = 10u;
+                    let COST_DIAG = 14u;
+                    let MAX_VAL = 0xFFFFFFFFu;
 
-                    if (best != 0xFFFFFFFFu) { outputDist[idx] = min(current, best + 1u); }
-                    else { outputDist[idx] = current; }
+                    // ----- Check straight neighbors (cost 10) ----- //
+                    // Left
+                    if (x > 0u) {
+                        let v = inputDist[get_idx(x - 1u, y)];
+                        if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
+                    }
+
+                    // Right
+                    if (x < grid.width - 1u) {
+                        let v = inputDist[get_idx(x + 1u, y)];
+                        if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
+                    }
+
+                    // Up
+                    if (y > 0u) {
+                        let v = inputDist[get_idx(x, y - 1u)];
+                        if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
+                    }
+
+                    // Down
+                    if (y < grid.height - 1u) {
+                        let v = inputDist[get_idx(x, y + 1u)];
+                        if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
+                    }
+
+                    // --- Check Diagonal Neighbors (Cost 14) ---
+
+                    // Strict diagonal check top-left example
+                    // if (x > 0u && y > 0u) {
+                    //  let left_wall = mapState[get_idx(x - 1u, y)] == 1u;
+                    //  let up_wall = mapState[get_idx(x, y - 1u)] == 1u;
+
+                    //  // Only process diagonal if adjacent cardinals are NOT walls
+                    //  if (!left_wall && !up_wall) {
+                    //       let v = inputDist[get_idx(x - 1u, y - 1u)];
+                    //       if (v != MAX_VAL) { best = min(best, v + COST_DIAG); }
+                    //  }
+                    // }
+
+                    // Top-Left
+                    if (x > 0u && y > 0u) {
+                        let v = inputDist[get_idx(x - 1u, y - 1u)];
+                        if (v != MAX_VAL) { best = min(best, v + COST_DIAG); }
+                    }
+
+                    // Top-Right
+                    if (x < grid.width - 1u && y > 0u) {
+                        let v = inputDist[get_idx(x + 1u, y - 1u)];
+                        if (v != MAX_VAL) { best = min(best, v + COST_DIAG); }
+                    }
+
+                    // Bottom-Left
+                    if (x > 0u && y < grid.height - 1u) {
+                        let v = inputDist[get_idx(x - 1u, y + 1u)];
+                        if (v != MAX_VAL) { best = min(best, v + COST_DIAG); }
+                    }
+
+                    // Bottom-Right
+                    if (x < grid.width - 1u && y < grid.height - 1u) {
+                        let v = inputDist[get_idx(x + 1u, y + 1u)];
+                        if (v != MAX_VAL) { best = min(best, v + COST_DIAG); }
+                    }
+
+                    // Update
+                    if ( best != MAX_VAL ) {
+                      outputDist[idx] = min(current, best);
+                    } else {
+                      outputDist[idx] = current;
+                    }
                 }
             `
         });
@@ -626,7 +698,8 @@ class GPUPathfinder {
 
         // Iterate enough times to cover the map (Manhattan distance approx)
         // For a generic grid, Width + Height is a safe upper bound.
-        const iterations = this.width + this.height;
+        // With diagonals, increase 150%.
+        const iterations = Math.max(this.width + this.height) * 1.5;
 
         for (let i = 0; i < iterations; i++) {
             // Swap bind groups every iteration
@@ -691,35 +764,55 @@ class GPUPathfinder {
         let idx = curr.y * this.width + curr.x;
 
         if (distMap[idx] === 0xFFFFFFFF) return null; // No path found
+        path.push({ ...curr });
 
-        while (distMap[idx] !== 0) {
-            path.push({ ...curr });
+        // Safety to break infinite loops in bad maps.
+        let safety = 0;
+        const MAX_STEPS = this.width * this.height;
+        while (distMap[idx] !== 0 && safety < MAX_STEPS) {
+            safety += 1;
 
             // Look for neighbor with strictly lower distance
             const neighbors = [
-                { x: curr.x - 1, y: curr.y },
-                { x: curr.x + 1, y: curr.y },
-                { x: curr.x, y: curr.y - 1 },
-                { x: curr.x, y: curr.y + 1 }
+              // Straight
+              { x: curr.x - 1, y: curr.y }, // Left
+              { x: curr.x + 1, y: curr.y }, // Right
+              { x: curr.x, y: curr.y - 1 }, // Top
+              { x: curr.x, y: curr.y + 1 }, // Bottom
+
+              // Diagonals
+              { x: curr.x - 1, y: curr.y - 1 }, // Top Left
+              { x: curr.x + 1, y: curr.y - 1 }, // Top Right
+              { x: curr.x - 1, y: curr.y + 1 }, // Bottom Left
+              { x: curr.x + 1, y: curr.y + 1 }, // Bottom Right
             ];
 
-            let found = false;
-            let currentDist = distMap[idx];
+            let bestNode = null;
+            let lowestDist = distMap[idx]; // Starts with the current distance.
 
-            for (let n of neighbors) {
-                if (n.x >= 0 && n.x < this.width && n.y >= 0 && n.y < this.height) {
-                    let nIdx = n.y * this.width + n.x;
-                    if (distMap[nIdx] < currentDist) {
-                        curr = n;
-                        idx = nIdx;
-                        found = true;
-                        break;
-                    }
+            // Find the neighbor with the strictly lowest distance value.
+            for ( let n of neighbors ) {
+              // Boundary checks
+              if ( n.x >= 0 && n.x < this.width && n.y >= 0 && n.y < this.height ) {
+                let nIdx = n.y * this.width + n.x;
+                let val = distMap[nIdx];
+
+                // We just want to roll "downhill" to 0.
+                // Any neighbor with a lower value is a valid step towards home.
+                if ( val < lowestDist ) {
+                  lowestDist = val;
+                  bestNode = n;
+                  // Optimization: You could break here if you don't care about "perfect" path smoothness,
+                  // but iterating all 8 ensures we pick the steepest descent.
                 }
+              }
             }
-            if (!found) break; // Should not happen if path exists
+            if ( bestNode ) {
+               curr  = bestNode;
+                idx = curr.y * this.width + curr.x;
+                path.push({ ...curr });
+            } else break; // We got stuck. Shouldn't happen in valid wavefront.
         }
-        path.push(curr); // Add start node
         return path.reverse();
     }
 }
@@ -774,4 +867,6 @@ function drawPath(path, { scale = 100 } = {}) {
   Draw.point(path.at(-1), { radius: drawOpts.radius + 1, color: Draw.lightorange})
 }
 
+drawMap(map)
+drawPath(path)
 
