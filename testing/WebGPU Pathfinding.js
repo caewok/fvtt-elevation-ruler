@@ -1185,6 +1185,7 @@ function drawMapWithFeatures(map, features, { width, height, scale = 100 } = {})
 
     const terrainValue = map[i];
     drawOpts.color = features.get(terrainValue);
+    drawOpts.fill = drawOpts.color;
 
     // console.log(`${i}: ${x},${y}`)
     Draw.shape(rect, drawOpts);
