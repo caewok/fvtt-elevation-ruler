@@ -8,6 +8,7 @@ PIXI,
 Region
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
+"use strict";
 
 import { BorderTriangle, BorderEdge } from "./BorderTriangle.js";
 import { boundsForPoint, segmentBounds, log } from "../util.js";
@@ -30,23 +31,30 @@ Pathfinder = api.pathfinding.Pathfinder
 SCENE_GRAPH = api.pathfinding.SCENE_GRAPH
 BorderEdge = api.pathfinding.BorderEdge
 BorderTriangle = api.pathfinding.BorderTriangle
-PriorityQueueArray = api.pathfinding.PriorityQueueArray;
 PriorityQueue = api.pathfinding.PriorityQueue;
 
 // Test queue (PQ takes only objects, not strings or numbers)
-pq = new PriorityQueueArray("high")
+pq = new PriorityQueue("high")
 pq.enqueue({"D": 4}, 4)
 pq.enqueue({"A": 1}, 1);
 pq.enqueue({"C": 3}, 3);
 pq.enqueue({"B": 2}, 2);
 pq.data
 
-pq = new PriorityQueueArray("low")
+pq = new PriorityQueue("low")
 pq.enqueue({"D": 4}, 4)
 pq.enqueue({"A": 1}, 1);
 pq.enqueue({"C": 3}, 3);
 pq.enqueue({"B": 2}, 2);
 pq.data
+
+pq = new PriorityQueue()
+pq.enqueue({"D": 4}, 4)
+pq.enqueue({"A": 1}, 1);
+pq.enqueue({"C": 3}, 3);
+pq.enqueue({"B": 2}, 2);
+
+
 
 // Test SCENE_GRAPH
 SCENE_GRAPH.drawEdges()
