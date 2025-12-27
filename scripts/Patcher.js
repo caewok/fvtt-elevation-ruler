@@ -1,7 +1,7 @@
 /* globals
-CONFIG,
+foundry,
 Hooks,
-libWrapper
+libWrapper,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
@@ -204,45 +204,29 @@ export class Patcher {
   /**
    * A thorough lookup method to locate Foundry classes by name.
    * Relies on CONFIG where possible, falling back on eval otherwise.
-   * @param {string} className
+   * @param {string|function} className         Class name or namespace path to class or the class function
    * @param {object} [opts]
-   * @param {boolean} [opts.returnPathString]   Return a string path to the object, for libWrapper.
-   * @returns {class}
+   * @param {boolean} [opts.returnPathString]   Return a string path to the object, primarily for libWrapper.
+   * @returns {class|string|null}
    */
   static lookupByClassName(className, { returnPathString = false } = {}) {
-    if ( className === "Ruler" ) return returnPathString ? "CONFIG.Canvas.rulerClass" : CONFIG.Canvas.rulerClass;
-    let isDoc = className.endsWith("Document");
-    let isConfig = className.endsWith("Config");
-    let baseClass = isDoc ? className.replace("Document", "")
-      : isConfig ? className.replace("Config", "")
-        : className;
+    if ( typeof className === "function" ) return returnPathString ? lookup(className.name) : className;
 
-    const configObj = CONFIG[baseClass];
-    if ( isConfig && configObj && configObj.sheetClasses?.base ) {
-      // Attempt to locate a base sheet class.
-      for ( const [key, obj] of Object.entries(configObj.sheetClasses.base) ) {
-        if ( !(obj.default && obj.cls) ) continue;
-        return returnPathString ? `CONFIG.${baseClass}.sheetClasses.base["${key}"].cls` : obj.cls;
-      }
+    // Is a class name or path.
+    // Class names cannot have periods in JS.
+    // Either, e.g.:
+    // • Token
+    // • foundry.canvas.placeables.Token <-- Always starts with "foundry."
+    // • some.other.module.namespace.TokenClass
+    const path = className.includes(".") ? className : lookup(className);
+    if ( path ) {
+      try {
+        const cl = eval?.(`"use strict";(${className})`);
+        if ( typeof cl === "function" ) return returnPathString ? className : cl;
+      } catch(error) { /* empty */ } /* eslint-disable-line no-unused-vars */
     }
-
-    if ( !configObj || isConfig ) return returnPathString ? className : eval?.(`"use strict";(${className})`);
-
-    // Do this the hard way to catch inconsistencies
-    switch ( className ) {
-      case "Actor":
-      case "ActiveEffect":
-      case "RegionBehavior":
-      case "Item":
-        isDoc = true; break;
-    }
-
-    if ( isDoc && configObj.documentClass ) {
-      return returnPathString ? `CONFIG.${baseClass}.documentClass` : configObj.documentClass;
-    }
-
-    if ( configObj.objectClass ) return returnPathString ? `CONFIG.${baseClass}.objectClass` : configObj.objectClass;
-    return returnPathString ? className : eval?.(`"use strict";(${className})`);
+    console.error(`lookupByClassName|${className} not found`);
+    return null;
   }
 
   /**
@@ -492,4 +476,37 @@ export class LibWrapperPatch extends AbstractPatch {
     libWrapper.unregister(MODULE_ID, this.regId, false);
     this.regId = undefined;
   }
+}
+
+/**
+ * Lookup a class name in the foundry namespace.
+ * Recursively traverses the directory.
+ * @param {string} className
+ * @param {object} [dir=foundry] Starting point
+ * @returns {string} The directory path
+ */
+function lookup(className) {
+   const res = lookupRecursive(className);
+   if ( res ) return `foundry.${res}`;
+ }
+
+ function lookupRecursive(className, dir = foundry) {
+  for ( const [key, obj] of Object.entries(dir) ) {
+    // Skip CONFIG and CONST directories
+    if ( key === "CONFIG" || key === "CONST" ) continue;
+    // console.log(`${key}: ${typeof obj}`, obj);
+
+    switch ( typeof obj ) {
+      case "function": {
+        if ( obj.name === className ) return key;
+        break;
+      }
+      case "object": {
+        const res = lookupRecursive(className, obj);
+        if ( res ) return `${key}.${res}`;
+        break;
+      }
+    }
+  }
+  return null;
 }

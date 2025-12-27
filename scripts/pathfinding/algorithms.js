@@ -6,7 +6,7 @@ PIXI
 "use strict";
 
 import { Draw } from "../geometry/Draw.js";
-import { PriorityQueueArray } from "./PriorityQueueArray.js";
+import { PriorityQueue } from "./PriorityQueue.js";
 
 // See https://www.redblobgames.com/pathfinding/a-star/introduction.html
 
@@ -165,8 +165,8 @@ export class BreadthFirstPathSearch {
  * Dijkstra's Algorithm, or uniform cost path search.
  */
 export class UniformCostPathSearch extends BreadthFirstPathSearch {
-  /** @type {PriorityQueueArray<PathNode>} */
-  frontier = new PriorityQueueArray("low");
+  /** @type {PriorityQueue<PathNode>} */
+  frontier = new PriorityQueue("low");
 
   /** @type {Map<PathNode.key, number>} */
   costSoFar = new Map();
@@ -225,8 +225,8 @@ export class UniformCostPathSearch extends BreadthFirstPathSearch {
  * Greedy search
  */
 export class GreedyPathSearch extends BreadthFirstPathSearch {
-  /** @type {PriorityQueueArray<PathNode>} */
-  frontier = new PriorityQueueArray("low");
+  /** @type {PriorityQueue<PathNode>} */
+  frontier = new PriorityQueue("low");
 
   clear() {
     this.start = undefined;

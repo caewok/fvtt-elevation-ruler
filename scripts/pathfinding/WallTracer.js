@@ -18,7 +18,7 @@ import { groupBy, segmentBounds } from "../util.js";
 import { Draw } from "../geometry/Draw.js";
 import { Graph, GraphVertex, GraphEdge } from "../geometry/Graph.js";
 import { Settings } from "../settings.js";
-import { doSegmentsOverlap, IX_TYPES, segmentCollision } from "../geometry/util.js";
+import { doSegmentsOverlap, IX_TYPES, segmentCollision, roundDecimals } from "../geometry/util.js";
 import { MODULE_ID, OTHER_MODULES, FLAGS } from "../const.js";
 
 /* WallTracerVertex
@@ -459,7 +459,7 @@ export class WallTracer extends Graph {
    * @param {WallTracerCollision} c   Collision to group
    * @returns {number} The t0 property, rounded.
    */
-  static _keyGetter(c) { return CONFIG.GeometryLib.utils.roundDecimals(c.t0, WallTracer.PLACES); }
+  static _keyGetter(c) { return roundDecimals(c.t0, WallTracer.PLACES); }
 
   /**
    * Map of a set of edges, keyed to the placeable's id.
