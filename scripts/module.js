@@ -1,6 +1,5 @@
 /* globals
 canvas,
-controls,
 game,
 CONFIG,
 Hooks,
@@ -20,9 +19,19 @@ import { registerGeometry } from "./geometry/registration.js";
 import { BorderTriangle, BorderEdge } from "./pathfinding/BorderTriangle.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
 import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./pathfinding/algorithms.js";
-import { PriorityQueueArray } from "./pathfinding/PriorityQueueArray.js";
 import { PriorityQueue } from "./pathfinding/PriorityQueue.js";
 import { benchPathfinding } from "./pathfinding/benchmark.js";
+
+import { AbstractPathfinder } from "./pathfinding/AbstractPathfinder.js";
+import {
+  SimplePathfindingWorld,
+  FoundryPathfindingWorld,
+  BFSPathfinder,
+  UniformCostPathfinder,
+  GreedyBestFirstPathfinder,
+  AStarPathfinder,
+} from "./pathfinding/SimplePathfinding.js";
+
 
 // Wall updates for pathfinding
 import { SCENE_GRAPH, WallTracer, WallTracerEdge, WallTracerVertex } from "./pathfinding/WallTracer.js";
@@ -84,10 +93,17 @@ Hooks.once("init", function() {
       UniformCostPathSearch,
       GreedyPathSearch,
       AStarPathSearch,
-      PriorityQueueArray,
       PriorityQueue,
       benchPathfinding,
-      SCENE_GRAPH
+      SCENE_GRAPH,
+
+      AbstractPathfinder,
+      SimplePathfindingWorld,
+      FoundryPathfindingWorld,
+      BFSPathfinder,
+      UniformCostPathfinder,
+      GreedyBestFirstPathfinder,
+      AStarPathfinder,
     },
 
     WallTracer, WallTracerEdge, WallTracerVertex,
