@@ -30,7 +30,15 @@ const SETTINGS = {
       ALL: "pathfinding_tokens_block_all"
     },
     LIMIT_TOKEN_LOS: "pathfinding_limit_token_los",
-    SNAP_TO_GRID: "pathfinding_snap_to_grid"
+    SNAP_TO_GRID: "pathfinding_snap_to_grid",
+    ALGORITHM: "pathfinding-algorithm",
+    ALGORITHM_CHOICES: {
+      SIMPLE: "pathfinding-algorithm-simple",
+      // TRIANGLEMESH: pathfinding-algorithm-trianglemesh,
+      // POLYMESH: "pathfinding-algorithm-polymesh",
+      // NAVMESH: "pathfinding-algorithm-navmesh", // recast-detour library
+      // WEBGPU: "pathfinding-algorithm-webgpu",
+    }
   },
 
   NO_MODS: "no-modules-message",
@@ -70,6 +78,20 @@ export class Settings extends ModuleSettingsAbstract {
       default: true,
       type: Boolean,
       requiresReload: false
+    });
+
+    const pathfindingAlgChoices = {};
+    Object.values(KEYS.PATHFINDING.ALGORITHM_CHOICES).forEach(alg => pathfindingAlgChoices[alg] = localize(alg));
+    register(KEYS.PATHFINDING.ALGORITHM, {
+      name: localize(`${KEYS.PATHFINDING.ALGORITHM}.name`),
+      // Currently unused hint: localize(`${KEYS.PATHFINDING.ALGORITHM}.hint`),
+      scope: "user",
+      config: true,
+      default: KEYS.PATHFINDING.ALGORITHM_CHOICES.SIMPLE,
+      type: String,
+      requiresReload: false,
+      choices: pathfindingAlgChoices,
+      // onChange: value => this.set(value) // TODO: Initialize the pathfinding algorithm?
     });
 
     register(KEYS.PATHFINDING.ENABLE, {

@@ -74,6 +74,13 @@ Hooks.once("init", function() {
     tokenPathfindingBuffer: -1,
 
     /**
+     * For the simple pathfinding algorithm, choose the type to apply.
+     * Used in testing; user would almost always want AStar.
+     * @type {"astar"|"greedy"|"breadthfirst"|"uniformcost"}
+     */
+    simplePathfindingAlgorithm: "astar",
+
+    /**
      * Enable certain debug console logging and tests.
      * @type {boolean}
      */
