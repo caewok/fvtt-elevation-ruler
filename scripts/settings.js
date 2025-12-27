@@ -33,19 +33,6 @@ const SETTINGS = {
     SNAP_TO_GRID: "pathfinding_snap_to_grid"
   },
 
-  LABELING: {
-    HIDE_ELEVATION: "hide-elevation-ruler",
-    ROUND_TO_MULTIPLE: "round-to-multiple",
-    USE_LEVELS_LABEL: "levels-use-floor-label",
-    LEVELS_LABELS: {
-      NEVER: "levels-labels-never",
-      UI_ONLY: "levels-labels-ui",
-      ALWAYS: "levels-labels-always"
-    },
-    CUSTOMIZED: "customized-labels",
-    SCALE_TEXT: "scale-text"
-  },
-
   NO_MODS: "no-modules-message",
 };
 
@@ -130,45 +117,6 @@ export class Settings extends ModuleSettingsAbstract {
       default: false,
       type: Boolean,
       requiresReload: false
-    });
-
-    register(KEYS.LABELING.SCALE_TEXT, {
-      name: localize(`${KEYS.LABELING.SCALE_TEXT}.name`),
-      hint: localize(`${KEYS.LABELING.SCALE_TEXT}.hint`),
-      scope: "user",
-      config: true,
-      default: false,
-      type: Boolean,
-      requiresReload: false
-    });
-
-    register(KEYS.LABELING.CUSTOMIZED, {
-      name: localize(`${KEYS.LABELING.CUSTOMIZED}.name`),
-      hint: localize(`${KEYS.LABELING.CUSTOMIZED}.hint`),
-      scope: "user",
-      config: true,
-      default: false,
-      type: Boolean,
-      requiresReload: false
-    });
-
-    register(KEYS.LABELING.HIDE_ELEVATION, {
-      name: localize(`${KEYS.LABELING.HIDE_ELEVATION}.name`),
-      hint: localize(`${KEYS.LABELING.HIDE_ELEVATION}.hint`),
-      scope: "user",
-      config: true,
-      default: false,
-      type: Boolean,
-      requiresReload: false
-    });
-
-    register(KEYS.LABELING.ROUND_TO_MULTIPLE, {
-      name: localize(`${KEYS.LABELING.ROUND_TO_MULTIPLE}.name`),
-      hint: localize(`${KEYS.LABELING.ROUND_TO_MULTIPLE}.hint`),
-      scope: "world",
-      config: true,
-      default: 0.1,
-      type: Number
     });
   }
 
