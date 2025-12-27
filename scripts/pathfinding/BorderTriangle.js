@@ -14,6 +14,7 @@ import { Draw } from "../geometry/Draw.js";
 import { WallTracerEdge } from "./WallTracer.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { Settings } from "../settings.js";
+import { gridUnitsToPixels } from "../geometry/util.js";
 
 const OTHER_DIRECTION = {
   ccw: "cw",
@@ -463,10 +464,10 @@ export class BorderTriangle {
    * @param {Token} [token]                         Token doing the movement
    * @returns {PathNode[]}
    */
-  getValidDestinationsWithCost(priorTriangle, elevation, spacer, fromPoint, token, movePenaltyInstance) {
+  getValidDestinationsWithCost(priorTriangle, elevation, spacer, fromPoint, token) {
     const destinations = this.getValidDestinations(priorTriangle, elevation, spacer);
     destinations.forEach(d => {
-      d.cost = this._calculateMovementCost(fromPoint, d.entryPoint, token, movePenaltyInstance);
+      d.cost = this._calculateMovementCost(fromPoint, d.entryPoint, token);
 
       // NaN is bad--results in infinite loop; probably don't want to set NaN to 0 cost.
       if ( !Number.isFinite(d.cost) ) d.cost = 1e06;
@@ -482,17 +483,14 @@ export class BorderTriangle {
    * @param {Token} [token]                           Token doing the movement
    * @returns {number} Cost value
    */
-  _calculateMovementCost(fromPoint, toPoint, token, movePenaltyInstance) {
+  _calculateMovementCost(fromPoint, toPoint, token) {
     // TODO: Handle 3d distance. Probably Ray3d with measureDistance or measureDistances.
     // TODO: Handle terrain distance.
     const diagonals = Settings.get(Settings.KEYS.MEASURING.EUCLIDEAN_GRID_DISTANCE)
       ? GridCoordinates3d.GRID_DIAGONALS.EUCLIDEAN : canvas.grid.diagonals;
     let distance;
-    if ( CONFIG[MODULE_ID].pathfindingCheckTerrains ) {
-      const res = movePenaltyInstance.measureSegment(fromPoint, toPoint, { numPrevDiagonal: 0, diagonals });
-      distance = res.cost;
-    } else distance = GridCoordinates3d.gridDistanceBetween(fromPoint, toPoint, { diagonals });
-    return CONFIG.GeometryLib.utils.gridUnitsToPixels(distance);
+    distance = GridCoordinates3d.gridDistanceBetween(fromPoint, toPoint, { diagonals });
+    return gridUnitsToPixels(distance);
   }
 
   /**

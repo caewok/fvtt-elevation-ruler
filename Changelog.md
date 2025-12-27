@@ -1,3 +1,12 @@
+# 1.0.0
+Update to v13.
+Remove features now covered by v13 base install.
+- Token Ruler.
+- Speed highlighting.
+- 3d measurement.
+
+
+
 # 0.10.18
 Rework Bresenham algorithm for grid 3d and hex 3d, to fix skipping of hexes and to ensure
 that the algorithm uses double-diagonals when moving in 3d. Use preallocated array to increase speed. Closes #247.

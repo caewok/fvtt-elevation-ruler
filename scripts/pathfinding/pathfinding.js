@@ -17,8 +17,10 @@ import { SCENE_GRAPH } from "./WallTracer.js";
 import { cdt2dConstrainedGraph, cdt2dToBorderTriangles } from "../delaunator/cdt2d_access_functions.js";
 import { Settings } from "../settings.js";
 import { MODULE_ID } from "../const.js";
-import { MovePenalty } from "../measurement/MovePenalty.js";
-
+import { gridUnitsToPixels } from "../geometry/util.js";
+import { GridCoordinates } from "../geometry/GridCoordinates.js";
+import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
+import { PixelCache } from "../geometry/PixelCache.js";
 
 /* Testing
 
@@ -220,9 +222,6 @@ export class Pathfinder {
   /** @type {number} */
   startElevation = 0;
 
-  /** @type {MovePenalty} */
-  movePenaltyInstance;
-
   /**
    * Optional token to associate with this path.
    * Used for path spacing near obstacles.
@@ -230,7 +229,6 @@ export class Pathfinder {
    */
   constructor(token) {
     this.token = token;
-    this.movePenaltyInstance = new MovePenalty(token);
   }
 
   /** @type {number} */
@@ -305,9 +303,8 @@ export class Pathfinder {
    * @param {PathNode} current
    */
   _heuristic(goal, current) {
-    const geom = CONFIG.GeometryLib;
-    const distance = geom.threeD.GridCoordinates3d.gridDistanceBetween(goal.entryPoint, current.entryPoint);
-    return geom.utils.gridUnitsToPixels(distance);
+    const distance = GridCoordinates3d.gridDistanceBetween(goal.entryPoint, current.entryPoint);
+    return gridUnitsToPixels(distance);
   }
 
   /**
@@ -383,7 +380,7 @@ export class Pathfinder {
       // Need a copy so we can modify cost for this goal node only.
       const newNode = {...goal};
       newNode.cost = goal.entryTriangle._calculateMovementCost(
-        pathNode.entryPoint, goal.entryPoint, this.token, this.movePenaltyInstance);
+        pathNode.entryPoint, goal.entryPoint, this.token);
       newNode.priorTriangle = pathNode.priorTriangle;
       newNode.fromPoint = pathNode.entryPoint;
       return [newNode];
@@ -391,7 +388,7 @@ export class Pathfinder {
 
     const destinations = pathNode.entryTriangle.getValidDestinationsWithCost(
       pathNode.priorTriangle, this.startElevation, this.spacer,
-      pathNode.entryPoint, this.token, this.movePenaltyInstance);
+      pathNode.entryPoint, this.token);
     return this.#filterDestinationsbyExploration(destinations);
   }
 
@@ -665,7 +662,6 @@ function cleanSegmentGridConnections(gridPoints, token) {
 function alignSegmentToGrid(a, b, token) {
   if ( hasCollision(a, b, token) ) return [a, b];
 
-  const GridCoordinates = CONFIG.GeometryLib.GridCoordinates;
   const gridPoints = canvas.grid.getDirectPath([a, b]);
   const allPoints = [
     GridCoordinates.fromObject(a),
@@ -778,8 +774,7 @@ function distanceSquaredToSegment(a, b, pt) {
  * @returns {boolean} True if collision is present between a|b.
  */
 function hasAnyCollisions(a, b, token) {
-  return hasCollision(a, b, token)
-    || (CONFIG[MODULE_ID].pathfindingCheckTerrains && MovePenalty.anyTerrainPlaceablesAlongSegment(a, b, token));
+  return hasCollision(a, b, token);
 }
 
 /**
@@ -814,6 +809,6 @@ export function fogIsExploredFn() {
   if ( !tex || !tex.valid ) return undefined;
 
   const { width, height } = canvas.visibility.textureConfiguration;
-  const cache = CONFIG.GeometryLib.PixelCache.fromTexture(tex, { width, height });
+  const cache = PixelCache.fromTexture(tex, { width, height });
   return (x, y) => cache.pixelAtCanvas(x, y) > 128;
 }
