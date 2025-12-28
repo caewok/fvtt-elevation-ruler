@@ -86,6 +86,35 @@ export class FoundryPathfindingWorld extends SimplePathfindingWorld {
   }
 }
 
+export class FoundryTokenPathfindingWorld extends FoundryPathfindingWorld {
+  static tokenPathCost(a, b, token) { return token.measureMovementPath([a, b]); }
+
+  /** @type {function} */
+  heuristic = this.constructor.foundryMeasure;
+
+  /** @type {PointSourcePolygon} */
+  #poly = new foundry.canvas.geometry.ClockwiseSweepPolygon();
+
+  cost = this.constructor.tokenPathCost;
+
+  /**
+   * Get the neighbors
+   * @param {GridCoordinates} node
+   * @returns {GridCoordinates[]}
+   */
+  getNeighbors(node) {
+    const allNeighbors = super.getNeighbors(node);
+    const aabb = AABB2d.fromPoints(allNeighbors);
+    const poly = this.#poly;
+    poly.initialize(node, { type: "move", boundaryShapes: [aabb.toPIXIRectangle()] });
+    return allNeighbors.filter(n => {
+      const ray = new foundry.canvas.geometry.Ray(node, n);
+      return !this.#poly._testCollision(ray, "any", n);
+    });
+  }
+}
+
+
 /**
  * Basic frontier that simply uses an array.
  * Mimics PriorityQueue so that can be used as a frontier.
@@ -246,7 +275,7 @@ export class UniformCostPathfinder extends BFSPathfinder {
    */
   _processFrontierNeighbor(current, next) {
     const costSoFar = this._costSoFar;
-    const newCost = costSoFar.get(current.key) + this.world.cost(current, next);
+    const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
       costSoFar.set(next.key, newCost);
       this._frontier.enqueue(next, newCost);
@@ -327,7 +356,7 @@ export class AStarPathfinder extends UniformCostPathfinder {
    */
   _processFrontierNeighbor(current, next, goal) {
     const costSoFar = this._costSoFar;
-    const newCost = costSoFar.get(current.key) + this.world.cost(current, next);
+    const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
       costSoFar.set(next.key, newCost);
 
