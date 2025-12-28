@@ -1,174 +1,73 @@
 /* globals
-canvas,
-CanvasAnimation,
-CONFIG,
-Ruler,
+CONFIG
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
-
-import { MODULE_ID } from "./const.js";
-import { Settings } from "./settings.js";
-import { log } from "./util.js";
 
 // Patches for the Token class
 export const PATCHES = {};
 PATCHES.BASIC = {};
-PATCHES.TOKEN_RULER = {}; // Assume this patch is only present if the token ruler setting is enabled.
-PATCHES.MOVEMENT_TRACKING = {};
-PATCHES.PATHFINDING = {};
+
+import { MODULE_ID } from "./const.js";
+import { BFSPathfinder, UniformCostPathfinder, GreedyBestFirstPathfinder, AStarPathfinder } from "./pathfinding/SimplePathfinding.js";
+import { GridCoordinates } from "./geometry/GridCoordinates.js";
 
 // ----- NOTE: Hooks ----- //
 
 // ----- NOTE: Wraps ----- //
 
 /**
- * Wrap Token.prototype._onDragLeftMove
- * Continue the ruler measurement
+ * Recalculate the planned movement path of this Token for the current User.
  */
-function _onDragLeftMove(wrapped, event) {
-  log("Token#_onDragLeftMove");
+function findMovementPath(wrapped, waypoints, options) {
+  if ( waypoints.length < 2 ) return wrapped(waypoints, options);
 
-  // Gridless snapping: pause the mouse position at the token speed boundary.
-  const er = this[MODULE_ID] ??= {};
-  const gridlessSnap = gridlessSnapping(this, event);
-  if ( gridlessSnap ) {
-    er.gridless ??= { ...event.interactionData.destination };
-    event.interactionData.destination.x = er.gridless.x;
-    event.interactionData.destination.y = er.gridless.y;
-  } else er.gridless = null;
+  const pf = new (pathfinderClass())(this); // TODO: Initialize this in advance.
 
-  // Default token drag move.
-  wrapped(event);
+  /* For debugging.
+  const dist = canvas.grid.measurePath(waypoints).euclidean;
+  if ( dist > 20 ) console.log("\nfindMovementPath", ...waypoints);
+  */
+
+  // Only pathfind over the last waypoints.
+  const start = GridCoordinates.fromObject(waypoints.at(-2)).center; // TODO: Gridless?
+  const end = GridCoordinates.fromObject(waypoints.at(-1)).center;
+  const path = pf.findPath(start, end);
+  return { result: undefined, promise: pathfind(path, wrapped, waypoints, options), cancel: () => { pf.stop = true; } }; // TODO: Better cancel handling?
 }
 
-/**
- * Gridless snapping.
- * Snap to the dragged token's movement limit.
- * Inspired by Drag Ruler's version.
-MIT License
-
-Copyright (c) 2021 Manuel Vögele
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
- */
-function gridlessSnapping(token, event) {
-  if ( !canvas.grid.isGridless ) return false;
-  if ( !Settings.useSpeedHighlighting(token) ) return false;
-
-  const ruler = canvas.controls.ruler;
-  if ( !ruler.state === Ruler.STATES.MEASURING ) return false;
-
-  const snapDistance = CONFIG[MODULE_ID]?.gridlessSnapDistance();
-  if ( !snapDistance ) return false;
-
-  // Add the new destination and check the segments.
-  let res = true;
-  const oldDestination = { ...ruler.destination};
-  const snap = !event.shiftKey;
-  const newDest = ruler._getMeasurementDestination(event.interactionData.destination, { snap });
-  ruler.destination = newDest;
-  ruler.segments = ruler._getMeasurementSegments();
-  ruler._computeDistance();
-
-  // Test if we just passed the prior speed category limit.
-//   const splitterFn = tokenSpeedSegmentSplitter(canvas.controls.ruler, token);
-//   const segments = [];
-//   for ( const segment of ruler.segments ) segments.push(...splitterFn(segment));
-//   if ( segments.length < 2 ) res = false;
-//   if ( res ) {
-//     res = false;
-//     const targetDistance = segments.at(-2).maxSpeedCategoryDistance;
-//     const distance = segments.at(-1).cumulativeCost;
-//
-//     // Determine how to adjust the mouse movement.
-//     // If just past the target distance, make the mouse movement "sticky".
-//     if ( distance >= targetDistance && distance < (targetDistance + snapDistance) ) res = true;
-//   }
-  ruler.destination = oldDestination;
-  return res;
-}
-
-/**
- * Wrap Token.prototype._onUpdate to remove easing for pathfinding segments.
- */
-function _onUpdate(wrapped, data, options, userId) {
-  if ( options?.rulerSegment && options?.animation?.easing ) {
-    options.animation.easing = options.firstRulerSegment ? noEndEase(options.animation.easing)
-      : options.lastRulerSegment ? noStartEase(options.animation.easing)
-        : undefined;
-  }
-  return wrapped(data, options, userId);
-}
-
-/**
- * Mix Token.prototype._onDragLeftDrop
- * End the ruler measurement.
- */
-async function _onDragLeftDrop(wrapped, event) {
-  // End the ruler measurement
-  const ruler = canvas.controls.ruler;
-  if ( !ruler.active || !Settings.get(Settings.KEYS.TOKEN_RULER.ENABLED) ) return wrapped(event);
-  const destination = event.interactionData.destination;
-
-  // Ensure the cursor destination is within bounds
-  if ( !canvas.dimensions.rect.contains(destination.x, destination.y) ) {
-    ruler._onMouseUp(event);
-    return false;
-  }
-
-  // NO: ruler._state = Ruler.STATES.MOVING; // Do NOT set state to MOVING here in v12, as it will break the canvas.
-  ruler._onMoveKeyDown(event); // Movement is async here but not awaited in _onMoveKeyDown.
-}
-
-// ----- NOTE: New getters ----- //
-
-
-// ----- NOTE: Patches ----- //
-
-PATCHES.TOKEN_RULER.WRAPS = {
-  _onDragLeftMove
-};
-
-PATCHES.PATHFINDING.WRAPS = { _onUpdate };
-
-PATCHES.TOKEN_RULER.MIXES = { _onDragLeftDrop };
+PATCHES.BASIC.WRAPS = { findMovementPath };
 
 
 // ----- NOTE: Helper functions ----- //
+async function pathfind(path, wrapped, waypoints, options) {
+  const foundPath = await path;
 
-/**
- * For given easing function, modify it so it does not ease for the first half of the move.
- * @param {function} easing
- * @returns {function}
- */
-function noStartEase(easing) {
-  if ( typeof easing === "string" ) easing = CanvasAnimation[easing];
-  return pt => (pt < 0.5) ? pt : easing(pt);
+  // Construct pathfinding waypoints.
+  // TODO: Handle elevation, hex; for now just pass through.
+  if ( foundPath ) {
+    const foundryEnd = waypoints.pop();
+    const foundryStart = waypoints.at(-1);
+    for ( let i = 1, iMax = foundPath.length - 1; i < iMax; i += 1 ) {
+      const pt = canvas.grid.getTopLeftPoint(foundPath[i]); // Foundry ruler uses top left coordinates.
+      waypoints.push({ ...foundryStart, checkpoint: false, explicit: false, x: pt.x, y: pt.y });
+    }
+    waypoints.push(foundryEnd);
+  }
+
+  // Rerun findMovementPath to account for regions, etc.
+  const foundrySearch = wrapped(waypoints, options);
+  return foundrySearch.result || foundrySearch.promise;
 }
 
-/**
- * For given easing function, modify it so it does not ease for the second half of the move.
- * @param {function} easing
- * @returns {function}
- */
-function noEndEase(easing) {
-  if ( typeof easing === "string" ) easing = CanvasAnimation[easing];
-  return pt => (pt > 0.5) ? pt : easing(pt);
+
+function pathfinderClass() {
+  switch ( CONFIG[MODULE_ID].simplePathfindingAlgorithm ) {
+    case "astar": return AStarPathfinder;
+    case "breadthfirst": return BFSPathfinder;
+    case "uniformcost": return UniformCostPathfinder;
+    case "GreedyBestFirstPathfinder": return GreedyBestFirstPathfinder;
+    default: return AStarPathfinder;
+  }
 }
+
+

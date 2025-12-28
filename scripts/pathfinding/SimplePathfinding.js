@@ -51,6 +51,12 @@ export class SimplePathfindingWorld {
   getNeighbors(node) {
     return canvas.grid.getAdjacentOffsets(node).map(offset => node.constructor.fromOffset(offset));
   }
+
+  /**
+   * Get the closest node to end coordinates.
+   * Necessary so the end goal can be matched.
+   */
+  closestNode(position) { return position.center; }
 }
 
 export class FoundryPathfindingWorld extends SimplePathfindingWorld {
@@ -106,6 +112,8 @@ export class BFSPathfinder extends AbstractPathfinder {
 
   _frontier = new Frontier();
 
+  stop = false;
+
   /**
    * Find the path between startPoint and endPoint using the chosen algorithm.
    * @param {Point} start       Start point for the graph
@@ -114,11 +122,13 @@ export class BFSPathfinder extends AbstractPathfinder {
   async findPath(start, goal) {
     // Frontier tracks next neighbors to be visited.
     this._initializePathfindingRun(start);
+    goal = this.world.closestNode(goal);
 
-    while ( this._frontier.length > 0 ) {
+    while ( this._frontier.length > 0 && !this.stop ) {
       const current = this._frontier.dequeue();
+      // console.debug(`${this.constructor.name}|Processing frontier ${current.x},${current.y}`)
       if ( current.almostEqual(goal) ) return this.constructor.reconstructPath(this._cameFrom, goal);
-      for ( let next of this.world.getNeighbors(current) ) this._processFrontierNeighbors(current, next, goal);
+      await this._processFrontierNeighbors(current, goal);
     }
     return null;
   }
@@ -127,6 +137,7 @@ export class BFSPathfinder extends AbstractPathfinder {
    * Initialize the pathfinding run.
    */
   _initializePathfindingRun(start) {
+    this.stop = false;
     this._initializeFrontier(start);
     this._initializeCameFrom(start);
   }
@@ -152,9 +163,18 @@ export class BFSPathfinder extends AbstractPathfinder {
   }
 
   /**
+   * Asynchronously process all the neighbors for the current node of the frontier.
+   * Async so it can be stopped.
+   * @param {Point} current
+   */
+  async _processFrontierNeighbors(current, goal) {
+    for ( let next of this.world.getNeighbors(current) ) this._processFrontierNeighbor(current, next, goal);
+  }
+
+  /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  _processFrontierNeighbors(current, next) {
+  _processFrontierNeighbor(current, next) {
     if ( !this._cameFrom.has(next.key) ) {
       this._frontier.enqueue(next);
       this._cameFrom.set(next.key, current);
@@ -224,7 +244,7 @@ export class UniformCostPathfinder extends BFSPathfinder {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  _processFrontierNeighbors(current, next) {
+  _processFrontierNeighbor(current, next) {
     const costSoFar = this._costSoFar;
     const newCost = costSoFar.get(current.key) + this.world.cost(current, next);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
@@ -265,7 +285,7 @@ export class GreedyBestFirstPathfinder extends BFSPathfinder {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  _processFrontierNeighbors(current, next, goal) {
+  _processFrontierNeighbor(current, next, goal) {
     if ( !this._cameFrom.has(next.key) ) {
       const priority = this.world.heuristic(next, goal);
       this._frontier.enqueue(next, priority);
@@ -305,7 +325,7 @@ export class AStarPathfinder extends UniformCostPathfinder {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  _processFrontierNeighbors(current, next, goal) {
+  _processFrontierNeighbor(current, next, goal) {
     const costSoFar = this._costSoFar;
     const newCost = costSoFar.get(current.key) + this.world.cost(current, next);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
@@ -354,6 +374,7 @@ let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
 
 start = GridCoordinates.fromObject(randal.center)
 end = GridCoordinates.fromObject(zanna.center)
+// end.y += 25
 
 pf = new BFSPathfinder()
 pf = new UniformCostPathfinder()
@@ -364,6 +385,132 @@ pf = new AStarPathfinder()
 path = await pf.findPath(start, end)
 pf.drawDebug()
 BFSPathfinder.drawPath(path)
+
+end = GridCoordinates.fromObject(zanna.center)
+end.y += 25
+path = pf.findPath(start, end)
+setTimeout(() => {
+  console.log("--- Cancel button clicked! ---");
+  pf.stop = true
+}, 1);
+
+
+path = pf.findPath(start, end)
+pf.stop = true;
+
+
+// Test
+
+class TestClass {
+  isRunning = false;
+
+  progress = 0;
+
+  async longRunningProcess() {
+    this.isRunning = true;
+    this.progress = 0;
+
+    console.log("Starting loop...");
+
+    while (this.isRunning) {
+      // 1. Perform an async task
+      console.log(`Processing step ${this.progress}...`);
+      // await new Promise(resolve => setTimeout(resolve, 1000));
+      await this.subprocess();
+
+      // 2. IMMEDIATE CHECK
+      // If the flag was flipped during the 'await' above, exit now.
+      if (!this.isRunning) {
+        break;
+      }
+
+      // 3. Update internal logic
+      this.progress++;
+
+      if (this.progress >= 10) {
+        console.log("Task finished naturally.");
+        break;
+      }
+    }
+
+    console.log("Loop has exited. Cleaning up resources...");
+    this.isRunning = false;
+  }
+
+//   async subprocess() {
+//     console.log("...running subprocess");
+//     await new Promise(resolve => setTimeout(resolve, 1000));
+//     console.log("...finished subprocess");
+//   }
+
+  async subprocess() {
+    return new Promise(resolve => {
+      pf.findPath
+    })
+
+    const path = await pf.findPath(start, end)
+  }
+}
+
+// Start the process
+test = new TestClass()
+
+test.longRunningProcess();
+
+// Simulate a user clicking "Cancel" after 3.5 seconds
+setTimeout(() => {
+  console.log("--- Cancel button clicked! ---");
+  test.isRunning = false;
+}, 3500);
+
+
+
+
+let isCancelled = false;
+
+// A generic async function that might be doing
+// file I/O, heavy calculation, or database work
+async function processChunk(id) {
+  // Simulating any async work
+  let a = 1;
+  for ( let i = 0; i < 1000000; i += 1 ) a *= i;
+//   return new Promise(resolve => {
+//     console.log(`Working on ID: ${id}`);
+//     resolve(`Result ${id}`);
+//   });
+}
+
+async function runHeavyTask() {
+  const items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+  for (const item of items) {
+    // 1. Check BEFORE starting the next task
+    if (isCancelled) {
+      console.log("Cancelled before.")
+      break;
+    }
+
+    // 2. The generic async call
+    const result = await processChunk(item);
+
+    // 3. Check AFTER the task finishes
+    if (isCancelled) {
+      console.log("Stopping after task finished.");
+      return;
+    }
+
+    console.log("Processed:", result);
+  }
+
+}
+
+// Start the loop
+runHeavyTask();
+
+// Later, an external event cancels it
+isCancelled = true;
+
+
 
 
 
