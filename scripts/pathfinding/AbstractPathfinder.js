@@ -23,6 +23,8 @@ export class AbstractPathfinder {
   /** @type {Token} token */
   token;
 
+  constructor(token) { this.token = token; }
+
   /**
    * Initialize the pathfinder algorithm.
    */

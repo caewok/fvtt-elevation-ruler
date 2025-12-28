@@ -87,7 +87,10 @@ export class FoundryPathfindingWorld extends SimplePathfindingWorld {
 }
 
 export class FoundryTokenPathfindingWorld extends FoundryPathfindingWorld {
-  static tokenPathCost(a, b, token) { return token.measureMovementPath([a, b]); }
+  static tokenPathCost(a, b, token) {
+    const terrainWaypoints = token.createTerrainMovementPath([a, b]);
+    return token.measureMovementPath(terrainWaypoints).cost;
+  }
 
   /** @type {function} */
   heuristic = this.constructor.foundryMeasure;
@@ -248,6 +251,8 @@ export class BFSPathfinder extends AbstractPathfinder {
  */
 export class UniformCostPathfinder extends BFSPathfinder {
 
+  world = new FoundryTokenPathfindingWorld();
+
   _costSoFar = new Map();
 
   _frontier = new PriorityQueue("low");
@@ -403,6 +408,9 @@ let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
 
 start = GridCoordinates.fromObject(randal.center)
 end = GridCoordinates.fromObject(zanna.center)
+
+waypoints = randal.createTerrainMovementPath([start, end])
+randal.measureMovementPath(waypoints)
 // end.y += 25
 
 pf = new BFSPathfinder()
