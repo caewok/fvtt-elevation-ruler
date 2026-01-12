@@ -11,6 +11,7 @@ import { Point3d } from "../geometry/3d/Point3d.js";
 import { Draw } from "../geometry/Draw.js";
 import { AbstractPathfinder } from "./AbstractPathfinder.js";
 import { PriorityQueue } from "./PriorityQueue.js";
+import { ObstacleOcclusionTest } from "../geometry/ObstacleOcclusionTest.js";
 
 /* Basic pathfinding algorithms.
 
@@ -36,6 +37,8 @@ export class SimplePathfindingWorld {
   static euclidean3d(a, b) { return Point3d.distanceBetween(a, b); }
 
   static foundryMeasure(a, b) { return canvas.grid.measurePath([a, b]).cost; }
+
+  initialize(token, start, goal) {}
 
   /** @type {function} */
   cost = this.constructor.euclidean;
@@ -78,7 +81,7 @@ export class FoundryPathfindingWorld extends SimplePathfindingWorld {
     const allNeighbors = super.getNeighbors(node);
     const aabb = AABB2d.fromPoints(allNeighbors);
     const poly = this.#poly;
-    poly.initialize(node, { type: "move", boundaryShapes: [aabb.toPIXIRectangle()] });
+    poly.initialize(node, { type: "move", boundaryShapes: [aabb.toRectangle()] });
     return allNeighbors.filter(n => {
       const ray = new foundry.canvas.geometry.Ray(node, n);
       return !this.#poly._testCollision(ray, "any", n);
@@ -109,13 +112,58 @@ export class FoundryTokenPathfindingWorld extends FoundryPathfindingWorld {
     const allNeighbors = super.getNeighbors(node);
     const aabb = AABB2d.fromPoints(allNeighbors);
     const poly = this.#poly;
-    poly.initialize(node, { type: "move", boundaryShapes: [aabb.toPIXIRectangle()] });
+    poly.initialize(node, { type: "move", boundaryShapes: [aabb.toRectangle()] });
     return allNeighbors.filter(n => {
       const ray = new foundry.canvas.geometry.Ray(node, n);
       return !this.#poly._testCollision(ray, "any", n);
     });
   }
 }
+
+export class OcclusionPathfindingWorld extends SimplePathfindingWorld {
+
+  initialize(token, start, goal) {
+    this.#occlusionTester.subjectToken = token;
+
+    const cfg = this.#occlusionTester._config;
+    cfg.senseType = "move";
+    cfg.blocking.walls = true;
+    cfg.blocking.tiles = true;
+    cfg.blocking.regions = true;
+    cfg.blocking.tokens.dead = false;
+    cfg.blocking.tokens.live = true;
+    cfg.blocking.tokens.prone = true;
+    cfg.blocking.tokens.enemies = true;
+    cfg.blocking.tokens.allies = false;
+  }
+
+  /** @type {function} */
+  heuristic = this.constructor.foundryMeasure;
+
+  /** @type {function} */
+  cost = FoundryTokenPathfindingWorld.tokenPathCost;
+
+  #occlusionTester = new ObstacleOcclusionTest();
+
+  getNeighbors(node) {
+    const allNeighbors = super.getNeighbors(node);
+    const aabb = AABB2d.fromPoints(allNeighbors);
+
+    const ot = this.#occlusionTester;
+    ot.frustum = AABB2d.fromPoints(allNeighbors);
+    ot._initialize({ rayOrigin: node });
+
+    // TODO: Create _rayIntersection that does not trigger placeable geometry updates?
+    const tmpPt = Point3d.tmp;
+    const out = allNeighbors.filter(n => {
+      n.subtract(node, tmpPt);
+      return !ot._rayIsOccluded(tmpPt);
+    });
+    tmpPt.release();
+    return out;
+  }
+}
+
 
 
 /**
@@ -138,7 +186,8 @@ class Frontier extends Array {
 export class BFSPathfinder extends AbstractPathfinder {
 
   /** @type {AbstractPathfindingWorld} */
-  world = new FoundryPathfindingWorld();
+  // world = new FoundryPathfindingWorld();
+  world = new OcclusionPathfindingWorld();
 
   _cameFrom = new Map();
 
@@ -153,6 +202,7 @@ export class BFSPathfinder extends AbstractPathfinder {
    */
   async findPath(start, goal) {
     // Frontier tracks next neighbors to be visited.
+    this.world.initialize(this.token, start, goal);
     this._initializePathfindingRun(start);
     goal = this.world.closestNode(goal);
 
@@ -251,7 +301,8 @@ export class BFSPathfinder extends AbstractPathfinder {
  */
 export class UniformCostPathfinder extends BFSPathfinder {
 
-  world = new FoundryTokenPathfindingWorld();
+  // world = new FoundryTokenPathfindingWorld();
+  world = new OcclusionPathfindingWorld();
 
   _costSoFar = new Map();
 

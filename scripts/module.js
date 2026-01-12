@@ -13,7 +13,6 @@ import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID, TEMPLATES } from "./const.js";
 import { log, gridShape } from "./util.js";
-import { registerGeometry } from "./geometry/registration.js";
 
 // Pathfinding
 import { BorderTriangle, BorderEdge } from "./pathfinding/BorderTriangle.js";
@@ -32,12 +31,13 @@ import {
   AStarPathfinder,
 } from "./pathfinding/SimplePathfinding.js";
 
+// Load the geometry library.
+import "./geometry/registration.js";
 
 // Wall updates for pathfinding
 import { SCENE_GRAPH, WallTracer, WallTracerEdge, WallTracerVertex } from "./pathfinding/WallTracer.js";
 
 Hooks.once("init", function() {
-  registerGeometry();
 
   // Configuration
   CONFIG[MODULE_ID] = {
@@ -128,6 +128,22 @@ Hooks.once("setup", function() {
   Settings.registerKeybindings(); // Should go before registering settings, so hotkey group is defined
   Settings.registerAll();
   initializePatching();
+});
+
+Hooks.once("canvasReady", function() {
+  // Need geometry tracking to test collisions when pathfinding.
+  const tracking = CONFIG.GeometryLib.lib.placeableGeometryTracking;
+  tracking.TileGeometryTracker.registerPlaceableHooks();
+  tracking.TileGeometryTracker.registerExistingPlaceables();
+
+  tracking.WallGeometryTracker.registerPlaceableHooks();
+  tracking.WallGeometryTracker.registerExistingPlaceables();
+
+  tracking.TokenGeometryTracker.registerPlaceableHooks();
+  tracking.TokenGeometryTracker.registerExistingPlaceables();
+
+  tracking.RegionGeometryTracker.registerPlaceableHooks();
+  tracking.RegionGeometryTracker.registerExistingPlaceables();
 });
 
 // For https://github.com/League-of-Foundry-Developers/foundryvtt-devMode
