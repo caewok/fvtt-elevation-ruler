@@ -23,13 +23,14 @@ import { benchPathfinding } from "./pathfinding/benchmark.js";
 
 import { AbstractPathfinder } from "./pathfinding/AbstractPathfinder.js";
 import {
-  SimplePathfindingWorld,
-  FoundryPathfindingWorld,
   BFSPathfinder,
   UniformCostPathfinder,
   GreedyBestFirstPathfinder,
   AStarPathfinder,
 } from "./pathfinding/SimplePathfinding.js";
+
+// WebGPU Pathfinding
+import { Terrain, WebGPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 
 // Load the geometry library.
 import "./geometry/registration.js";
@@ -73,12 +74,32 @@ Hooks.once("init", function() {
      */
     tokenPathfindingBuffer: -1,
 
+
     /**
-     * For the simple pathfinding algorithm, choose the type to apply.
-     * Used in testing; user would almost always want AStar.
-     * @type {"astar"|"greedy"|"breadthfirst"|"uniformcost"}
+     * Use pathfinding in 3d, which can be slow.
+     * @type {boolean}
      */
-    simplePathfindingAlgorithm: "astar",
+    use3dPathfinding: false,
+
+    /**
+     * @type {
+     * manhattan
+     * manhattan3d
+     * euclidean
+     * euclidean3d
+     * foundry
+     * foundryTokenCost
+     * occlusion
+     * }
+     */
+    simplePathfinding: {
+      algorithm: "astar",   // @type {"astar"|"greedy"|"breadth"|"uniform"}
+      use3d: false,         // @type {true|false}
+      cost: "foundry",      // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
+      heuristic: "foundry", // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
+      pt3d: false,          // @type {true|false} Will be true if use3d is true;
+      neighborFilter: "clockwiseSweep",    // @type{"clockwiseSweep"|"occlusion"}
+    },
 
     /**
      * Enable certain debug console logging and tests.
@@ -105,12 +126,13 @@ Hooks.once("init", function() {
       SCENE_GRAPH,
 
       AbstractPathfinder,
-      SimplePathfindingWorld,
-      FoundryPathfindingWorld,
       BFSPathfinder,
       UniformCostPathfinder,
       GreedyBestFirstPathfinder,
       AStarPathfinder,
+
+      Terrain,
+      WebGPUPathfinder,
     },
 
     WallTracer, WallTracerEdge, WallTracerVertex,

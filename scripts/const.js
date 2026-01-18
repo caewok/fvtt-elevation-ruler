@@ -6,6 +6,7 @@ Hooks
 "use strict";
 
 export const MODULE_ID = "elevationruler";
+export const PATHFINDING_ID = "pathfinding";
 export const EPSILON = 1e-08;
 
 export const TEMPLATES = {
