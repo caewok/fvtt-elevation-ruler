@@ -2,6 +2,7 @@
 canvas,
 GPUMapMode,
 GPUBufferUsage,
+PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
@@ -38,7 +39,7 @@ export class Terrain {
   get size() { return this.staticData.width * this.staticData.height; }
 
   constructor({ resolution = 1 } = {}) {
-    const sceneRect = canvas.scene.dimensions.rect; // canvas.scene.dimensions.sceneRect;
+    const sceneRect = canvas.scene.dimensions.sceneRect;
     const scale = {
       resolution,
       x: sceneRect.x,
@@ -91,11 +92,12 @@ export class Terrain {
    * @param {Edge[]} [edges]        Edges to mark, if not the entire canvas
    */
   markEdges(edges) {
-    edges ??= canvas.edges.getEdges(canvas.scene.dimensions.rect, {
+    edges ??= canvas.edges.getEdges(canvas.scene.dimensions.sceneRect, {
       includeOuterBounds: false,
-      includeInnerBounds: true
+      includeInnerBounds: false,
     });
-    edges.forEach(edge => this.staticData.setPixelsUnderCanvasSegment(edge.a, edge.b, this.constructor.FEATURES.BLOCKING));
+    edges.forEach(edge =>
+      this.staticData.setPixelsUnderCanvasSegment(edge.a, edge.b, this.constructor.FEATURES.BLOCKING));
   }
 
   /**
@@ -141,6 +143,8 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   */
 
   async findPath(start, end, _signal = {}) {
+
+
     // NOTE: uniform buffer already initialized.
     // NOTE: terrain buffer already initialized.
     console.time("GPU Pathfinding Setup");
@@ -153,18 +157,20 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     console.time("GPU Pathfinding backtrackPath");
     const out = this.backtrackPath(end);
     console.timeEnd("GPU Pathfinding backtrackPath");
+    return out;
 
     // TODO: Only need to rerun the webGPU if the start changes.
     // Otherwise just call backtrackPath.
   }
 
   _initializeDistanceBuffers(start) {
+    const startIndex = this.terrain.staticData._indexAtCanvas(start.x, start.y);
+
     // TODO: Create initialDist only once? Would take quite a bit of memory to keep around.
     // Distance Buffers (Ping-Pong)
     // Initialize: Start Node = 0, Others = MAX_INT
-    const { width, size } = this.terrain;
-    const initialDist = new Uint32Array(size).fill(0xFFFFFFFF);
-    initialDist[(start.y * width) + start.x] = 0;
+    const initialDist = new Uint32Array(this.terrain.size).fill(0xFFFFFFFF);
+    initialDist[startIndex] = 0;
     this.constructor.device.queue.writeBuffer(
       this.buffers.A,         // Destination buffer
       0,                      // Destination offset (byte)
@@ -323,36 +329,50 @@ export class WebGPUPathfinder extends AbstractPathfinder {
 
 
   backtrackPath(end) {
+    end = this.terrain.staticData._fromCanvasCoordinates(end.x, end.y);
+
     const distMap = this.distanceMap;
     const { width, height } = this.terrain;
     const path = [];
-    let curr = { ...end };
-    let idx = (curr.y * width) + curr.x;
-
+    let curr = end.clone();
+    let idx = this.terrain.staticData._indexAtLocal(curr.x, curr.y);
     if (distMap[idx] === 0xFFFFFFFF) return null; // No path found
-    path.push({ ...curr });
+    path.push(curr.clone());
+
+    // Preallocate neighbors.
+    const neighborOffsets = [
+      PIXI.Point.tmp.set(-1, 0), // Left
+      PIXI.Point.tmp.set(1, 0), // Right
+      PIXI.Point.tmp.set(0, -1), // Top
+      PIXI.Point.tmp.set(0, 1), // Bottom
+
+      PIXI.Point.tmp.set(-1, -1), // Top left
+      PIXI.Point.tmp.set(1, -1), // Top right
+      PIXI.Point.tmp.set(-1, 1), // Bottom left
+      PIXI.Point.tmp.set(1, 1), // Bottom right
+    ];
+
+    const neighbors = [
+      PIXI.Point.tmp,
+      PIXI.Point.tmp,
+      PIXI.Point.tmp,
+      PIXI.Point.tmp,
+
+      PIXI.Point.tmp,
+      PIXI.Point.tmp,
+      PIXI.Point.tmp,
+      PIXI.Point.tmp
+    ];
+
 
     // Safety to break infinite loops in bad maps.
     let safety = 0;
     const MAX_STEPS = width * height;
-    while (distMap[idx] !== 0 && safety < MAX_STEPS) {
+    while ( distMap[idx] !== 0 && safety < MAX_STEPS ) {
       safety += 1;
 
       // Look for neighbor with strictly lower distance
-      const neighbors = [
-        // Straight
-        { x: curr.x - 1, y: curr.y }, // Left
-        { x: curr.x + 1, y: curr.y }, // Right
-        { x: curr.x, y: curr.y - 1 }, // Top
-        { x: curr.x, y: curr.y + 1 }, // Bottom
-
-        // Diagonals
-        { x: curr.x - 1, y: curr.y - 1 }, // Top Left
-        { x: curr.x + 1, y: curr.y - 1 }, // Top Right
-        { x: curr.x - 1, y: curr.y + 1 }, // Bottom Left
-        { x: curr.x + 1, y: curr.y + 1 }, // Bottom Right
-      ];
-
+      for ( let i = 0; i < 8; i += 1 ) curr.add(neighborOffsets[i], neighbors[i]);
       let bestNode = null;
       let lowestDist = distMap[idx]; // Starts with the current distance.
 
@@ -360,7 +380,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
       for ( let n of neighbors ) {
         // Boundary checks
         if ( n.x >= 0 && n.x < width && n.y >= 0 && n.y < height ) {
-          let nIdx = (n.y * width) + n.x;
+          let nIdx = this.terrain.staticData._indexAtLocal(n.x, n.y);
           let val = distMap[nIdx];
           let terrain = this.terrain.staticData.pixels[nIdx];
 
@@ -377,10 +397,12 @@ export class WebGPUPathfinder extends AbstractPathfinder {
       }
       if ( bestNode ) {
         curr = bestNode;
-        idx = (curr.y * width) + curr.x;
-        path.push({ ...curr });
+        idx = this.terrain.staticData._indexAtLocal(curr.x, curr.y);
+        path.push(curr.clone());
       } else break; // We got stuck. Shouldn't happen in valid wavefront.
     }
+    PIXI.Point.release(...neighborOffsets, ...neighbors, curr);
+    path.forEach(pt => this.terrain.staticData._toCanvasCoordinates(pt.x, pt.y, pt));
     return path.reverse();
   }
 
@@ -576,13 +598,32 @@ start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
 
 pf = new WebGPUPathfinder(randal);
+pf.resolution = .25;
 await pf.initializeWebGPU()
 path = await pf.findPath(start, end)
 
 
-distMap = new PixelCache(pf.distanceMap, pf.terrain.width)
-distMap.draw({ local: true, skip: 50 })
+pf.terrain.staticData.draw({ maximumPixelValue: 255, skip: 10 })
+WebGPUPathfinder.drawPath(path);
 
+pf.terrain.staticData.draw({ maximumPixelValue: 255, skip: 2, local: true })
+
+distMap = new PixelCache(pf.distanceMap, pf.terrain.width)
+distValues = sortedUnique(distMap.pixels);
+console.log(`Max distance is ${distValues.at(-2)}`);
+
+heatMap = createHeatMap(0, distValues.at(-2));
+colorFn = value => value > distValues.at(-2) ? Draw.COLORS.red : heatMap(value);
+alphaFn = value => value > distValues.at(-2) ? 1 : 0.5;
+distMap.draw({ local: true, skip: 5, maximumPixelValue: distValues.at(-2), colorFn, alphaFn, gammaCorrect: false })
+
+
+pf.terrain.staticData.draw({ maximumPixelValue: 255, local: true, skip: 10 })
+localStart = pf.terrain.staticData._fromCanvasCoordinates(start.x, start.y);
+localEnd = pf.terrain.staticData._fromCanvasCoordinates(end.x, end.y);
+
+Draw.point(localStart, { color: Draw.COLORS.red, radius: 2 })
+Draw.point(localEnd, { color: Draw.COLORS.green, radius: 2 })
 
 */
 
@@ -595,4 +636,71 @@ for ( let x = 0; x < 100; x += 1 ) {
 }
 */
 
+
+/**
+ * Get unique array values and sort low-to-high.
+ * @param {TypedArray} arr
+ * @returns {number[]}
+ */
+function sortedUnique(arr) {
+  const s = new Set(arr);
+  const out = [...s];
+  out.sort((a, b) => a - b);
+  return out;
+}
+
+/**
+ * Creates a function that maps a value to a color between blue and red.
+ *
+ * @param {number} min - The minimum value of the range (Blue/Cold).
+ * @param {number} max - The maximum value of the range (Red/Hot).
+ * @returns {function(number): number} - A function that accepts a value and returns a PIXI-compatible Hex integer.
+ */
+function createHeatMap(min, max) {
+  return function(value) {
+    // 1. Normalize the value to a 0-1 range
+    // Clamp the value to ensure it stays within the min/max bounds
+    const clampedValue = Math.max(min, Math.min(max, value));
+
+    // Calculate ratio (0 = min, 1 = max)
+    const ratio = (clampedValue - min) / (max - min);
+
+    // 2. Map ratio to Hue
+    // Blue is 240°, Red is 0°.
+    // We want to go from 240 down to 0 based on the ratio.
+    const hue = (1 - ratio) * 240;
+
+    // 3. Convert HSL to RGB
+    // Using standard saturation (100%) and lightness (50%) for vibrant colors
+    const saturation = 100;
+    const lightness = 50;
+
+    return hslToHex(hue, saturation, lightness);
+  };
+}
+
+/**
+ * Helper: Converts HSL values to a PIXI-friendly Hex Integer.
+ * * @param {number} h - Hue (0-360)
+ * @param {number} s - Saturation (0-100)
+ * @param {number} l - Lightness (0-100)
+ * @returns {number} - Hex integer (e.g., 0xFF0000)
+ */
+function hslToHex(h, s, l) {
+  s /= 100;
+  l /= 100;
+
+  const k = n => (n + (h / 30)) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n =>
+    l - (a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))));
+
+  // Calculate RGB components (0-255)
+  const r = Math.round(255 * f(0));
+  const g = Math.round(255 * f(8));
+  const b = Math.round(255 * f(4));
+
+  // Combine bitwise into a single integer
+  return (r << 16) + (g << 8) + b;
+}
 
