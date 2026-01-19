@@ -96,10 +96,42 @@ class AbstractGridPathfindingWorld {
   /**
    * Check if a node is definitely unreachable. For example, within a blocking token.
    * @param {Node} node
+   * @param {Node} start
    * @returns {boolean}
    */
-  nodeIsUnreachable(node) {
+  nodeIsUnreachable(node, _start) {
     return !canvas.scene.dimensions.sceneRect.contains(node.x, node.y);
+  }
+
+  /**
+   * Maximum number of iterations given a start and end coordinate.
+   * Used to stop if no path.
+   * @param {Node} start
+   * @param {Node} goal
+   * @returns {number}
+   */
+  maxIterations(start, goal) {
+    // Number of steps from start to the edge of the scene.
+    // For a grid, 1 step is one grid square.
+    const { sceneRect, size } = canvas.scene.dimensions;
+    if ( canvas.grid.isGridless ) {
+      const maxDist = Math.max(
+        sceneRect.width - start.x,
+        start.x - sceneRect.x,
+        sceneRect.height - start.y,
+        start.y - sceneRect.y,
+      );
+      return Math.ceil(maxDist / (this.resolution || 1)); // TODO: Resolution for gridless.
+
+    } else {
+      const maxDist = Math.max(
+        sceneRect.width - start.x,
+        start.x - sceneRect.x,
+        sceneRect.height - start.y,
+        start.y - sceneRect.y,
+      );
+      return Math.ceil(maxDist / size);
+    }
   }
 
   /**

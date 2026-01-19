@@ -6,7 +6,7 @@ foundry,
 "use strict";
 
 import { Draw } from "../geometry/Draw.js";
-
+import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 
 
 /* Pathfinding class.
@@ -32,11 +32,24 @@ export class AbstractPathfinder {
 
   constructor(token, world) { this.token = token; this.world = world; }
 
+  cachedPaths = new Map();
+
+  #start = new GridCoordinates3d();
+
+  get start() { return this.#start; }
+
+  set start(value) {
+    if ( this.#start.equals(value) ) return;
+    this.cachedPaths.clear();
+    this.#start.copyFrom(value);
+  }
+
   /**
    * Initialize the pathfinder algorithm.
    */
   initialize() {
     this.world.initialize(this.token);
+    this.cachedPaths.clear();
   }
 
   /**
@@ -50,6 +63,8 @@ export class AbstractPathfinder {
       this.activeJobs.delete(jobId);
     }
   }
+
+
 
   /**
    * Get a job id and associated job runner to find a path.

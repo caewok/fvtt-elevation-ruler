@@ -52,9 +52,16 @@ export class BFSPathfinder extends AbstractPathfinder {
    * @param {Point} goal        End point for the graph
    */
   async findPath(start, goal, signal = {}) {
-    start = this.world.buildNode(start);
+    start = this.start = this.world.buildNode(start);
     goal = this.world.buildNode(goal);
-    if ( !(start || goal) || start.almostEqual(goal) ) return null;
+    if ( this.cachedPaths.has(goal.key) ) return this.cachedPaths.get(goal.key);
+    if ( !(start || goal)
+      || start.almostEqual(goal)
+      || this.world.nodeIsUnreachable(goal, start) ) {
+      console.error(`${this.constructor.name}|Node unreachable or start === goal.`, { start, goal });
+      this.cachedPaths.set(goal.key, null);
+      return null;
+    }
 
     const t0 = performance.now();
     const id = foundry.utils.randomID();
@@ -63,7 +70,7 @@ export class BFSPathfinder extends AbstractPathfinder {
     this._initializePathfindingRun(start);
 
     let iter = 0;
-    let MAX_ITER = 1e04;
+    let MAX_ITER = this.world.maxIterations(start, goal) || 1e03;
     let reachedGoal = false;
     while ( this._frontier.length > 0 && iter < MAX_ITER ) {
       if ( signal.aborted ) return null;
@@ -74,13 +81,17 @@ export class BFSPathfinder extends AbstractPathfinder {
       await this._processFrontierNeighbors(current, goal);
     }
 
-    if ( iter >= MAX_ITER ) console.error(`${this.constructor.name}|findPath stuck in loop.`);
+    if ( iter >= MAX_ITER ) {
+      this.cachedPaths.set(goal.key, null);
+      console.error(`${this.constructor.name}|findPath stuck in loop.`, { start, goal });
+    }
     start.release();
-    const out = reachedGoal ? this.constructor.reconstructPath(this._cameFrom, goal) : null;
+    const path = reachedGoal ? this.constructor.reconstructPath(this._cameFrom, goal) : null;
 
     const t1 = performance.now();
-    console.debug(`Pathfinder ${id}|${start.x},${start.y} --> ${goal.x},${goal.y}\n\tdistance: ${PIXI.Point.distanceBetween(start, goal).toPrecision(3)} pixels\n\tpath length: ${out?.length?.toPrecision(3)}\n\ttime: ${((t1 - t0)/1000).toPrecision(3)} secs.`);
-    return out;
+    console.debug(`Pathfinder ${id}|${start.x},${start.y} --> ${goal.x},${goal.y}\n\tdistance: ${PIXI.Point.distanceBetween(start, goal).toPrecision(3)} pixels\n\tpath length: ${path?.length}\n\ttime: ${((t1 - t0)/1000).toPrecision(3)} secs.`);
+    this.cachedPaths.set(goal.key, path)
+    return path;
   }
 
   /**
