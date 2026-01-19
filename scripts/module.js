@@ -13,7 +13,6 @@ import { Settings } from "./settings.js";
 import { initializePatching, PATCHER } from "./patching.js";
 import { MODULE_ID, TEMPLATES } from "./const.js";
 import { log, gridShape } from "./util.js";
-import { registerGeometry } from "./geometry/registration.js";
 
 // Pathfinding
 import { BorderTriangle, BorderEdge } from "./pathfinding/BorderTriangle.js";
@@ -24,20 +23,23 @@ import { benchPathfinding } from "./pathfinding/benchmark.js";
 
 import { AbstractPathfinder } from "./pathfinding/AbstractPathfinder.js";
 import {
-  SimplePathfindingWorld,
-  FoundryPathfindingWorld,
   BFSPathfinder,
   UniformCostPathfinder,
   GreedyBestFirstPathfinder,
   AStarPathfinder,
 } from "./pathfinding/SimplePathfinding.js";
+import { worldBuilder } from "./pathfinding/GriddedPathfindingWorld.js";
 
+// WebGPU Pathfinding
+import { Terrain, WebGPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
+
+// Load the geometry library.
+import "./geometry/registration.js";
 
 // Wall updates for pathfinding
 import { SCENE_GRAPH, WallTracer, WallTracerEdge, WallTracerVertex } from "./pathfinding/WallTracer.js";
 
 Hooks.once("init", function() {
-  registerGeometry();
 
   // Configuration
   CONFIG[MODULE_ID] = {
@@ -73,12 +75,32 @@ Hooks.once("init", function() {
      */
     tokenPathfindingBuffer: -1,
 
+
     /**
-     * For the simple pathfinding algorithm, choose the type to apply.
-     * Used in testing; user would almost always want AStar.
-     * @type {"astar"|"greedy"|"breadthfirst"|"uniformcost"}
+     * Use pathfinding in 3d, which can be slow.
+     * @type {boolean}
      */
-    simplePathfindingAlgorithm: "astar",
+    use3dPathfinding: false,
+
+    /**
+     * @type {
+     * manhattan
+     * manhattan3d
+     * euclidean
+     * euclidean3d
+     * foundry
+     * foundryTokenCost
+     * occlusion
+     * }
+     */
+    simplePathfinding: {
+      algorithm: "astar",   // @type {"astar"|"greedy"|"breadth"|"uniform"}
+      use3d: false,         // @type {true|false}
+      cost: "foundry",      // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
+      heuristic: "foundry", // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
+      pt3d: false,          // @type {true|false} Will be true if use3d is true;
+      neighborFilter: "clockwiseSweep",    // @type{"clockwiseSweep"|"occlusion"}
+    },
 
     /**
      * Enable certain debug console logging and tests.
@@ -105,12 +127,15 @@ Hooks.once("init", function() {
       SCENE_GRAPH,
 
       AbstractPathfinder,
-      SimplePathfindingWorld,
-      FoundryPathfindingWorld,
       BFSPathfinder,
       UniformCostPathfinder,
       GreedyBestFirstPathfinder,
       AStarPathfinder,
+
+      worldBuilder,
+
+      Terrain,
+      WebGPUPathfinder,
     },
 
     WallTracer, WallTracerEdge, WallTracerVertex,
@@ -128,6 +153,22 @@ Hooks.once("setup", function() {
   Settings.registerKeybindings(); // Should go before registering settings, so hotkey group is defined
   Settings.registerAll();
   initializePatching();
+});
+
+Hooks.once("canvasReady", function() {
+  // Need geometry tracking to test collisions when pathfinding.
+  const tracking = CONFIG.GeometryLib.lib.placeableGeometryTracking;
+  tracking.TileGeometryTracker.registerPlaceableHooks();
+  tracking.TileGeometryTracker.registerExistingPlaceables();
+
+  tracking.WallGeometryTracker.registerPlaceableHooks();
+  tracking.WallGeometryTracker.registerExistingPlaceables();
+
+  tracking.TokenGeometryTracker.registerPlaceableHooks();
+  tracking.TokenGeometryTracker.registerExistingPlaceables();
+
+  tracking.RegionGeometryTracker.registerPlaceableHooks();
+  tracking.RegionGeometryTracker.registerExistingPlaceables();
 });
 
 // For https://github.com/League-of-Foundry-Developers/foundryvtt-devMode

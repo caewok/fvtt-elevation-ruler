@@ -1,121 +1,26 @@
 /* globals
 canvas,
-foundry,
 PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { AABB2d } from "../geometry/AABB.js";
-import { Point3d } from "../geometry/3d/Point3d.js";
 import { Draw } from "../geometry/Draw.js";
 import { AbstractPathfinder } from "./AbstractPathfinder.js";
 import { PriorityQueue } from "./PriorityQueue.js";
 
 /* Basic pathfinding algorithms.
 
-AbstractPathfindingWorld
+Abstract
 - getNeighbors
+  - adjacentOffsets
+  - filterNeighbors
+- cost
 - heuristic
-
-canvas.grid.getAdjacentOffsets
-canvas.grid.testAdjacency
-
-AbstractSimplePathfinding
-
+- buildNode
+- initialize
+- closestNode
 */
-
-
-export class SimplePathfindingWorld {
-  static manhattan(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
-
-  static manhattan3d(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y) + Math.abs(a.z - b.z); }
-
-  static euclidean(a, b) { return PIXI.Point.distanceBetween(a, b); }
-
-  static euclidean3d(a, b) { return Point3d.distanceBetween(a, b); }
-
-  static foundryMeasure(a, b) { return canvas.grid.measurePath([a, b]).cost; }
-
-  /** @type {function} */
-  cost = this.constructor.euclidean;
-
-  /** @type {function} */
-  heuristic = this.constructor.euclidean;
-
-  /**
-   * Get the neighbors
-   * @param {GridCoordinates} node
-   * @returns {GridCoordinates[]}
-   */
-  getNeighbors(node) {
-    return canvas.grid.getAdjacentOffsets(node).map(offset => node.constructor.fromOffset(offset));
-  }
-
-  /**
-   * Get the closest node to end coordinates.
-   * Necessary so the end goal can be matched.
-   */
-  closestNode(position) { return position.center; }
-}
-
-export class FoundryPathfindingWorld extends SimplePathfindingWorld {
-  /** @type {function} */
-  heuristic = this.constructor.foundryMeasure;
-
-  /** @type {function} */
-  cost = this.constructor.foundryMeasure;
-
-  /** @type {PointSourcePolygon} */
-  #poly = new foundry.canvas.geometry.ClockwiseSweepPolygon();
-
-  /**
-   * Get the neighbors
-   * @param {GridCoordinates} node
-   * @returns {GridCoordinates[]}
-   */
-  getNeighbors(node) {
-    const allNeighbors = super.getNeighbors(node);
-    const aabb = AABB2d.fromPoints(allNeighbors);
-    const poly = this.#poly;
-    poly.initialize(node, { type: "move", boundaryShapes: [aabb.toPIXIRectangle()] });
-    return allNeighbors.filter(n => {
-      const ray = new foundry.canvas.geometry.Ray(node, n);
-      return !this.#poly._testCollision(ray, "any", n);
-    });
-  }
-}
-
-export class FoundryTokenPathfindingWorld extends FoundryPathfindingWorld {
-  static tokenPathCost(a, b, token) {
-    const terrainWaypoints = token.createTerrainMovementPath([a, b]);
-    return token.measureMovementPath(terrainWaypoints).cost;
-  }
-
-  /** @type {function} */
-  heuristic = this.constructor.foundryMeasure;
-
-  /** @type {PointSourcePolygon} */
-  #poly = new foundry.canvas.geometry.ClockwiseSweepPolygon();
-
-  cost = this.constructor.tokenPathCost;
-
-  /**
-   * Get the neighbors
-   * @param {GridCoordinates} node
-   * @returns {GridCoordinates[]}
-   */
-  getNeighbors(node) {
-    const allNeighbors = super.getNeighbors(node);
-    const aabb = AABB2d.fromPoints(allNeighbors);
-    const poly = this.#poly;
-    poly.initialize(node, { type: "move", boundaryShapes: [aabb.toPIXIRectangle()] });
-    return allNeighbors.filter(n => {
-      const ray = new foundry.canvas.geometry.Ray(node, n);
-      return !this.#poly._testCollision(ray, "any", n);
-    });
-  }
-}
 
 
 /**
@@ -137,39 +42,62 @@ class Frontier extends Array {
  */
 export class BFSPathfinder extends AbstractPathfinder {
 
-  /** @type {AbstractPathfindingWorld} */
-  world = new FoundryPathfindingWorld();
-
   _cameFrom = new Map();
 
   _frontier = new Frontier();
-
-  stop = false;
 
   /**
    * Find the path between startPoint and endPoint using the chosen algorithm.
    * @param {Point} start       Start point for the graph
    * @param {Point} goal        End point for the graph
    */
-  async findPath(start, goal) {
+  async findPath(start, goal, signal = {}) {
+    start = this.start = this.world.buildNode(start);
+    goal = this.world.buildNode(goal);
+    if ( this.cachedPaths.has(goal.key) ) return this.cachedPaths.get(goal.key);
+    if ( !(start || goal)
+      || start.almostEqual(goal)
+      || this.world.nodeIsUnreachable(goal, start) ) {
+      console.error(`${this.constructor.name}|Node unreachable or start === goal.`, { start, goal });
+      this.cachedPaths.set(goal.key, null);
+      return null;
+    }
+
+    const t0 = performance.now();
+    const id = foundry.utils.randomID();
+
     // Frontier tracks next neighbors to be visited.
     this._initializePathfindingRun(start);
-    goal = this.world.closestNode(goal);
 
-    while ( this._frontier.length > 0 && !this.stop ) {
+    let iter = 0;
+    let MAX_ITER = this.world.maxIterations(start, goal) || 1e03;
+    let reachedGoal = false;
+    while ( this._frontier.length > 0 && iter < MAX_ITER ) {
+      if ( signal.aborted ) return null;
+      iter += 1;
       const current = this._frontier.dequeue();
       // console.debug(`${this.constructor.name}|Processing frontier ${current.x},${current.y}`)
-      if ( current.almostEqual(goal) ) return this.constructor.reconstructPath(this._cameFrom, goal);
+      if ( (reachedGoal = current.almostEqual(goal)) ) break;
       await this._processFrontierNeighbors(current, goal);
     }
-    return null;
+
+    if ( iter >= MAX_ITER ) {
+      this.cachedPaths.set(goal.key, null);
+      console.error(`${this.constructor.name}|findPath stuck in loop.`, { start, goal });
+    }
+    start.release();
+    const path = reachedGoal ? this.constructor.reconstructPath(this._cameFrom, goal) : null;
+
+    const t1 = performance.now();
+    console.debug(`Pathfinder ${id}|${start.x},${start.y} --> ${goal.x},${goal.y}\n\tdistance: ${PIXI.Point.distanceBetween(start, goal).toPrecision(3)} pixels\n\tpath length: ${path?.length}\n\ttime: ${((t1 - t0)/1000).toPrecision(3)} secs.`);
+    this.cachedPaths.set(goal.key, path)
+    return path;
   }
 
   /**
    * Initialize the pathfinding run.
    */
   _initializePathfindingRun(start) {
-    this.stop = false;
     this._initializeFrontier(start);
     this._initializeCameFrom(start);
   }
@@ -250,8 +178,6 @@ export class BFSPathfinder extends AbstractPathfinder {
  * It expands the node with the lowest cumulative cost g(n) from the start.
  */
 export class UniformCostPathfinder extends BFSPathfinder {
-
-  world = new FoundryTokenPathfindingWorld();
 
   _costSoFar = new Map();
 
@@ -395,33 +321,73 @@ export class AStarPathfinder extends UniformCostPathfinder {
 }
 
 /* Testing
-Draw = CONFIG.GeometryLib.Draw;
-GridCoordinates = CONFIG.GeometryLib.GridCoordinates
+Draw = CONFIG.GeometryLib.lib.Draw;
+GridCoordinates3d = CONFIG.GeometryLib.lib.threeD.GridCoordinates3d
 api = game.modules.get("elevationruler").api
 let { BFSPathfinder,
       UniformCostPathfinder,
       GreedyBestFirstPathfinder,
-      AStarPathfinder } = api.pathfinding;
+      AStarPathfinder, worldBuilder } = api.pathfinding;
 
 let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
 
-start = GridCoordinates.fromObject(randal.center)
-end = GridCoordinates.fromObject(zanna.center)
+pf = new AStarPathfinder(randal)
+start = GridCoordinates3d.fromObject(randal.center)
+end = GridCoordinates3d.fromObject(zanna.center)
+
+
+pf.world = new (worldBuilder())()
+pf.initialize()
+path = await pf.findPath(start, end)
+AStarPathfinder.drawPath(path)
+
+
+// Test with terrain cost
+pf.world = new (worldBuilder({ cost: "terrain" }))()
+pf.initialize()
+path = await pf.findPath(start, end)
+AStarPathfinder.drawPath(path)
+
+// Change to occlusion
+pf.world = new (worldBuilder({ neighborFilter: "occlusion" }))()
+pf.initialize()
+path = await pf.findPath(start, end)
+AStarPathfinder.drawPath(path)
+
+// Occlusion + cost
+pf.world = new (worldBuilder({ neighborFilter: "occlusion", cost: "terrain" }))()
+pf.initialize()
+path = await pf.findPath(start, end)
+AStarPathfinder.drawPath(path)
+
+
+
+// Test with token dragging
+CONFIG.elevationruler.simplePathfinding.cost = "terrain"
+CONFIG.elevationruler.simplePathfinding.neighborFilter = "occlusion"
+
+
+
+
+geom = randal.GeometryLib.geometry
+geom.rayIntersection(start, end.subtract(start))
 
 waypoints = randal.createTerrainMovementPath([start, end])
 randal.measureMovementPath(waypoints)
 // end.y += 25
 
-pf = new BFSPathfinder()
-pf = new UniformCostPathfinder()
-pf = new GreedyBestFirstPathfinder()
-pf = new AStarPathfinder()
 
+pathfindingCfg = CONFIG.elevationruler.simplePathfinding;
+
+pf = new BFSPathfinder(randal)
+pf = new UniformCostPathfinder(randal)
+pf = new GreedyBestFirstPathfinder(randal)
+pf = new AStarPathfinder(randal)
 
 path = await pf.findPath(start, end)
 pf.drawDebug()
-BFSPathfinder.drawPath(path)
+AStarPathfinder.drawPath(path)
 
 end = GridCoordinates.fromObject(zanna.center)
 end.y += 25
@@ -501,8 +467,6 @@ setTimeout(() => {
 }, 3500);
 
 
-
-
 let isCancelled = false;
 
 // A generic async function that might be doing
@@ -546,9 +510,5 @@ runHeavyTask();
 
 // Later, an external event cancels it
 isCancelled = true;
-
-
-
-
 
 */

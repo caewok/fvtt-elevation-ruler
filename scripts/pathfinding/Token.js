@@ -6,7 +6,6 @@
 import { SCENE_GRAPH } from "./WallTracer.js";
 import { Pathfinder } from "./pathfinding.js";
 import { log } from "../util.js";
-import { MODULE_ID } from "../const.js";
 
 // Track wall creation, update, and deletion, constructing WallTracerEdges as we go.
 // Use to update the pathfinding triangulation.
@@ -37,7 +36,7 @@ function createToken(document, _options, _userId) {
  * @param {Partial<DatabaseUpdateOperation>} options Additional options which modified the update request
  * @param {string} userId                           The ID of the User who triggered the update workflow
  */
-function updateToken(document, changed, options, userId) {
+function updateToken(document, changed, _options, _userId) {
   if ( !(Object.hasOwn(changed, "x")
       || Object.hasOwn(changed, "y")
       || Object.hasOwn(changed, "elevation")
