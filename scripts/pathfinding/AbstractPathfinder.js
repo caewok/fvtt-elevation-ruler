@@ -8,6 +8,7 @@ foundry,
 import { Draw } from "../geometry/Draw.js";
 
 
+
 /* Pathfinding class.
 
 Abstract class used to build path between 2 points.
@@ -26,12 +27,17 @@ export class AbstractPathfinder {
   /** @type {Map<string, AbortController>} */
   activeJobs = new Map();
 
-  constructor(token) { this.token = token; }
+  /** @type {AbstractPathfindingWorld} */
+  world;
+
+  constructor(token, world) { this.token = token; this.world = world; }
 
   /**
    * Initialize the pathfinder algorithm.
    */
-  initialize() {}
+  initialize() {
+    this.world.initialize(this.token);
+  }
 
   /**
    * Update the scene-related objects for the pathfinder algorithm.

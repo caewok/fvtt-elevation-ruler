@@ -12,6 +12,7 @@ import { MODULE_ID, PATHFINDING_ID } from "./const.js";
 import { BFSPathfinder, UniformCostPathfinder, GreedyBestFirstPathfinder, AStarPathfinder } from "./pathfinding/SimplePathfinding.js";
 import { TestPathfinder } from "./pathfinding/AbstractPathfinder.js";
 import { GridCoordinates3d } from "./geometry/3d/GridCoordinates3d.js";
+import { worldBuilder } from "./pathfinding/GriddedPathfindingWorld.js";
 
 // ----- NOTE: Hooks ----- //
 
@@ -23,7 +24,8 @@ import { GridCoordinates3d } from "./geometry/3d/GridCoordinates3d.js";
 function _initializeDragLeft(wrapped, event) {
   // TODO: Create pathfinder on token creation? Only initialize or update scene here?
   const obj = this[MODULE_ID] ??= {};
-  const pf = obj[PATHFINDING_ID] = new (pathfinderClass())(this);
+  const world = new (worldBuilder())();
+  const pf = obj[PATHFINDING_ID] = new (pathfinderClass())(this, world);
   pf.initialize();
 
   wrapped(event);

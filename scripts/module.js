@@ -28,6 +28,7 @@ import {
   GreedyBestFirstPathfinder,
   AStarPathfinder,
 } from "./pathfinding/SimplePathfinding.js";
+import { worldBuilder } from "./pathfinding/GriddedPathfindingWorld.js";
 
 // WebGPU Pathfinding
 import { Terrain, WebGPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
@@ -130,6 +131,8 @@ Hooks.once("init", function() {
       UniformCostPathfinder,
       GreedyBestFirstPathfinder,
       AStarPathfinder,
+
+      worldBuilder,
 
       Terrain,
       WebGPUPathfinder,
