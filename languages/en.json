@@ -98,6 +98,11 @@
     "elevationruler.settings.pathfinding_tokens_block_hostile": "Hostile only",
     "elevationruler.settings.pathfinding_tokens_block_all": "All",
 
+    "elevationruler.settings.pathfinding_difficulty_friendly.name": "Move Multiplier: Friendlies",
+     "elevationruler.settings.pathfinding_difficulty_friendly.hint": "Penalize movement speed when moving through friendly tokens",
+    "elevationruler.settings.pathfinding_difficulty_hostile.name": "Move Multiplier: Hostiles",
+    "elevationruler.settings.pathfinding_difficulty_hostile.hint": "Penalize movement speed when moving through hostile tokens",
+
     "elevationruler.settings.pathfinding_limit_token_los.name": "Limit Pathfinding to Explored Areas",
     "elevationruler.settings.pathfinding_limit_token_los.hint": "When pathfinding, limit the range of the pathfinding to explored areas unless the user is the GM",
 

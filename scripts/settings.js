@@ -2,6 +2,7 @@
 game,
 CONST,
 canvas,
+foundry,
 Ruler,
 ui
 */
@@ -29,6 +30,11 @@ const SETTINGS = {
       HOSTILE: "pathfinding_tokens_block_hostile",
       ALL: "pathfinding_tokens_block_all"
     },
+    TOKEN_DIFFICULTY: {
+      FRIENDLY: "pathfinding_difficulty_friendly",
+      HOSTILE: "pathfinding_difficulty_hostile",
+    },
+
     LIMIT_TOKEN_LOS: "pathfinding_limit_token_los",
     SNAP_TO_GRID: "pathfinding_snap_to_grid",
     ALGORITHM: "pathfinding-algorithm",
@@ -75,8 +81,7 @@ export class Settings extends ModuleSettingsAbstract {
     register(KEYS.CONTROLS.PATHFINDING, {
       scope: "user",
       config: false,
-      default: true,
-      type: Boolean,
+      type: new foundry.data.fields.BooleanField({ initial: true }),
       requiresReload: false
     });
 
@@ -87,10 +92,13 @@ export class Settings extends ModuleSettingsAbstract {
       // Currently unused hint: localize(`${KEYS.PATHFINDING.ALGORITHM}.hint`),
       scope: "user",
       config: true,
-      default: KEYS.PATHFINDING.ALGORITHM_CHOICES.SIMPLE,
-      type: String,
+      type: new foundry.data.fields.StringField({
+        required: true,
+        blank: false,
+        initial: KEYS.PATHFINDING.ALGORITHM_CHOICES.SIMPLE,
+        choices: pathfindingAlgChoices,
+      }),
       requiresReload: false,
-      choices: pathfindingAlgChoices,
       // onChange: value => this.set(value) // TODO: Initialize the pathfinding algorithm?
     });
 
@@ -99,8 +107,7 @@ export class Settings extends ModuleSettingsAbstract {
       hint: localize(`${KEYS.PATHFINDING.ENABLE}.hint`),
       scope: "user",
       config: true,
-      default: true,
-      type: Boolean,
+      type: new foundry.data.fields.BooleanField({ initial: true }),
       requiresReload: false,
       onChange: value => this.togglePathfinding(value)
     });
@@ -108,26 +115,47 @@ export class Settings extends ModuleSettingsAbstract {
     register(KEYS.PATHFINDING.TOKENS_BLOCK, {
       name: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK}.name`),
       hint: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK}.hint`),
-      scope: "user",
+      scope: "world",
       config: true,
-      default: KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
-      type: String,
+      type: new foundry.data.fields.StringField({
+        required: true,
+        blank: false,
+        initial: KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
+        choices: {
+          [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO}`),
+          [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.HOSTILE]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.HOSTILE}`),
+          [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL}`),
+        }
+      }),
       requiresReload: false,
-      choices: {
-        [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO}`),
-        [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.HOSTILE]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.HOSTILE}`),
-        [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL}`)
-      },
       onChange: value => this.setTokenBlocksPathfinding(value)
     });
+
+    register(KEYS.PATHFINDING.TOKEN_DIFFICULTY.FRIENDLY, {
+      name: localize(`${KEYS.PATHFINDING.TOKEN_DIFFICULTY.FRIENDLY}.name`),
+      hint: localize(`${KEYS.PATHFINDING.TOKEN_DIFFICULTY.FRIENDLY}.hint`),
+      scope: "world",
+      config: true,
+      type: new foundry.data.fields.NumberField({ nullable: false, min: 0 }),
+      default: 0,
+    });
+
+    register(KEYS.PATHFINDING.TOKEN_DIFFICULTY.HOSTILE, {
+      name: localize(`${KEYS.PATHFINDING.TOKEN_DIFFICULTY.HOSTILE}.name`),
+      hint: localize(`${KEYS.PATHFINDING.TOKEN_DIFFICULTY.HOSTILE}.hint`),
+      scope: "world",
+      config: true,
+      type: new foundry.data.fields.NumberField({ nullable: false, min: 0 }),
+      default: 0,
+    });
+
 
     register(KEYS.PATHFINDING.LIMIT_TOKEN_LOS, {
       name: localize(`${KEYS.PATHFINDING.LIMIT_TOKEN_LOS}.name`),
       hint: localize(`${KEYS.PATHFINDING.LIMIT_TOKEN_LOS}.hint`),
       scope: "world",
       config: true,
-      default: false,
-      type: Boolean,
+      type: new foundry.data.fields.BooleanField({ initial: false }),
       requiresReload: false
     });
 
@@ -136,8 +164,7 @@ export class Settings extends ModuleSettingsAbstract {
       hint: localize(`${KEYS.PATHFINDING.SNAP_TO_GRID}.hint`),
       scope: "world",
       config: true,
-      default: false,
-      type: Boolean,
+      type: new foundry.data.fields.BooleanField({ initial: false }),
       requiresReload: false
     });
   }
