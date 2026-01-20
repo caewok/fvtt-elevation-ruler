@@ -13,8 +13,11 @@ import { BFSPathfinder, UniformCostPathfinder, GreedyBestFirstPathfinder, AStarP
 import { TestPathfinder } from "./pathfinding/AbstractPathfinder.js";
 import { GridCoordinates3d } from "./geometry/3d/GridCoordinates3d.js";
 import { worldBuilder } from "./pathfinding/GriddedPathfindingWorld.js";
+import { WebGPUPathfinder, Terrain } from "./pathfinding/WebGPUPathfinding.js";
 
 // ----- NOTE: Hooks ----- //
+
+
 
 // ----- NOTE: Wraps ----- //
 
@@ -24,9 +27,23 @@ import { worldBuilder } from "./pathfinding/GriddedPathfindingWorld.js";
 function _initializeDragLeft(wrapped, event) {
   // TODO: Create pathfinder on token creation? Only initialize or update scene here?
   const obj = this[MODULE_ID] ??= {};
+
   const world = new (worldBuilder())();
   const pf = obj[PATHFINDING_ID] = new (pathfinderClass())(this, world);
+
+  // TODO: Move most of this outside the drag loop.
+  if ( pf instanceof WebGPUPathfinder ) {
+    pf.resolution = Terrain.recommendedResolution();
+    pf.initializeWebGPU();
+    pf.updateStaticTerrain(this.bottomZ);
+    pf.updateTransientTerrain(this);
+  }
+
   pf.initialize();
+
+  const start = GridCoordinates3d.fromObject(this.getCenterPoint());
+  start.elevation = this.bottomE;
+  pf.start = start;
 
   wrapped(event);
 }
@@ -47,8 +64,11 @@ function findMovementPath(wrapped, waypoints, options) {
   */
 
   // Only pathfind over the last waypoints.
-  const start = GridCoordinates3d.fromObject(waypoints.at(-2)).center; // TODO: Gridless?
-  const end = GridCoordinates3d.fromObject(waypoints.at(-1)).center;
+  const start = GridCoordinates3d.fromObject(this.getCenterPoint(waypoints.at(-2)));
+  const end = GridCoordinates3d.fromObject(this.getCenterPoint(waypoints.at(-1)));
+  start.elevation = waypoints.at(-2).elevation;
+  end.elevation = waypoints.at(-1).elevation;
+
   const pathfindingJob = pf.startJob();
   const path = pathfindingJob.findPath(start, end);
   return {
@@ -60,7 +80,10 @@ function findMovementPath(wrapped, waypoints, options) {
 PATCHES.BASIC.WRAPS = { findMovementPath, _initializeDragLeft };
 
 
+
+
 // ----- NOTE: Helper functions ----- //
+
 async function pathfind(path, wrapped, waypoints, options) {
   const foundPath = await path;
 
@@ -89,6 +112,7 @@ function pathfinderClass() {
     case "uniform": return UniformCostPathfinder;
     case "greedy": return GreedyBestFirstPathfinder;
     case "test": return TestPathfinder;
+    case "webgpu": return WebGPUPathfinder;
     default: return AStarPathfinder;
   }
 }

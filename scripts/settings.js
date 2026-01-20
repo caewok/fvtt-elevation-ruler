@@ -136,8 +136,7 @@ export class Settings extends ModuleSettingsAbstract {
       hint: localize(`${KEYS.PATHFINDING.TOKEN_DIFFICULTY.FRIENDLY}.hint`),
       scope: "world",
       config: true,
-      type: new foundry.data.fields.NumberField({ nullable: false, min: 0 }),
-      default: 0,
+      type: new foundry.data.fields.NumberField({ nullable: false, min: 1, initial: 1 }),
     });
 
     register(KEYS.PATHFINDING.TOKEN_DIFFICULTY.HOSTILE, {
@@ -145,8 +144,7 @@ export class Settings extends ModuleSettingsAbstract {
       hint: localize(`${KEYS.PATHFINDING.TOKEN_DIFFICULTY.HOSTILE}.hint`),
       scope: "world",
       config: true,
-      type: new foundry.data.fields.NumberField({ nullable: false, min: 0 }),
-      default: 0,
+      type: new foundry.data.fields.NumberField({ nullable: false, min: 1, initial: 1 }),
     });
 
 

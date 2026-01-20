@@ -46,25 +46,32 @@ export class BFSPathfinder extends AbstractPathfinder {
 
   _frontier = new Frontier();
 
+  /** @type {AbstractPathfindingWorld} */
+  world;
+
+  constructor(token, world) {
+    super(token);
+    this.world = world;
+  }
+
+  initialize() {
+    this.world.initialize(this.token);
+    super.initialize();
+  }
+
   /**
    * Find the path between startPoint and endPoint using the chosen algorithm.
    * @param {Point} start       Start point for the graph
    * @param {Point} goal        End point for the graph
    */
-  async findPath(start, goal, signal = {}) {
-    start = this.start = this.world.buildNode(start);
+  async _findPath(start, goal, signal = {}) {
+    start = this.world.buildNode(start);
     goal = this.world.buildNode(goal);
-    if ( this.cachedPaths.has(goal.key) ) return this.cachedPaths.get(goal.key);
-    if ( !(start || goal)
-      || start.almostEqual(goal)
-      || this.world.nodeIsUnreachable(goal, start) ) {
-      console.error(`${this.constructor.name}|Node unreachable or start === goal.`, { start, goal });
+    if ( this.world.nodeIsUnreachable(goal, start) ) {
+      console.error(`${this.constructor.name}|Node unreachable.`, { start, goal });
       this.cachedPaths.set(goal.key, null);
       return null;
     }
-
-    const t0 = performance.now();
-    const id = foundry.utils.randomID();
 
     // Frontier tracks next neighbors to be visited.
     this._initializePathfindingRun(start);
@@ -82,15 +89,10 @@ export class BFSPathfinder extends AbstractPathfinder {
     }
 
     if ( iter >= MAX_ITER ) {
-      this.cachedPaths.set(goal.key, null);
       console.error(`${this.constructor.name}|findPath stuck in loop.`, { start, goal });
     }
     start.release();
     const path = reachedGoal ? this.constructor.reconstructPath(this._cameFrom, goal) : null;
-
-    const t1 = performance.now();
-    console.debug(`Pathfinder ${id}|${start.x},${start.y} --> ${goal.x},${goal.y}\n\tdistance: ${PIXI.Point.distanceBetween(start, goal).toPrecision(3)} pixels\n\tpath length: ${path?.length}\n\ttime: ${((t1 - t0)/1000).toPrecision(3)} secs.`);
-    this.cachedPaths.set(goal.key, path)
     return path;
   }
 
@@ -128,13 +130,19 @@ export class BFSPathfinder extends AbstractPathfinder {
    * @param {Point} current
    */
   async _processFrontierNeighbors(current, goal) {
-    for ( let next of this.world.getNeighbors(current) ) this._processFrontierNeighbor(current, next, goal);
+    const neighbors = this.world.getNeighbors(current);
+    const numNeighbors = neighbors.length;
+    const promises = Array(numNeighbors);
+    for ( let i = 0; i < numNeighbors; i += 1 ) {
+      promises.push(this._processFrontierNeighbor(current, neighbors[i], goal));
+    }
+    return Promise.allSettled(promises);
   }
 
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  _processFrontierNeighbor(current, next) {
+  async _processFrontierNeighbor(current, next) {
     if ( !this._cameFrom.has(next.key) ) {
       this._frontier.enqueue(next);
       this._cameFrom.set(next.key, current);
@@ -204,7 +212,7 @@ export class UniformCostPathfinder extends BFSPathfinder {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  _processFrontierNeighbor(current, next) {
+  async _processFrontierNeighbor(current, next) {
     const costSoFar = this._costSoFar;
     const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
@@ -245,7 +253,7 @@ export class GreedyBestFirstPathfinder extends BFSPathfinder {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  _processFrontierNeighbor(current, next, goal) {
+  async _processFrontierNeighbor(current, next, goal) {
     if ( !this._cameFrom.has(next.key) ) {
       const priority = this.world.heuristic(next, goal);
       this._frontier.enqueue(next, priority);
@@ -285,7 +293,7 @@ export class AStarPathfinder extends UniformCostPathfinder {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  _processFrontierNeighbor(current, next, goal) {
+  async _processFrontierNeighbor(current, next, goal) {
     const costSoFar = this._costSoFar;
     const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
@@ -361,13 +369,9 @@ pf.initialize()
 path = await pf.findPath(start, end)
 AStarPathfinder.drawPath(path)
 
-
-
 // Test with token dragging
 CONFIG.elevationruler.simplePathfinding.cost = "terrain"
 CONFIG.elevationruler.simplePathfinding.neighborFilter = "occlusion"
-
-
 
 
 geom = randal.GeometryLib.geometry

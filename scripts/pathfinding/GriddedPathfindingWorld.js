@@ -329,7 +329,7 @@ export const ClockwiseSweepFilter = superclass => class extends superclass {
   _identifyBlockingTokenEdges(subjectToken) {
     // Add token edges. Must be temporary wall edges.
     const PATHFINDING = Settings.KEYS.PATHFINDING;
-    const blocking = Settings.get(PATHFINDING.TOKEN_BLOCK_CHOICES);
+    const blocking = Settings.get(PATHFINDING.TOKENS_BLOCK);
     const blockingCfg = {
       dead: false,
       live: blocking !== PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
