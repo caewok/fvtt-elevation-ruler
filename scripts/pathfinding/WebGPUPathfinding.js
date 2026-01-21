@@ -297,8 +297,8 @@ export class Terrain {
         case 255: return Draw.COLORS.red;
         default: return heatMap(value);
       }
-    }
-    const alphaFn = value => value === 255 ? 1 : 1 ? 0.1 : 0.5;
+    };
+    const alphaFn = value => value === 255 ? 1 : value === 1 ? 0.1 : 0.5;
     opts.colorFn ??= colorFn;
     opts.alphaFn ??= alphaFn;
     opts.maximumPixelValue ??= 255;
@@ -309,6 +309,16 @@ export class Terrain {
 
 
 export class WebGPUPathfinder extends AbstractPathfinder {
+
+  /** @type {GPUDevice} */
+  static device = null;
+
+  static async initializeDevice() {
+    if ( this.device ) return;
+    if ( !navigator.gpu ) throw new Error("WebGPU not supported");
+    const adapter = await navigator.gpu.requestAdapter();
+    this.device = await adapter.requestDevice();
+  }
 
   /** @type {Terrain} */
   terrain;
@@ -321,37 +331,70 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     if ( !this.constructor.device ) throw new Error(`${this.constructor.name}|webGPU device not initialized.`);
   }
 
-  initializeWebGPU() {
+  initializeWebGPU(token) {
     this.createTerrain({ resolution: this.resolution });
+    this.updateStaticTerrain(0);
+    this.updateTransientTerrain(token)
     this.createPipeline();
-    // this.createBuffers();
-    // this.createBindGroups();
+    this.createBuffers();
   }
+
+  /** @type {GPUPipeline} */
+  pipeline = null;
+
+  createPipeline() {
+    const shaderModule = this.constructor.device.createShaderModule({
+      code: this.constructor.shaderCode,
+    });
+
+    this.pipeline = this.constructor.device.createComputePipeline({
+      layout: "auto",
+      compute: { module: shaderModule, entryPoint: "main" },
+    });
+  }
+
+  buffers = {
+    terrain: null,
+    uniform: null,
+
+    // For ping-pong.
+    A: null,
+    B: null,
+
+    // Results.
+    read: null,
+  };
+
+  bindGroups = {
+    // For ping-pong.
+    A: null,
+    B: null,
+  };
 
   createBuffers() {
     const buffers = this.buffers;
 
     // Static terrain weights.
-    buffers.terrain = this.createMappedBuffer(this.terrain.transientData.pixels, GPUBufferUsage.STORAGE);
+    buffers.terrain = this.createBuffer(this.terrain.transientData.pixels, GPUBufferUsage.STORAGE);
 
     // Distance Buffers (Ping-Pong)
     // Initialize: Start Node = 0, Others = MAX_INT
     const size = this.terrain.size;
     const initialDist = new Uint32Array(size).fill(0xFFFFFFFF);
-    this.buffers.A = this.createMappedBuffer(initialDist, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
-    this.buffers.B = this.createMappedBuffer(initialDist, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+    this.buffers.A = this.createBuffer(initialDist, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+    this.buffers.B = this.createBuffer(initialDist, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
 
     // Uniform Buffer (Dimensions)
     const { width, height } = this.terrain;
     const uniformData = new Uint32Array([width, height]);
-    buffers.uniform = this.createMappedBuffer(uniformData, GPUBufferUsage.UNIFORM);
+    buffers.uniform = this.createBuffer(uniformData, GPUBufferUsage.UNIFORM);
 
     // 2. Create Bind Groups
     // Group A: Reads A, Writes B
-    this.bindGroups.A = this.createBindGroup(buffers.A, buffers.B);
+    this.bindGroups.A = this.createBindGroup(buffers.uniform, buffers.terrain, buffers.A, buffers.B);
 
     // Group B: Reads B, Writes A
-    this.bindGroups.B = this.createBindGroup(buffers.B, buffers.A);
+    this.bindGroups.B = this.createBindGroup(buffers.uniform, buffers.terrain, buffers.B, buffers.A);
 
     // Read-back buffer.
     buffers.read = this.constructor.device.createBuffer({
@@ -361,79 +404,56 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     this.distanceMap = new Uint32Array(size);
   }
 
-  updateStaticTerrain(elevationZ = 0) {
-    this.terrain.updateStaticData(elevationZ);
+  createBuffer(data, usage) {
+    const buffer = this.constructor.device.createBuffer({
+      size: data.byteLength,
+      usage: usage | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true
+    });
+    new Uint32Array(buffer.getMappedRange()).set(data);
+    buffer.unmap();
+    return buffer;
   }
 
-  updateTransientTerrain(subjectToken) {
-    this.terrain.updateTransientData(subjectToken);
-
-    // Combine with static data.
-    // If, e.g, static costs 2 and transient costs 3, that means there is a 2x static and 3x transient.
-    // In total, 5 units.
-    // Static and transient start as 0 if no obstacle/terrain present.
-    // And treat 255 as hard cap. (May be necessary for Uint8Array implementation.)
-    const { staticData, transientData } = this.terrain;
-    const { NORMAL, BLOCKING } = this.terrain.constructor.FEATURES;
-    for ( let i = 0, iMax = staticData.pixels.length; i < iMax; i += 1 ) {
-      transientData.pixels[i] = Math.min(BLOCKING, staticData.pixels[i] + transientData.pixels[i]) || 1; // Replace zeroes with ones.
-    }
-    // this.updateBufferData(this.buffers.terrain, transientData.pixels);
+  createBindGroup(uniform, map, input, output) {
+    return this.constructor.device.createBindGroup({
+      layout: this.pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: uniform } },
+        { binding: 1, resource: { buffer: map } },
+        { binding: 2, resource: { buffer: input } },
+        { binding: 3, resource: { buffer: output } }
+      ]
+    });
   }
 
-  updateBufferData(buffer, newData, { srcOffset = 0, destOffset = 0 } = {}) {
-    this.constructor.device.queue.writeBuffer(
-      buffer,             // Destination buffer
-      destOffset,         // Destination offset (byte)
-      newData.buffer,     // Source data (ArrayBuffer)
-      srcOffset,          // Source offset (byte)
-      newData.byteLength  // Source size (byte)
-    );
-  }
+  async findPath(start, end, _signal = {}) {
 
-  distanceMapReady = false;
 
-  get start() { return super.start; }
+    // NOTE: uniform buffer already initialized.
+    // NOTE: terrain buffer already initialized.
+    console.time("GPU Pathfinding Setup");
+    this._initializeDistanceBuffers(start);
+    this._wavefrontPropagation();
+    console.timeEnd("GPU Pathfinding Setup");
+    console.time("GPU Pathfinding");
+    await this._readResult();
+    console.timeEnd("GPU Pathfinding");
+    console.time("GPU Pathfinding backtrackPath");
+    const out = this.backtrackPath(end);
+    console.timeEnd("GPU Pathfinding backtrackPath");
+    return out;
 
-  set start(value) {
-    if ( this.start.equals(value) ) return;
-    super.start = value;
-
-    this.distanceMapReady = false;
-    this.calculateDistanceMap(value); // Async.
-  }
-
-  async findPath(start, goal, signal) {
-    // Skip caching if distance map not yet prepared.
-    if ( !this.distanceMapReady ) return null;
-    return super.findPath(start, goal, signal);
-  }
-
-  async _findPath(start, goal, _signal) {
-    return this.backtrackPath(goal);
-  }
-
-  async calculateDistanceMap(start, _signal = {}) {
-    this.distanceMapReady = false;
-    // try {
-      console.time("GPU Pathfinding Setup");
-      this._initializeDistanceBuffers(start);
-      this._wavefrontPropagation();
-      console.timeEnd("GPU Pathfinding Setup");
-      console.time("GPU Pathfinding Distance Map");
-      await this._readResult();
-      console.timeEnd("GPU Pathfinding Distance Map");
-      this.distanceMapReady = true;
-    /*} catch(err) {
-      console.error(err);
-      this.distanceMapReady = false;
-    } finally {
-      // this._resetDistanceBuffers(start);
-    }*/
+    // TODO: Only need to rerun the webGPU if the start changes.
+    // Otherwise just call backtrackPath.
   }
 
   _initializeDistanceBuffers(start) {
     const startIndex = this.terrain.staticData._indexAtCanvas(start.x, start.y);
+
+    // TODO: Create initialDist only once? Would take quite a bit of memory to keep around.
+    // Distance Buffers (Ping-Pong)
+    // Initialize: Start Node = 0, Others = MAX_INT
     const initialDist = new Uint32Array(this.terrain.size).fill(0xFFFFFFFF);
     initialDist[startIndex] = 0;
     this.constructor.device.queue.writeBuffer(
@@ -450,48 +470,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
       0,                      // Source offset (byte)
       initialDist.byteLength  // Source size (byte)
     );
-
-    /*
-    // TODO: Create initialDist only once? Would take quite a bit of memory to keep around.
-    // Distance Buffers (Ping-Pong)
-    // Initialize: Start Node = 0, Others = MAX_INT
-    const initialDist = new Uint32Array([0]);
-    this.constructor.device.queue.writeBuffer(
-      this.buffers.A,         // Destination buffer
-      startIndex * Uint32Array.BYTES_PER_ELEMENT, // Destination offset (byte)
-      initialDist.buffer,     // Source data (ArrayBuffer)
-      0,                      // Source offset (byte)
-      initialDist.byteLength  // Source size (byte)
-    );
-    this.constructor.device.queue.writeBuffer(
-      this.buffers.B,         // Destination buffer
-      startIndex * Uint32Array.BYTES_PER_ELEMENT,                      // Destination offset (byte)
-      initialDist.buffer,     // Source data (ArrayBuffer)
-      0,                      // Source offset (byte)
-      initialDist.byteLength  // Source size (byte)
-    );
-    */
   }
-
-  /*
-  _resetDistanceBuffers() {
-    const defaultDist = new Uint32Array(this.terrain.size).fill(0xFFFFFFFF);
-    this.constructor.device.queue.writeBuffer(
-      this.buffers.A,         // Destination buffer
-      0,                      // Destination offset (byte)
-      defaultDist.buffer,     // Source data (ArrayBuffer)
-      0,                      // Source offset (byte)
-      defaultDist.byteLength  // Source size (byte)
-    );
-    this.constructor.device.queue.writeBuffer(
-      this.buffers.B,         // Destination buffer
-      0,                      // Destination offset (byte)
-      defaultDist.buffer,     // Source data (ArrayBuffer)
-      0,                      // Source offset (byte)
-      defaultDist.byteLength  // Source size (byte)
-    );
-  }
-  */
 
   _wavefrontPropagation() {
     const commandEncoder = this.constructor.device.createCommandEncoder();
@@ -526,26 +505,203 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   async _readResult() {
     await this.buffers.read.mapAsync(GPUMapMode.READ);
     const resultArray = new Uint32Array(this.buffers.read.getMappedRange());
+    this.distanceMap.set(resultArray);
+    this.buffers.read.unmap();
+  }
+
+
+  updateStaticTerrain(elevationZ = 0) {
+    this.terrain.updateStaticData(elevationZ);
+  }
+
+  updateTransientTerrain(subjectToken) {
+    this.terrain.updateTransientData(subjectToken);
+
+    // Combine with static data.
+    // If, e.g, static costs 2 and transient costs 3, that means there is a 2x static and 3x transient.
+    // In total, 5 units.
+    // Static and transient start as 0 if no obstacle/terrain present.
+    // And treat 255 as hard cap. (May be necessary for Uint8Array implementation.)
+    const { staticData, transientData } = this.terrain;
+    const { NORMAL, BLOCKING } = this.terrain.constructor.FEATURES;
+    for ( let i = 0, iMax = staticData.pixels.length; i < iMax; i += 1 ) {
+      transientData.pixels[i] = Math.min(BLOCKING, staticData.pixels[i] + transientData.pixels[i]) || NORMAL; // Replace zeroes with ones.
+    }
+    // this.updateBufferData(this.buffers.terrain, transientData.pixels);
+  }
+
+
+
+  /*
+  updateBufferData(buffer, newData, { srcOffset = 0, destOffset = 0 } = {}) {
+    this.constructor.device.queue.writeBuffer(
+      buffer,             // Destination buffer
+      destOffset,         // Destination offset (byte)
+      newData.buffer,     // Source data (ArrayBuffer)
+      srcOffset,          // Source offset (byte)
+      newData.byteLength  // Source size (byte)
+    );
+  }
+
+  distanceMapReady = false;
+
+  get start() { return super.start; }
+
+  set start(value) {
+    if ( this.start.equals(value) ) return;
+    super.start = value;
+
+    this.distanceMapReady = false;
+    this.calculateDistanceMap(value); // Async.
+  }
+
+  async findPath(start, goal, signal) {
+    // Skip caching if distance map not yet prepared.
+    if ( !this.distanceMapReady ) return null;
+    return super.findPath(start, goal, signal);
+  }
+
+  async _findPath(start, goal, _signal) {
+    return this.backtrackPath(goal);
+  }
+  */
+
+/*
+  async calculateDistanceMap(start, _signal = {}) {
+    this.distanceMapReady = false;
+    // try {
+      console.time("GPU Pathfinding Setup");
+      this._initializeDistanceBuffers(start);
+      this._wavefrontPropagation();
+      console.timeEnd("GPU Pathfinding Setup");
+      console.time("GPU Pathfinding Distance Map");
+      await this._readResult();
+      console.timeEnd("GPU Pathfinding Distance Map");
+      this.distanceMapReady = true;
+    /*} catch(err) {
+      console.error(err);
+      this.distanceMapReady = false;
+    } finally {
+      // this._resetDistanceBuffers(start);
+    }*/
+  // }
+
+
+  /*
+  _initializeDistanceBuffers(start) {
+    const startIndex = this.terrain.staticData._indexAtCanvas(start.x, start.y);
+    const initialDist = new Uint32Array(this.terrain.size).fill(0xFFFFFFFF);
+    initialDist[startIndex] = 0;
+    this.constructor.device.queue.writeBuffer(
+      this.buffers.A,         // Destination buffer
+      0,                      // Destination offset (byte)
+      initialDist.buffer,     // Source data (ArrayBuffer)
+      0,                      // Source offset (byte)
+      initialDist.byteLength  // Source size (byte)
+    );
+    this.constructor.device.queue.writeBuffer(
+      this.buffers.B,         // Destination buffer
+      0,                      // Destination offset (byte)
+      initialDist.buffer,     // Source data (ArrayBuffer)
+      0,                      // Source offset (byte)
+      initialDist.byteLength  // Source size (byte)
+    );
+   */
+
+
+    /*
+    // TODO: Create initialDist only once? Would take quite a bit of memory to keep around.
+    // Distance Buffers (Ping-Pong)
+    // Initialize: Start Node = 0, Others = MAX_INT
+    const initialDist = new Uint32Array([0]);
+    this.constructor.device.queue.writeBuffer(
+      this.buffers.A,         // Destination buffer
+      startIndex * Uint32Array.BYTES_PER_ELEMENT, // Destination offset (byte)
+      initialDist.buffer,     // Source data (ArrayBuffer)
+      0,                      // Source offset (byte)
+      initialDist.byteLength  // Source size (byte)
+    );
+    this.constructor.device.queue.writeBuffer(
+      this.buffers.B,         // Destination buffer
+      startIndex * Uint32Array.BYTES_PER_ELEMENT,                      // Destination offset (byte)
+      initialDist.buffer,     // Source data (ArrayBuffer)
+      0,                      // Source offset (byte)
+      initialDist.byteLength  // Source size (byte)
+    );
+    */
+  // }
+
+  /*
+  _resetDistanceBuffers() {
+    const defaultDist = new Uint32Array(this.terrain.size).fill(0xFFFFFFFF);
+    this.constructor.device.queue.writeBuffer(
+      this.buffers.A,         // Destination buffer
+      0,                      // Destination offset (byte)
+      defaultDist.buffer,     // Source data (ArrayBuffer)
+      0,                      // Source offset (byte)
+      defaultDist.byteLength  // Source size (byte)
+    );
+    this.constructor.device.queue.writeBuffer(
+      this.buffers.B,         // Destination buffer
+      0,                      // Destination offset (byte)
+      defaultDist.buffer,     // Source data (ArrayBuffer)
+      0,                      // Source offset (byte)
+      defaultDist.byteLength  // Source size (byte)
+    );
+  }
+  */
+
+  /*
+  _wavefrontPropagation() {
+    const commandEncoder = this.constructor.device.createCommandEncoder();
+    const pass = commandEncoder.beginComputePass();
+    pass.setPipeline(this.pipeline);
+
+    // Iterate enough times to cover the map (Manhattan distance approx)
+    // For a generic grid, Width + Height is a safe upper bound.
+    // With diagonals, increase 150%.
+    const { width, height, size } = this.terrain;
+    const iterations = Math.max(width, height) * 1.5;
+    for ( let i = 0; i < iterations; i += 1 ) {
+      // Swap bind groups every iteration
+      pass.setBindGroup(0, i % 2 === 0 ? this.bindGroups.A : this.bindGroups.B);
+      pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
+    }
+    pass.end();
+
+    // Read Results
+    // The final result is in Buffer A if iterations is even, Buffer B if odd.
+    const finalBuffer = (iterations % 2 === 0) ? this.buffers.A : this.buffers.B;
+
+    // Copy to read-back buffer
+    commandEncoder.copyBufferToBuffer(finalBuffer, 0, this.buffers.read, 0, size * 4);
+
+    this.constructor.device.queue.submit([commandEncoder.finish()]);
+  }
+
+  /** @type {Uint32Array} */
+  /*
+  distanceMap;
+
+  async _readResult() {
+    await this.buffers.read.mapAsync(GPUMapMode.READ);
+    const resultArray = new Uint32Array(this.buffers.read.getMappedRange());
 
     // TODO: Should be able to keep mapped and unmap only once we need a new buffer or destroy this pathfinder.
     this.distanceMap ??= new Uint32Array(this.terrain.size);
     this.distanceMap.set(resultArray);
     this.buffers.read.unmap();
   }
+  */
 
 
-  /** @type {GPUDevice} */
-  static device = null;
+
 
   /** @type {GPUPipeline} */
+  /*
   pipeline = null;
 
-  static async initializeDevice() {
-    if ( this.device ) return;
-    if ( !navigator.gpu ) throw new Error("WebGPU not supported");
-    const adapter = await navigator.gpu.requestAdapter();
-    this.device = await adapter.requestDevice();
-  }
+
 
   createPipeline() {
     const shaderModule = this.constructor.device.createShaderModule({
@@ -635,6 +791,9 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     A: null,
     B: null,
   };
+  */
+
+
 
   /*
   createBuffers() {
@@ -645,6 +804,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   }
   */
 
+  /*
   createBindGroups() {
     const buffers = this.buffers;
 
@@ -660,6 +820,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
       buffers.A
     );
   }
+  */
 
 
   backtrackPath(end) {
@@ -763,8 +924,6 @@ struct GridInfo { width: u32, height: u32 };
 // terrainMap holds weights.
 // e.g. 1 = Road, 5 = Grass, 255 = Wall
 @group(0) @binding(1) var<storage, read> terrainMap: array<u32>;
-
-// Calculate new output distance given input distance for each index.
 @group(0) @binding(2) var<storage, read> inputDist: array<u32>;
 @group(0) @binding(3) var<storage, read_write> outputDist: array<u32>;
 
@@ -867,6 +1026,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 }
 `;
+
 }
 
 
@@ -976,6 +1136,14 @@ let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
 
+// Old approach
+pf = new WebGPUPathfinder(randal);
+pf.resolution = .25;
+await pf.initializeWebGPU()
+path = await pf.findPath(start, end)
+
+
+// New approach
 pf = new WebGPUPathfinder(randal);
 pf.resolution = .25;
 await pf.initializeWebGPU()
