@@ -93,13 +93,11 @@ export class Terrain {
   }
 
   clear() {
-    if ( this.staticData ) this.staticData.pixels.fill(this.constructor.FEATURES.NORMAL);
-    if ( this.transientData ) this.transientData.pixels.fill(this.constructor.FEATURES.NORMAL);
+    if ( this.staticData ) this.staticData.pixels.fill(0);
+    if ( this.transientData ) this.clearTransient();
   }
 
-  clearTransient() {
-    this.transientData.pixels.fill(this.constructor.FEATURES.NORMAL);
-  }
+  clearTransient() { this.transientData.pixels.fill(0); }
 
   /**
    * Mark the edges in the static data.
@@ -326,18 +324,61 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   initializeWebGPU() {
     this.createTerrain({ resolution: this.resolution });
     this.createPipeline();
-    this.createBuffers();
-    this.createBindGroups();
+    // this.createBuffers();
+    // this.createBindGroups();
+  }
+
+  createBuffers() {
+    const buffers = this.buffers;
+
+    // Static terrain weights.
+    buffers.terrain = this.createMappedBuffer(this.terrain.transientData.pixels, GPUBufferUsage.STORAGE);
+
+    // Distance Buffers (Ping-Pong)
+    // Initialize: Start Node = 0, Others = MAX_INT
+    const size = this.terrain.size;
+    const initialDist = new Uint32Array(size).fill(0xFFFFFFFF);
+    this.buffers.A = this.createMappedBuffer(initialDist, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+    this.buffers.B = this.createMappedBuffer(initialDist, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+
+    // Uniform Buffer (Dimensions)
+    const { width, height } = this.terrain;
+    const uniformData = new Uint32Array([width, height]);
+    buffers.uniform = this.createMappedBuffer(uniformData, GPUBufferUsage.UNIFORM);
+
+    // 2. Create Bind Groups
+    // Group A: Reads A, Writes B
+    this.bindGroups.A = this.createBindGroup(buffers.A, buffers.B);
+
+    // Group B: Reads B, Writes A
+    this.bindGroups.B = this.createBindGroup(buffers.B, buffers.A);
+
+    // Read-back buffer.
+    buffers.read = this.constructor.device.createBuffer({
+      size: size * 4,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+    });
+    this.distanceMap = new Uint32Array(size);
   }
 
   updateStaticTerrain(elevationZ = 0) {
     this.terrain.updateStaticData(elevationZ);
-    this.updateBufferData(this.buffers.staticTerrain, this.terrain.staticData.pixels);
   }
 
   updateTransientTerrain(subjectToken) {
     this.terrain.updateTransientData(subjectToken);
-    this.updateBufferData(this.buffers.transientTerrain, this.terrain.transientData.pixels);
+
+    // Combine with static data.
+    // If, e.g, static costs 2 and transient costs 3, that means there is a 2x static and 3x transient.
+    // In total, 5 units.
+    // Static and transient start as 0 if no obstacle/terrain present.
+    // And treat 255 as hard cap. (May be necessary for Uint8Array implementation.)
+    const { staticData, transientData } = this.terrain;
+    const { NORMAL, BLOCKING } = this.terrain.constructor.FEATURES;
+    for ( let i = 0, iMax = staticData.pixels.length; i < iMax; i += 1 ) {
+      transientData.pixels[i] = Math.min(BLOCKING, staticData.pixels[i] + transientData.pixels[i]) || 1; // Replace zeroes with ones.
+    }
+    // this.updateBufferData(this.buffers.terrain, transientData.pixels);
   }
 
   updateBufferData(buffer, newData, { srcOffset = 0, destOffset = 0 } = {}) {
@@ -374,7 +415,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
 
   async calculateDistanceMap(start, _signal = {}) {
     this.distanceMapReady = false;
-    try {
+    // try {
       console.time("GPU Pathfinding Setup");
       this._initializeDistanceBuffers(start);
       this._wavefrontPropagation();
@@ -383,12 +424,12 @@ export class WebGPUPathfinder extends AbstractPathfinder {
       await this._readResult();
       console.timeEnd("GPU Pathfinding Distance Map");
       this.distanceMapReady = true;
-    } catch(err) {
+    /*} catch(err) {
       console.error(err);
       this.distanceMapReady = false;
     } finally {
-      this._resetDistanceBuffers(start);
-    }
+      // this._resetDistanceBuffers(start);
+    }*/
   }
 
   _initializeDistanceBuffers(start) {
@@ -432,6 +473,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     */
   }
 
+  /*
   _resetDistanceBuffers() {
     const defaultDist = new Uint32Array(this.terrain.size).fill(0xFFFFFFFF);
     this.constructor.device.queue.writeBuffer(
@@ -449,6 +491,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
       defaultDist.byteLength  // Source size (byte)
     );
   }
+  */
 
   _wavefrontPropagation() {
     const commandEncoder = this.constructor.device.createCommandEncoder();
@@ -521,11 +564,10 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     this.buffers.uniform = this.createMappedBuffer(uniformData, GPUBufferUsage.UNIFORM);
   }
 
-  _createTerrainBuffers() {
+  _createTerrainBuffer() {
     const size = this.terrain.size;
     const byteLength = size * Uint32Array.BYTES_PER_ELEMENT;
-    this.buffers.staticTerrain = this.createBuffer(byteLength, GPUBufferUsage.STORAGE);
-    this.buffers.transientTerrain = this.createBuffer(byteLength, GPUBufferUsage.STORAGE);
+    this.buffers.terrain = this.createBuffer(byteLength, GPUBufferUsage.STORAGE);
   }
 
   _createDistanceBuffers() {
@@ -565,10 +607,9 @@ export class WebGPUPathfinder extends AbstractPathfinder {
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: buffers.uniform } },
-        { binding: 1, resource: { buffer: buffers.staticTerrain } },
-        { binding: 2, resource: { buffer: buffers.transientTerrain } },
-        { binding: 3, resource: { buffer: input } },
-        { binding: 4, resource: { buffer: output } }
+        { binding: 1, resource: { buffer: buffers.terrain } },
+        { binding: 2, resource: { buffer: input } },
+        { binding: 3, resource: { buffer: output } }
       ]
     });
   }
@@ -578,9 +619,8 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   }
 
   buffers = {
-    staticTerrain: null,
-    transientTerrain: null,
     uniform: null,
+    terrain: null,
 
     // For ping-pong.
     A: null,
@@ -596,12 +636,14 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     B: null,
   };
 
+  /*
   createBuffers() {
     this._createUniformBuffer();
-    this._createTerrainBuffers();
+    this._createTerrainBuffer();
     this._createDistanceBuffers();
     this._createReadBackBuffer();
   }
+  */
 
   createBindGroups() {
     const buffers = this.buffers;
@@ -720,26 +762,13 @@ struct GridInfo { width: u32, height: u32 };
 
 // terrainMap holds weights.
 // e.g. 1 = Road, 5 = Grass, 255 = Wall
-@group(0) @binding(1) var<storage, read> staticTerrainMap: array<u32>;
-@group(0) @binding(2) var<storage, read> transientTerrainMap: array<u32>;
+@group(0) @binding(1) var<storage, read> terrainMap: array<u32>;
 
 // Calculate new output distance given input distance for each index.
-@group(0) @binding(3) var<storage, read> inputDist: array<u32>;
-@group(0) @binding(4) var<storage, read_write> outputDist: array<u32>;
-
+@group(0) @binding(2) var<storage, read> inputDist: array<u32>;
+@group(0) @binding(3) var<storage, read_write> outputDist: array<u32>;
 
 fn get_idx(x: u32, y: u32) -> u32 { return y * grid.width + x; }
-
-/**
- * Tile cost for a given index.
- * Maximum of static and transient costs.
- */
-fn tile_cost(idx: u32) -> u32 {
-  let staticCost = staticTerrainMap[idx];
-  let transientCost = transientTerrainMap[idx];
-  // return max(staticCost, transientCost);
-  return staticCost;
-}
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -751,7 +780,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     // Wall check.
     // Note 0xFFFFFFFFu represents infinity internally.
     let WALL = 255u;
-    let tileCost = tile_cost(idx);
+    let tileCost = terrainMap[idx];
     if ( tileCost >= WALL ) {
       outputDist[idx] = 0xFFFFFFFFu;
       return;
@@ -953,7 +982,15 @@ await pf.initializeWebGPU()
 pf.initialize();
 pf.updateStaticTerrain(0)
 pf.updateTransientTerrain(randal)
+
+pf.createBuffers()
+// pf.createBindGroups()
+
 await pf.calculateDistanceMap(start)
+
+new Set(pf.terrain.staticData.pixels)
+new Set(pf.terrain.transientData.pixels)
+new Set(pf.distanceMap)
 
 path = await pf.findPath(start, end)
 path = await pf.findPath(start, end)
