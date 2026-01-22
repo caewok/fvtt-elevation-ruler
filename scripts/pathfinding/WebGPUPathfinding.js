@@ -430,6 +430,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
 
     this.createPipeline();
     this.createBuffers();
+    this._createBindGroups();
   }
 
   /* Needed?
@@ -442,11 +443,19 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   }
   */
 
-  async findPath(start, end, _signal = {}) {
+  /** @type {boolean} */
+  #distanceMapReady = false;
 
+  get distanceMapReady() { return this.#distanceMapReady; }
 
-    // NOTE: uniform buffer already initialized.
-    // NOTE: terrain buffer already initialized.
+  async calculateDistanceMap(start, _signal = {}) {
+    this.#distanceMapReady = false;
+    this.buffers.read.unmap();
+
+    console.time("GPU Terrain Buffer Update");
+    this.updateTerrainBuffer();
+    console.timeEnd("GPU Terrain Buffer Update");
+
     console.time("GPU Pathfinding Setup");
     this._initializeDistanceBuffers(start);
     this._wavefrontPropagation();
@@ -454,13 +463,17 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     console.time("GPU Pathfinding");
     await this._readResult();
     console.timeEnd("GPU Pathfinding");
-    console.time("GPU Pathfinding backtrackPath");
-    const out = this.backtrackPath(end);
-    console.timeEnd("GPU Pathfinding backtrackPath");
-    return out;
+    this.#distanceMapReady = true;
+  }
 
-    // TODO: Only need to rerun the webGPU if the start changes.
-    // Otherwise just call backtrackPath.
+  async findPath(start, goal, signal) {
+    // Skip caching if distance map not yet prepared.
+    if ( !this.distanceMapReady ) return null;
+    return super.findPath(start, goal, signal);
+  }
+
+  async _findPath(_start, goal, _signal) {
+    return this.backtrackPath(goal);
   }
 
   _initializeDistanceBuffers(start) {
@@ -469,6 +482,9 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     // TODO: Create initialDist only once? Would take quite a bit of memory to keep around.
     // Distance Buffers (Ping-Pong)
     // Initialize: Start Node = 0, Others = MAX_INT
+
+
+
     const initialDist = new Uint32Array(this.staticTerrain.size).fill(0xFFFFFFFF);
     initialDist[startIndex] = 0;
     this.constructor.device.queue.writeBuffer(
@@ -519,9 +535,16 @@ export class WebGPUPathfinder extends AbstractPathfinder {
 
   async _readResult() {
     await this.buffers.read.mapAsync(GPUMapMode.READ);
-    const resultArray = new Uint32Array(this.buffers.read.getMappedRange());
-    this.distanceMap.set(resultArray);
+    this.distanceMap = new Uint32Array(this.buffers.read.getMappedRange());
+
+    // Should be able to keep mapped and unmap only once we need a new buffer or destroy this pathfinder.
+    // this.distanceMap.set(resultArray);
+    // this.buffers.read.unmap();
+  }
+
+  destroy() {
     this.buffers.read.unmap();
+    this.distanceMap = null;
   }
 
 
@@ -549,7 +572,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     });
   }
 
-  createBuffer(data, usage) {
+  createMappedBuffer(data, usage) {
     const buffer = this.constructor.device.createBuffer({
       size: data.byteLength,
       usage: usage | GPUBufferUsage.COPY_DST,
@@ -560,17 +583,8 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     return buffer;
   }
 
-  createBindGroup(uniform, map, input, output) {
-    return this.constructor.device.createBindGroup({
-      layout: this.pipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: uniform } },
-        { binding: 1, resource: { buffer: map } },
-        { binding: 2, resource: { buffer: input } },
-        { binding: 3, resource: { buffer: output } }
-      ]
-    });
-  }
+
+
 
   buffers = {
     terrain: null,
@@ -591,38 +605,72 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   };
 
   createBuffers() {
-    const buffers = this.buffers;
-
-    // Static terrain weights.
-    buffers.terrain = this.createBuffer(this.combinedTerrain.pixels, GPUBufferUsage.STORAGE);
-
-    // Distance Buffers (Ping-Pong)
-    // Initialize: Start Node = 0, Others = MAX_INT
-    const size = this.staticTerrain.size;
-    const initialDist = new Uint32Array(size).fill(0xFFFFFFFF);
-    this.buffers.A = this.createBuffer(initialDist, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
-    this.buffers.B = this.createBuffer(initialDist, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
-
-    // Uniform Buffer (Dimensions)
-    const { width, height } = this.staticTerrain;
-    const uniformData = new Uint32Array([width, height]);
-    buffers.uniform = this.createBuffer(uniformData, GPUBufferUsage.UNIFORM);
-
-    // 2. Create Bind Groups
-    // Group A: Reads A, Writes B
-    this.bindGroups.A = this.createBindGroup(buffers.uniform, buffers.terrain, buffers.A, buffers.B);
-
-    // Group B: Reads B, Writes A
-    this.bindGroups.B = this.createBindGroup(buffers.uniform, buffers.terrain, buffers.B, buffers.A);
-
-    // Read-back buffer.
-    buffers.read = this.constructor.device.createBuffer({
-      size: size * 4,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
-    });
-    this.distanceMap = new Uint32Array(size);
+    this._createUniformBuffer();
+    this._createDistanceBuffers();
+    this._createTerrainBuffer();
+    this._createReadBackBuffer();
   }
 
+  _createUniformBuffer() {
+    const { width, height } = this.staticTerrain;
+    const uniformData = new Uint32Array([width, height]);
+    this.buffers.uniform = this.createMappedBuffer(uniformData, GPUBufferUsage.UNIFORM);
+  }
+
+  _createTerrainBuffer() {
+    this.buffers.terrain = this.constructor.device.createBuffer({
+      size: this.combinedTerrain.size * Uint32Array.BYTES_PER_ELEMENT,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+  }
+
+  _createDistanceBuffers() {
+    // Distance Buffers (Ping-Pong)
+    // Initialize: Start Node = 0, Others = MAX_INT
+    const initialDist = new Uint32Array(this.staticTerrain.size).fill(0xFFFFFFFF);
+    this.buffers.A = this.createMappedBuffer(initialDist, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+    this.buffers.B = this.createMappedBuffer(initialDist, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+  }
+
+  _createReadBackBuffer() {
+    this.buffers.read = this.constructor.device.createBuffer({
+      size: this.staticTerrain.size * Uint32Array.BYTES_PER_ELEMENT,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+    });
+  }
+
+
+  _createBindGroups() {
+    const buffers = this.buffers;
+
+    // Group A: Reads A, Writes B
+    this.bindGroups.A = this.createBindGroup(
+      buffers.A,
+      buffers.B
+    );
+
+    // Group B: Reads B, Writes A
+    this.bindGroups.B = this.createBindGroup(
+      buffers.B,
+      buffers.A
+    );
+  }
+
+  createBindGroup(input, output) {
+    return this.constructor.device.createBindGroup({
+      layout: this.pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.buffers.uniform } },
+        { binding: 1, resource: { buffer: this.buffers.terrain } },
+        { binding: 2, resource: { buffer: input } },
+        { binding: 3, resource: { buffer: output } }
+      ]
+    });
+  }
+
+  updateTerrainBuffer() {
+    this.constructor.device.queue.writeBuffer(this.buffers.terrain, 0, this.combinedTerrain.pixels);
+  }
 
   backtrackPath(end) {
     end = this.staticTerrain._fromCanvasCoordinates(end.x, end.y);
@@ -814,6 +862,57 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 `;
 }
 
+/**
+ * Manage mapping, reading, unmapping of WebGPU buffers using a staging ring.
+ * See https://toji.dev/webgpu-best-practices/buffer-uploads.html
+ */
+class StagingBufferRing {
+  /** @type {WebGPUDevice} */
+  device;
+
+  /** @type {number} */
+  bufferSize = 0;
+
+  /** @type {class<TypedArray>} */
+  typedArrayClass = Uint32Array;
+
+  /** @type {GPUBuffer[]} */
+  buffers = [];
+
+  constructor(device, { bufferSize = 0, typedArrayClass = Uint32Array } = {}) {
+    this.device = device;
+    this.bufferSize = bufferSize;
+    this.typedArrayClass = Uint32Array;
+  }
+
+  get stagingBuffer() {
+    return this.buffers.pop() || this.device.createBuffer({
+      size: this.bufferSize,
+      usage: GPUBufferUsage.MAP_WRITE | GPUBufferUsage.COPY_SRC,
+      mappedAtCreation: true,
+    });
+  }
+
+  mapStagingBuffer(stagingBuffer, typedArrayClass = this.typedArrayClass) {
+    return new typedArrayClass(stagingBuffer.getMappedRange());
+  }
+
+  copyToBuffer(stagingBuffer, ) {
+    stagingBuffer.unmap();
+    const commandEncoder = gpuDevice.createCommandEncoder({});
+    commandEncoder.copyBufferToBuffer(stagingBuffer, 0, waveGridVertexBuffer, 0, waveGridBufferSize);
+    this.device.queue.submit([commandEncoder.finish()]);
+
+    // Immediately after copying, re-map the buffer. Push onto the list of staging buffers when the
+    // mapping completes.
+    stagingBuffer.mapAsync(GPUMapMode.WRITE).then(() => this.buffers.push(stagingBuffer));
+  }
+
+  destroy() {
+    this.buffers.forEach(buffer => buffer.destroy());
+  }
+}
+
 
 /* PixelCache testing
 PixelCache = CONFIG.GeometryLib.lib.PixelCache
@@ -921,17 +1020,13 @@ let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
 
-// Old approach
 pf = new WebGPUPathfinder(randal, 1);
 await pf.initializeWebGPU(randal)
+await pf.calculateDistanceMap(start)
 path = await pf.findPath(start, end)
+WebGPUPathfinder.drawPath(path);
 
 
-// New approach
-pf = new WebGPUPathfinder(randal);
-pf.resolution = .25;
-await pf.initializeWebGPU()
-pf.initialize();
 
 
 pf.createBuffers()
