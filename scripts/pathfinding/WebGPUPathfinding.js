@@ -68,8 +68,8 @@ export class Terrain extends PixelCache {
       x: sceneRect.x,
       y: sceneRect.y,
     };
-    const localWidth = Math.round(sceneRect.width * resolution);
-    const localHeight = Math.round(sceneRect.height * resolution);
+    const localWidth = Math.ceil(sceneRect.width * resolution);
+    const localHeight = Math.ceil(sceneRect.height * resolution);
     const N = localWidth * localHeight;
     const out = new this(new Uint32Array(N), localWidth, { scale, senseType, elevationZ });
     out.pixels.fill(this.FEATURES.CLEAR);
@@ -480,7 +480,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     const startIndex = this.staticTerrain._indexAtCanvas(start.x, start.y);
     const { width, height, size } = this.staticTerrain;
     const workgroupX = Math.ceil(width / 8);
-    const workgroupY =  Math.ceil(height / 8);
+    const workgroupY = Math.ceil(height / 8);
     this.constructor.device.queue.writeBuffer(this.buffers.initUniform, 0, new Uint32Array([startIndex]));
 
     const commandEncoder = this.constructor.device.createCommandEncoder();
@@ -540,9 +540,6 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   }
 
 
-  /** @type {GPUDevice} */
-  static device = null;
-
   /** @type {object<GPUPipeline>} */
   pipelines = {
     init: null,
@@ -553,6 +550,9 @@ export class WebGPUPathfinder extends AbstractPathfinder {
 
   /** @type {GPUPipeline} */
   initPipeline = null;
+
+  /** @type {GPUDevice} */
+  static device = null;
 
   static async initializeDevice() {
     if ( this.device ) return;
@@ -963,6 +963,318 @@ class StagingBufferRing {
     this.buffers.forEach(buffer => buffer.destroy());
   }
 }
+
+
+/**
+ * Test using the GPU to write the terrain map.
+ * Draw segments for the walls and flat triangles for everything else.
+ */
+class GPUTerrainMap {
+
+  resolution = 1;
+
+  get sceneWidth() { return canvas.scene.dimensions.width; }
+
+  get sceneHeight() { return canvas.scene.dimensions.height; }
+
+  get gridWidth() { return Math.ceil(canvas.scene.dimensions.width * this.resolution); }
+
+  get gridHeight() { return Math.ceil(canvas.scene.dimensions.height * this.resolution); }
+
+  get gridSize() { return this.gridWidth * this.gridHeight; }
+
+  constructor(resolution = 1) {
+    if ( !this.constructor.device ) throw new Error(`${this.constructor.name}|webGPU device not initialized.`);
+    this.resolution = resolution;
+  }
+
+  /** @type {GPUDevice} */
+  static device = null;
+
+  static async initializeDevice() {
+    if ( this.device ) return;
+    if ( !navigator.gpu ) throw new Error("WebGPU not supported");
+    const adapter = await navigator.gpu.requestAdapter();
+    this.device = await adapter.requestDevice();
+  }
+
+  /** @type {object<WebGPUBuffer>} */
+  buffers = {
+    uniform: null,
+    terrain: null,
+    staging: null,
+  };
+
+  /** @type {object<WebGPUPipeline} */
+  pipelines = {
+    segment: null,
+  };
+
+  /** @type {object<WebGPUBindGroup} */
+  bindGroups = {
+    segment: null,
+  };
+
+  /** @type {WebGPUTexture} */
+  dummyTexture;
+
+  async initialize() {
+    const format = navigator.gpu.getPreferredCanvasFormat();
+
+    // 0. Uniform buffer.
+    const uniformData = new Float32Array([
+      this.sceneWidth, this.sceneHeight,
+      this.gridWidth, this.gridHeight,
+    ]);
+    this.buffers.uniform = this.constructor.device.createBuffer({
+      label: "uniform",
+      size: uniformData.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    this.constructor.device.queue.writeBuffer(this.buffers.uniform, 0, uniformData);
+
+    // 1. Storage buffer. (The terrain map on the GPU, scaled by resolution.)
+    this.buffers.terrain = this.constructor.device.createBuffer({
+      label: "storage",
+      size: this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+
+    // 2. Staging buffer, scaled by resolution.
+    this.buffers.staging = this.constructor.device.createBuffer({
+      label: "staging",
+      size: this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    });
+
+    // Create dummy texture.
+    // This defines the coordinate space for the rasterizer.
+    this.dummyTexture = this.constructor.device.createTexture({
+      label: "dummy raster attachment",
+      size: [this.gridWidth, this.gridHeight],
+      format, // Match the format used in your pipeline targets
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+    // 3. Create pipeline.
+    const shaderModule = this.constructor.device.createShaderModule({
+      code: this.constructor.shaderCode,
+    });
+    this.pipelines.segment = this.constructor.device.createRenderPipeline({
+      label: "segmentRender",
+      layout: "auto",
+      vertex: {
+        module: shaderModule,
+        entryPoint: "vs_segment_main",
+        buffers: [{
+          arrayStride: 8, // 2 floats (x, y) * 4 bytes
+          attributes: [{ shaderLocation: 0, offset: 0, format: "float32x2" }]
+        }]
+      },
+
+      // Even though we are writing to a Storage Buffer, WebGPU's RenderPipeline still expects
+      // a "drawing surface" (a texture) to define the boundaries of the grid.
+      // We use a "dummy" texture for this.
+      fragment: {
+        module: shaderModule,
+        entryPoint: "fs_segment_main",
+        targets: [{
+          format,
+          writeMask: 0, // IMPORTANT: Do not write to the dummy texture.
+        }]
+      },
+      primitive: { topology: "line-list" }
+    });
+
+    this.bindGroups.segment = this.constructor.device.createBindGroup({
+      label: "segment",
+      layout: this.pipelines.segment.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.buffers.uniform } },
+        { binding: 1, resource: { buffer: this.buffers.terrain } },
+      ]
+    });
+  }
+
+  /**
+   * @typedef object Segment
+   * @prop {PIXI.Point} a
+   * @prop {PIXI.Point} b
+   *
+   * Or
+   * @prop {PIXI.Point} A
+   * @prop {PIXI.Point} B
+   */
+
+
+  /**
+   * @param {Wall[]} walls
+   * @returns {Float32Array}
+   */
+  static convertWallsToArray(walls) {
+    const numSegments = walls.length;
+    const numCoordinates = numSegments * 4; // A.x, A.y, B.x, B.y
+    const segmentArr = new Float32Array(numCoordinates);
+    let i = 0;
+    for ( const wall of walls ) {
+      segmentArr.set(wall.document.c, i);
+      i += 4;
+    }
+    return segmentArr;
+  }
+
+  /**
+   * @param {Segment[]} segments
+   * @returns {Float32Array}
+   */
+  static convertEdgesToArray(edges) {
+    const numSegments = edges.length;
+    const numCoordinates = numSegments * 4; // A.x, A.y, B.x, B.y
+    const segmentArr = new Float32Array(numCoordinates);
+    let i = 0;
+    for ( const edge of edges ) {
+      const a = edge.a ?? edge.A;
+      const b = edge.b ?? edge.B;
+      segmentArr[i++] = a.x;
+      segmentArr[i++] = a.y;
+      segmentArr[i++] = b.x;
+      segmentArr[i++] = b.y;
+    }
+    return segmentArr;
+  }
+
+  /**
+   * @param {Segment[]} segments
+   */
+  async processWalls(segmentArr) {
+    // Copy segment data to GPU.
+    const vertexBuffer = this.constructor.device.createBuffer({
+      size: segmentArr.byteLength,
+      usage: GPUBufferUsage.VERTEX,
+      mappedAtCreation: true,
+    });
+    new Float32Array(vertexBuffer.getMappedRange()).set(segmentArr);
+    vertexBuffer.unmap();
+
+    // Process the segments on the GPU.
+    const commandEncoder = this.constructor.device.createCommandEncoder();
+    const passEncoder = commandEncoder.beginRenderPass({
+      colorAttachments: [{
+        view: this.dummyTexture.createView(),
+        clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        loadOp: "clear",
+        storeOp: "discard", // We don't care about saving the pixel colors.
+      }] // No visual output needed; dummy texture used.
+    });
+
+    passEncoder.setPipeline(this.pipelines.segment);
+    passEncoder.setBindGroup(0, this.bindGroups.segment);
+    passEncoder.setVertexBuffer(0, vertexBuffer);
+    passEncoder.draw(segmentArr.length / 2); // 2 floats per vertex
+    passEncoder.end();
+
+    // Copy result from Storage -> Staging
+    commandEncoder.copyBufferToBuffer(
+      this.buffers.terrain, 0,
+      this.buffers.staging, 0,
+      this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
+    );
+
+    this.constructor.device.queue.submit([commandEncoder.finish()]);
+
+    // Read the data.
+    await this.buffers.staging.mapAsync(GPUMapMode.READ);
+    const terrainBuffer = this.buffers.staging.getMappedRange();
+    const data = new Uint32Array(terrainBuffer.slice()); // Use slice to copy the buffer.
+    this.buffers.staging.unmap();
+
+    return data; // Flat JS array.
+  }
+
+  static shaderCode = `
+
+struct Uniforms {
+  sceneRes: vec2<f32>,
+  gridRes: vec2<f32>,
+};
+
+struct VertexOutput {
+  @builtin(position) pos: vec4<f32>,
+};
+
+// TODO: Is atomic necessary here? We are not incrementing for walls.
+@group(0) @binding(0) var<uniform> config: Uniforms;
+@group(0) @binding(1) var<storage, read_write> terrainMap: array<atomic<u32>>;
+
+fn get_idx(x: u32, y: u32) -> u32 { return y * u32(config.gridRes.x) + x; }
+
+@vertex
+fn vs_segment_main(@location(0) pos: vec2<f32>) -> VertexOutput {
+  var out: VertexOutput;
+
+  // Convert scene coordinates (0 to res) to NDC (-1 to 1)
+  let ndcX = ((pos.x / config.sceneRes.x)) * 2.0 - 1.0;
+  let ndcY = 1.0 - ((pos.y / config.sceneRes.y) * 2.0); // Flip Y for screen space.
+  out.pos = vec4<f32>(ndcX, ndcY, 0.0, 1.0);
+  return out;
+}
+
+const WALL: u32 = 255u;
+
+@fragment
+fn fs_segment_main(@builtin(position) fragPos: vec4<f32>) {
+  // fragPos is in the coordinate space of the attachment (the dummy texture).
+  // Since the dummy texture is sized to gridRes, these are already grid coords.
+  let x = u32(fragPos.x);
+  let y = u32(fragPos.y);
+  let index = get_idx(x, y);
+
+  // Safety check to prevent out-of-bounds if floating point error occurs
+  if ( index < arrayLength(&terrainMap) ) { atomicStore(&terrainMap[index], WALL); }
+}
+`;
+
+}
+
+
+/* Test GPUTerrainMap
+Draw = CONFIG.GeometryLib.lib.Draw
+api = game.modules.get("elevationruler").api
+Terrain = api.pathfinding.Terrain
+await GPUTerrainMap.initializeDevice()
+resolution = 0.25
+width = Math.ceil(canvas.scene.dimensions.width * resolution)
+height = Math.ceil(canvas.scene.dimensions.height * resolution);
+
+mapper = new GPUTerrainMap(resolution)
+await mapper.initialize();
+segmentArr = GPUTerrainMap.convertWallsToArray(canvas.walls.placeables)
+terrainMap = await mapper.processWalls(segmentArr)
+
+terrain = new Terrain(terrainMap, width, { scale: { resolution, x: 0, y: 0 } })
+
+
+new Set(terrain.pixels)
+terrain.draw({ skip: 5, local: true })
+
+terrain.draw({ skip: 5, local: false })
+
+m = new Map()
+for ( let i = 0, iMax = terrain.pixels.length; i < iMax; i += 1 ) {
+  const px = terrain.pixels[i];
+  let num = m.get(px) || 0;
+  num += 1;
+  m.set(px, num);
+
+  if ( px === 255 ) {
+    const localPt = terrain._localAtIndex(i);
+    console.log(`${i}: ${localPt.x},${localPt.y}`)
+    Draw.point(localPt)
+  }
+}
+
+
+*/
 
 
 /* PixelCache testing
