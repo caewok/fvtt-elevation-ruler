@@ -994,7 +994,8 @@ export class GPUTerrainMap {
 
   get gridSize() { return this.gridWidth * this.gridHeight; }
 
-  constructor(resolution = 1) {
+  constructor(resolution = 1, device) {
+    device ??= this.constructor.device;
     if ( !this.constructor.device ) throw new Error(`${this.constructor.name}|webGPU device not initialized.`);
     this.resolution = resolution;
   }
@@ -1028,6 +1029,7 @@ export class GPUTerrainMap {
   pipelines = {
     segment: null,
     triangle: null,
+    combine: null,
   };
 
   /** @type {object<WebGPUBindGroup} */
@@ -1038,6 +1040,7 @@ export class GPUTerrainMap {
     subjectTerrain: null,
     transientWalls: null,
     transientTerrain: null,
+    combine: null,
   };
 
   /** @type {WebGPUTexture} */
@@ -1142,6 +1145,15 @@ export class GPUTerrainMap {
       primitive: { topology: "triangle-list" },
     });
 
+    this.pipelines.combine = device.createComputePipeline({
+      label: "Combine Terrains",
+      layout: "auto",
+      compute: {
+        module: shaderModule,
+        entryPoint: "cs_combine",
+      },
+    });
+
     this.bindGroups.staticWalls = device.createBindGroup({
       label: "staticWalls",
       layout: this.pipelines.segment.getBindGroupLayout(0),
@@ -1194,6 +1206,16 @@ export class GPUTerrainMap {
         { binding: 0, resource: { buffer: this.buffers.uniform } },
         { binding: 1, resource: { buffer: this.buffers.transientTerrain } },
       ]
+    });
+
+    this.bindGroups.combine = device.createBindGroup({
+      label: "Combine Terrains",
+      layout: this.pipelines.combine.getBindGroupLayout(1),
+      entries: [
+        { binding: 0, resource: { buffer: this.buffers.staticTerrain } },
+        { binding: 1, resource: { buffer: this.buffers.subjectTerrain } },
+        { binding: 2, resource: { buffer: this.buffers.transientTerrain } },
+      ],
     });
   }
 
@@ -1438,14 +1460,14 @@ export class GPUTerrainMap {
   }
 
   /**
-   * Process wall segments on the GPU.
+   * Process blokcing segments on the GPU.
    * The chosen terrain buffer will have pixels under each segment set to block.
    * @param {Segment[]} segments
    * @param {object} opts
    * - @prop {"static"|"subject"|"transient"} bufferType
    * - @prop {boolean} clear                                If true, clears the buffer first
    */
-  async processWallSegments(segmentArr, { bufferType = "transient", clear = true } = {}) {
+  async processBlockingSegments(segmentArr, { bufferType = "transient", clear = true } = {}) {
     const device = this.constructor.device;
     const commandEncoder = device.createCommandEncoder();
     const bindGroup = this.bindGroups[`${bufferType}Walls`];
@@ -1544,6 +1566,40 @@ export class GPUTerrainMap {
     return data;
   }
 
+  /**
+   * Sums the static and subject buffers into the transient buffer.
+   * Ensures every pixel has a minimum value of 1.
+   */
+  async combineTerrainBuffers() {
+    const device = this.constructor.device;
+    const commandEncoder = device.createCommandEncoder({ label: "Combine Terrains" });
+
+    const passEncoder = commandEncoder.beginComputePass();
+    passEncoder.setPipeline(this.pipelines.combine);
+    passEncoder.setBindGroup(1, this.bindGroups.combine);
+
+    // Dispatch workgroups. We use 64 as the workgroup size (defined in shader).
+    const workgroupCount = Math.ceil(this.gridSize / 64);
+    passEncoder.dispatchWorkgroups(workgroupCount);
+    passEncoder.end();
+
+    // Copy result to staging for readback
+    commandEncoder.copyBufferToBuffer(
+      this.buffers.transientTerrain, 0,
+      this.buffers.staging, 0,
+      this.gridSize * Uint32Array.BYTES_PER_ELEMENT
+    );
+
+    device.queue.submit([commandEncoder.finish()]);
+
+    // Read the final combined data
+    await this.buffers.staging.mapAsync(GPUMapMode.READ);
+    const data = new Uint32Array(this.buffers.staging.getMappedRange().slice());
+    this.buffers.staging.unmap();
+
+    return data;
+  }
+
 
   static shaderCode = `
 
@@ -1559,6 +1615,10 @@ struct VertexOutput {
 
 @group(0) @binding(0) var<uniform> config: Uniforms;
 @group(0) @binding(1) var<storage, read_write> terrainMap: array<atomic<u32>>;
+
+@group(1) @binding(0) var<storage, read> staticMap: array<u32>;
+@group(1) @binding(1) var<storage, read> subjectMap: array<u32>;
+@group(1) @binding(2) var<storage, read_write> transientMap: array<u32>;
 
 fn get_idx(x: u32, y: u32) -> u32 { return y * u32(config.gridRes.x) + x; }
 
@@ -1626,6 +1686,22 @@ fn fs_difficult_terrain(@builtin(position) fragPos: vec4<f32>) {
     updateTerrainValue(idx);
   }
 }
+
+@compute @workgroup_size(64)
+fn cs_combine(@builtin(global_invocation_id) id: vec3<u32>) {
+  let idx = id.x;
+  let totalPixels = arrayLength(&transientMap);
+
+  // Boundary check.
+  if ( idx >= totalPixels ) { return; }
+
+  // 1. Sum corresponding pixels.
+  var result = staticMap[idx] + subjectMap[idx] + transientMap[idx];
+
+  // 2. Set the minimum pixel value to 1.
+  result = max(result, 1u);
+  transientMap[idx] = result;
+}
 `;
 
 }
@@ -1655,13 +1731,15 @@ await mapper.initialize();
 
 blockingWalls = mapper.blockingWalls();
 blockingWallsSegments = GPUTerrainMap.convertWallsToFlatArray(blockingWalls)
-bufferData = await mapper.processWallSegments(blockingWallsSegments, { bufferType: "static", clear: true });
+bufferData = await mapper.processBlockingSegments(blockingWallsSegments, { bufferType: "static", clear: true });
 
 blockingTokens = mapper.blockingTokens();
 blockingTokensSegments = blockingTokens.map(token => GPUTerrainMap.convertTokenEdgesToFlatArray(token))
+bufferData = await mapper.processBlockingSegments(blockingTokensSegments, { bufferType: "subject", clear: true });
 
 blockingDoors = mapper.blockingDoors();
 blockingDoorsSegments = GPUTerrainMap.convertWallsToFlatArray(blockingDoors)
+bufferData = await mapper.processBlockingSegments(blockingDoorsSegments, { bufferType: "transient", clear: true });
 
 terrainRegions = mapper.terrainRegions()
 terrainRegionsVO = GPUTerrainMap.convertRegionTopsToVertexObject(terrainRegions);
@@ -1671,10 +1749,13 @@ terrainTokens = mapper.terrainTokens();
 terrainTokensVO = GPUTerrainMap.convertTokenTopsToVertexObject(terrainTokens);
 bufferData = await mapper.processTerrainTriangles(terrainTokensVO, { bufferType: "transient", clear: true });
 
+bufferData = await mapper.combineTerrainBuffers();
+
+
 
 new Set(bufferData)
-terrain = new Terrain(bufferData, mapper.gridWidth, { scale: { x: 0, y: 0, resolution }})
-terrain.draw({ skip: 20, local: true })
+
+
 terrain.draw({ skip: 20, local: false })
 
 
