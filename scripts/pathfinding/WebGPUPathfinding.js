@@ -5,6 +5,7 @@ CONST,
 game,
 GPUMapMode,
 GPUBufferUsage,
+GPUTextureUsage,
 Hooks,
 PIXI,
 */
@@ -16,6 +17,12 @@ import { PixelCache } from "../geometry/PixelCache.js";
 import { GEOMETRY_LIB_ID, GEOMETRY_ID } from "../geometry/const.js";
 import { Settings } from "../settings.js";
 import { Draw } from "../geometry/Draw.js";
+import { Polygons3d } from "../geometry/3d/Polygon3d.js";
+import { combineTypedArrays } from "../geometry/util.js";
+import { HorizontalQuadVertices, Polygon3dVertices } from "../geometry/placeable_geometry/BasicVertices.js";
+import { VertexObject } from "../geometry/placeable_geometry/GeometryDesc.js";
+import { ConstrainedTokenModelVertices } from "../geometry/placeable_geometry/GeometryToken.js";
+import { RegionVertices } from "../geometry/placeable_geometry/GeometryRegion.js";
 
 // TODO: import { FastBitSet } from "../FastBitSet/FastBitSet.js";
 
@@ -969,9 +976,13 @@ class StagingBufferRing {
  * Test using the GPU to write the terrain map.
  * Draw segments for the walls and flat triangles for everything else.
  */
-class GPUTerrainMap {
+export class GPUTerrainMap {
 
   resolution = 1;
+
+  senseType = "move";
+
+  token;
 
   get sceneWidth() { return canvas.scene.dimensions.width; }
 
@@ -998,21 +1009,35 @@ class GPUTerrainMap {
     this.device = await adapter.requestDevice();
   }
 
+  /* Buffers
+  Static: Walls or other obstacles that do not move often and are not token-specific.
+  Subject: Token-specific difficult terrain, like regions, that do not move often.
+  Transient: Doors and token walls or token-based difficult terrain. Subject token specific or moves often.
+  */
+
   /** @type {object<WebGPUBuffer>} */
   buffers = {
     uniform: null,
-    terrain: null,
+    staticTerrain: null,
+    subjectTerrain: null,
+    transientTerrain: null,
     staging: null,
   };
 
   /** @type {object<WebGPUPipeline} */
   pipelines = {
     segment: null,
+    triangle: null,
   };
 
   /** @type {object<WebGPUBindGroup} */
   bindGroups = {
-    segment: null,
+    staticWalls: null,
+    staticTerrain: null,
+    subjectWalls: null,
+    subjectTerrain: null,
+    transientWalls: null,
+    transientTerrain: null,
   };
 
   /** @type {WebGPUTexture} */
@@ -1020,28 +1045,41 @@ class GPUTerrainMap {
 
   async initialize() {
     const format = navigator.gpu.getPreferredCanvasFormat();
+    const device = this.constructor.device;
 
     // 0. Uniform buffer.
     const uniformData = new Float32Array([
       this.sceneWidth, this.sceneHeight,
       this.gridWidth, this.gridHeight,
     ]);
-    this.buffers.uniform = this.constructor.device.createBuffer({
+    this.buffers.uniform = device.createBuffer({
       label: "uniform",
       size: uniformData.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    this.constructor.device.queue.writeBuffer(this.buffers.uniform, 0, uniformData);
+    device.queue.writeBuffer(this.buffers.uniform, 0, uniformData);
 
     // 1. Storage buffer. (The terrain map on the GPU, scaled by resolution.)
-    this.buffers.terrain = this.constructor.device.createBuffer({
-      label: "storage",
+    this.buffers.staticTerrain = device.createBuffer({
+      label: "staticTerrain",
+      size: this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+
+    this.buffers.subjectTerrain = device.createBuffer({
+      label: "subjectTerrain",
+      size: this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+
+    this.buffers.transientTerrain = device.createBuffer({
+      label: "transientTerrain",
       size: this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
     });
 
     // 2. Staging buffer, scaled by resolution.
-    this.buffers.staging = this.constructor.device.createBuffer({
+    this.buffers.staging = device.createBuffer({
       label: "staging",
       size: this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
       usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
@@ -1049,7 +1087,7 @@ class GPUTerrainMap {
 
     // Create dummy texture.
     // This defines the coordinate space for the rasterizer.
-    this.dummyTexture = this.constructor.device.createTexture({
+    this.dummyTexture = device.createTexture({
       label: "dummy raster attachment",
       size: [this.gridWidth, this.gridHeight],
       format, // Match the format used in your pipeline targets
@@ -1057,43 +1095,123 @@ class GPUTerrainMap {
     });
 
     // 3. Create pipeline.
-    const shaderModule = this.constructor.device.createShaderModule({
+    const shaderModule = device.createShaderModule({
       code: this.constructor.shaderCode,
     });
-    this.pipelines.segment = this.constructor.device.createRenderPipeline({
-      label: "segmentRender",
-      layout: "auto",
-      vertex: {
-        module: shaderModule,
-        entryPoint: "vs_segment_main",
-        buffers: [{
-          arrayStride: 8, // 2 floats (x, y) * 4 bytes
-          attributes: [{ shaderLocation: 0, offset: 0, format: "float32x2" }]
-        }]
-      },
 
-      // Even though we are writing to a Storage Buffer, WebGPU's RenderPipeline still expects
-      // a "drawing surface" (a texture) to define the boundaries of the grid.
-      // We use a "dummy" texture for this.
-      fragment: {
-        module: shaderModule,
-        entryPoint: "fs_segment_main",
-        targets: [{
-          format,
-          writeMask: 0, // IMPORTANT: Do not write to the dummy texture.
-        }]
-      },
-      primitive: { topology: "line-list" }
+    const vertex = {
+      module: shaderModule,
+      entryPoint: "vs_main",
+      buffers: [{
+        arrayStride: Float32Array.BYTES_PER_ELEMENT * 2, // 2 floats (x, y) * 4 bytes
+        attributes: [{ shaderLocation: 0, offset: 0, format: "float32x2" }]
+      }]
+    };
+
+    const fragmentWall = {
+      module: shaderModule,
+      entryPoint: "fs_wall",
+      targets: [{
+        format,
+        writeMask: 0, // IMPORTANT: Do not write to the dummy texture.
+      }]
+    };
+
+    const fragmentDifficultTerrain = {
+      module: shaderModule,
+      entryPoint: "fs_difficult_terrain",
+      targets: [{
+        format,
+        writeMask: 0, // IMPORTANT: Do not write to the dummy texture.
+      }]
+    };
+
+    this.pipelines.segment = device.createRenderPipeline({
+      label: "segment",
+      layout: "auto",
+      vertex,
+      fragment: fragmentWall,
+      primitive: { topology: "line-list" },
     });
 
-    this.bindGroups.segment = this.constructor.device.createBindGroup({
-      label: "segment",
+    this.pipelines.triangle = device.createRenderPipeline({
+      label: "triangle",
+      layout: "auto",
+      vertex,
+      fragment: fragmentDifficultTerrain,
+      primitive: { topology: "triangle-list" },
+    });
+
+    this.bindGroups.staticWalls = device.createBindGroup({
+      label: "staticWalls",
       layout: this.pipelines.segment.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: this.buffers.uniform } },
-        { binding: 1, resource: { buffer: this.buffers.terrain } },
+        { binding: 1, resource: { buffer: this.buffers.staticTerrain } },
       ]
     });
+
+    this.bindGroups.staticTerrain = device.createBindGroup({
+      label: "staticTerrain",
+      layout: this.pipelines.triangle.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.buffers.uniform } },
+        { binding: 1, resource: { buffer: this.buffers.staticTerrain } },
+      ]
+    });
+
+    this.bindGroups.subjectWalls = device.createBindGroup({
+      label: "subjectWalls",
+      layout: this.pipelines.segment.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.buffers.uniform } },
+        { binding: 1, resource: { buffer: this.buffers.subjectTerrain } },
+      ]
+    });
+
+    this.bindGroups.subjectTerrain = device.createBindGroup({
+      label: "subjectTerrain",
+      layout: this.pipelines.triangle.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.buffers.uniform } },
+        { binding: 1, resource: { buffer: this.buffers.subjectTerrain } },
+      ]
+    });
+
+    this.bindGroups.transientWalls = device.createBindGroup({
+      label: "transientWalls",
+      layout: this.pipelines.segment.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.buffers.uniform } },
+        { binding: 1, resource: { buffer: this.buffers.transientTerrain } },
+      ]
+    });
+
+    this.bindGroups.transientTerrain = device.createBindGroup({
+      label: "transientTerrain",
+      layout: this.pipelines.triangle.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.buffers.uniform } },
+        { binding: 1, resource: { buffer: this.buffers.transientTerrain } },
+      ]
+    });
+  }
+
+  /**
+   * Resets all values in the terrain storage buffer to 0.
+   * TODO: Is this needed or can we just trigger clearing on processing?
+   * Probably need to clear if no obstacles/difficult terrain to process.
+   */
+  clearTerrainMap() {
+    // Faster than recreating the buffer.
+    const device = this.constructor.device;
+    const commandEncoder = device.createCommandEncoder({ label: "Clear Terrain Encoder" });
+
+    // Zero out the entire storage buffer
+    commandEncoder.clearBuffer(this.buffers.terrain);
+
+    // TODO: Add to update queue instead of submitting a new one here?
+    device.queue.submit([commandEncoder.finish()]);
   }
 
   /**
@@ -1108,10 +1226,11 @@ class GPUTerrainMap {
 
 
   /**
+   * Convert a wall object or Edge to flat typed array.
    * @param {Wall[]} walls
    * @returns {Float32Array}
    */
-  static convertWallsToArray(walls) {
+  static convertWallsToFlatArray(walls) {
     const numSegments = walls.length;
     const numCoordinates = numSegments * 4; // A.x, A.y, B.x, B.y
     const segmentArr = new Float32Array(numCoordinates);
@@ -1124,10 +1243,11 @@ class GPUTerrainMap {
   }
 
   /**
-   * @param {Segment[]} segments
+   * Convert a segment object or Edge to flat typed array.
+   * @param {Segment[]|Edge[]} segments
    * @returns {Float32Array}
    */
-  static convertEdgesToArray(edges) {
+  static convertEdgesToFlatArray(edges) {
     const numSegments = edges.length;
     const numCoordinates = numSegments * 4; // A.x, A.y, B.x, B.y
     const segmentArr = new Float32Array(numCoordinates);
@@ -1144,21 +1264,201 @@ class GPUTerrainMap {
   }
 
   /**
-   * @param {Segment[]} segments
+   * Convert token edges to flat segment array.
+   * Used to treat a token as having walls.
+   * @param {Token} token
+   * @returns {Float32Array}
    */
-  async processWalls(segmentArr) {
-    // Copy segment data to GPU.
-    const vertexBuffer = this.constructor.device.createBuffer({
-      size: segmentArr.byteLength,
-      usage: GPUBufferUsage.VERTEX,
+  static convertTokenEdgesToFlatArray(token) {
+    const border = token.constrainedTokenBorder;
+    return this.convertEdgesToFlatArray([...border.iterateEdges({ close: true })]);
+  }
+
+  /**
+   * Convert token tops to vertices object.
+   * @param {Token[]} tokens
+   * @returns {VertexObject}
+   */
+  static convertTokenTopsToVertexObject(tokens) {
+    const vos = tokens.map(token => this._convertTokenTopToVertexObject(token));
+    const vo = vos.length === 1 ? vos[0] : vos[0].combine(...vos.slice(1));
+    vo.condense(vo);
+    vo.dropZ();
+    return vo;
+  }
+
+  /**
+   * Convert token top to vertices object.
+   * @param {Token} token
+   * @returns {VertexObject}
+   */
+  static _convertTokenTopToVertexObject(token) {
+    const vo = new VertexObject();
+    if ( token.isConstrainedTokenBorder ) {
+      vo.vertices = Polygon3dVertices.polygonTopFace(token.constrainedTokenBorder, { topZ: token.bottomZ, stride: 3 });
+      vo.hasNormals = false;
+      vo.hasUVs = false;
+      return vo;
+    }
+
+    vo.vertices = HorizontalQuadVertices.top;
+    vo.hasNormals = true;
+    vo.hasUVs = true;
+    vo.dropNormalsAndUVs({ out: vo });
+
+    const geom = token[GEOMETRY_LIB_ID][GEOMETRY_ID];
+    geom.update();
+    vo.transformToModel(geom.modelMatrix, vo);
+    return vo;
+  }
+
+  /**
+   * Convert region tops to vertices object.
+   * @param {Region[]} regions
+   * @returns {VertexObject}
+   */
+  static convertRegionTopsToVertexObject(regions) {
+    const vos = regions.map(region => this._convertRegionTopToVertexObject(region));
+    const vo = vos.length === 1 ? vos[0] : vos[0].combine(...vos.slice(1));
+    vo.condense(vo);
+    vo.dropZ();
+    return vo;
+  }
+
+  /**
+   * Convert region top to vertices object.
+   * @param {Region} region
+   * @returns {VertexObject}
+   */
+  static _convertRegionTopToVertexObject(region) {
+    const geom = region[GEOMETRY_LIB_ID][GEOMETRY_ID];
+    geom.update();
+
+    // Need to earcut faces but also handle holes.
+    const vertices = [];
+    for ( const faces of geom.combinedFaces ) {
+      if ( faces.top.matchesClass(Polygons3d) ) {
+        const paths = faces.top.toClipperPaths();
+        const top = Polygon3dVertices.polygonTopFace(paths, { topZ: 0, stride: 3 });
+        vertices.push(top);
+      } else {
+        const tris = faces.top.triangulate();
+        const outArr = new Float32Array(9 * tris.length);
+        let outIdx = 0;
+        for ( const tri of tris ) {
+          tri.toVertices({ outArr, outIdx });
+          outIdx += 9;
+        }
+        vertices.push(outArr);
+      }
+    }
+    const vo = new VertexObject();
+    vo.hasUVs = false;
+    vo.hasNormals = false;
+    if ( !vertices.length ) return vo;
+    vo.vertices = vertices.length > 1 ? combineTypedArrays(vertices) : vertices[0];
+    return vo;
+  }
+
+  /** Helper to create vertex buffers */
+  _createStaticBuffer(data, usage) {
+    const buffer = this.constructor.device.createBuffer({
+      size: data.byteLength,
+      usage,
       mappedAtCreation: true,
     });
-    new Float32Array(vertexBuffer.getMappedRange()).set(segmentArr);
-    vertexBuffer.unmap();
+    new Float32Array(buffer.getMappedRange()).set(data);
+    buffer.unmap();
+    return buffer;
+  }
+
+  /** Helper to create index buffers */
+  _createIndexBuffer(data) {
+    const buffer = this.constructor.device.createBuffer({
+      size: data.byteLength,
+      usage: GPUBufferUsage.INDEX,
+      mappedAtCreation: true,
+    });
+    // Indices must be Uint32 or Uint16
+    new Uint16Array(buffer.getMappedRange()).set(data);
+    buffer.unmap();
+    return buffer;
+  }
+
+  blockingWalls() {
+    const senseType = this.senseType;
+    const elevationZ = this.token.bottomZ;
+    const NORMAL = CONST.WALL_SENSE_TYPES.NORMAL;
+    return canvas.walls.placeables
+      .filter(wall => {
+        if ( wall.document[senseType] !== NORMAL ) return false;
+        if ( wall.isDoor ) return false; // Doors go in transient data.
+        if ( elevationZ >= wall.topZ && elevationZ < wall.bottomZ ) return false; // If top equals token elevation, don't blokc.
+        return true;
+      });
+  }
+
+  blockingDoors() {
+    const senseType = this.senseType;
+    const elevationZ = this.token.bottomZ;
+    const NORMAL = CONST.WALL_SENSE_TYPES.NORMAL;
+    return canvas.walls.placeables.filter(wall => {
+      if ( wall.document[senseType] !== NORMAL ) return false;
+      if ( !wall.isDoor ) return false; // Doors go in transient data.
+      if ( elevationZ >= wall.topZ && elevationZ < wall.bottomZ ) return false; // If top equals token elevation, don't blokc.
+      return true;
+    });
+  }
+
+  blockingTokens() {
+    const subjectToken = this.token;
+    return canvas.tokens.placeables.filter(token => {
+      const value = Terrain.tokenValue(token, subjectToken);
+      return value === Terrain.FEATURES.BLOCKING;
+    });
+  }
+
+  terrainRegions() {
+    // TODO: Handle more than 2x multipliers. Probably by adding more than once.
+    const subjectToken = this.token;
+    return canvas.regions.placeables.filter(region => {
+      if ( !region.document.shapes.length ) return false;
+      const value = Terrain.regionValue(region, subjectToken);
+      return value !== Terrain.FEATURES.NORMAL;
+    });
+  }
+
+  terrainTokens() {
+    // TODO: Handle more than 2x multipliers. Probably by adding more than once.
+    const subjectToken = this.token;
+    return canvas.tokens.placeables.filter(token => {
+      const value = Terrain.tokenValue(token, subjectToken);
+      return !(value === Terrain.FEATURES.NORMAL && value === Terrain.FEATURES.BLOCKING);
+    });
+  }
+
+  /**
+   * Process wall segments on the GPU.
+   * The chosen terrain buffer will have pixels under each segment set to block.
+   * @param {Segment[]} segments
+   * @param {object} opts
+   * - @prop {"static"|"subject"|"transient"} bufferType
+   * - @prop {boolean} clear                                If true, clears the buffer first
+   */
+  async processWallSegments(segmentArr, { bufferType = "transient", clear = true } = {}) {
+    const device = this.constructor.device;
+    const commandEncoder = device.createCommandEncoder();
+    const bindGroup = this.bindGroups[`${bufferType}Walls`];
+    const buffer = this.buffers[`${bufferType}Terrain`];
+
+    // Clear map before drawing.
+    if ( clear ) commandEncoder.clearBuffer(buffer);
+
+    // Send the segment vertices to the GPU.
+    const vertexBuffer = this._createStaticBuffer(segmentArr, GPUBufferUsage.VERTEX);
 
     // Process the segments on the GPU.
-    const commandEncoder = this.constructor.device.createCommandEncoder();
-    const passEncoder = commandEncoder.beginRenderPass({
+    const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [{
         view: this.dummyTexture.createView(),
         clearValue: { r: 0, g: 0, b: 0, a: 1 },
@@ -1167,20 +1467,20 @@ class GPUTerrainMap {
       }] // No visual output needed; dummy texture used.
     });
 
-    passEncoder.setPipeline(this.pipelines.segment);
-    passEncoder.setBindGroup(0, this.bindGroups.segment);
-    passEncoder.setVertexBuffer(0, vertexBuffer);
-    passEncoder.draw(segmentArr.length / 2); // 2 floats per vertex
-    passEncoder.end();
+    renderPass.setPipeline(this.pipelines.segment);
+    renderPass.setBindGroup(0, bindGroup);
+    renderPass.setVertexBuffer(0, vertexBuffer);
+    renderPass.draw(segmentArr.length / 2); // 2 floats per vertex
+    renderPass.end();
 
     // Copy result from Storage -> Staging
     commandEncoder.copyBufferToBuffer(
-      this.buffers.terrain, 0,
+      buffer, 0,
       this.buffers.staging, 0,
       this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
     );
 
-    this.constructor.device.queue.submit([commandEncoder.finish()]);
+    device.queue.submit([commandEncoder.finish()]);
 
     // Read the data.
     await this.buffers.staging.mapAsync(GPUMapMode.READ);
@@ -1190,6 +1490,60 @@ class GPUTerrainMap {
 
     return data; // Flat JS array.
   }
+
+  /**
+   * Process terrain triangles on the GPU.
+   * The pixels under the triangles will be multiplied by 2 for the difficulty.
+   * @param {VertexObject} triVO
+   * @param {object} opts
+   * - @prop {"static"|"subject"|"transient"} bufferType
+   * - @prop {boolean} clear                                If true, clears the buffer first
+   */
+  async processTerrainTriangles(triVO, { bufferType = "transient", clear = true } = {}) {
+    const device = this.constructor.device;
+    const commandEncoder = device.createCommandEncoder();
+    const bindGroup = this.bindGroups[`${bufferType}Terrain`];
+    const buffer = this.buffers[`${bufferType}Terrain`];
+
+    // Clear map before drawing.
+    if ( clear ) commandEncoder.clearBuffer(buffer);
+
+    // Send the triangle vertices and indices to the GPU.
+    const vBuf = this._createStaticBuffer(triVO.vertices, GPUBufferUsage.VERTEX);
+    const iBuf = this._createIndexBuffer(triVO.indices);
+
+    // Render to the selected buffer.
+    const renderPass = commandEncoder.beginRenderPass({
+      colorAttachments: [{
+        view: this.dummyTexture.createView(),
+        loadOp: "clear",
+        storeOp: "discard",
+        clearValue: { r: 0, g: 0, b: 0, a: 1 }
+      }]
+    });
+    renderPass.setPipeline(this.pipelines.triangle);
+    renderPass.setBindGroup(0, bindGroup);
+    renderPass.setVertexBuffer(0, vBuf);
+    renderPass.setIndexBuffer(iBuf, "uint16"); // Or uint32
+    renderPass.drawIndexed(triVO.indices.length);
+    renderPass.end();
+
+    // Copy to staging for readback
+    commandEncoder.copyBufferToBuffer(
+      buffer, 0,
+      this.buffers.staging, 0,
+      this.gridSize * Uint32Array.BYTES_PER_ELEMENT
+    );
+
+    device.queue.submit([commandEncoder.finish()]);
+
+    // Read the data.
+    await this.buffers.staging.mapAsync(GPUMapMode.READ);
+    const data = new Uint32Array(this.buffers.staging.getMappedRange().slice());
+    this.buffers.staging.unmap();
+    return data;
+  }
+
 
   static shaderCode = `
 
@@ -1202,14 +1556,14 @@ struct VertexOutput {
   @builtin(position) pos: vec4<f32>,
 };
 
-// TODO: Is atomic necessary here? We are not incrementing for walls.
+
 @group(0) @binding(0) var<uniform> config: Uniforms;
 @group(0) @binding(1) var<storage, read_write> terrainMap: array<atomic<u32>>;
 
 fn get_idx(x: u32, y: u32) -> u32 { return y * u32(config.gridRes.x) + x; }
 
 @vertex
-fn vs_segment_main(@location(0) pos: vec2<f32>) -> VertexOutput {
+fn vs_main(@location(0) pos: vec2<f32>) -> VertexOutput {
   var out: VertexOutput;
 
   // Convert scene coordinates (0 to res) to NDC (-1 to 1)
@@ -1222,15 +1576,55 @@ fn vs_segment_main(@location(0) pos: vec2<f32>) -> VertexOutput {
 const WALL: u32 = 255u;
 
 @fragment
-fn fs_segment_main(@builtin(position) fragPos: vec4<f32>) {
+fn fs_wall(@builtin(position) fragPos: vec4<f32>) {
   // fragPos is in the coordinate space of the attachment (the dummy texture).
   // Since the dummy texture is sized to gridRes, these are already grid coords.
   let x = u32(fragPos.x);
   let y = u32(fragPos.y);
-  let index = get_idx(x, y);
+  let idx = get_idx(x, y);
 
   // Safety check to prevent out-of-bounds if floating point error occurs
-  if ( index < arrayLength(&terrainMap) ) { atomicStore(&terrainMap[index], WALL); }
+  // TODO: Is atomic necessary here? We are not incrementing for walls.
+  if ( idx < arrayLength(&terrainMap) ) { atomicStore(&terrainMap[idx], WALL); }
+}
+
+fn updateTerrainValue(idx: u32) {
+  // Initial read of the current value.
+  let oldValue = atomicLoad(&terrainMap[idx]);
+  atomicStore(&terrainMap[idx], max(oldValue, 1u) * 2u);
+
+  // Enter a loop to ensure the update eventually succeeds.
+  /*
+  loop {
+    var newValue: u32;
+
+    // Try to set the new value.
+    // if ( oldValue == 0u ) { newValue = 2u; }
+    // else { newValue = oldValue * 2u; }
+    newValue = max(oldValue, 2u);
+
+    // Attempt to swap.
+    let res = atomicCompareExchangeWeak(&terrainMap[idx], oldValue, newValue);
+    if ( res.exchanged ) { break; }
+  }
+  */
+
+}
+
+@fragment
+fn fs_difficult_terrain(@builtin(position) fragPos: vec4<f32>) {
+  // fragPos is in the coordinate space of the attachment (the dummy texture).
+  // Since the dummy texture is sized to gridRes, these are already grid coords.
+  let x = u32(fragPos.x);
+  let y = u32(fragPos.y);
+  let idx = get_idx(x, y);
+
+  // Safety check to prevent out-of-bounds if floating point error occurs
+  if ( idx < arrayLength(&terrainMap) ) {
+    // Set terrain to 2 (double it). If 2+, multiply by 2.
+    // TODO: Is atomic necessary here? Multiple fragments should not overlap.
+    updateTerrainValue(idx);
+  }
 }
 `;
 
@@ -1241,23 +1635,57 @@ fn fs_segment_main(@builtin(position) fragPos: vec4<f32>) {
 Draw = CONFIG.GeometryLib.lib.Draw
 api = game.modules.get("elevationruler").api
 Terrain = api.pathfinding.Terrain
+GPUTerrainMap = api.pathfinding.GPUTerrainMap
+let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
+
+vo = GPUTerrainMap.convertTokenTopToVertexObject(canvas.tokens.placeables[0])
+vo.debugDraw()
+
+vo = GPUTerrainMap.convertRegionTopToVertexObject(canvas.regions.placeables[0])
+vo.debugDraw()
+
 await GPUTerrainMap.initializeDevice()
-resolution = 0.25
+resolution = .25
 width = Math.ceil(canvas.scene.dimensions.width * resolution)
 height = Math.ceil(canvas.scene.dimensions.height * resolution);
 
 mapper = new GPUTerrainMap(resolution)
+mapper.token = randal
 await mapper.initialize();
+
+blockingWalls = mapper.blockingWalls();
+blockingWallsSegments = GPUTerrainMap.convertWallsToFlatArray(blockingWalls)
+bufferData = await mapper.processWallSegments(blockingWallsSegments, { bufferType: "static", clear: true });
+
+blockingTokens = mapper.blockingTokens();
+blockingTokensSegments = blockingTokens.map(token => GPUTerrainMap.convertTokenEdgesToFlatArray(token))
+
+blockingDoors = mapper.blockingDoors();
+blockingDoorsSegments = GPUTerrainMap.convertWallsToFlatArray(blockingDoors)
+
+terrainRegions = mapper.terrainRegions()
+terrainRegionsVO = GPUTerrainMap.convertRegionTopsToVertexObject(terrainRegions);
+bufferData = await mapper.processTerrainTriangles(terrainRegionsVO, { bufferType: "subject", clear: true });
+
+terrainTokens = mapper.terrainTokens();
+terrainTokensVO = GPUTerrainMap.convertTokenTopsToVertexObject(terrainTokens);
+bufferData = await mapper.processTerrainTriangles(terrainTokensVO, { bufferType: "transient", clear: true });
+
+
+new Set(bufferData)
+terrain = new Terrain(bufferData, mapper.gridWidth, { scale: { x: 0, y: 0, resolution }})
+terrain.draw({ skip: 20, local: true })
+terrain.draw({ skip: 20, local: false })
+
+
+console.time("GPUTerrainMap convert walls")
 segmentArr = GPUTerrainMap.convertWallsToArray(canvas.walls.placeables)
+console.timeEnd("GPUTerrainMap convert walls")
+console.time("GPUTerrainMap process walls")
 terrainMap = await mapper.processWalls(segmentArr)
+console.timeEnd("GPUTerrainMap process walls")
 
 terrain = new Terrain(terrainMap, width, { scale: { resolution, x: 0, y: 0 } })
-
-
-new Set(terrain.pixels)
-terrain.draw({ skip: 5, local: true })
-
-terrain.draw({ skip: 5, local: false })
 
 m = new Map()
 for ( let i = 0, iMax = terrain.pixels.length; i < iMax; i += 1 ) {

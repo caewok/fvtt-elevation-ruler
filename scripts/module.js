@@ -31,7 +31,7 @@ import {
 import { worldBuilder } from "./pathfinding/GriddedPathfindingWorld.js";
 
 // WebGPU Pathfinding
-import { Terrain, WebGPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
+import { Terrain, WebGPUPathfinder, GPUTerrainMap } from "./pathfinding/WebGPUPathfinding.js";
 
 // Load the geometry library.
 import "./geometry/registration.js";
@@ -136,6 +136,7 @@ Hooks.once("init", function() {
 
       Terrain,
       WebGPUPathfinder,
+      GPUTerrainMap,
     },
 
     WallTracer, WallTracerEdge, WallTracerVertex,
@@ -169,6 +170,8 @@ Hooks.once("canvasReady", function() {
 
   tracking.RegionGeometryTracker.registerPlaceableHooks();
   tracking.RegionGeometryTracker.registerExistingPlaceables();
+
+  // Track token and region geometry for use with terrain difficulty.
 });
 
 // For https://github.com/League-of-Foundry-Developers/foundryvtt-devMode
