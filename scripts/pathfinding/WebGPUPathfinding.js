@@ -14,6 +14,7 @@ PIXI,
 
 import { AbstractPathfinder } from "./AbstractPathfinder.js";
 import { PixelCache } from "../geometry/PixelCache.js";
+import { MatrixFlat } from "../geometry/MatrixFlat.js";
 import { GEOMETRY_LIB_ID, GEOMETRY_ID } from "../geometry/const.js";
 import { Settings } from "../settings.js";
 import { Draw } from "../geometry/Draw.js";
@@ -21,8 +22,6 @@ import { Polygons3d } from "../geometry/3d/Polygon3d.js";
 import { combineTypedArrays } from "../geometry/util.js";
 import { HorizontalQuadVertices, Polygon3dVertices } from "../geometry/placeable_geometry/BasicVertices.js";
 import { VertexObject } from "../geometry/placeable_geometry/GeometryDesc.js";
-import { ConstrainedTokenModelVertices } from "../geometry/placeable_geometry/GeometryToken.js";
-import { RegionVertices } from "../geometry/placeable_geometry/GeometryRegion.js";
 
 // TODO: import { FastBitSet } from "../FastBitSet/FastBitSet.js";
 
@@ -354,18 +353,6 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     return data;
   }
 
-  /** @type {Terrain} */
-  staticTerrain;
-
-  /** @type {Terrain} */
-  tokenTerrain;     // Token-specific, such as region difficulty.
-
-  /** @type {Terrain} */
-  transientTerrain; // Transient terrain, such as tokens and doors
-
-  /** @type {Terrain} */
-  combinedTerrain; // Combined static + token + transient. TODO: Copy directly to the WebGPU buffer for this instead of allocating.
-
   /** @type {number} */
   #resolution = 1;
 
@@ -375,46 +362,50 @@ export class WebGPUPathfinder extends AbstractPathfinder {
 
   get senseType() { return this.#senseType; }
 
-  initializeTerrain() {
-    const opts = { resolution: this.resolution, senseType: this.senseType, elevationZ: this.token.bottomZ };
-    this.staticTerrain = this.constructor.getStaticTerrain(opts);
-    this.tokenTerrain = this.staticTerrain.clone();
-    this.transientTerrain = this.staticTerrain.clone();
-    this.tokenTerrain.clear();
-    this.transientTerrain.clear();
-
-    // TODO: Copy directly to the WebGPU buffer for this instead of allocating.
-    this.combinedTerrain = this.staticTerrain.clone();
-    this.combinedTerrain.clear();
-  }
-
   updateStaticTerrain() {
-    const terrain = this.staticTerrain;
-    terrain.clear();
-    terrain.updateWalls();
+    const mapper = this.terrainMapper;
+    const bufferType = "static";
+    const blockingWalls = mapper.blockingWalls();
+    if ( blockingWalls.length ) {
+      const blockingSegments = GPUTerrainMap.convertWallsToFlatArray(blockingWalls);
+      mapper.processBlockingSegments(blockingSegments, { bufferType, clear: true });
+    } else mapper.clearTerrainMap(bufferType);
   }
 
-  updateTokenTerrain() {
-    const terrain = this.tokenTerrain;
-    terrain.clear();
-    terrain.updateRegions(this.token);
+  updateSubjectTerrain() {
+    // TODO: In GPUTerrainMap, track if buffer is already cleared with WeakSet.
+    const mapper = this.terrainMapper;
+    const bufferType = "subject";
+    const terrainRegions = mapper.terrainRegions();
+    if ( terrainRegions.length ) {
+      const terrainRegionsVO = GPUTerrainMap.convertRegionTopsToVertexObject(terrainRegions);
+      mapper.processTerrainTriangles(terrainRegionsVO, { bufferType, clear: true });
+    } else mapper.clearTerrainMap(bufferType);
   }
 
   updateTransientTerrain() {
-    const terrain = this.transientTerrain;
-    terrain.clear();
-    terrain.updateDoors();
-    terrain.updateTokens(this.token);
+    const mapper = this.terrainMapper;
+    const bufferType = "transient";
+    const blockingTokens = mapper.blockingTokens();
+    const blockingDoors = mapper.blockingDoors();
+    if ( blockingTokens.length || blockingDoors.length ) {
+      const blockingSegments = GPUTerrainMap.convertWallsToFlatArray([...blockingTokens, ...blockingDoors]);
+      mapper.processBlockingSegments(blockingSegments, { bufferType, clear: true });
+    } else mapper.clearTerrainMap(bufferType);
+
+    const terrainTokens = mapper.terrainTokens();
+    if ( terrainTokens.length ) {
+      const terrainTokensVO = GPUTerrainMap.convertTokenTopsToVertexObject(terrainTokens);
+      mapper.processTerrainTriangles(terrainTokensVO, { bufferType: "transient", clear: false });
+    }
   }
 
   updateCombinedTerrain() {
-    const { staticTerrain, tokenTerrain, transientTerrain, combinedTerrain } = this;
-    for ( let i = 0, iMax = staticTerrain.size; i < iMax; i += 1 ) {
-      // No need to use Math.min to keep under 256 so long as the typed array does not wrap.
-      // Must set normal terrain to 1. Otherwise, the initial start marked as 0 will fail.
-      combinedTerrain.pixels[i] = (staticTerrain.pixels[i] + tokenTerrain.pixels[i] + transientTerrain.pixels[i]) || 1;
-    }
+    this.terrainMapper.combineTerrainBuffers();
   }
+
+  /** @type {GPUTerrainMap} */
+  terrainMapper;
 
   // ----- NOTE: Constructor ----- //
 
@@ -427,17 +418,17 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   // ----- NOTE: Initialize ----- //
 
   async initializeWebGPU() {
-    this.initializeTerrain();
+    this.terrainMapper = new GPUTerrainMap(this.resolution, this.constructor.device);
+    this.terrainMapper.token = this.token;
+    await this.terrainMapper.initialize();
 
     // TODO: Postpone terrain updating and subsequent buffer updating.
     this.updateStaticTerrain();
-    this.updateTokenTerrain();
-    this.updateTransientTerrain();
-    this.updateCombinedTerrain();
+    this.updateSubjectTerrain();
 
     this.createPipeline();
     this.createBuffers();
-    this._createBindGroups();
+    this.createBindGroups();
   }
 
   /* Needed?
@@ -460,15 +451,17 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     this.buffers.read.unmap();
 
     console.time("GPU Terrain Buffer Update");
-    this.updateTerrainBuffer();
+    this.updateTransientTerrain();
+    this.updateCombinedTerrain();
     console.timeEnd("GPU Terrain Buffer Update");
 
     console.time("GPU Pathfinding Setup");
     this._wavefrontPropagation(start);
     console.timeEnd("GPU Pathfinding Setup");
-    console.time("GPU Pathfinding");
+
+    console.time("GPU Pathfinding Read Result");
     await this._readResult();
-    console.timeEnd("GPU Pathfinding");
+    console.timeEnd("GPU Pathfinding Read Result");
     this.#distanceMapReady = true;
   }
 
@@ -484,10 +477,10 @@ export class WebGPUPathfinder extends AbstractPathfinder {
 
   _wavefrontPropagation(start) {
     // 1. Upload start index to the GPU
-    const startIndex = this.staticTerrain._indexAtCanvas(start.x, start.y);
-    const { width, height, size } = this.staticTerrain;
-    const workgroupX = Math.ceil(width / 8);
-    const workgroupY = Math.ceil(height / 8);
+    const startIndex = this.terrainMapper._indexAtCanvas(start.x, start.y);
+    const { gridWidth, gridHeight, gridSize } = this.terrainMapper;
+    const workgroupX = Math.ceil(gridWidth / 8);
+    const workgroupY = Math.ceil(gridHeight / 8);
     this.constructor.device.queue.writeBuffer(this.buffers.initUniform, 0, new Uint32Array([startIndex]));
 
     const commandEncoder = this.constructor.device.createCommandEncoder();
@@ -505,7 +498,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     // For a generic grid, Width + Height is a safe upper bound.
     // With diagonals, increase 150%.
 
-    const iterations = Math.max(width, height) * 1.5;
+    const iterations = Math.max(gridWidth, gridHeight) * 1.5;
     const propagationPass = commandEncoder.beginComputePass();
     propagationPass.setPipeline(this.pipelines.propagation);
 
@@ -524,7 +517,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     const finalBuffer = (iterations % 2 === 0) ? this.buffers.A : this.buffers.B;
 
     // Copy to read-back buffer
-    commandEncoder.copyBufferToBuffer(finalBuffer, 0, this.buffers.read, 0, size * 4);
+    commandEncoder.copyBufferToBuffer(finalBuffer, 0, this.buffers.read, 0, gridSize * 4);
 
     this.constructor.device.queue.submit([commandEncoder.finish()]);
   }
@@ -620,13 +613,13 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   createBuffers() {
     this._createUniformBuffer();
     this._createDistanceBuffers();
-    this._createTerrainBuffer();
     this._createReadBackBuffer();
+    this.buffers.terrain = this.terrainMapper.buffers.combinedTerrain;
   }
 
   _createUniformBuffer() {
-    const { width, height } = this.staticTerrain;
-    const uniformData = new Uint32Array([width, height]);
+    const { gridWidth, gridHeight } = this.terrainMapper;
+    const uniformData = new Uint32Array([gridWidth, gridHeight]);
     this.buffers.uniform = this.createMappedBuffer(uniformData, GPUBufferUsage.UNIFORM);
 
     // Buffer for InitParams (startIndex)
@@ -636,18 +629,11 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     });
   }
 
-  _createTerrainBuffer() {
-    this.buffers.terrain = this.constructor.device.createBuffer({
-      size: this.combinedTerrain.size * Uint32Array.BYTES_PER_ELEMENT,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
-  }
-
   _createDistanceBuffers() {
     // Distance Buffers (Ping-Pong)
     // Initialize: Start Node = 0, Others = MAX_INT
     // Allocate memory here but no mapping; handled on the GPU.
-    const size = this.staticTerrain.size * Uint32Array.BYTES_PER_ELEMENT;
+    const size = this.terrainMapper.gridSize * Uint32Array.BYTES_PER_ELEMENT;
     const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
     this.buffers.A = this.constructor.device.createBuffer({ size, usage });
     this.buffers.B = this.constructor.device.createBuffer({ size, usage });
@@ -655,13 +641,12 @@ export class WebGPUPathfinder extends AbstractPathfinder {
 
   _createReadBackBuffer() {
     this.buffers.read = this.constructor.device.createBuffer({
-      size: this.staticTerrain.size * Uint32Array.BYTES_PER_ELEMENT,
+      size: this.terrainMapper.gridSize * Uint32Array.BYTES_PER_ELEMENT,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
     });
   }
 
-
-  _createBindGroups() {
+  createBindGroups() {
     const buffers = this.buffers;
 
     // Group A: Reads A, Writes B
@@ -704,19 +689,14 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     });
   }
 
-  updateTerrainBuffer() {
-    this.constructor.device.queue.writeBuffer(this.buffers.terrain, 0, this.combinedTerrain.pixels);
-  }
-
   backtrackPath(end) {
-    end = this.staticTerrain._fromCanvasCoordinates(end.x, end.y);
+    end = this.terrainMapper._fromCanvasCoordinates(end.x, end.y);
 
     const distMap = this.distanceMap;
-    const { width, height } = this.staticTerrain;
     const path = [];
     let curr = end.clone();
-    let idx = this.staticTerrain._indexAtLocal(curr.x, curr.y);
-    if (distMap[idx] === 0xFFFFFFFF) return null; // No path found
+    let idx = this.terrainMapper._indexAtLocal(curr.x, curr.y);
+    if ( distMap[idx] === 0xFFFFFFFF ) return null; // No path found
     path.push(curr.clone());
 
     // Preallocate neighbors.
@@ -747,8 +727,8 @@ export class WebGPUPathfinder extends AbstractPathfinder {
 
     // Safety to break infinite loops in bad maps.
     let safety = 0;
-    const MAX_STEPS = width * height;
-    while ( distMap[idx] !== 0 && safety < MAX_STEPS ) {
+    const { gridWidth, gridHeight, gridSize } = this.terrainMapper;
+    while ( distMap[idx] !== 0 && safety < gridSize ) {
       safety += 1;
 
       // Look for neighbor with strictly lower distance
@@ -759,15 +739,16 @@ export class WebGPUPathfinder extends AbstractPathfinder {
       // Find the neighbor with the strictly lowest distance value.
       for ( let n of neighbors ) {
         // Boundary checks
-        if ( n.x >= 0 && n.x < width && n.y >= 0 && n.y < height ) {
-          let nIdx = this.staticTerrain._indexAtLocal(n.x, n.y);
+        if ( n.x >= 0 && n.x < gridWidth && n.y >= 0 && n.y < gridHeight ) {
+          let nIdx = this.terrainMapper._indexAtLocal(n.x, n.y);
           let val = distMap[nIdx];
-          let terrain = this.staticTerrain.pixels[nIdx];
+          // let terrain = this.staticTerrain.pixels[nIdx];
 
           // We just want to roll "downhill" to 0.
           // Any neighbor with a lower value is a valid step towards home.
           // Check if neighbor is a wall (255).
-          if ( terrain < 255 && val < lowestDist ) {
+          // if ( terrain < 255 && val < lowestDist ) {
+          if ( val < lowestDist ) {
             lowestDist = val;
             bestNode = n;
             // Optimization: You could break here if you don't care about "perfect" path smoothness,
@@ -777,12 +758,12 @@ export class WebGPUPathfinder extends AbstractPathfinder {
       }
       if ( bestNode ) {
         curr = bestNode;
-        idx = this.staticTerrain._indexAtLocal(curr.x, curr.y);
+        idx = this.terrainMapper._indexAtLocal(curr.x, curr.y);
         path.push(curr.clone());
       } else break; // We got stuck. Shouldn't happen in valid wavefront.
     }
     PIXI.Point.release(...neighborOffsets, ...neighbors, curr);
-    path.forEach(pt => this.staticTerrain._toCanvasCoordinates(pt.x, pt.y, pt));
+    path.forEach(pt => this.terrainMapper._toCanvasCoordinates(pt.x, pt.y, pt));
     return path.reverse();
   }
 
@@ -978,27 +959,131 @@ class StagingBufferRing {
  */
 export class GPUTerrainMap {
 
-  resolution = 1;
+  constructor(resolution = 1, device = this.constructor.device) {
+    if ( !device ) throw new Error(`${this.constructor.name}|webGPU device not initialized.`);
+    this.device = device;
+    this.#initializeGrid(resolution);
+  }
+
+  #initializeGrid(resolution = 1) {
+    this.#resolution = resolution;
+    this.#gridWidth = Math.ceil(this.#sceneWidth * resolution);
+    this.#gridHeight = Math.ceil(this.#sceneHeight * resolution);
+  }
+
+  #resolution = 1;
+
+  #sceneWidth = canvas.scene.dimensions.width;
+
+  #sceneHeight = canvas.scene.dimensions.height;
+
+  #gridWidth = 0;
+
+  #gridHeight = 0;
 
   senseType = "move";
 
   token;
 
-  get sceneWidth() { return canvas.scene.dimensions.width; }
+  device;
 
-  get sceneHeight() { return canvas.scene.dimensions.height; }
+  translate = new PIXI.Point(0, 0);
 
-  get gridWidth() { return Math.ceil(canvas.scene.dimensions.width * this.resolution); }
+  get resolution() { return this.#resolution; }
 
-  get gridHeight() { return Math.ceil(canvas.scene.dimensions.height * this.resolution); }
+  get sceneWidth() { return this.#sceneWidth; }
 
-  get gridSize() { return this.gridWidth * this.gridHeight; }
+  get sceneHeight() { return this.#sceneHeight; }
 
-  constructor(resolution = 1, device) {
-    device ??= this.constructor.device;
-    if ( !this.constructor.device ) throw new Error(`${this.constructor.name}|webGPU device not initialized.`);
-    this.resolution = resolution;
+  get gridWidth() { return this.#gridWidth; }
+
+  get gridHeight() { return this.#gridHeight; }
+
+  get gridSize() { return this.#gridWidth * this.#gridHeight; }
+
+  /**
+   * Pixel index for a specific texture location
+   * @param {number} x      Local texture x coordinate
+   * @param {number} y      Local texture y coordinate
+   * @returns {number}
+   */
+  _indexAtLocal(x, y) {
+    const { gridWidth, gridHeight } = this;
+    if ( x < 0 || y < 0 || x >= gridWidth || y >= gridHeight ) return -1;
+
+    // Use floor to ensure consistency when converting to/from coordinates <--> index.
+    return ((~~y) * gridWidth) + (~~x);
   }
+
+  _indexAtCanvas(x, y) {
+    const local = this._fromCanvasCoordinates(x, y);
+    return this._indexAtLocal(local.x, local.y);
+  }
+
+  /**
+   * Transform canvas coordinates into the local pixel rectangle coordinates.
+   * @param {number} x    Canvas x coordinate
+   * @param {number} y    Canvas y coordinate
+   * @param {PIXI.Point} outPoint   Point to use to store the coordinate
+   * @returns {PIXI.Point} The outPoint, for convenience
+   */
+  _fromCanvasCoordinates(x, y, outPoint) {
+    outPoint ??= PIXI.Point.tmp;
+    outPoint.set(x, y);
+    const local = this.toLocalTransform.multiplyPoint2d(outPoint, outPoint);
+
+    // Avoid common rounding errors, like 19.999999999998.
+    local.x = fastFixed(local.x);
+    local.y = fastFixed(local.y);
+    return local;
+  }
+
+  /**
+   * Transform local coordinates into canvas coordinates.
+   * Inverse of _fromCanvasCoordinates
+   * @param {number} x    Local x coordinate
+   * @param {number} y    Local y coordinate
+   * @param {PIXI.Point} outPoint   Point to use to store the coordinate
+   * @returns {PIXI.Point} The outPoint, for convenience
+   */
+  _toCanvasCoordinates(x, y, outPoint) {
+    outPoint ??= PIXI.Point.tmp;
+    outPoint.set(x, y);
+    const canvas = this.toCanvasTransform.multiplyPoint2d(outPoint, outPoint);
+
+    // Avoid common rounding errors, like 19.999999999998.
+    canvas.x = fastFixed(canvas.x);
+    canvas.y = fastFixed(canvas.y);
+    return canvas;
+  }
+
+  /** @type {Matrix} */
+  #toLocalTransform;
+
+  get toLocalTransform() {
+    return this.#toLocalTransform ?? (this.#toLocalTransform = this._calculateToLocalTransform());
+  }
+
+  /** @type {Matrix} */
+  #toCanvasTransform;
+
+  get toCanvasTransform() {
+    return this.#toCanvasTransform ?? (this.#toCanvasTransform = this.toLocalTransform.invert());
+  }
+
+  /**
+   * Matrix that takes a canvas point and transforms to a local point.
+   * @returns {Matrix}
+   */
+  _calculateToLocalTransform() {
+    const mTranslate = MatrixFlat.translation(-this.translate.x, -this.translate.y);
+
+    // Scale based on resolution.
+    const resolution = this.resolution;
+    const mRes = MatrixFlat.scale(resolution, resolution);
+    return mTranslate.multiply3x3(mRes);
+  }
+
 
   /** @type {GPUDevice} */
   static device = null;
@@ -1022,6 +1107,7 @@ export class GPUTerrainMap {
     staticTerrain: null,
     subjectTerrain: null,
     transientTerrain: null,
+    combinedTerrain: null,
     staging: null,
   };
 
@@ -1048,7 +1134,7 @@ export class GPUTerrainMap {
 
   async initialize() {
     const format = navigator.gpu.getPreferredCanvasFormat();
-    const device = this.constructor.device;
+    const device = this.device;
 
     // 0. Uniform buffer.
     const uniformData = new Float32Array([
@@ -1077,6 +1163,12 @@ export class GPUTerrainMap {
 
     this.buffers.transientTerrain = device.createBuffer({
       label: "transientTerrain",
+      size: this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+
+    this.buffers.combinedTerrain = device.createBuffer({
+      label: "combinedTerrain",
       size: this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
     });
@@ -1210,11 +1302,13 @@ export class GPUTerrainMap {
 
     this.bindGroups.combine = device.createBindGroup({
       label: "Combine Terrains",
-      layout: this.pipelines.combine.getBindGroupLayout(1),
+      layout: this.pipelines.combine.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: { buffer: this.buffers.staticTerrain } },
-        { binding: 1, resource: { buffer: this.buffers.subjectTerrain } },
-        { binding: 2, resource: { buffer: this.buffers.transientTerrain } },
+        { binding: 0, resource: { buffer: this.buffers.uniform } },
+        { binding: 2, resource: { buffer: this.buffers.staticTerrain } },
+        { binding: 3, resource: { buffer: this.buffers.subjectTerrain } },
+        { binding: 4, resource: { buffer: this.buffers.transientTerrain } },
+        { binding: 5, resource: { buffer: this.buffers.combinedTerrain } },
       ],
     });
   }
@@ -1224,15 +1318,17 @@ export class GPUTerrainMap {
    * TODO: Is this needed or can we just trigger clearing on processing?
    * Probably need to clear if no obstacles/difficult terrain to process.
    */
-  clearTerrainMap() {
+  clearTerrainMap(bufferType = "transient") {
+    const buffer = this.buffers[`${bufferType}Terrain`];
+
     // Faster than recreating the buffer.
-    const device = this.constructor.device;
+    const device = this.device;
     const commandEncoder = device.createCommandEncoder({ label: "Clear Terrain Encoder" });
 
     // Zero out the entire storage buffer
-    commandEncoder.clearBuffer(this.buffers.terrain);
+    commandEncoder.clearBuffer(buffer);
 
-    // TODO: Add to update queue instead of submitting a new one here?
+    // TODO: Faster to do in a single queue
     device.queue.submit([commandEncoder.finish()]);
   }
 
@@ -1383,8 +1479,8 @@ export class GPUTerrainMap {
   }
 
   /** Helper to create vertex buffers */
-  _createStaticBuffer(data, usage) {
-    const buffer = this.constructor.device.createBuffer({
+  _createMappedBuffer(data, usage) {
+    const buffer = this.device.createBuffer({
       size: data.byteLength,
       usage,
       mappedAtCreation: true,
@@ -1396,7 +1492,7 @@ export class GPUTerrainMap {
 
   /** Helper to create index buffers */
   _createIndexBuffer(data) {
-    const buffer = this.constructor.device.createBuffer({
+    const buffer = this.device.createBuffer({
       size: data.byteLength,
       usage: GPUBufferUsage.INDEX,
       mappedAtCreation: true,
@@ -1426,7 +1522,7 @@ export class GPUTerrainMap {
     const NORMAL = CONST.WALL_SENSE_TYPES.NORMAL;
     return canvas.walls.placeables.filter(wall => {
       if ( wall.document[senseType] !== NORMAL ) return false;
-      if ( !wall.isDoor ) return false; // Doors go in transient data.
+      if ( !wall.isDoor || wall.isOpen ) return false; // Only want closed doors here.
       if ( elevationZ >= wall.topZ && elevationZ < wall.bottomZ ) return false; // If top equals token elevation, don't blokc.
       return true;
     });
@@ -1467,8 +1563,8 @@ export class GPUTerrainMap {
    * - @prop {"static"|"subject"|"transient"} bufferType
    * - @prop {boolean} clear                                If true, clears the buffer first
    */
-  async processBlockingSegments(segmentArr, { bufferType = "transient", clear = true } = {}) {
-    const device = this.constructor.device;
+  processBlockingSegments(segmentArr, { bufferType = "transient", clear = true } = {}) {
+    const device = this.device;
     const commandEncoder = device.createCommandEncoder();
     const bindGroup = this.bindGroups[`${bufferType}Walls`];
     const buffer = this.buffers[`${bufferType}Terrain`];
@@ -1477,7 +1573,7 @@ export class GPUTerrainMap {
     if ( clear ) commandEncoder.clearBuffer(buffer);
 
     // Send the segment vertices to the GPU.
-    const vertexBuffer = this._createStaticBuffer(segmentArr, GPUBufferUsage.VERTEX);
+    const vertexBuffer = this._createMappedBuffer(segmentArr, GPUBufferUsage.VERTEX);
 
     // Process the segments on the GPU.
     const renderPass = commandEncoder.beginRenderPass({
@@ -1494,6 +1590,13 @@ export class GPUTerrainMap {
     renderPass.setVertexBuffer(0, vertexBuffer);
     renderPass.draw(segmentArr.length / 2); // 2 floats per vertex
     renderPass.end();
+    device.queue.submit([commandEncoder.finish()]);
+  }
+
+  async extractBufferData(bufferType = "transient") {
+    const device = this.device;
+    const buffer = this.buffers[`${bufferType}Terrain`];
+    const commandEncoder = device.createCommandEncoder();
 
     // Copy result from Storage -> Staging
     commandEncoder.copyBufferToBuffer(
@@ -1501,15 +1604,12 @@ export class GPUTerrainMap {
       this.buffers.staging, 0,
       this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
     );
-
     device.queue.submit([commandEncoder.finish()]);
 
-    // Read the data.
     await this.buffers.staging.mapAsync(GPUMapMode.READ);
     const terrainBuffer = this.buffers.staging.getMappedRange();
     const data = new Uint32Array(terrainBuffer.slice()); // Use slice to copy the buffer.
     this.buffers.staging.unmap();
-
     return data; // Flat JS array.
   }
 
@@ -1521,8 +1621,8 @@ export class GPUTerrainMap {
    * - @prop {"static"|"subject"|"transient"} bufferType
    * - @prop {boolean} clear                                If true, clears the buffer first
    */
-  async processTerrainTriangles(triVO, { bufferType = "transient", clear = true } = {}) {
-    const device = this.constructor.device;
+  processTerrainTriangles(triVO, { bufferType = "transient", clear = true } = {}) {
+    const device = this.device;
     const commandEncoder = device.createCommandEncoder();
     const bindGroup = this.bindGroups[`${bufferType}Terrain`];
     const buffer = this.buffers[`${bufferType}Terrain`];
@@ -1531,7 +1631,7 @@ export class GPUTerrainMap {
     if ( clear ) commandEncoder.clearBuffer(buffer);
 
     // Send the triangle vertices and indices to the GPU.
-    const vBuf = this._createStaticBuffer(triVO.vertices, GPUBufferUsage.VERTEX);
+    const vBuf = this._createMappedBuffer(triVO.vertices, GPUBufferUsage.VERTEX);
     const iBuf = this._createIndexBuffer(triVO.indices);
 
     // Render to the selected buffer.
@@ -1549,55 +1649,27 @@ export class GPUTerrainMap {
     renderPass.setIndexBuffer(iBuf, "uint16"); // Or uint32
     renderPass.drawIndexed(triVO.indices.length);
     renderPass.end();
-
-    // Copy to staging for readback
-    commandEncoder.copyBufferToBuffer(
-      buffer, 0,
-      this.buffers.staging, 0,
-      this.gridSize * Uint32Array.BYTES_PER_ELEMENT
-    );
-
     device.queue.submit([commandEncoder.finish()]);
-
-    // Read the data.
-    await this.buffers.staging.mapAsync(GPUMapMode.READ);
-    const data = new Uint32Array(this.buffers.staging.getMappedRange().slice());
-    this.buffers.staging.unmap();
-    return data;
   }
 
   /**
    * Sums the static and subject buffers into the transient buffer.
    * Ensures every pixel has a minimum value of 1.
    */
-  async combineTerrainBuffers() {
-    const device = this.constructor.device;
+  combineTerrainBuffers() {
+    const device = this.device;
     const commandEncoder = device.createCommandEncoder({ label: "Combine Terrains" });
 
     const passEncoder = commandEncoder.beginComputePass();
     passEncoder.setPipeline(this.pipelines.combine);
-    passEncoder.setBindGroup(1, this.bindGroups.combine);
+    passEncoder.setBindGroup(0, this.bindGroups.combine);
 
     // Dispatch workgroups. We use 64 as the workgroup size (defined in shader).
-    const workgroupCount = Math.ceil(this.gridSize / 64);
-    passEncoder.dispatchWorkgroups(workgroupCount);
+    const workgroupCountX = Math.ceil(this.gridWidth / 8);
+    const workgroupCountY = Math.ceil(this.gridHeight / 8);
+    passEncoder.dispatchWorkgroups(workgroupCountX, workgroupCountY);
     passEncoder.end();
-
-    // Copy result to staging for readback
-    commandEncoder.copyBufferToBuffer(
-      this.buffers.transientTerrain, 0,
-      this.buffers.staging, 0,
-      this.gridSize * Uint32Array.BYTES_PER_ELEMENT
-    );
-
     device.queue.submit([commandEncoder.finish()]);
-
-    // Read the final combined data
-    await this.buffers.staging.mapAsync(GPUMapMode.READ);
-    const data = new Uint32Array(this.buffers.staging.getMappedRange().slice());
-    this.buffers.staging.unmap();
-
-    return data;
   }
 
 
@@ -1616,9 +1688,10 @@ struct VertexOutput {
 @group(0) @binding(0) var<uniform> config: Uniforms;
 @group(0) @binding(1) var<storage, read_write> terrainMap: array<atomic<u32>>;
 
-@group(1) @binding(0) var<storage, read> staticMap: array<u32>;
-@group(1) @binding(1) var<storage, read> subjectMap: array<u32>;
-@group(1) @binding(2) var<storage, read_write> transientMap: array<u32>;
+@group(0) @binding(2) var<storage, read> staticMap: array<u32>;
+@group(0) @binding(3) var<storage, read> subjectMap: array<u32>;
+@group(0) @binding(4) var<storage, read_write> transientMap: array<u32>;
+@group(0) @binding(5) var<storage, read_write> combinedMap: array<u32>;
 
 fn get_idx(x: u32, y: u32) -> u32 { return y * u32(config.gridRes.x) + x; }
 
@@ -1687,24 +1760,38 @@ fn fs_difficult_terrain(@builtin(position) fragPos: vec4<f32>) {
   }
 }
 
-@compute @workgroup_size(64)
+@compute @workgroup_size(8, 8, 1)
 fn cs_combine(@builtin(global_invocation_id) id: vec3<u32>) {
-  let idx = id.x;
-  let totalPixels = arrayLength(&transientMap);
+  let x = id.x;
+  let y = id.y;
+  let totalPixels = arrayLength(&combinedMap);
 
   // Boundary check.
-  if ( idx >= totalPixels ) { return; }
+  let width = u32(config.gridRes.x);
+  let height = u32(config.gridRes.y);
+  if ( x >= width || y >= height ) { return; }
+
+  // Linear index for the pixel.
+  let idx = (y * width) + x;
 
   // 1. Sum corresponding pixels.
   var result = staticMap[idx] + subjectMap[idx] + transientMap[idx];
 
   // 2. Set the minimum pixel value to 1.
   result = max(result, 1u);
-  transientMap[idx] = result;
+  combinedMap[idx] = result;
 }
 `;
 
 }
+
+/**
+ * Fix a number to 8 decimal places
+ * @param {number} x    Number to fix
+ * @returns {number}
+ */
+const POW10_8 = Math.pow(10, 8);
+function fastFixed(x) { return Math.round(x * POW10_8) / POW10_8; }
 
 
 /* Test GPUTerrainMap
@@ -1731,31 +1818,36 @@ await mapper.initialize();
 
 blockingWalls = mapper.blockingWalls();
 blockingWallsSegments = GPUTerrainMap.convertWallsToFlatArray(blockingWalls)
-bufferData = await mapper.processBlockingSegments(blockingWallsSegments, { bufferType: "static", clear: true });
+mapper.processBlockingSegments(blockingWallsSegments, { bufferType: "static", clear: true });
+
 
 blockingTokens = mapper.blockingTokens();
 blockingTokensSegments = blockingTokens.map(token => GPUTerrainMap.convertTokenEdgesToFlatArray(token))
-bufferData = await mapper.processBlockingSegments(blockingTokensSegments, { bufferType: "subject", clear: true });
+mapper.processBlockingSegments(blockingTokensSegments, { bufferType: "subject", clear: true });
 
 blockingDoors = mapper.blockingDoors();
 blockingDoorsSegments = GPUTerrainMap.convertWallsToFlatArray(blockingDoors)
-bufferData = await mapper.processBlockingSegments(blockingDoorsSegments, { bufferType: "transient", clear: true });
+mapper.processBlockingSegments(blockingDoorsSegments, { bufferType: "transient", clear: true });
 
 terrainRegions = mapper.terrainRegions()
 terrainRegionsVO = GPUTerrainMap.convertRegionTopsToVertexObject(terrainRegions);
-bufferData = await mapper.processTerrainTriangles(terrainRegionsVO, { bufferType: "subject", clear: true });
+mapper.processTerrainTriangles(terrainRegionsVO, { bufferType: "subject", clear: true });
 
 terrainTokens = mapper.terrainTokens();
 terrainTokensVO = GPUTerrainMap.convertTokenTopsToVertexObject(terrainTokens);
-bufferData = await mapper.processTerrainTriangles(terrainTokensVO, { bufferType: "transient", clear: true });
+mapper.processTerrainTriangles(terrainTokensVO, { bufferType: "transient", clear: true });
 
-bufferData = await mapper.combineTerrainBuffers();
+mapper.combineTerrainBuffers();
 
+bufferData = await mapper.extractBufferData(bufferType = "static")
+bufferData = await mapper.extractBufferData(bufferType = "subject")
+bufferData = await mapper.extractBufferData(bufferType = "transient")
+bufferData = await mapper.extractBufferData(bufferType = "combined")
 
 
 new Set(bufferData)
-
-
+histogram(bufferData)
+terrain = new Terrain(bufferData, mapper.gridWidth, { scale: { x: 0, y: 0, resolution }})
 terrain.draw({ skip: 20, local: false })
 
 
@@ -1893,10 +1985,25 @@ start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
 
 pf = new WebGPUPathfinder(randal, 1);
-await pf.initializeWebGPU(randal)
+await pf.initializeWebGPU()
 await pf.calculateDistanceMap(start)
 path = await pf.findPath(start, end)
 WebGPUPathfinder.drawPath(path);
+
+
+pf.updateTransientTerrain()
+pf.updateCombinedTerrain()
+
+bufferData = await pf.terrainMapper.extractBufferData(bufferType = "static")
+bufferData = await pf.terrainMapper.extractBufferData(bufferType = "subject")
+bufferData = await pf.terrainMapper.extractBufferData(bufferType = "transient")
+bufferData = await pf.terrainMapper.extractBufferData(bufferType = "combined")
+
+new Set(bufferData)
+histogram(bufferData)
+
+terrain = new Terrain(bufferData, pf.terrainMapper.gridWidth, { scale: { x: 0, y: 0, resolution: pf.terrainMapper.resolution }})
+terrain.draw({ skip: 20, local: false })
 
 
 pf.createBuffers()
@@ -1927,14 +2034,14 @@ pf.drawDistanceMap({ local: false, skip: 5 })
 
 pf.terrain.staticTerrain.draw({ maximumPixelValue: 255, skip: 2, local: true })
 
-distMap = new PixelCache(pf.distanceMap, pf.terrain.width)
+distMap = new PixelCache(pf.distanceMap, pf.terrainMapper.gridWidth)
 distValues = sortedUnique(distMap.pixels);
 console.log(`Max distance is ${distValues.at(-2)}`);
 
 heatMap = createHeatMap(0, distValues.at(-2));
 colorFn = value => value > distValues.at(-2) ? Draw.COLORS.red : heatMap(value);
 alphaFn = value => value > distValues.at(-2) ? 1 : 0.5;
-distMap.draw({ local: true, skip: 5, maximumPixelValue: distValues.at(-2), colorFn, alphaFn, gammaCorrect: false })
+distMap.draw({ local: true, skip: 50, maximumPixelValue: distValues.at(-2), colorFn, alphaFn, gammaCorrect: false })
 
 
 pf.terrain.staticTerrain.draw({ maximumPixelValue: 255, local: true, skip: 10 })
@@ -1966,6 +2073,19 @@ function sortedUnique(arr) {
   const out = [...s];
   out.sort((a, b) => a - b);
   return out;
+}
+
+/**
+ * Histogram using map
+ * @param {TypedArray} arr
+ * @returns {Map<number, number>} Number and total count for each
+ */
+function histogram(arr) {
+  const s = new Set(arr);
+  const m = new Map();
+  for ( const n of s ) m.set(n, 0);
+  for ( const n of arr ) m.set(n, m.get(n) + 1);
+  return m;
 }
 
 /**
