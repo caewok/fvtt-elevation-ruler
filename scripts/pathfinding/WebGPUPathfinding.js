@@ -902,58 +902,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 
 /**
- * Manage mapping, reading, unmapping of WebGPU buffers using a staging ring.
- * See https://toji.dev/webgpu-best-practices/buffer-uploads.html
- */
-class StagingBufferRing {
-  /** @type {WebGPUDevice} */
-  device;
-
-  /** @type {number} */
-  bufferSize = 0;
-
-  /** @type {class<TypedArray>} */
-  typedArrayClass = Uint32Array;
-
-  /** @type {GPUBuffer[]} */
-  buffers = [];
-
-  constructor(device, { bufferSize = 0, typedArrayClass = Uint32Array } = {}) {
-    this.device = device;
-    this.bufferSize = bufferSize;
-    this.typedArrayClass = typedArrayClass;
-  }
-
-  get stagingBuffer() {
-    return this.buffers.pop() || this.device.createBuffer({
-      size: this.bufferSize,
-      usage: GPUBufferUsage.MAP_WRITE | GPUBufferUsage.COPY_SRC,
-      mappedAtCreation: true,
-    });
-  }
-
-  mapStagingBuffer(stagingBuffer, typedArrayClass = this.typedArrayClass) {
-    return new typedArrayClass(stagingBuffer.getMappedRange());
-  }
-
-  copyToBuffer(stagingBuffer, copyBuffer, copyBufferSize) {
-    stagingBuffer.unmap();
-    const commandEncoder = this.device.createCommandEncoder({});
-    commandEncoder.copyBufferToBuffer(stagingBuffer, 0, copyBuffer, 0, copyBufferSize);
-    this.device.queue.submit([commandEncoder.finish()]);
-
-    // Immediately after copying, re-map the buffer. Push onto the list of staging buffers when the
-    // mapping completes.
-    stagingBuffer.mapAsync(GPUMapMode.WRITE).then(() => this.buffers.push(stagingBuffer));
-  }
-
-  destroy() {
-    this.buffers.forEach(buffer => buffer.destroy());
-  }
-}
-
-
-/**
  * Test using the GPU to write the terrain map.
  * Draw segments for the walls and flat triangles for everything else.
  */
@@ -1135,61 +1083,73 @@ export class GPUTerrainMap {
   async initialize() {
     const format = navigator.gpu.getPreferredCanvasFormat();
     const device = this.device;
-
-    // 0. Uniform buffer.
-    const uniformData = new Float32Array([
-      this.sceneWidth, this.sceneHeight,
-      this.gridWidth, this.gridHeight,
-    ]);
-    this.buffers.uniform = device.createBuffer({
-      label: "uniform",
-      size: uniformData.byteLength,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-    device.queue.writeBuffer(this.buffers.uniform, 0, uniformData);
-
-    // 1. Storage buffer. (The terrain map on the GPU, scaled by resolution.)
-    this.buffers.staticTerrain = device.createBuffer({
-      label: "staticTerrain",
-      size: this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-    });
-
-    this.buffers.subjectTerrain = device.createBuffer({
-      label: "subjectTerrain",
-      size: this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-    });
-
-    this.buffers.transientTerrain = device.createBuffer({
-      label: "transientTerrain",
-      size: this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-    });
-
-    this.buffers.combinedTerrain = device.createBuffer({
-      label: "combinedTerrain",
-      size: this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-    });
-
-    // 2. Staging buffer, scaled by resolution.
-    this.buffers.staging = device.createBuffer({
-      label: "staging",
-      size: this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    });
+    this.createBuffers();
+    this.createPipelines();
+    this.createBindGroups();
 
     // Create dummy texture.
     // This defines the coordinate space for the rasterizer.
     this.dummyTexture = device.createTexture({
       label: "dummy raster attachment",
       size: [this.gridWidth, this.gridHeight],
-      format, // Match the format used in your pipeline targets
+      format, // Match the format used in the pipeline targets
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
+  }
 
-    // 3. Create pipeline.
+  createBuffers() {
+    const { device, buffers } = this;
+
+    // 0. Uniform buffer.
+    const uniformData = new Float32Array([
+      this.sceneWidth, this.sceneHeight,
+      this.gridWidth, this.gridHeight,
+    ]);
+
+    buffers.uniform = device.createBuffer({
+      label: "uniform",
+      size: uniformData.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(buffers.uniform, 0, uniformData);
+
+    // 1. Storage buffer. (The terrain map on the GPU, scaled by resolution.)
+    const size = this.gridSize * Uint32Array.BYTES_PER_ELEMENT;
+    buffers.staticTerrain = device.createBuffer({
+      label: "staticTerrain",
+      size,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+
+    buffers.subjectTerrain = device.createBuffer({
+      label: "subjectTerrain",
+      size,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+
+    buffers.transientTerrain = device.createBuffer({
+      label: "transientTerrain",
+      size,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+
+    buffers.combinedTerrain = device.createBuffer({
+      label: "combinedTerrain",
+      size,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+
+    // 2. Staging buffer, scaled by resolution.
+    buffers.staging = device.createBuffer({
+      label: "staging",
+      size,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    });
+  }
+
+  createPipelines() {
+    const format = navigator.gpu.getPreferredCanvasFormat();
+    const { device, pipelines } = this;
     const shaderModule = device.createShaderModule({
       code: this.constructor.shaderCode,
     });
@@ -1221,7 +1181,7 @@ export class GPUTerrainMap {
       }]
     };
 
-    this.pipelines.segment = device.createRenderPipeline({
+    pipelines.segment = device.createRenderPipeline({
       label: "segment",
       layout: "auto",
       vertex,
@@ -1229,7 +1189,7 @@ export class GPUTerrainMap {
       primitive: { topology: "line-list" },
     });
 
-    this.pipelines.triangle = device.createRenderPipeline({
+    pipelines.triangle = device.createRenderPipeline({
       label: "triangle",
       layout: "auto",
       vertex,
@@ -1237,7 +1197,7 @@ export class GPUTerrainMap {
       primitive: { topology: "triangle-list" },
     });
 
-    this.pipelines.combine = device.createComputePipeline({
+    pipelines.combine = device.createComputePipeline({
       label: "Combine Terrains",
       layout: "auto",
       compute: {
@@ -1245,70 +1205,74 @@ export class GPUTerrainMap {
         entryPoint: "cs_combine",
       },
     });
+  }
 
-    this.bindGroups.staticWalls = device.createBindGroup({
+  createBindGroups() {
+    const { device, buffers, pipelines, bindGroups } = this;
+
+    bindGroups.staticWalls = device.createBindGroup({
       label: "staticWalls",
-      layout: this.pipelines.segment.getBindGroupLayout(0),
+      layout: pipelines.segment.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: { buffer: this.buffers.uniform } },
-        { binding: 1, resource: { buffer: this.buffers.staticTerrain } },
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.staticTerrain } },
       ]
     });
 
-    this.bindGroups.staticTerrain = device.createBindGroup({
+    bindGroups.staticTerrain = device.createBindGroup({
       label: "staticTerrain",
-      layout: this.pipelines.triangle.getBindGroupLayout(0),
+      layout: pipelines.triangle.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: { buffer: this.buffers.uniform } },
-        { binding: 1, resource: { buffer: this.buffers.staticTerrain } },
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.staticTerrain } },
       ]
     });
 
-    this.bindGroups.subjectWalls = device.createBindGroup({
+    bindGroups.subjectWalls = device.createBindGroup({
       label: "subjectWalls",
-      layout: this.pipelines.segment.getBindGroupLayout(0),
+      layout: pipelines.segment.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: { buffer: this.buffers.uniform } },
-        { binding: 1, resource: { buffer: this.buffers.subjectTerrain } },
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.subjectTerrain } },
       ]
     });
 
-    this.bindGroups.subjectTerrain = device.createBindGroup({
+    bindGroups.subjectTerrain = device.createBindGroup({
       label: "subjectTerrain",
-      layout: this.pipelines.triangle.getBindGroupLayout(0),
+      layout: pipelines.triangle.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: { buffer: this.buffers.uniform } },
-        { binding: 1, resource: { buffer: this.buffers.subjectTerrain } },
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.subjectTerrain } },
       ]
     });
 
-    this.bindGroups.transientWalls = device.createBindGroup({
+    bindGroups.transientWalls = device.createBindGroup({
       label: "transientWalls",
-      layout: this.pipelines.segment.getBindGroupLayout(0),
+      layout: pipelines.segment.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: { buffer: this.buffers.uniform } },
-        { binding: 1, resource: { buffer: this.buffers.transientTerrain } },
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.transientTerrain } },
       ]
     });
 
-    this.bindGroups.transientTerrain = device.createBindGroup({
+    bindGroups.transientTerrain = device.createBindGroup({
       label: "transientTerrain",
-      layout: this.pipelines.triangle.getBindGroupLayout(0),
+      layout: pipelines.triangle.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: { buffer: this.buffers.uniform } },
-        { binding: 1, resource: { buffer: this.buffers.transientTerrain } },
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.transientTerrain } },
       ]
     });
 
-    this.bindGroups.combine = device.createBindGroup({
+    bindGroups.combine = device.createBindGroup({
       label: "Combine Terrains",
-      layout: this.pipelines.combine.getBindGroupLayout(0),
+      layout: pipelines.combine.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: { buffer: this.buffers.uniform } },
-        { binding: 2, resource: { buffer: this.buffers.staticTerrain } },
-        { binding: 3, resource: { buffer: this.buffers.subjectTerrain } },
-        { binding: 4, resource: { buffer: this.buffers.transientTerrain } },
-        { binding: 5, resource: { buffer: this.buffers.combinedTerrain } },
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 2, resource: { buffer: buffers.staticTerrain } },
+        { binding: 3, resource: { buffer: buffers.subjectTerrain } },
+        { binding: 4, resource: { buffer: buffers.transientTerrain } },
+        { binding: 5, resource: { buffer: buffers.combinedTerrain } },
       ],
     });
   }
