@@ -13,8 +13,7 @@ PIXI,
 "use strict";
 
 import { AbstractPathfinder } from "./AbstractPathfinder.js";
-import { PixelCache } from "../geometry/PixelCache.js";
-import { MatrixFlat } from "../geometry/MatrixFlat.js";
+import { PixelCache, LocalCoordinateCache } from "../geometry/PixelCache.js";
 import { GEOMETRY_LIB_ID, GEOMETRY_ID } from "../geometry/const.js";
 import { Settings } from "../settings.js";
 import { Draw } from "../geometry/Draw.js";
@@ -50,10 +49,6 @@ export class Terrain extends PixelCache {
     this.clear();
   }
 
-  get resolution() { return this.scale.resolution; }
-
-  get size() { return this.pixels.length; } // Or this.area.
-
   /**
    * @param {object} [opts]
    * @param {number} [opts.resolution=1]
@@ -61,24 +56,16 @@ export class Terrain extends PixelCache {
    * @param {number} [opts.elevationZ = 0]
    * @returns {PixelCache<Uint32Array}
    */
-  constructor(pixels, pixelWidth, { senseType = "move", elevationZ = 0, ...opts} = {}) {
-    super(pixels, pixelWidth, opts);
+  constructor(localWidth, localHeight, { senseType = "move", elevationZ = 0, ...opts} = {}) {
+    opts.pixelsOrClass ??= Uint32Array;
+    super(localWidth, localHeight, opts);
     this.#senseType = senseType;
     this.#elevationZ = elevationZ;
   }
 
-  static create({ resolution = 1, senseType = "move", elevationZ = 0 } = {}) {
-    const sceneRect = canvas.scene.dimensions.sceneRect;
-    const scale = {
-      resolution,
-      x: sceneRect.x,
-      y: sceneRect.y,
-    };
-    const localWidth = Math.ceil(sceneRect.width * resolution);
-    const localHeight = Math.ceil(sceneRect.height * resolution);
-    const N = localWidth * localHeight;
-    const out = new this(new Uint32Array(N), localWidth, { scale, senseType, elevationZ });
-    out.pixels.fill(this.FEATURES.CLEAR);
+  static create(opts) {
+    const out = this.fromCanvasRectangle(canvas.scene.dimensions.sceneRect, opts);
+    out.clear(); // Duplicative if CLEAR is 0.
     return out;
   }
 
@@ -418,7 +405,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   // ----- NOTE: Initialize ----- //
 
   async initializeWebGPU() {
-    this.terrainMapper = new GPUTerrainMap(this.resolution, this.constructor.device);
+    this.terrainMapper = GPUTerrainMap.create(this.resolution, this.constructor.device);
     this.terrainMapper.token = this.token;
     await this.terrainMapper.initialize();
 
@@ -478,9 +465,9 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   _wavefrontPropagation(start) {
     // 1. Upload start index to the GPU
     const startIndex = this.terrainMapper._indexAtCanvas(start.x, start.y);
-    const { gridWidth, gridHeight, gridSize } = this.terrainMapper;
-    const workgroupX = Math.ceil(gridWidth / 8);
-    const workgroupY = Math.ceil(gridHeight / 8);
+    const { width, height, area } = this.terrainMapper;
+    const workgroupX = Math.ceil(width / 8);
+    const workgroupY = Math.ceil(height / 8);
     this.constructor.device.queue.writeBuffer(this.buffers.initUniform, 0, new Uint32Array([startIndex]));
 
     const commandEncoder = this.constructor.device.createCommandEncoder();
@@ -498,7 +485,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     // For a generic grid, Width + Height is a safe upper bound.
     // With diagonals, increase 150%.
 
-    const iterations = Math.max(gridWidth, gridHeight) * 1.5;
+    const iterations = Math.max(width, height) * 1.5;
     const propagationPass = commandEncoder.beginComputePass();
     propagationPass.setPipeline(this.pipelines.propagation);
 
@@ -517,7 +504,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     const finalBuffer = (iterations % 2 === 0) ? this.buffers.A : this.buffers.B;
 
     // Copy to read-back buffer
-    commandEncoder.copyBufferToBuffer(finalBuffer, 0, this.buffers.read, 0, gridSize * 4);
+    commandEncoder.copyBufferToBuffer(finalBuffer, 0, this.buffers.read, 0, area * 4);
 
     this.constructor.device.queue.submit([commandEncoder.finish()]);
   }
@@ -618,8 +605,8 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   }
 
   _createUniformBuffer() {
-    const { gridWidth, gridHeight } = this.terrainMapper;
-    const uniformData = new Uint32Array([gridWidth, gridHeight]);
+    const { width, height } = this.terrainMapper;
+    const uniformData = new Uint32Array([width, height]);
     this.buffers.uniform = this.createMappedBuffer(uniformData, GPUBufferUsage.UNIFORM);
 
     // Buffer for InitParams (startIndex)
@@ -633,7 +620,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     // Distance Buffers (Ping-Pong)
     // Initialize: Start Node = 0, Others = MAX_INT
     // Allocate memory here but no mapping; handled on the GPU.
-    const size = this.terrainMapper.gridSize * Uint32Array.BYTES_PER_ELEMENT;
+    const size = this.terrainMapper.area * Uint32Array.BYTES_PER_ELEMENT;
     const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
     this.buffers.A = this.constructor.device.createBuffer({ size, usage });
     this.buffers.B = this.constructor.device.createBuffer({ size, usage });
@@ -641,7 +628,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
 
   _createReadBackBuffer() {
     this.buffers.read = this.constructor.device.createBuffer({
-      size: this.terrainMapper.gridSize * Uint32Array.BYTES_PER_ELEMENT,
+      size: this.terrainMapper.area * Uint32Array.BYTES_PER_ELEMENT,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
     });
   }
@@ -727,8 +714,8 @@ export class WebGPUPathfinder extends AbstractPathfinder {
 
     // Safety to break infinite loops in bad maps.
     let safety = 0;
-    const { gridWidth, gridHeight, gridSize } = this.terrainMapper;
-    while ( distMap[idx] !== 0 && safety < gridSize ) {
+    const { width, height, area } = this.terrainMapper;
+    while ( distMap[idx] !== 0 && safety < area ) {
       safety += 1;
 
       // Look for neighbor with strictly lower distance
@@ -739,7 +726,7 @@ export class WebGPUPathfinder extends AbstractPathfinder {
       // Find the neighbor with the strictly lowest distance value.
       for ( let n of neighbors ) {
         // Boundary checks
-        if ( n.x >= 0 && n.x < gridWidth && n.y >= 0 && n.y < gridHeight ) {
+        if ( n.x >= 0 && n.x < width && n.y >= 0 && n.y < height ) {
           let nIdx = this.terrainMapper._indexAtLocal(n.x, n.y);
           let val = distMap[nIdx];
           // let terrain = this.staticTerrain.pixels[nIdx];
@@ -905,133 +892,55 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
  * Test using the GPU to write the terrain map.
  * Draw segments for the walls and flat triangles for everything else.
  */
-export class GPUTerrainMap {
-
-  constructor(resolution = 1, device = this.constructor.device) {
-    if ( !device ) throw new Error(`${this.constructor.name}|webGPU device not initialized.`);
-    this.device = device;
-    this.#initializeGrid(resolution);
-  }
-
-  #initializeGrid(resolution = 1) {
-    this.#resolution = resolution;
-    this.#gridWidth = Math.ceil(this.#sceneWidth * resolution);
-    this.#gridHeight = Math.ceil(this.#sceneHeight * resolution);
-  }
-
-  #resolution = 1;
-
-  #sceneWidth = canvas.scene.dimensions.width;
-
-  #sceneHeight = canvas.scene.dimensions.height;
-
-  #gridWidth = 0;
-
-  #gridHeight = 0;
-
+export class GPUTerrainMap extends LocalCoordinateCache {
+  /** @type {CONST.WALL_RESTRICTION_TYPES} */
   senseType = "move";
 
+  /** @type {Token} */
   token;
 
+  /** @type {GPUDevice} */
   device;
 
-  translate = new PIXI.Point(0, 0);
+  constructor(localWidth, localHeight, { device, ...opts } = {}) {
+    super(localWidth, localHeight, opts);
+    this.device = device ?? this.constructor.device;
+    if ( !this.device ) throw new Error(`${this.constructor.name}|webGPU device not initialized.`);
+  }
 
-  get resolution() { return this.#resolution; }
+  // ----- NOTE: Getters ----- //
 
-  get sceneWidth() { return this.#sceneWidth; }
+  /** @type {PIXI.Point} */
+  get sceneDims() {
+    return this.constructor.canvasSizeForResolution(this.gridDims, this.resolution);
+  }
 
-  get sceneHeight() { return this.#sceneHeight; }
+  /** @type {PIXI.Point} */
+  get gridDims() { return PIXI.Point.tmp.set(this.width, this.height); }
 
-  get gridWidth() { return this.#gridWidth; }
+  /** @type {PIXI.Point} */
+  get sceneTranslation() {
+    const tr = this.modelMatrix.translation;
+    return PIXI.Point.tmp.set(
+      tr.getIndex(2, 0),
+      tr.getIndex(2, 1),
+    );
+  }
 
-  get gridHeight() { return this.#gridHeight; }
-
-  get gridSize() { return this.#gridWidth * this.#gridHeight; }
+  // ----- NOTE: Static constructors ----- //
 
   /**
-   * Pixel index for a specific texture location
-   * @param {number} x      Local texture x coordinate
-   * @param {number} y      Local texture y coordinate
-   * @returns {number}
+   * Create a terrain map for a given scene, using the scene rectangle (not the full canvas).
+   * @param {object} [opts]
+   * @param {number} [opts.resolution=1]
+   * @param {GPUDevice} [opts.device=this.constructor.device]
+   * @returns {GPUTerrainMap}
    */
-  _indexAtLocal(x, y) {
-    const { gridWidth, gridHeight } = this;
-    if ( x < 0 || y < 0 || x >= gridWidth || y >= gridHeight ) return -1;
-
-    // Use floor to ensure consistency when converting to/from coordinates <--> index.
-    return ((~~y) * gridWidth) + (~~x);
+  static create(resolution = 1, device = this.constructor.device) {
+    return this.fromCanvasRectangle(canvas.scene.dimensions.sceneRect, resolution, { device });
   }
 
-  _indexAtCanvas(x, y) {
-    const local = this._fromCanvasCoordinates(x, y);
-    return this._indexAtLocal(local.x, local.y);
-  }
-
-  /**
-   * Transform canvas coordinates into the local pixel rectangle coordinates.
-   * @param {number} x    Canvas x coordinate
-   * @param {number} y    Canvas y coordinate
-   * @param {PIXI.Point} outPoint   Point to use to store the coordinate
-   * @returns {PIXI.Point} The outPoint, for convenience
-   */
-  _fromCanvasCoordinates(x, y, outPoint) {
-    outPoint ??= PIXI.Point.tmp;
-    outPoint.set(x, y);
-    const local = this.toLocalTransform.multiplyPoint2d(outPoint, outPoint);
-
-    // Avoid common rounding errors, like 19.999999999998.
-    local.x = fastFixed(local.x);
-    local.y = fastFixed(local.y);
-    return local;
-  }
-
-  /**
-   * Transform local coordinates into canvas coordinates.
-   * Inverse of _fromCanvasCoordinates
-   * @param {number} x    Local x coordinate
-   * @param {number} y    Local y coordinate
-   * @param {PIXI.Point} outPoint   Point to use to store the coordinate
-   * @returns {PIXI.Point} The outPoint, for convenience
-   */
-  _toCanvasCoordinates(x, y, outPoint) {
-    outPoint ??= PIXI.Point.tmp;
-    outPoint.set(x, y);
-    const canvas = this.toCanvasTransform.multiplyPoint2d(outPoint, outPoint);
-
-    // Avoid common rounding errors, like 19.999999999998.
-    canvas.x = fastFixed(canvas.x);
-    canvas.y = fastFixed(canvas.y);
-    return canvas;
-  }
-
-  /** @type {Matrix} */
-  #toLocalTransform;
-
-  get toLocalTransform() {
-    return this.#toLocalTransform ?? (this.#toLocalTransform = this._calculateToLocalTransform());
-  }
-
-  /** @type {Matrix} */
-  #toCanvasTransform;
-
-  get toCanvasTransform() {
-    return this.#toCanvasTransform ?? (this.#toCanvasTransform = this.toLocalTransform.invert());
-  }
-
-  /**
-   * Matrix that takes a canvas point and transforms to a local point.
-   * @returns {Matrix}
-   */
-  _calculateToLocalTransform() {
-    const mTranslate = MatrixFlat.translation(-this.translate.x, -this.translate.y);
-
-    // Scale based on resolution.
-    const resolution = this.resolution;
-    const mRes = MatrixFlat.scale(resolution, resolution);
-    return mTranslate.multiply3x3(mRes);
-  }
-
+  // ----- NOTE: Static device initialization ---- //
 
   /** @type {GPUDevice} */
   static device = null;
@@ -1042,6 +951,8 @@ export class GPUTerrainMap {
     const adapter = await navigator.gpu.requestAdapter();
     this.device = await adapter.requestDevice();
   }
+
+  // ----- NOTE: Buffers ----- //
 
   /* Buffers
   Static: Walls or other obstacles that do not move often and are not token-specific.
@@ -1089,22 +1000,27 @@ export class GPUTerrainMap {
 
     // Create dummy texture.
     // This defines the coordinate space for the rasterizer.
+    const gridDims = this.gridDims;
     this.dummyTexture = device.createTexture({
       label: "dummy raster attachment",
-      size: [this.gridWidth, this.gridHeight],
+      size: [gridDims.x, gridDims.y],
       format, // Match the format used in the pipeline targets
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
+    gridDims.release();
   }
 
   createBuffers() {
     const { device, buffers } = this;
 
     // 0. Uniform buffer.
+    const { sceneDims, gridDims, sceneTranslation } = this;
     const uniformData = new Float32Array([
-      this.sceneWidth, this.sceneHeight,
-      this.gridWidth, this.gridHeight,
+      sceneDims.x, sceneDims.y,
+      gridDims.x, gridDims.y,
+      sceneTranslation.x, sceneTranslation.y,
     ]);
+    PIXI.Point.release(sceneDims, gridDims, sceneTranslation);
 
     buffers.uniform = device.createBuffer({
       label: "uniform",
@@ -1114,7 +1030,7 @@ export class GPUTerrainMap {
     device.queue.writeBuffer(buffers.uniform, 0, uniformData);
 
     // 1. Storage buffer. (The terrain map on the GPU, scaled by resolution.)
-    const size = this.gridSize * Uint32Array.BYTES_PER_ELEMENT;
+    const size = this.area * Uint32Array.BYTES_PER_ELEMENT;
     buffers.staticTerrain = device.createBuffer({
       label: "staticTerrain",
       size,
@@ -1566,7 +1482,7 @@ export class GPUTerrainMap {
     commandEncoder.copyBufferToBuffer(
       buffer, 0,
       this.buffers.staging, 0,
-      this.gridSize * Uint32Array.BYTES_PER_ELEMENT,
+      this.area * Uint32Array.BYTES_PER_ELEMENT,
     );
     device.queue.submit([commandEncoder.finish()]);
 
@@ -1629,8 +1545,10 @@ export class GPUTerrainMap {
     passEncoder.setBindGroup(0, this.bindGroups.combine);
 
     // Dispatch workgroups. We use 64 as the workgroup size (defined in shader).
-    const workgroupCountX = Math.ceil(this.gridWidth / 8);
-    const workgroupCountY = Math.ceil(this.gridHeight / 8);
+    const gridDims = this.gridDims;
+    const workgroupCountX = Math.ceil(gridDims.x / 8);
+    const workgroupCountY = Math.ceil(gridDims.y / 8);
+    gridDims.release();
     passEncoder.dispatchWorkgroups(workgroupCountX, workgroupCountY);
     passEncoder.end();
     device.queue.submit([commandEncoder.finish()]);
@@ -1642,6 +1560,7 @@ export class GPUTerrainMap {
 struct Uniforms {
   sceneRes: vec2<f32>,
   gridRes: vec2<f32>,
+  translation: vec2<f32>,
 };
 
 struct VertexOutput {
@@ -1664,8 +1583,8 @@ fn vs_main(@location(0) pos: vec2<f32>) -> VertexOutput {
   var out: VertexOutput;
 
   // Convert scene coordinates (0 to res) to NDC (-1 to 1)
-  let ndcX = ((pos.x / config.sceneRes.x)) * 2.0 - 1.0;
-  let ndcY = 1.0 - ((pos.y / config.sceneRes.y) * 2.0); // Flip Y for screen space.
+  let ndcX = (((pos.x - config.translation.x) / config.sceneRes.x)) * 2.0 - 1.0;
+  let ndcY = 1.0 - (((pos.y - config.translation.y) / config.sceneRes.y) * 2.0); // Flip Y for screen space.
   out.pos = vec4<f32>(ndcX, ndcY, 0.0, 1.0);
   return out;
 }
@@ -1749,15 +1668,6 @@ fn cs_combine(@builtin(global_invocation_id) id: vec3<u32>) {
 
 }
 
-/**
- * Fix a number to 8 decimal places
- * @param {number} x    Number to fix
- * @returns {number}
- */
-const POW10_8 = Math.pow(10, 8);
-function fastFixed(x) { return Math.round(x * POW10_8) / POW10_8; }
-
-
 /* Test GPUTerrainMap
 Draw = CONFIG.GeometryLib.lib.Draw
 api = game.modules.get("elevationruler").api
@@ -1765,10 +1675,14 @@ Terrain = api.pathfinding.Terrain
 GPUTerrainMap = api.pathfinding.GPUTerrainMap
 let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 
-vo = GPUTerrainMap.convertTokenTopToVertexObject(canvas.tokens.placeables[0])
+
+vo = GPUTerrainMap._convertTokenTopToVertexObject(canvas.tokens.placeables[1])
 vo.debugDraw()
 
-vo = GPUTerrainMap.convertRegionTopToVertexObject(canvas.regions.placeables[0])
+vo = GPUTerrainMap.convertTokenTopsToVertexObject(canvas.tokens.placeables)
+vo.debugDraw()
+
+vo = GPUTerrainMap.convertRegionTopsToVertexObject(canvas.regions.placeables)
 vo.debugDraw()
 
 await GPUTerrainMap.initializeDevice()
@@ -1811,7 +1725,7 @@ bufferData = await mapper.extractBufferData(bufferType = "combined")
 
 new Set(bufferData)
 histogram(bufferData)
-terrain = new Terrain(bufferData, mapper.gridWidth, { scale: { x: 0, y: 0, resolution }})
+terrain = new Terrain(bufferData, mapper.width, { scale: { x: 0, y: 0, resolution }})
 terrain.draw({ skip: 20, local: false })
 
 
@@ -1966,7 +1880,8 @@ bufferData = await pf.terrainMapper.extractBufferData(bufferType = "combined")
 new Set(bufferData)
 histogram(bufferData)
 
-terrain = new Terrain(bufferData, pf.terrainMapper.gridWidth, { scale: { x: 0, y: 0, resolution: pf.terrainMapper.resolution }})
+terrain = new Terrain(bufferData, pf.terrainMapper.width, {
+  scale: { x: 0, y: 0, resolution: pf.terrainMapper.resolution }})
 terrain.draw({ skip: 20, local: false })
 
 
@@ -1998,7 +1913,7 @@ pf.drawDistanceMap({ local: false, skip: 5 })
 
 pf.terrain.staticTerrain.draw({ maximumPixelValue: 255, skip: 2, local: true })
 
-distMap = new PixelCache(pf.distanceMap, pf.terrainMapper.gridWidth)
+distMap = new PixelCache(pf.distanceMap, pf.terrainMapper.width)
 distValues = sortedUnique(distMap.pixels);
 console.log(`Max distance is ${distValues.at(-2)}`);
 
