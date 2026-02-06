@@ -21,7 +21,9 @@ Very basic.
 
 */
 
+
 export class AbstractPathfinder {
+
   /** @type {Token} token */
   token;
 
@@ -42,17 +44,30 @@ export class AbstractPathfinder {
     this.#start.copyFrom(value);
   }
 
+  #initialized = false;
+
   /**
    * Initialize the pathfinder algorithm.
    */
-  initialize() {
+  async initialize() {
     this.cachedPaths.clear();
+    this.#initialized = true;
   }
 
   /**
-   * Update the scene-related objects for the pathfinder algorithm.
+   * Initialize pathfinding. From this point, assume the scene will not change but
+   * starting point and elevation might.
+   * @param {GridCoordinates3d} start     May be updated by findPath
    */
-  updateScene() { }
+  startPathfinding(start) { }
+
+  /**
+   * Stop pathfinding.
+   */
+  endPathfinding() {
+    this.activeJobs.values().forEach(job => job.abort());
+    this.activeJobs.clear();
+  }
 
   cancelJob(jobId) {
     if ( this.activeJobs.has(jobId) ) {
@@ -89,6 +104,7 @@ export class AbstractPathfinder {
    * @param {Point} goal        End point for the graph
    */
   async findPath(start, goal, signal = {}) {
+    if ( !this.#initialized ) return null;
     this.start = start;
     if ( this.cachedPaths.has(goal.key) ) return this.cachedPaths.get(goal.key);
     if ( !(start || goal) || start.almostEqual(goal) ) return null;
@@ -104,6 +120,11 @@ export class AbstractPathfinder {
     console.debug(`Pathfinder ${id}|${start.x},${start.y} --> ${goal.x},${goal.y}\n\tdistance: ${PIXI.Point.distanceBetween(start, goal).toPrecision(3)} pixels\n\tpath length: ${path?.length} pixels.`);
 
     return path;
+  }
+
+  destroy() {
+    this.activeJobs.values().forEach(job => job.abort());
+    this.activeJobs.clear();
   }
 
   /**
@@ -154,4 +175,3 @@ export class TestPathfinder extends AbstractPathfinder {
     return canvas.grid.getDirectPath([startPoint, endPoint]);
   }
 }
-

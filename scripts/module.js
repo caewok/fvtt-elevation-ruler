@@ -40,6 +40,8 @@ import "./geometry/registration.js";
 import { SCENE_GRAPH, WallTracer, WallTracerEdge, WallTracerVertex } from "./pathfinding/WallTracer.js";
 
 Hooks.once("init", function() {
+  WebGPUPathfinder.initializeDevice(); // Async.
+
 
   // Configuration
   CONFIG[MODULE_ID] = {
@@ -170,6 +172,9 @@ Hooks.once("canvasReady", function() {
 
   tracking.RegionGeometryTracker.registerPlaceableHooks();
   tracking.RegionGeometryTracker.registerExistingPlaceables();
+
+  Settings.pathfinderReady = true;
+  Settings.updateTokensPathfinder();
 
   // Track token and region geometry for use with terrain difficulty.
 });

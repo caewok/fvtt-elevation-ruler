@@ -8,6 +8,7 @@ PIXI,
 import { Draw } from "../geometry/Draw.js";
 import { AbstractPathfinder } from "./AbstractPathfinder.js";
 import { PriorityQueue } from "./PriorityQueue.js";
+import { worldBuilder } from "./GriddedPathfindingWorld.js";
 
 /* Basic pathfinding algorithms.
 
@@ -51,12 +52,13 @@ export class BFSPathfinder extends AbstractPathfinder {
 
   constructor(token, world) {
     super(token);
+    world ??= new (worldBuilder())();
     this.world = world;
   }
 
-  initialize() {
+  async initialize() {
     this.world.initialize(this.token);
-    super.initialize();
+    return super.initialize();
   }
 
   /**

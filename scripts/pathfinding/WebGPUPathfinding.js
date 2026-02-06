@@ -399,39 +399,44 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   constructor(token, resolution = 1) {
     super(token);
     if ( !this.constructor.device ) throw new Error(`${this.constructor.name}|webGPU device not initialized.`);
+    resolution ??= Terrain.recommendedResolution();
     this.#resolution = resolution;
   }
 
   // ----- NOTE: Initialize ----- //
 
-  async initializeWebGPU() {
+  async initialize() {
     this.terrainMapper = GPUTerrainMap.create(this.resolution, this.constructor.device);
     this.terrainMapper.token = this.token;
     await this.terrainMapper.initialize();
+    this.distanceMap = new Uint32Array(this.terrainMapper.area);
 
-    // TODO: Postpone terrain updating and subsequent buffer updating.
+    // TODO: Postpone terrain updating and subsequent buffer updating?
     this.updateStaticTerrain();
     this.updateSubjectTerrain();
 
     this.createPipeline();
     this.createBuffers();
     this.createBindGroups();
+    return super.initialize();
   }
 
-  /* Needed?
-  initialize() {
-
+  startPathfinding(start) {
+    this.calculateDistanceMap(start); // Async
+    super.startPathfinding();
   }
 
-  async updateScene() {
-
+  endPathfinding() {
+    super.endPathfinding();
+    this.distanceMapReady = false;
   }
-  */
 
   /** @type {boolean} */
   #distanceMapReady = false;
 
   get distanceMapReady() { return this.#distanceMapReady; }
+
+  set distanceMapReady(value) { this.#distanceMapReady &&= value; }
 
   async calculateDistanceMap(start, _signal = {}) {
     this.#distanceMapReady = false;
@@ -447,7 +452,8 @@ export class WebGPUPathfinder extends AbstractPathfinder {
     console.timeEnd("GPU Pathfinding Setup");
 
     console.time("GPU Pathfinding Read Result");
-    await this._readResult();
+    await this.constructor.device.queue.onSubmittedWorkDone();
+    await this._readPropagationResult();
     console.timeEnd("GPU Pathfinding Read Result");
     this.#distanceMapReady = true;
   }
@@ -512,13 +518,10 @@ export class WebGPUPathfinder extends AbstractPathfinder {
   /** @type {Uint32Array} */
   distanceMap;
 
-  async _readResult() {
+  async _readPropagationResult() {
     await this.buffers.read.mapAsync(GPUMapMode.READ);
     this.distanceMap = new Uint32Array(this.buffers.read.getMappedRange());
-
-    // Should be able to keep mapped and unmap only once we need a new buffer or destroy this pathfinder.
-    // this.distanceMap.set(resultArray);
-    // this.buffers.read.unmap();
+    // Call this.buffers.read.unmap() elsewhere.
   }
 
   destroy() {
@@ -1863,7 +1866,7 @@ start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
 
 pf = new WebGPUPathfinder(randal, 1);
-await pf.initializeWebGPU()
+await pf.initialize()
 await pf.calculateDistanceMap(start)
 path = await pf.findPath(start, end)
 WebGPUPathfinder.drawPath(path);

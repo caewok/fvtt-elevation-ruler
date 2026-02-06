@@ -1,6 +1,5 @@
 /* globals
 canvas,
-CONFIG
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -8,15 +7,40 @@ CONFIG
 export const PATCHES = {};
 PATCHES.BASIC = {};
 
+import { Settings } from "./settings.js";
 import { MODULE_ID, PATHFINDING_ID } from "./const.js";
-import { BFSPathfinder, UniformCostPathfinder, GreedyBestFirstPathfinder, AStarPathfinder } from "./pathfinding/SimplePathfinding.js";
-import { TestPathfinder } from "./pathfinding/AbstractPathfinder.js";
 import { GridCoordinates3d } from "./geometry/3d/GridCoordinates3d.js";
-import { worldBuilder } from "./pathfinding/GriddedPathfindingWorld.js";
-import { WebGPUPathfinder, Terrain } from "./pathfinding/WebGPUPathfinding.js";
 
 // ----- NOTE: Hooks ----- //
 
+/**
+ * Add a pathfinder when drawing the token.
+ *
+ * A hook event that fires when a {@link foundry.canvas.placeables.PlaceableObject} is initially drawn.
+ * The dispatched event name replaces "Object" with the named PlaceableObject subclass, i.e. "drawToken".
+ * @event
+ * @category PlaceableObject
+ * @param {PlaceableObject} object    The object instance being drawn
+ */
+function drawToken(token) {
+  Settings.updateTokenPathfinder(token);
+}
+
+/**
+ * Destroy the pathfinder when destroying the token.
+ *
+ * A hook event that fires when a {@link foundry.canvas.placeables.PlaceableObject} is destroyed.
+ * The dispatched event name replaces "Object" with the named PlaceableObject subclass, i.e. "destroyToken".
+ * @event
+ * @category PlaceableObject
+ * @param {PlaceableObject} object    The object instance being destroyed
+ */
+function destroyToken(token) {
+  const pf = token[MODULE_ID]?.[PATHFINDING_ID];
+  if ( !pf ) return;
+  pf.destroy();
+}
+PATCHES.BASIC.HOOKS = { drawToken, destroyToken };
 
 
 // ----- NOTE: Wraps ----- //
@@ -25,29 +49,20 @@ import { WebGPUPathfinder, Terrain } from "./pathfinding/WebGPUPathfinding.js";
  * Create the pathfinder class when dragging starts and initialize.
  */
 function _initializeDragLeft(wrapped, event) {
-  // TODO: Create pathfinder on token creation? Only initialize or update scene here?
-  const obj = this[MODULE_ID] ??= {};
-
-  const world = new (worldBuilder())();
-  const pf = obj[PATHFINDING_ID] = new (pathfinderClass())(this, world);
-
-  // TODO: Move most of this outside the drag loop.
-  if ( pf instanceof WebGPUPathfinder ) {
-    pf.resolution = Terrain.recommendedResolution();
-    pf.initializeWebGPU();
-    pf.updateStaticTerrain(this.bottomZ);
-    pf.updateTransientTerrain(this);
-  }
-
-  pf.initialize();
+  const pf = this[MODULE_ID]?.[PATHFINDING_ID];
+  if ( !pf ) return wrapped(event);
 
   const start = GridCoordinates3d.fromObject(this.getCenterPoint());
   start.elevation = this.bottomE;
-  pf.start = start;
-
+  pf.startPathfinding(start);
   wrapped(event);
 }
 
+function _onDragEnd(wrapped) {
+  const pf = this[MODULE_ID]?.[PATHFINDING_ID];
+  if ( pf ) pf.endPathfinding();
+  wrapped();
+}
 
 
 /**
@@ -58,10 +73,10 @@ function findMovementPath(wrapped, waypoints, options) {
   const pf = this[MODULE_ID]?.[PATHFINDING_ID];
   if ( !pf ) return wrapped(waypoints, options);
 
-  /* For debugging.
-  const dist = canvas.grid.measurePath(waypoints).euclidean;
-  if ( dist > 20 ) console.log("\nfindMovementPath", ...waypoints);
-  */
+  // For debugging.
+  // const dist = canvas.grid.measurePath(waypoints).euclidean;
+  // if ( dist > 20 ) console.log("\nfindMovementPath", ...waypoints);
+
 
   // Only pathfind over the last waypoints.
   const start = GridCoordinates3d.fromObject(this.getCenterPoint(waypoints.at(-2)));
@@ -77,9 +92,7 @@ function findMovementPath(wrapped, waypoints, options) {
     cancel: () => { pf.cancelJob(pathfindingJob.jobId); } };
 }
 
-PATCHES.BASIC.WRAPS = { findMovementPath, _initializeDragLeft };
-
-
+PATCHES.BASIC.WRAPS = { findMovementPath, _initializeDragLeft, _onDragEnd };
 
 
 // ----- NOTE: Helper functions ----- //
@@ -102,19 +115,6 @@ async function pathfind(path, wrapped, waypoints, options) {
   // Rerun findMovementPath to account for regions, etc.
   const foundrySearch = wrapped(waypoints, options);
   return foundrySearch.result || foundrySearch.promise;
-}
-
-
-function pathfinderClass() {
-  switch ( CONFIG[MODULE_ID].simplePathfinding.algorithm ) {
-    case "astar": return AStarPathfinder;
-    case "breadth": return BFSPathfinder;
-    case "uniform": return UniformCostPathfinder;
-    case "greedy": return GreedyBestFirstPathfinder;
-    case "test": return TestPathfinder;
-    case "webgpu": return WebGPUPathfinder;
-    default: return AStarPathfinder;
-  }
 }
 
 
