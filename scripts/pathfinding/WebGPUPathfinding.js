@@ -317,6 +317,8 @@ Hooks.on("canvasReady", function() {
 
 export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
 
+  debug = false;
+
   /**
    * @param {string} [name="WebGPUPathfinder"]
    * @param {object} [config]                        Worker initialization options
@@ -327,6 +329,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
     config.scripts ??= [`/modules/${MODULE_ID}/scripts/pathfinding/workers/webgpu.pathfinder.worker.js`];
     config.loadPrimitives ??= false;
     super(name, config);
+    this.debug = config.debug;
   }
 
   /** @type {number} */
@@ -373,6 +376,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       translationX,
       translationY,
     };
+    params.debug = this.debug;
     return this.executeFunction("initialize", [params]);
   }
 
@@ -390,6 +394,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       bufferType,
       clear,
     };
+    params.debug = this.debug;
     return this.executeFunction("updateBufferBlockingSegments", [params], [segments.buffer]);
   }
 
@@ -410,6 +415,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       bufferType,
       clear,
     };
+    params.debug = this.debug;
     return this.executeFunction("updateBufferTerrainTriangles", [params], [triVO.vertices.buffer, triVO.indices.buffer]);
   }
 
@@ -420,6 +426,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
    */
   clearBuffer(bufferType = "transient") {
     const params = { bufferType };
+    params.debug = this.debug;
     return this.executeFunction("clearBuffer", [params]);
   }
 
@@ -441,6 +448,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
   async extractBufferData({ bufferType = "transient", buffer } = {}) {
     buffer ??= new Uint32Array(this.area);
     const params = { buffer, bufferType };
+    params.debug = this.debug;
     const res = await this.executeFunction("extractBufferData", [params], [buffer.buffer]);
     return res.buffer;
   }
@@ -456,6 +464,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
    */
   async calculateDistanceMap(start) {
     const params = { startX: start.x, startY: start.y, elevation: start.elevation };
+    params.debug = this.debug;
     return this.executeFunction("calculateDistanceMap", [params]);
   }
 
@@ -471,6 +480,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       elevation: start.elevation,
       signal,
     };
+    params.debug = this.debug;
     const res = await this.executeFunction("findPath", [params]);
     const nPts = res.path.length;
     if ( !nPts ) return null;
@@ -505,6 +515,30 @@ const neighbors = new Array(8);
     }
   }
 })();
+
+
+export class WebGPUPathfinderWithWorker extends AbstractPathfinder {
+  constructor(token, resolution = 1) {
+    super(token);
+
+  }
+
+
+  // ----- NOTE: Static worker creation ----- //
+  static #worker;
+
+  static get worker() {
+    if ( !this.#worker ) {
+      this.#worker = new WebGPUPathfinderWorker();
+      this.#worker.initialize(); // Async.
+    }
+  }
+
+
+
+
+}
+
 
 export class WebGPUPathfinder extends AbstractPathfinder {
 
@@ -2235,7 +2269,7 @@ pf.terrainMapper.token = pf.token;
 
 
 worker = new WebGPUPathfinderWorker(undefined, { debug: true })
-await worker.initialize();
+await worker.initialize(.25);
 await worker.pixelBufferDimensions()
 await worker.clearBuffer()
 
@@ -2266,6 +2300,7 @@ bufferData = await worker.extractBufferData({ bufferType: "transient" })
 bufferData = await worker.extractBufferData({ bufferType: "combined" })
 bufferData = await worker.extractBufferData({ bufferType: "distance" })
 new Set(bufferData)
+new Set(bufferData.sort((a, b) => a - b))
 histogram(bufferData)
 
 
@@ -2277,4 +2312,14 @@ WebGPUPathfinder.drawPath(path);
 
 
 */
+/*
+idleCallBackTest = function(idleDeadline) {
+  console.debug(`${idleDeadline.timeRemaining()}, ${idleDeadline.timeout}`);
+  requestIdleCallback(idleCallBackTest)
+}
+
+requestIdleCallback(idleCallBackTest)
+*/
+
+
 

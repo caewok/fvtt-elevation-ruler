@@ -163,22 +163,12 @@ class WebGPUPathfinder {
   static staticTerrainMap = new Map();
 
 
-  // ----- NOTE: Constructor ----- //
-
-  /** @type {number} */
-  resolution = 1;
-
-
   // ----- NOTE: Initialize ----- //
 
   async initialize({ resolution = 1, sceneWidth, sceneHeight, translationX = 0, translationY = 0, debug = false } = {}) {
-    this.resolution = resolution;
     await this.constructor.initializeDevice();
     if ( debug ) console.debug("WebGPUPathfinderWorker|Initialized device.");
-    const gridWidth = Math.ceil(sceneWidth * resolution);
-    const gridHeight = Math.ceil(sceneHeight * resolution);
-    const uniforms = [sceneWidth, sceneHeight, gridWidth, gridHeight, translationX, translationY];
-    this.terrainMapper = new GPUTerrainMap(uniforms, this.constructor.device);
+    this.terrainMapper = new GPUTerrainMap(sceneWidth, sceneHeight, this.constructor.device, { resolution, translationX, translationY });
     if ( debug ) console.debug("WebGPUPathfinderWorker|Initializing terrain mapper...");
     await this.terrainMapper.initialize();
     if ( debug ) console.debug("WebGPUPathfinderWorker|Finished initializing terrain mapper.");
@@ -659,10 +649,12 @@ class GPUTerrainMap {
    */
   uniforms = new Float32Array(6);
 
-  constructor(uniforms, device) {
-    this.uniforms.set(uniforms);
+  constructor(sceneWidth, sceneHeight, device, { translationX = 0, translationY = 0, resolution = 1 } = {}) {
+    const gridWidth = Math.ceil(sceneWidth * resolution);
+    const gridHeight = Math.ceil(sceneHeight * resolution);
+    this.uniforms.set([sceneWidth, sceneHeight, gridWidth, gridHeight, translationX, translationY]);
     this.device = device;
-    this.#resolution = this.sceneDims[0] / this.gridDims[0];
+    this.#resolution = resolution;
   }
 
   /** @type {Float32Array[2]} */
@@ -689,9 +681,7 @@ class GPUTerrainMap {
     if ( x < 0 || y < 0 ) return -1;
     const [width, height] = this.gridDims;
     if ( x >= width || y >= height ) return -1;
-
-    // Skip floor for speed; x and y should be integers.
-    return (y * width) + x;
+    return (~~y * width) + ~~x; // Floor x and y.
   }
 
   indexAtCanvas(x, y) {
@@ -702,16 +692,16 @@ class GPUTerrainMap {
   fromCanvasCoordinates(x, y) {
     const [trX, trY] = this.sceneTranslation;
     const res = this.resolution;
-    x = fastFixed((x - trX) / res);
-    y = fastFixed((y - trY) / res);
+    x = fastFixed((x - trX) * res);
+    y = fastFixed((y - trY) * res);
     return { x, y };
   }
 
   toCanvasCoordinates(x, y) {
     const [trX, trY] = this.sceneTranslation;
-    const res = this.resolution;
-    x = fastFixed((x * res) + trX);
-    y = fastFixed((y * res) + trY);
+    const invRes = 1 / this.resolution;
+    x = fastFixed((x * invRes) + trX);
+    y = fastFixed((y * invRes) + trY);
     return { x, y };
   }
 
