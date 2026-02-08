@@ -31,7 +31,7 @@ import {
 import { worldBuilder } from "./pathfinding/GriddedPathfindingWorld.js";
 
 // WebGPU Pathfinding
-import { Terrain, WebGPUPathfinder, GPUTerrainMap } from "./pathfinding/WebGPUPathfinding.js";
+import { Terrain, WebGPUPathfinder, GPUTerrainMap, WebGPUPathfinderWorker } from "./pathfinding/WebGPUPathfinding.js";
 
 // Load the geometry library.
 import "./geometry/registration.js";
@@ -139,6 +139,7 @@ Hooks.once("init", function() {
       Terrain,
       WebGPUPathfinder,
       GPUTerrainMap,
+      WebGPUPathfinderWorker,
     },
 
     WallTracer, WallTracerEdge, WallTracerVertex,
