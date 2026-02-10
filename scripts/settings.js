@@ -19,7 +19,7 @@ import { BFSPathfinder, UniformCostPathfinder, GreedyBestFirstPathfinder, AStarP
 import { PATCHER } from "./patching.js";
 import { BorderEdge } from "./pathfinding/BorderTriangle.js";
 import { updatePathfindingControl } from "./module.js";
-import { WebGPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
+import { WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 
 const SETTINGS = {
   CONTROLS: {
@@ -91,7 +91,7 @@ export class Settings extends ModuleSettingsAbstract {
 
     const pathfindingAlgChoices = {};
     Object.values(KEYS.PATHFINDING.ALGORITHM_CHOICES).forEach(alg => pathfindingAlgChoices[alg] = localize(alg));
-    if ( !WebGPUPathfinder.device ) delete pathfindingAlgChoices[KEYS.PATHFINDING.ALGORITHM_CHOICES.WEBGPU];
+    if ( !GPUPathfinder.device ) delete pathfindingAlgChoices[KEYS.PATHFINDING.ALGORITHM_CHOICES.WEBGPU];
 
     register(KEYS.PATHFINDING.ALGORITHM, {
       name: localize(`${KEYS.PATHFINDING.ALGORITHM}.name`),
@@ -299,7 +299,8 @@ export class Settings extends ModuleSettingsAbstract {
     if ( !this.pathfinderReady ) return;
     tokens ??= canvas.tokens.placeables;
     algorithm ??= this.get(this.KEYS.PATHFINDING.ALGORITHM);
-    tokens.forEach(token => this.updateTokenPathfinder(token, algorithm));
+    const cl = pathfinderClass(algorithm);
+    tokens.forEach(token => this.updateTokenPathfinder(token, { algorithm, cl }));
   }
 
   static updateTokenPathfinder(token, { cl, algorithm } = {}) {
@@ -324,13 +325,13 @@ function pathfinderClass(algorithm) {
   algorithm ??= Settings.get(Settings.KEYS.PATHFINDING.ALGORITHM);
   if ( algorithm === ALG.SIMPLE ) algorithm = CONFIG[MODULE_ID].simplePathfinding.algorithm;
   switch ( algorithm ) {
-    case ALG.WEBGPU: return WebGPUPathfinder;
+    case ALG.WEBGPU: return WebGPUPathfinderWithWorker;
     case "astar": return AStarPathfinder;
     case "breadth": return BFSPathfinder;
     case "uniform": return UniformCostPathfinder;
     case "greedy": return GreedyBestFirstPathfinder;
     case "test": return TestPathfinder;
-    case "webgpu": return WebGPUPathfinder;
+    case "webgpu": return WebGPUPathfinderWithWorker;
     default: return AStarPathfinder;
   }
 }

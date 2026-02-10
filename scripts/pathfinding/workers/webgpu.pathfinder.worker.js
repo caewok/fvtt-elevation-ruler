@@ -8,7 +8,7 @@ GPUTextureUsage,
 
 // ----- NOTE: Properties ----- //
 
-/** @type {WebGPUPathfinder} */
+/** @type {GPUPathfinder} */
 let pf;
 
 
@@ -24,7 +24,7 @@ let pf;
  * @returns {boolean}
  */
 async function initialize({ debug, ...opts } = {}) { /* eslint-disable-line no-unused-vars */
-  pf = new WebGPUPathfinder();
+  pf = new GPUPathfinder();
   await pf.initialize(opts);
   if ( debug ) console.debug("WebGPUPathfinderWorker|Initialized.");
   return [true];
@@ -129,33 +129,16 @@ async function findPath({ startX = 0, startY = 0, endX = 0, endY = 0, _elevation
 
 
 /**
- * Helper for backtrackPath.
- * Stores the current value and the neighbor offsets.
- * @type {Int16Array[18]}
- */
-const neighborBuffer = new ArrayBuffer(18 * Int16Array.BYTES_PER_ELEMENT);
-const currDistMapPosition = new Int16Array(neighborBuffer, 0, 2);
-const neighborOffsets = new Int16Array(neighborBuffer, 2 * Int16Array.BYTES_PER_ELEMENT, 16);
-
-// Define the neighbor offsets.
-// 8 coordinates. E.g., -1,-1, or 0,-1.
-// L, R, T, B, TL, TR, BL, BR.
-(() => {
-  let i = 0;
-  for ( let x = -1; x < 2; x += 1 ) {
-    for ( let y = -1; y < 2; y += 1 ) {
-      if ( !(x || y) ) continue; // Skip 0,0.
-      neighborOffsets[i++] = x;
-      neighborOffsets[i++] = y;
-    }
-  }
-})();
-
-
-/**
  * Get a path
  */
-class WebGPUPathfinder {
+// !!!GPUPathfinder
+class GPUPathfinder {
+  static STATUS = {
+    CALCULATING: -1,
+    NOT_READY: 0,
+    READY: 1,
+  };
+
   /**
    * Map of static terrain buffers for different elevations.
    * @type {Map<string, Terrain>}
@@ -165,10 +148,11 @@ class WebGPUPathfinder {
 
   // ----- NOTE: Initialize ----- //
 
-  async initialize({ resolution = 1, sceneWidth, sceneHeight, translationX = 0, translationY = 0, debug = false } = {}) {
+  async initialize({ resolution = 1, sceneWidth, sceneHeight, translationX = 0, translationY = 0, debug = false } = {}) { /* eslint-disable-line max-len */
     await this.constructor.initializeDevice();
     if ( debug ) console.debug("WebGPUPathfinderWorker|Initialized device.");
-    this.terrainMapper = new GPUTerrainMap(sceneWidth, sceneHeight, this.constructor.device, { resolution, translationX, translationY });
+    this.terrainMapper = new GPUTerrainMap(sceneWidth, sceneHeight, this.constructor.device, {
+      resolution, translationX, translationY });
     if ( debug ) console.debug("WebGPUPathfinderWorker|Initializing terrain mapper...");
     await this.terrainMapper.initialize();
     if ( debug ) console.debug("WebGPUPathfinderWorker|Finished initializing terrain mapper.");
@@ -190,12 +174,6 @@ class WebGPUPathfinder {
   }
 
   // ----- NOTE: Distance map ----- //
-
-  static STATUS = {
-    CALCULATING: -1,
-    NOT_READY: 0,
-    READY: 1,
-  };
 
   /** @type {STATUS} */
   #distanceMapStatus = this.constructor.STATUS.NOT_READY;
@@ -308,6 +286,8 @@ class WebGPUPathfinder {
     const [width, height] = this.terrainMapper.gridDims;
     const area = this.terrainMapper.area;
     const path = [];
+    const neighborOffsets = this.constructor.neighborOffsets;
+    const currDistMapPosition = new Int16Array(2);
     currDistMapPosition[0] = x;
     currDistMapPosition[1] = y;
     path.push(x, y);
@@ -353,6 +333,13 @@ class WebGPUPathfinder {
     }
     return out;
   }
+
+  /**
+   * Helper for backtrackPath.
+   * Stores the neighbor offsets.
+   * @type {Int16Array[16]}
+   */
+  static neighborOffsets = new Int16Array(16);
 
   // ----- NOTE: WebGPU Setup ----- //
 
@@ -628,8 +615,18 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 }
 `;
-
 }
+
+(() => {
+  let i = 0;
+  for ( let x = -1; x < 2; x += 1 ) {
+    for ( let y = -1; y < 2; y += 1 ) {
+      if ( !(x || y) ) continue; // Skip 0,0.
+      GPUPathfinder.neighborOffsets[i++] = x;
+      GPUPathfinder.neighborOffsets[i++] = y;
+    }
+  }
+})();
 
 
 /**
@@ -726,6 +723,7 @@ class GPUTerrainMap {
   /** @type {object<WebGPUPipeline} */
   pipelines = {
     segment: null,
+    openDoor: null,
     triangle: null,
     combine: null,
   };
@@ -733,6 +731,7 @@ class GPUTerrainMap {
   /** @type {object<WebGPUBindGroup} */
   bindGroups = {
     staticWalls: null,
+    staticOpenDoors: null,
     staticTerrain: null,
     subjectWalls: null,
     subjectTerrain: null,
@@ -834,6 +833,15 @@ class GPUTerrainMap {
       }]
     };
 
+    const fragmentOpenDoor = {
+      module: shaderModule,
+      entryPoint: "fs_open_door",
+      targets: [{
+        format,
+        writeMask: 0, // IMPORTANT: Do not write to the dummy texture.
+      }]
+    };
+
     const fragmentDifficultTerrain = {
       module: shaderModule,
       entryPoint: "fs_difficult_terrain",
@@ -848,6 +856,14 @@ class GPUTerrainMap {
       layout: "auto",
       vertex,
       fragment: fragmentWall,
+      primitive: { topology: "line-list" },
+    });
+
+    pipelines.openDoor = device.createRenderPipeline({
+      label: "segment",
+      layout: "auto",
+      vertex,
+      fragment: fragmentOpenDoor,
       primitive: { topology: "line-list" },
     });
 
@@ -875,6 +891,15 @@ class GPUTerrainMap {
     bindGroups.staticWalls = device.createBindGroup({
       label: "staticWalls",
       layout: pipelines.segment.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.staticTerrain } },
+      ]
+    });
+
+    bindGroups.staticOpenDoors = device.createBindGroup({
+      label: "staticOpenDoors",
+      layout: pipelines.openDoor.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: buffers.uniform } },
         { binding: 1, resource: { buffer: buffers.staticTerrain } },
@@ -991,11 +1016,12 @@ class GPUTerrainMap {
    * - @prop {"static"|"subject"|"transient"} bufferType
    * - @prop {boolean} clear                                If true, clears the buffer first
    */
-  processBlockingSegments(segmentArr, { bufferType = "transient", clear = true } = {}) {
+  processBlockingSegments(segmentArr, { bufferType = "transient", openDoors = false, clear = true } = {}) {
     const device = this.device;
     const commandEncoder = device.createCommandEncoder();
-    const bindGroup = this.bindGroups[`${bufferType}Walls`];
+    const bindGroup = openDoors ? this.bindGroups.staticOpenDoors : this.bindGroups[`${bufferType}Walls`];
     const buffer = this.buffers[`${bufferType}Terrain`];
+    const pipeline = openDoors ? this.pipelines.openDoor : this.pipelines.segment;
 
     // Clear map before drawing.
     if ( clear ) commandEncoder.clearBuffer(buffer);
@@ -1013,7 +1039,7 @@ class GPUTerrainMap {
       }] // No visual output needed; dummy texture used.
     });
 
-    renderPass.setPipeline(this.pipelines.segment);
+    renderPass.setPipeline(pipeline);
     renderPass.setBindGroup(0, bindGroup);
     renderPass.setVertexBuffer(0, vertexBuffer);
     renderPass.draw(segmentArr.length / 2); // 2 floats per vertex
@@ -1144,6 +1170,7 @@ fn vs_main(@location(0) pos: vec2<f32>) -> VertexOutput {
 }
 
 const WALL: u32 = 255u;
+const OPEN_DOOR: u32 = 0u;
 
 @fragment
 fn fs_wall(@builtin(position) fragPos: vec4<f32>) {
@@ -1156,6 +1183,19 @@ fn fs_wall(@builtin(position) fragPos: vec4<f32>) {
   // Safety check to prevent out-of-bounds if floating point error occurs
   // TODO: Is atomic necessary here? We are not incrementing for walls.
   if ( idx < arrayLength(&terrainMap) ) { atomicStore(&terrainMap[idx], WALL); }
+}
+
+@fragment
+fn fs_open_door(@builtin(position) fragPos: vec4<f32>) {
+  // fragPos is in the coordinate space of the attachment (the dummy texture).
+  // Since the dummy texture is sized to gridRes, these are already grid coords.
+  let x = u32(fragPos.x);
+  let y = u32(fragPos.y);
+  let idx = get_idx(x, y);
+
+  // Safety check to prevent out-of-bounds if floating point error occurs
+  // TODO: Is atomic necessary here? We are not incrementing for walls.
+  if ( idx < arrayLength(&terrainMap) ) { atomicStore(&terrainMap[idx], OPEN_DOOR); }
 }
 
 fn updateTerrainValue(idx: u32) {
@@ -1219,10 +1259,7 @@ fn cs_combine(@builtin(global_invocation_id) id: vec3<u32>) {
   combinedMap[idx] = result;
 }
 `;
-
 }
-
-// ----- NOTE: Helper functions ----- //
 
 /**
  * Fix a number to 8 decimal places
@@ -1231,5 +1268,4 @@ fn cs_combine(@builtin(global_invocation_id) id: vec3<u32>) {
  */
 const POW10_8 = Math.pow(10, 8);
 function fastFixed(x) { return Math.round(x * POW10_8) / POW10_8; }
-
 

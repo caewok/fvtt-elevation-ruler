@@ -10,6 +10,7 @@ PATCHES.BASIC = {};
 import { Settings } from "./settings.js";
 import { MODULE_ID, PATHFINDING_ID } from "./const.js";
 import { GridCoordinates3d } from "./geometry/3d/GridCoordinates3d.js";
+import { tokenTopLeftFromCenter } from "./util.js";
 
 // ----- NOTE: Hooks ----- //
 
@@ -88,7 +89,7 @@ function findMovementPath(wrapped, waypoints, options) {
   const path = pathfindingJob.findPath(start, end);
   return {
     result: undefined,
-    promise: pathfind(path, wrapped, waypoints, options),
+    promise: pathfind(path, wrapped, waypoints, options, this),
     cancel: () => { pf.cancelJob(pathfindingJob.jobId); } };
 }
 
@@ -97,7 +98,7 @@ PATCHES.BASIC.WRAPS = { findMovementPath, _initializeDragLeft, _onDragEnd };
 
 // ----- NOTE: Helper functions ----- //
 
-async function pathfind(path, wrapped, waypoints, options) {
+async function pathfind(path, wrapped, waypoints, options, token) {
   const foundPath = await path;
 
   // Construct pathfinding waypoints.
@@ -106,9 +107,14 @@ async function pathfind(path, wrapped, waypoints, options) {
     const foundryEnd = waypoints.pop();
     const foundryStart = waypoints.at(-1);
     for ( let i = 1, iMax = foundPath.length - 1; i < iMax; i += 1 ) {
-      const pt = canvas.grid.getTopLeftPoint(foundPath[i]); // Foundry ruler uses top left coordinates.
+      // const pt = canvas.grid.getTopLeftPoint(foundPath[i]); // Foundry ruler uses top left coordinates.
+      const pt = tokenTopLeftFromCenter(token, foundPath[i]);
+      const prevW = waypoints[i - 1];
+      if ( prevW.x.almostEqual(pt.x) && prevW.y.almostEqual(pt.y) ) continue;
       waypoints.push({ ...foundryStart, checkpoint: false, explicit: false, x: pt.x, y: pt.y });
     }
+    const prevW = waypoints.at(-1);
+    if ( prevW.x.almostEqual(foundryEnd.x) && prevW.y.almostEqual(foundryEnd.y) ) waypoints.pop();
     waypoints.push(foundryEnd);
   }
 
