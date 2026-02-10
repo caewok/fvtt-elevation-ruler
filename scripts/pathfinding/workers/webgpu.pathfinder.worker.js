@@ -787,10 +787,14 @@ class GPUTerrainMap {
   bindGroups = {
     staticWalls: null,
     staticOpenDoors: null,
+    staticWallsPoints: null,
+    staticOpenDoorsPoints: null,
     staticTerrain: null,
     subjectWalls: null,
+    subjectWallsPoints: null,
     subjectTerrain: null,
     transientWalls: null,
+    transientWallsPoints: null,
     transientTerrain: null,
     combine: null,
   };
@@ -979,6 +983,24 @@ class GPUTerrainMap {
       ]
     });
 
+    bindGroups.staticWallsPoints = device.createBindGroup({
+      label: "staticWallsPoints",
+      layout: pipelines.points.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.staticTerrain } },
+      ]
+    });
+
+    bindGroups.staticOpenDoorsPoints = device.createBindGroup({
+      label: "staticOpenDoorsPoints",
+      layout: pipelines.openPoints.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.staticTerrain } },
+      ]
+    });
+
     bindGroups.staticTerrain = device.createBindGroup({
       label: "staticTerrain",
       layout: pipelines.triangles.getBindGroupLayout(0),
@@ -997,6 +1019,15 @@ class GPUTerrainMap {
       ]
     });
 
+    bindGroups.subjectWallsPoints = device.createBindGroup({
+      label: "subjectWallsPoints",
+      layout: pipelines.points.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.subjectTerrain } },
+      ]
+    });
+
     bindGroups.subjectTerrain = device.createBindGroup({
       label: "subjectTerrain",
       layout: pipelines.triangles.getBindGroupLayout(0),
@@ -1009,6 +1040,15 @@ class GPUTerrainMap {
     bindGroups.transientWalls = device.createBindGroup({
       label: "transientWalls",
       layout: pipelines.segments.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.transientTerrain } },
+      ]
+    });
+
+    bindGroups.transientWallsPoints = device.createBindGroup({
+      label: "transientWallsPoints",
+      layout: pipelines.points.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: buffers.uniform } },
         { binding: 1, resource: { buffer: buffers.transientTerrain } },
@@ -1092,10 +1132,21 @@ class GPUTerrainMap {
   processBlockingSegments(segmentArr, { bufferType = "transient", openDoors = false, clear = true } = {}) {
     const device = this.device;
     const commandEncoder = device.createCommandEncoder();
-    const bindGroup = openDoors ? this.bindGroups.staticOpenDoors : this.bindGroups[`${bufferType}Walls`];
     const buffer = this.buffers[`${bufferType}Terrain`];
-    const segmentsPipeline = openDoors ? this.pipelines.openSegments : this.pipelines.segments;
-    const pointsPipeline = openDoors ? this.pipelines.openPoints : this.pipelines.points;
+
+    let pipeline = { segments: null, points: null };
+    let bindGroup = { segments: null, points: null };
+    if ( openDoors ) {
+      pipeline.segments = this.pipelines.openSegments;
+      pipeline.points = this.pipelines.openPoints;
+      bindGroup.segments = this.bindGroups.staticOpenDoors;
+      bindGroup.points = this.bindGroups.staticOpenDoorsPoints;
+    } else {
+      pipeline.segments = this.pipelines.segments;
+      pipeline.points = this.pipelines.points;
+      bindGroup.segments = this.bindGroups[`${bufferType}Walls`];
+      bindGroup.points = this.bindGroups[`${bufferType}WallsPoints`];
+    }
 
     // Clear map before drawing.
     if ( clear ) commandEncoder.clearBuffer(buffer);
@@ -1115,13 +1166,14 @@ class GPUTerrainMap {
 
     // Draw the lines (fills gaps between endpoints).
     const vertexCount = segmentArr.length / 2; // 2 floats per vertex
-    renderPass.setPipeline(segmentsPipeline);
-    renderPass.setBindGroup(0, bindGroup);
+    renderPass.setPipeline(pipeline.segments);
+    renderPass.setBindGroup(0, bindGroup.segments);
     renderPass.setVertexBuffer(0, vertexBuffer);
     renderPass.draw(vertexCount);
 
     // Draw the points (ensure endpoints are filled). Minimal overhead to draw both.
-    renderPass.setPipeline(pointsPipeline);
+    renderPass.setPipeline(pipeline.points);
+    renderPass.setBindGroup(0, bindGroup.points);
     renderPass.draw(vertexCount);
 
     renderPass.end();
