@@ -4,6 +4,9 @@ CONFIG,
 CONST,
 foundry,
 game,
+GPUBufferUsage,
+GPUMapMode,
+GPUTextureUsage,
 PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -57,6 +60,14 @@ const GPUTerrainMixin = superclass => class extends superclass {
     const segmentArr = new Float32Array(numCoordinates);
     let i = 0;
     for ( const wall of walls ) {
+      // Lengthen walls by 1 pixel in each direction to avoid path skipping.
+      /*
+      const edge = wall.edge;
+      const dist2 = (PIXI.Point.distanceBetween(edge.a, edge.b) + 1) ** 2;
+      const b = edge.a.towardsPointSquared(edge.b, dist2);
+      const a = edge.b.towardsPointSquared(edge.a, dist2);
+      segmentArr.set([a.x, a.y, b.x, b.y], i);
+      */
       segmentArr.set(wall.document.c, i);
       i += 4;
     }
@@ -559,7 +570,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
   /** @type {number} */
   #resolution = 1;
 
-  get resolution() { return 1; }
+  get resolution() { return this.#resolution; }
 
   /** @type {PIXI.Point} */
   sceneDims = new PIXI.Point();
@@ -716,6 +727,14 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
     }
     return path;
   }
+
+  async destroy() {
+    return this.executeFunction("destroy");
+  }
+
+  async terminate() {
+    return this.executeFunction("terminate");
+  }
 }
 
 
@@ -735,7 +754,7 @@ export class WebGPUPathfinderFakeWorker {
   /** @type {number} */
   #resolution = 1;
 
-  get resolution() { return 1; }
+  get resolution() { return this.#resolution; }
 
   /** @type {PIXI.Point} */
   sceneDims = new PIXI.Point();
@@ -924,6 +943,22 @@ export class WebGPUPathfinderFakeWorker {
       path[j] = GridCoordinates3d.tmp.set(res.path[i], res.path[i+1], start.z);
     }
     return path;
+  }
+
+  async destroy() {
+    // Real worker:
+    // await this.executeFunction("destroy");
+    if ( this.pf ) this.pf.destroy();
+    this.pf = null;
+    return true;
+  }
+
+  async terminate() {
+    // Real worker:
+    // await this.executeFunction("terminate");
+    await this.destroy();
+    GPUPathfinder.destroy();
+    return true;
   }
 }
 
@@ -1227,11 +1262,34 @@ export class GPUPathfinder {
     // Call this.buffers.read.unmap() elsewhere.
   }
 
+  // ----- NOTE: Destroy ----- //
+
   destroy() {
-    this.buffers.read.unmap();
+    // Teardown the terrain mapper.
+    if ( this.terrainMapper ) {
+      this.terrainMapper.destroy();
+      this.terrainMapper = null;
+    }
+
+    // Destroy internal pathfinding buffers.
+    for ( const key in this.buffers ) {
+      if ( this.buffers[key] ) {
+        try { this.buffesr[key].unmap(); } catch(e) { /* Ignore if not mapped. */ } /* eslint-disable-line no-unused-vars */
+        this.buffers[key].destroy();
+        this.buffers[key] = null;
+      }
+    }
+
+    // Clear the large distanceMap array from JS memory.
     this.distanceMap = null;
   }
 
+  static destroy() {
+    if ( this.device ) {
+      this.device.destroy();
+      this.device = null;
+    }
+  }
 
   // ----- NOTE: Find path ----- //
 
@@ -1459,6 +1517,8 @@ export class GPUPathfinder {
 struct GridInfo { width: u32, height: u32 };
 struct InitParams { startIndex: u32 };
 
+const WALL = 255u;
+
 @group(0) @binding(0) var<uniform> grid: GridInfo;
 
 // terrainMap holds weights.
@@ -1470,7 +1530,16 @@ struct InitParams { startIndex: u32 };
 // Params specifically for initialization
 @group(0) @binding(4) var<uniform> initParams: InitParams;
 
+/**
+ * Get index for given local x, y location.
+ */
 fn get_idx(x: u32, y: u32) -> u32 { return y * grid.width + x; }
+
+/**
+ * Check if cell is a wall.
+ * @returns True if wall, false if traversable.
+ */
+fn is_wall(x: u32, y: u32) -> bool { return terrainMap[get_idx(x, y)] >= WALL; }
 
 @compute @workgroup_size(8, 8)
 fn init_dist(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -1499,7 +1568,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     // Wall check.
     // Note 0xFFFFFFFFu represents infinity internally.
-    let WALL = 255u;
     let tileCost = terrainMap[idx];
     if ( tileCost >= WALL ) {
       outputDist[idx] = 0xFFFFFFFFu;
@@ -1518,63 +1586,54 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     // ----- Check straight neighbors (cost 10) ----- //
     // Left
-    if (x > 0u) {
+    if ( x > 0u ) {
         let v = inputDist[get_idx(x - 1u, y)];
         if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
     }
 
     // Right
-    if (x < grid.width - 1u) {
+    if ( x < grid.width - 1u ) {
         let v = inputDist[get_idx(x + 1u, y)];
         if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
     }
 
     // Up
-    if (y > 0u) {
+    if ( y > 0u ) {
         let v = inputDist[get_idx(x, y - 1u)];
         if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
     }
 
     // Down
-    if (y < grid.height - 1u) {
+    if ( y < grid.height - 1u ) {
         let v = inputDist[get_idx(x, y + 1u)];
         if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
     }
 
     // --- Check Diagonal Neighbors (Cost 14) ---
-
-    // Strict diagonal check top-left example
-    // if (x > 0u && y > 0u) {
-    //  let left_wall = mapState[get_idx(x - 1u, y)] == 1u;
-    //  let up_wall = mapState[get_idx(x, y - 1u)] == 1u;
-
-    //  // Only process diagonal if adjacent cardinals are NOT walls
-    //  if (!left_wall && !up_wall) {
-    //       let v = inputDist[get_idx(x - 1u, y - 1u)];
-    //       if (v != MAX_VAL) { best = min(best, v + COST_DIAGONAL); }
-    //  }
-    // }
+    // A diagonal move is only valid if we are not cutting a corner.
+    // E.g., to move (x - 1, y - 1), both (x - 1, y) and (x, y - 1) must not be walls.
+    // Prevents clipping wall endpoints.
 
     // Top-Left
-    if (x > 0u && y > 0u) {
+    if ( x > 0u && y > 0u && !is_wall(x - 1u, y) && !is_wall(x, y - 1u) ) {
         let v = inputDist[get_idx(x - 1u, y - 1u)];
         if (v != MAX_VAL) { best = min(best, v + COST_DIAGONAL); }
     }
 
     // Top-Right
-    if (x < grid.width - 1u && y > 0u) {
+    if ( x < grid.width - 1u && y > 0u && !is_wall(x + 1u, y) && !is_wall(x, y - 1u) ) {
         let v = inputDist[get_idx(x + 1u, y - 1u)];
         if (v != MAX_VAL) { best = min(best, v + COST_DIAGONAL); }
     }
 
     // Bottom-Left
-    if (x > 0u && y < grid.height - 1u) {
+    if ( x > 0u && y < grid.height - 1u && !is_wall(x - 1u, y) && !is_wall(x, y + 1u) ) {
         let v = inputDist[get_idx(x - 1u, y + 1u)];
         if (v != MAX_VAL) { best = min(best, v + COST_DIAGONAL); }
     }
 
     // Bottom-Right
-    if (x < grid.width - 1u && y < grid.height - 1u) {
+    if ( x < grid.width - 1u && y < grid.height - 1u && !is_wall(x + 1u, y) && !is_wall(x, y + 1u) ) {
         let v = inputDist[get_idx(x + 1u, y + 1u)];
         if (v != MAX_VAL) { best = min(best, v + COST_DIAGONAL); }
     }
@@ -1647,10 +1706,17 @@ export class GPUTerrainMap {
   // ----- NOTE: Indexing ----- //
 
   indexAtLocal(x, y) {
+    // Use floor to determine in which "pixel bucket" the coordinate lies.
+    x = ~~x;
+    y = ~~y;
+
+    // Bounds check.
     if ( x < 0 || y < 0 ) return -1;
     const [width, height] = this.gridDims;
     if ( x >= width || y >= height ) return -1;
-    return (~~y * width) + ~~x; // Floor x and y.
+
+    // Return the index.
+    return (y * width) + x;
   }
 
   indexAtCanvas(x, y) {
@@ -1661,8 +1727,8 @@ export class GPUTerrainMap {
   fromCanvasCoordinates(x, y) {
     const [trX, trY] = this.sceneTranslation;
     const res = this.resolution;
-    x = fastFixed((x - trX) * res);
-    y = fastFixed((y - trY) * res);
+    x = (x - trX) * res;
+    y = (y - trY) * res;
     return { x, y };
   }
 
@@ -1694,9 +1760,11 @@ export class GPUTerrainMap {
 
   /** @type {object<WebGPUPipeline} */
   pipelines = {
-    segment: null,
-    openDoor: null,
-    triangle: null,
+    segments: null,
+    points: null,
+    openSegments: null,
+    openPoints: null,
+    triangles: null,
     combine: null,
   };
 
@@ -1704,10 +1772,14 @@ export class GPUTerrainMap {
   bindGroups = {
     staticWalls: null,
     staticOpenDoors: null,
+    staticWallsPoints: null,
+    staticOpenDoorsPoints: null,
     staticTerrain: null,
     subjectWalls: null,
+    subjectWallsPoints: null,
     subjectTerrain: null,
     transientWalls: null,
+    transientWallsPoints: null,
     transientTerrain: null,
     combine: null,
   };
@@ -1823,7 +1895,7 @@ export class GPUTerrainMap {
       }]
     };
 
-    pipelines.segment = device.createRenderPipeline({
+    pipelines.segments = device.createRenderPipeline({
       label: "segment",
       layout: "auto",
       vertex,
@@ -1831,15 +1903,33 @@ export class GPUTerrainMap {
       primitive: { topology: "line-list" },
     });
 
-    pipelines.openDoor = device.createRenderPipeline({
-      label: "segment",
+    // Draw the segment buffer twice; once as points and once as line list to ensure
+    // wall endpoints are filled in.
+    pipelines.points = device.createRenderPipeline({
+      label: "points",
+      layout: "auto",
+      vertex,
+      fragment: fragmentWall,
+      primitive: { topology: "point-list" },
+    });
+
+    pipelines.openSegments = device.createRenderPipeline({
+      label: "open segment",
       layout: "auto",
       vertex,
       fragment: fragmentOpenDoor,
       primitive: { topology: "line-list" },
     });
 
-    pipelines.triangle = device.createRenderPipeline({
+    pipelines.openPoints = device.createRenderPipeline({
+      label: "open points",
+      layout: "auto",
+      vertex,
+      fragment: fragmentWall,
+      primitive: { topology: "point-list" },
+    });
+
+    pipelines.triangles = device.createRenderPipeline({
       label: "triangle",
       layout: "auto",
       vertex,
@@ -1862,7 +1952,7 @@ export class GPUTerrainMap {
 
     bindGroups.staticWalls = device.createBindGroup({
       label: "staticWalls",
-      layout: pipelines.segment.getBindGroupLayout(0),
+      layout: pipelines.segments.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: buffers.uniform } },
         { binding: 1, resource: { buffer: buffers.staticTerrain } },
@@ -1871,7 +1961,25 @@ export class GPUTerrainMap {
 
     bindGroups.staticOpenDoors = device.createBindGroup({
       label: "staticOpenDoors",
-      layout: pipelines.openDoor.getBindGroupLayout(0),
+      layout: pipelines.openSegments.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.staticTerrain } },
+      ]
+    });
+
+    bindGroups.staticWallsPoints = device.createBindGroup({
+      label: "staticWallsPoints",
+      layout: pipelines.points.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.staticTerrain } },
+      ]
+    });
+
+    bindGroups.staticOpenDoorsPoints = device.createBindGroup({
+      label: "staticOpenDoorsPoints",
+      layout: pipelines.openPoints.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: buffers.uniform } },
         { binding: 1, resource: { buffer: buffers.staticTerrain } },
@@ -1880,7 +1988,7 @@ export class GPUTerrainMap {
 
     bindGroups.staticTerrain = device.createBindGroup({
       label: "staticTerrain",
-      layout: pipelines.triangle.getBindGroupLayout(0),
+      layout: pipelines.triangles.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: buffers.uniform } },
         { binding: 1, resource: { buffer: buffers.staticTerrain } },
@@ -1889,7 +1997,16 @@ export class GPUTerrainMap {
 
     bindGroups.subjectWalls = device.createBindGroup({
       label: "subjectWalls",
-      layout: pipelines.segment.getBindGroupLayout(0),
+      layout: pipelines.segments.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.subjectTerrain } },
+      ]
+    });
+
+    bindGroups.subjectWallsPoints = device.createBindGroup({
+      label: "subjectWallsPoints",
+      layout: pipelines.points.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: buffers.uniform } },
         { binding: 1, resource: { buffer: buffers.subjectTerrain } },
@@ -1898,7 +2015,7 @@ export class GPUTerrainMap {
 
     bindGroups.subjectTerrain = device.createBindGroup({
       label: "subjectTerrain",
-      layout: pipelines.triangle.getBindGroupLayout(0),
+      layout: pipelines.triangles.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: buffers.uniform } },
         { binding: 1, resource: { buffer: buffers.subjectTerrain } },
@@ -1907,7 +2024,16 @@ export class GPUTerrainMap {
 
     bindGroups.transientWalls = device.createBindGroup({
       label: "transientWalls",
-      layout: pipelines.segment.getBindGroupLayout(0),
+      layout: pipelines.segments.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: buffers.uniform } },
+        { binding: 1, resource: { buffer: buffers.transientTerrain } },
+      ]
+    });
+
+    bindGroups.transientWallsPoints = device.createBindGroup({
+      label: "transientWallsPoints",
+      layout: pipelines.points.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: buffers.uniform } },
         { binding: 1, resource: { buffer: buffers.transientTerrain } },
@@ -1916,7 +2042,7 @@ export class GPUTerrainMap {
 
     bindGroups.transientTerrain = device.createBindGroup({
       label: "transientTerrain",
-      layout: pipelines.triangle.getBindGroupLayout(0),
+      layout: pipelines.triangles.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: buffers.uniform } },
         { binding: 1, resource: { buffer: buffers.transientTerrain } },
@@ -1991,9 +2117,21 @@ export class GPUTerrainMap {
   processBlockingSegments(segmentArr, { bufferType = "transient", openDoors = false, clear = true } = {}) {
     const device = this.device;
     const commandEncoder = device.createCommandEncoder();
-    const bindGroup = openDoors ? this.bindGroups.staticOpenDoors : this.bindGroups[`${bufferType}Walls`];
     const buffer = this.buffers[`${bufferType}Terrain`];
-    const pipeline = openDoors ? this.pipelines.openDoor : this.pipelines.segment;
+
+    let pipeline = { segments: null, points: null };
+    let bindGroup = { segments: null, points: null };
+    if ( openDoors ) {
+      pipeline.segments = this.pipelines.openSegments;
+      pipeline.points = this.pipelines.openPoints;
+      bindGroup.segments = this.bindGroups.staticOpenDoors;
+      bindGroup.points = this.bindGroups.staticOpenDoorsPoints;
+    } else {
+      pipeline.segments = this.pipelines.segments;
+      pipeline.points = this.pipelines.points;
+      bindGroup.segments = this.bindGroups[`${bufferType}Walls`];
+      bindGroup.points = this.bindGroups[`${bufferType}WallsPoints`];
+    }
 
     // Clear map before drawing.
     if ( clear ) commandEncoder.clearBuffer(buffer);
@@ -2011,10 +2149,18 @@ export class GPUTerrainMap {
       }] // No visual output needed; dummy texture used.
     });
 
-    renderPass.setPipeline(pipeline);
-    renderPass.setBindGroup(0, bindGroup);
+    // Draw the lines (fills gaps between endpoints).
+    const vertexCount = segmentArr.length / 2; // 2 floats per vertex
+    renderPass.setPipeline(pipeline.segments);
+    renderPass.setBindGroup(0, bindGroup.segments);
     renderPass.setVertexBuffer(0, vertexBuffer);
-    renderPass.draw(segmentArr.length / 2); // 2 floats per vertex
+    renderPass.draw(vertexCount);
+
+    // Draw the points (ensure endpoints are filled). Minimal overhead to draw both.
+    renderPass.setPipeline(pipeline.points);
+    renderPass.setBindGroup(0, bindGroup.points);
+    renderPass.draw(vertexCount);
+
     renderPass.end();
     device.queue.submit([commandEncoder.finish()]);
   }
@@ -2076,7 +2222,7 @@ export class GPUTerrainMap {
         clearValue: { r: 0, g: 0, b: 0, a: 1 }
       }]
     });
-    renderPass.setPipeline(this.pipelines.triangle);
+    renderPass.setPipeline(this.pipelines.triangles);
     renderPass.setBindGroup(0, bindGroup);
     renderPass.setVertexBuffer(0, vBuf);
     renderPass.setIndexBuffer(iBuf, "uint16"); // Or uint32
@@ -2106,6 +2252,31 @@ export class GPUTerrainMap {
     device.queue.submit([commandEncoder.finish()]);
   }
 
+  // ----- NOTE: Destroy ----- //
+
+  destroy() {
+    // Destroy all GPU buffers.
+    for ( const key in this.buffers ) {
+      if ( this.buffers[key] ) {
+        this.buffers[key].destroy();
+        this.buffers[key] = null;
+      }
+    }
+
+    // Destroy the dummy texture.
+    if ( this.dummyTexture ) {
+      this.dummyTexture.destroy();
+      this.dummyTexture = null;
+    }
+
+    // Clear references to pipelines and bind groups to trigger GC.
+    this.pipelines = {};
+    this.bindGroups = {};
+    this.device = null;
+  }
+
+  // ----- NOTE: Shader code ----- //
+
 
   static shaderCode = `
 
@@ -2134,10 +2305,18 @@ fn get_idx(x: u32, y: u32) -> u32 { return y * u32(config.gridRes.x) + x; }
 fn vs_main(@location(0) pos: vec2<f32>) -> VertexOutput {
   var out: VertexOutput;
 
-  // Convert scene coordinates (0 to res) to NDC (-1 to 1)
-  let ndcX = (((pos.x - config.translation.x) / config.sceneRes.x)) * 2.0 - 1.0;
-  let ndcY = 1.0 - (((pos.y - config.translation.y) / config.sceneRes.y) * 2.0); // Flip Y for screen space.
-  out.pos = vec4<f32>(ndcX, ndcY, 0.0, 1.0);
+  // Apply 0.5 offset to target pixel centers.
+  // This moves the coordinate from the "edge" of the pixel to its "middle."
+  // This fixes the bottom-right off-by-one shift.
+  let adjustedPos = pos + 0.5;
+
+  // Transform to NDC.
+  // Formula: (((pos - translation) * sceneRes) * 2.0) - 1.0
+  let ndc = (((adjustedPos - config.translation) / config.sceneRes) * 2.0) - 1.0;
+
+  // WebGPU NDC y-axis points UP, but Foundry/canvas y points DOWN.
+  // Negate y result to flip it.
+  out.pos = vec4<f32>(ndc.x, -ndc.y, 0.0, 1.0);
   return out;
 }
 
@@ -2699,12 +2878,12 @@ pf = new WebGPUPathfinder(randal);
 pf = new WebGPUPathfinderWithWorker(randal)
 
 
-await pf.initialize(.25);
+await pf.initialize(1);
 await pf.constructor.updateStaticTerrain();
 await pf.updateSubjectTerrain();
 await pf.startPathfinding(start)
 path = await pf.findPath(start, end);
-pf.constructor.drawPath(path)
+pf.constructor.drawPath(path, { radius: 1 })
 
 
 bufferData = await pf.constructor.worker.extractBufferData({ bufferType: "static" })
@@ -2716,9 +2895,12 @@ new Set(bufferData)
 new Set(bufferData.sort((a, b) => a - b))
 
 
+Terrain = api.pathfinding.Terrain
+terrain = Terrain.fromPixelArray(bufferData, pf.constructor.worker.gridDims.x, { resolution: pf.constructor.worker.resolution })
+terrain.translation = pf.constructor.worker.sceneTranslation
+terrain.draw({ skip: 20, local: false })
 
-
-
+bufferData[pf.constructor.worker.pf.terrainMapper.indexAtCanvas(1997, 2699)]
 
 */
 
