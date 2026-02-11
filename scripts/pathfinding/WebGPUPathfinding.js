@@ -989,11 +989,35 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
   }
 
   /**
-   * Recommend a resolution of 10% of the pixel size.
+   * Recommend a resolution based on the wall subgrid snapping.
+   * Should be double the number of snapping positions.
    * @returns {number}
    */
   static get recommendedResolution() {
-    return this.resolutionForPixelSize(canvas.scene.dimensions.size * 0.1);
+    /* https://foundryvtt.com/article/walls/
+    50px grids have 1/4 precision (5 snap points per grid unit).
+    100px grids have 1/8 precision (9 snap points per grid unit)
+    200px grids have 1/16 precision (17 snap points per grid unit)
+
+    See canvas.walls.getSnappedPoint
+    size = canvas.dimensions.size
+    size >= 128 ? 8 : (size >= 64 ? 4 : 2)
+
+    If canvas size is 100, resolution of 2 / 100 divides a grid square into two portions.
+    Approximately:
+    |ww••••ww|ww••••ww| <-- Forces path to be in middle of grid or get blocked.
+
+    As wall positions increase, resolution must be incremented by 2. E.g., 4 /100:
+    |w••ww••w|w••ww••w|
+
+    */
+
+    const size = canvas.dimensions.size;
+    let numWallPositions = 4; // Small grid.
+    if ( !canvas.grid.isGridless && Settings.get(Settings.KEYS.PATHFINDING.SNAP_TO_GRID ) ) numWallPositions = 1;
+    else if ( size >= 128 ) numWallPositions = 8;
+    else if ( size >= 64 ) numWallPositions = 4;
+    return (numWallPositions * 2) / size;
   }
 
   /** @type {WebGPUPathfinderWorker|WebGPUPathfinderFakeWorker} */

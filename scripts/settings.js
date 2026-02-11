@@ -169,7 +169,8 @@ export class Settings extends ModuleSettingsAbstract {
       scope: "world",
       config: true,
       type: new foundry.data.fields.BooleanField({ initial: false }),
-      requiresReload: false
+      onChange: value => this.toggleSnapToGrid(value),
+      requiresReload: false,
     });
   }
 
@@ -236,6 +237,11 @@ export class Settings extends ModuleSettingsAbstract {
 
     // Set up pathfinding for each token on the canvas.
     this.updateTokensPathfinder({ algorithm });
+  }
+
+  static async toggleSnapToGrid(enable) {
+    const PF = Settings.KEYS.PATHFINDING;
+    if ( Settings.get(PF.ALGORITHM) === PF.ALGORITHM_CHOICES.WEBGPU ) await WebGPUPathfinderWithWorker.initialize();
   }
 
   static togglePathfinding(enable) {
