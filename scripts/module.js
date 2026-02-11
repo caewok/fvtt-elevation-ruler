@@ -196,7 +196,7 @@ const PATHFINDING_CONTROL = {
 // Render the pathfinding control.
 // Render the prefer token control if that setting is enabled.
 Hooks.on("getSceneControlButtons", (controls, _html, _data) => {
-  if ( !canvas.scene || !Settings.get(Settings.KEYS.PATHFINDING.ENABLE) ) return;
+  if ( !canvas.scene ) return;
   PATHFINDING_CONTROL.order = 0;
   Object.values(controls.tokens.tools)
     .forEach(tool => PATHFINDING_CONTROL.order = Math.max(tool.order + 1, PATHFINDING_CONTROL.order));
@@ -216,7 +216,6 @@ Hooks.on("renderSceneControls", async function(controls, _html, _data) {
 });
 
 export function updatePathfindingControl(enable) {
-  if ( !Settings.get(Settings.KEYS.PATHFINDING.ENABLE) ) return;
   enable ??= Settings.get(Settings.KEYS.CONTROLS.PATHFINDING);
   PATHFINDING_CONTROL.active = enable;
 
