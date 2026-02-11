@@ -3,6 +3,7 @@ canvas,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
+import { MODULE_ID, PATHFINDING_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { WebGPUPathfinderWithWorker } from "./pathfinding/WebGPUPathfinding.js";
 
@@ -11,28 +12,8 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 
 /**
- * When the walls layer is deactivated, check for modified walls.
- *
- * A hook event that fires with a {@link foundry.canvas.layers.InteractionLayer} becomes inactive.
- * The dispatched event name replaces "Layer" with the named InteractionLayer subclass, i.e. "deactivateTokensLayer".
- * @event
- * @category InteractionLayer
- * @param {InteractionLayer} layer    The layer becoming inactive
- */
-
-let updatesMade = false;
-
-function deactivateRegionsLayer(layer) {
-  if ( !updatesMade ) return;
-
-  // Trigger full update of the region difficult terrain.
-  const PF = Settings.KEYS.PATHFINDING;
-  if ( Settings.get(PF.ALGORITHM) !== PF.ALGORITHM_CHOICES.WEBGPU ) return;
-  WebGPUPathfinderWithWorker.updateStaticTerrain(); // Async.
-}
-
-/**
- * If a door is opened or closed, modify the WebGPUPathfinder static terrain for that door.
+ * If a region is modified, invalidate the current subject token for WebGPUPathfinderWithWorker.
+ * Forces a later update.
  *
  * A hook event that fires for every Document type after conclusion of an update workflow.
  * Substitute the Document name in the hook event to target a specific Document type, for example "updateActor".
@@ -58,16 +39,15 @@ const DOCUMENT_KEYS = new Set([
 function updateRegion(regionD, changed, options, userId) {
   const PF = Settings.KEYS.PATHFINDING;
   if ( !canvas.regions.active || Settings.get(PF.ALGORITHM) !== PF.ALGORITHM_CHOICES.WEBGPU ) return;
+  if ( WebGPUPathfinderWithWorker.currentTokenId === "" ) return;
 
-  if ( canvas.regions.active ) {
-    if ( updatesMade ) return;
-    const changeKeys = Object.keys(foundry.utils.flattenObject(changed));
-    if ( changeKeys.some(key => DOCUMENT_KEYS.has(key)) ) updatesMade = true;
+  const changeKeys = Object.keys(foundry.utils.flattenObject(changed));
+  if ( changeKeys.some(key => DOCUMENT_KEYS.has(key)) ) {
+    WebGPUPathfinderWithWorker.currentTokenId = "";
     return;
   }
 }
 
 PATCHES.BASIC.HOOKS = {
   updateRegion,
-  deactivateRegionsLayer,
 };

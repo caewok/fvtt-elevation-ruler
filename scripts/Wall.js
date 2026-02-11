@@ -11,27 +11,6 @@ export const PATCHES = {};
 PATCHES.BASIC = {};
 
 /**
- * When the walls layer is deactivated, check for modified walls.
- *
- * A hook event that fires with a {@link foundry.canvas.layers.InteractionLayer} becomes inactive.
- * The dispatched event name replaces "Layer" with the named InteractionLayer subclass, i.e. "deactivateTokensLayer".
- * @event
- * @category InteractionLayer
- * @param {InteractionLayer} layer    The layer becoming inactive
- */
-
-let updatesMade = false;
-
-function deactivateWallsLayer(layer) {
-  if ( !updatesMade ) return;
-
-  // Trigger a full update of the static terrain.
-  const PF = Settings.KEYS.PATHFINDING;
-  if ( Settings.get(PF.ALGORITHM) !== PF.ALGORITHM_CHOICES.WEBGPU ) return;
-  WebGPUPathfinderWithWorker.updateStaticTerrain(); // Async.
-}
-
-/**
  * If a door is opened or closed, modify the WebGPUPathfinder static terrain for that door.
  *
  * A hook event that fires for every Document type after conclusion of an update workflow.
@@ -59,31 +38,27 @@ const DOCUMENT_KEYS = new Set([
   "sight",
   "sound",
   "door",
-  "ds",
 ]);
 
 function updateWall(wallD, changed, options, userId) {
   const PF = Settings.KEYS.PATHFINDING;
   if ( Settings.get(PF.ALGORITHM) !== PF.ALGORITHM_CHOICES.WEBGPU ) return;
+  if ( WebGPUPathfinderWithWorker.currentElevationZ === null ) return;
 
-  // Record the update for once we move out of the walls layer.
-  if ( canvas.walls.active ) {
-    if ( updatesMade ) return;
-    const changeKeys = Object.keys(foundry.utils.flattenObject(changed));
-    if ( changeKeys.some(key => DOCUMENT_KEYS.has(key)) ) updatesMade = true;
+  const changeKeys = Object.keys(foundry.utils.flattenObject(changed));
+  if ( changeKeys.some(key => DOCUMENT_KEYS.has(key)) ) {
+    WebGPUPathfinderWithWorker.currentElevationZ = null;
     return;
   }
 
-  // Not in the walls layer.
-  if ( !Object.hasOwn(changed, "ds") ) return;
-
-  // Door opened or closed while not in the walls layer.
-  // Update that door state in WebGPU pathfinding.
-  const doorAction = changed.ds === CONST.WALL_DOOR_STATES.OPEN ? "openDoors" : "closeDoors";
-  WebGPUPathfinderWithWorker[doorAction]({ walls: wallD.object }); // Async.
+  // Otherwise, check if a door state has changed and update the static terrain.
+  // Could do this update per-wall, but that would likely be overkill.
+  if ( Object.hasOwn(changed, "ds") ) {
+    const doorAction = changed.ds === CONST.WALL_DOOR_STATES.OPEN ? "openDoors" : "closeDoors";
+    WebGPUPathfinderWithWorker[doorAction]({ walls: wallD.object }); // Async.
+  }
 }
 
 PATCHES.BASIC.HOOKS = {
   updateWall,
-  deactivateWallsLayer,
 };
