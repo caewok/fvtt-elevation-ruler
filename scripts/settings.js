@@ -27,7 +27,7 @@ const SETTINGS = {
   },
 
   PATHFINDING: {
-    ENABLE: "pathfinding_enable",
+    // ENABLE: "pathfinding_enable", // Deprecated, at least until other features present
     TOKENS_BLOCK: "pathfinding_tokens_block",
     TOKENS_BLOCK_CHOICES: {
       NO: "pathfinding_tokens_block_no",
@@ -106,16 +106,6 @@ export class Settings extends ModuleSettingsAbstract {
       }),
       requiresReload: false,
       onChange: value => this.updateTokensPathfinder({ algorithm: value }), // TODO: Initialize the pathfinding algorithm?
-    });
-
-    register(KEYS.PATHFINDING.ENABLE, {
-      name: localize(`${KEYS.PATHFINDING.ENABLE}.name`),
-      hint: localize(`${KEYS.PATHFINDING.ENABLE}.hint`),
-      scope: "user",
-      config: true,
-      type: new foundry.data.fields.BooleanField({ initial: true }),
-      requiresReload: false,
-      onChange: value => this.initializePathfinding(value)
     });
 
     register(KEYS.PATHFINDING.TOKENS_BLOCK, {
@@ -256,7 +246,6 @@ export class Settings extends ModuleSettingsAbstract {
   static setTokenBlocksPathfinding(blockSetting) {
     blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
     BorderEdge.tokenBlockType = this._tokenBlockType(blockSetting);
-    if ( !Settings.get(Settings.KEYS.PATHFINDING.ENABLE) ) return;
 
     if ( this.useTokensInPathfinding ) {
       PATCHER.registerGroup("PATHFINDING_TOKENS");
