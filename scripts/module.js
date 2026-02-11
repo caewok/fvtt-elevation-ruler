@@ -175,7 +175,7 @@ Hooks.once("canvasReady", function() {
   }
 
   Settings.pathfinderReady = true;
-  Settings.updateTokensPathfinder();
+  Settings.initializePathfinding();
 });
 
 // For https://github.com/League-of-Foundry-Developers/foundryvtt-devMode

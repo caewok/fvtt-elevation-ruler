@@ -124,10 +124,11 @@ async function calculateDistanceMap({ startX = 0, startY = 0, elevation = 0, sig
  * @param {number} options.elevation        Token elevation; if changed will
  * @param {AbortSignal} options.signal
  */
-async function findPath({ startX = 0, startY = 0, endX = 0, endY = 0, _elevation = 0, signal = {}, _debug = false }) { /* eslint-disable-line no-unused-vars */
+async function findPath({ startX = 0, startY = 0, endX = 0, endY = 0, _elevation = 0, signal = {}, debug = false }) { /* eslint-disable-line no-unused-vars */
   const start = { x: startX, y: startY };
   const goal = { x: endX, y: endY };
   const path = await pf.findPath(start, goal, signal);
+  if ( debug ) console.debug(`WebGPUPathfinderWorker|Path length ${path.length} found for ${startX},${startY},${elevation}.`);
   return [{ path }, [path.buffer]];
 }
 
@@ -141,12 +142,12 @@ async function destroy() {
 }
 
 /**
- * Destroy the current pathfinder and the device, in preparation to terminate the worker.
+ * Destroy the current pathfinder and the device, and terminate the worker.
  */
 async function terminate() { /* eslint-disable-line no-unused-vars */
   await destroy();
   GPUPathfinder.destroy();
-  return [true];
+  self.close();
 }
 
 
@@ -171,6 +172,7 @@ class GPUPathfinder {
   // ----- NOTE: Initialize ----- //
 
   async initialize({ resolution = 1, sceneWidth, sceneHeight, translationX = 0, translationY = 0, debug = false } = {}) { /* eslint-disable-line max-len */
+    this.destroy();
     await this.constructor.initializeDevice();
     if ( debug ) console.debug("WebGPUPathfinderWorker|Initialized device.");
     this.terrainMapper = new GPUTerrainMap(sceneWidth, sceneHeight, this.constructor.device, {
@@ -309,7 +311,7 @@ class GPUPathfinder {
   // ----- NOTE: Find path ----- //
 
   async findPath(start, goal, _signal = {}) {
-    if ( !this.distanceMapStatus === this.constructor.STATUS.NOT_READY ) {
+    if ( this.distanceMapStatus === this.constructor.STATUS.NOT_READY ) {
       await this.calculateDistanceMap(start, _signal);
     }
 
@@ -1434,4 +1436,3 @@ fn cs_combine(@builtin(global_invocation_id) id: vec3<u32>) {
  */
 const POW10_8 = Math.pow(10, 8);
 function fastFixed(x) { return Math.round(x * POW10_8) / POW10_8; }
-

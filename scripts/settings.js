@@ -115,7 +115,7 @@ export class Settings extends ModuleSettingsAbstract {
       config: true,
       type: new foundry.data.fields.BooleanField({ initial: true }),
       requiresReload: false,
-      onChange: value => this.togglePathfinding(value)
+      onChange: value => this.initializePathfinding(value)
     });
 
     register(KEYS.PATHFINDING.TOKENS_BLOCK, {
@@ -221,43 +221,31 @@ export class Settings extends ModuleSettingsAbstract {
     });
   }
 
+  static async initializePathfinding(algorithm) {
+    // Destroy prior pathfinding.
+    await WebGPUPathfinderWithWorker.terminate();
+
+    // Initialize pathfinding.
+    const ALG = Settings.KEYS.PATHFINDING.ALGORITHM_CHOICES;
+    algorithm ??= Settings.get(Settings.KEYS.PATHFINDING.ALGORITHM);
+    if ( algorithm === ALG.SIMPLE ) algorithm = CONFIG[MODULE_ID].simplePathfinding.algorithm;
+    switch ( algorithm ) {
+      case ALG.WEBGPU:
+      case "webgpu": await WebGPUPathfinderWithWorker.initialize(); break;
+    }
+
+    // Set up pathfinding for each token on the canvas.
+    this.updateTokensPathfinder({ algorithm });
+  }
+
   static togglePathfinding(enable) {
-    enable ??= Settings.get(Settings.KEYS.PATHFINDING.ENABLE);
-    if ( enable ) this.#enablePathfinding();
-    else this.#disablePathfinding();
-    updatePathfindingControl();
+    updatePathfindingControl(enable);
     ui.controls.render(true);
   }
 
-  static #enablePathfinding() {
-    PATCHER.registerGroup("PATHFINDING");
-
-    const t0 = performance.now();
-    SCENE_GRAPH._reset();
-    this.setTokenBlocksPathfinding();
-    const t1 = performance.now();
-
-    // Use the scene graph to initialize Pathfinder triangulation.
-    Pathfinder.dirty = true;
-    Pathfinder.initialize();
-    const t2 = performance.now();
-
-    console.group(`${MODULE_ID}|Initialized scene graph and pathfinding.`);
-    console.debug(`${MODULE_ID}|Constructed scene graph in ${t1 - t0} ms.`);
-    console.debug(`${MODULE_ID}|Tracked ${SCENE_GRAPH.wallIds.size} walls.`);
-    console.debug(`Tracked ${SCENE_GRAPH.tokenIds.size} tokens.`);
-    console.debug(`Located ${SCENE_GRAPH.edges.size} distinct edges.`);
-    console.debug(`${MODULE_ID}|Initialized pathfinding in ${t2 - t1} ms.`);
-    console.groupEnd();
+  static pathfindingActive() {
+    return ui.controls.tools[SETTINGS.CONTROLS.PATHFINDING].active;
   }
-
-  static #disablePathfinding() {
-    PATCHER.deregisterGroup("PATHFINDING_TOKENS");
-    PATCHER.deregisterGroup("PATHFINDING");
-    SCENE_GRAPH.clear();
-    Pathfinder.dirty = true;
-  }
-
 
   static setTokenBlocksPathfinding(blockSetting) {
     blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
@@ -311,10 +299,7 @@ export class Settings extends ModuleSettingsAbstract {
     }
     const obj = token[MODULE_ID] ??= {};
     const pf = obj[PATHFINDING_ID];
-    if ( pf ) {
-      if ( pf.constructor === cl ) return;
-      pf.destroy();
-    }
+    if ( pf && pf.constructor === cl ) return;
     obj[PATHFINDING_ID] = new cl(token);
     obj[PATHFINDING_ID].initialize(); // Async.
   }

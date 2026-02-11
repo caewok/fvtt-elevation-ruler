@@ -552,19 +552,16 @@ export class Terrain extends PixelCache {
 
 export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
 
-  debug = false;
-
   /**
    * @param {string} [name="WebGPUPathfinder"]
    * @param {object} [config]                        Worker initialization options
    * @param {boolean} [config.debug=false]           Should the worker run in debug mode?
    */
   constructor(name = `${MODULE_ID}.WebGPUPathfinder`, config = {}) {
-    config.debug ||= false;
+    config.debug ??= CONFIG[MODULE_ID].debug;
     config.scripts ??= [`/modules/${MODULE_ID}/scripts/pathfinding/workers/webgpu.pathfinder.worker.js`];
     config.loadPrimitives ??= false;
     super(name, config);
-    this.debug = config.debug;
   }
 
   /** @type {number} */
@@ -611,7 +608,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       translationX,
       translationY,
     };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
     return this.executeFunction("initialize", [params]);
   }
 
@@ -629,7 +626,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       bufferType,
       clear,
     };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
     return this.executeFunction("updateBufferBlockingSegments", [params], [segments.buffer]);
   }
 
@@ -650,7 +647,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       bufferType,
       clear,
     };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
     return this.executeFunction("updateBufferTerrainTriangles", [params], [triVO.vertices.buffer, triVO.indices.buffer]);
   }
 
@@ -661,7 +658,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
    */
   clearBuffer(bufferType = "transient") {
     const params = { bufferType };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
     return this.executeFunction("clearBuffer", [params]);
   }
 
@@ -683,7 +680,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
   async extractBufferData({ bufferType = "transient", buffer } = {}) {
     buffer ??= new Uint32Array(this.area);
     const params = { buffer, bufferType };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
     const res = await this.executeFunction("extractBufferData", [params], [buffer.buffer]);
     return res.buffer;
   }
@@ -699,7 +696,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
    */
   async calculateDistanceMap(start) {
     const params = { startX: start.x, startY: start.y, elevation: start.elevation };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
     return this.executeFunction("calculateDistanceMap", [params]);
   }
 
@@ -715,7 +712,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       elevation: start.elevation,
       signal,
     };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
     const res = await this.executeFunction("findPath", [params]);
     const nPts = res.path.length;
     if ( !nPts ) return null;
@@ -730,6 +727,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
 
   async destroy() {
     return this.executeFunction("destroy");
+
   }
 
   async terminate() {
@@ -740,16 +738,12 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
 
 export class WebGPUPathfinderFakeWorker {
 
-  debug = false;
-
   /**
    * @param {string} [name="WebGPUPathfinder"]
    * @param {object} [config]                        Worker initialization options
    * @param {boolean} [config.debug=false]           Should the worker run in debug mode?
    */
-  constructor(_name = `${MODULE_ID}.WebGPUPathfinder`, config = {}) {
-    this.debug = config.debug;
-  }
+  constructor(_name = `${MODULE_ID}.WebGPUPathfinder`, _config = {}) {}
 
   /** @type {number} */
   #resolution = 1;
@@ -797,12 +791,12 @@ export class WebGPUPathfinderFakeWorker {
       translationX,
       translationY,
     };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
 
     // Real worker: return this.executeFunction("initialize", [params]);
     this.pf = new GPUPathfinder();
     await this.pf.initialize(params);
-    if ( this.debug ) console.debug("WebGPUPathfinderWorker|Initialized.");
+    if ( CONFIG[MODULE_ID].debug ) console.debug("WebGPUPathfinderWorker|Initialized.");
     return true;
   }
 
@@ -820,10 +814,10 @@ export class WebGPUPathfinderFakeWorker {
       bufferType,
       clear,
     };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
     // Real worker: return this.executeFunction("updateBufferBlockingSegments", [params], [segments.buffer]);
     this.pf.terrainMapper.processBlockingSegments(segments, { bufferType, clear });
-    if ( this.debug ) console.debug(`WebGPUPathfinderWorker|Updated blocking segments for ${bufferType} buffer.`);
+    if ( params.debug ) console.debug(`WebGPUPathfinderWorker|Updated blocking segments for ${params.bufferType} buffer.`);
     return true;
   }
 
@@ -844,12 +838,12 @@ export class WebGPUPathfinderFakeWorker {
       bufferType,
       clear,
     };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
     /* Real worker: return this.executeFunction("updateBufferTerrainTriangles",
       [params], [triVO.vertices.buffer, triVO.indices.buffer]);
     */
     this.pf.terrainMapper.processTerrainTriangles(params.vertices, params.indices, { bufferType, clear });
-    if ( this.debug ) console.debug(`WebGPUPathfinderWorker|Updated terrain for ${bufferType} buffer.`);
+    if ( params.debug ) console.debug(`WebGPUPathfinderWorker|Updated terrain for ${params.bufferType} buffer.`);
     return true;
   }
 
@@ -860,10 +854,10 @@ export class WebGPUPathfinderFakeWorker {
    */
   clearBuffer(bufferType = "transient") {
     const params = { bufferType };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
     // Real worker: return this.executeFunction("clearBuffer", [params]);
     this.pf.terrainMapper.clearTerrainMap(bufferType);
-    if ( this.debug ) console.debug(`WebGPUPathfinderWorker|Cleared ${bufferType} buffer.`);
+    if ( params.debug ) console.debug(`WebGPUPathfinderWorker|Cleared ${params.bufferType} buffer.`);
     return true;
   }
 
@@ -887,7 +881,7 @@ export class WebGPUPathfinderFakeWorker {
   async extractBufferData({ bufferType = "transient", buffer } = {}) {
     buffer ??= new Uint32Array(this.area);
     const params = { buffer, bufferType };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
     // Real worker: const res = await this.executeFunction("extractBufferData", [params], [buffer.buffer]);
     // return res.buffer;
 
@@ -907,11 +901,11 @@ export class WebGPUPathfinderFakeWorker {
    */
   async calculateDistanceMap(start) {
     const params = { startX: start.x, startY: start.y, elevation: start.elevation };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
     // Real worker: return this.executeFunction("calculateDistanceMap", [params]);
     const signal = {};
     await this.pf.calculateDistanceMap({ x: params.startX, y: params.startY }, signal, params.debug);
-    if ( this.debug ) console.debug(`WebGPUPathfinderWorker|Distance map calculated for ${params.startX},${params.startY},${params.elevation}.`);
+    if ( params.debug ) console.debug(`WebGPUPathfinderWorker|Distance map calculated for ${params.startX},${params.startY},${params.elevation}.`);
     return true;
   }
 
@@ -927,7 +921,7 @@ export class WebGPUPathfinderFakeWorker {
       elevation: start.elevation,
       signal,
     };
-    params.debug = this.debug;
+    params.debug = CONFIG[MODULE_ID].debug;
     // Real worker:
     // const res = await this.executeFunction("findPath", [params]);
     // const start = { x: startX, y: startY };
@@ -942,6 +936,7 @@ export class WebGPUPathfinderFakeWorker {
     for ( let i = 0, j = 0; i < nPts; i += 2, j += 1 ) {
       path[j] = GridCoordinates3d.tmp.set(res.path[i], res.path[i+1], start.z);
     }
+    if ( params.debug ) console.debug(`WebGPUPathfinderWorker|Path length ${path.length} found for ${params.startX},${params.startY},${params.elevation}.`);
     return path;
   }
 
@@ -965,15 +960,17 @@ export class WebGPUPathfinderFakeWorker {
 // !!! WebGPUPathfinder
 export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMixin) {
 
-  async initialize(resolution) {
-    if ( !this.constructor.worker ) {
-      resolution ??= this.constructor.recommendedResolution;
-      this.constructor.worker = new this.constructor.workerClass();
-      await this.constructor.worker.initialize(resolution);
-    }
-    return super.initialize();
-  }
+  static _initialized = false;
 
+  static async initialize(resolution) {
+    if ( this._initialized ) {
+      if ( resolution === this.worker.resolution ) return;
+      await this.destroy(); // Reset the worker to the new resolution.
+    } else if ( !this.worker ) this.worker = new this.workerClass();
+    resolution ??= this.recommendedResolution;
+    await this.worker.initialize(resolution);
+    this._initialized = true;
+  }
 
   // ----- NOTE: Static worker creation ----- //
 
@@ -1002,18 +999,11 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
   /** @type {WebGPUPathfinderWorker|WebGPUPathfinderFakeWorker} */
   static worker;
 
-  /**
-   * Track the current token used for pathfinding in the worker.
-   * Needed so that subject terrain can be changed when the token changes.
-   * @type {Token}
-   */
-  static currToken = null;
-
 
   // ----- NOTE: Static scene data update ----- //
 
-  // Track the current elevation. Reset the static terrain if the elevation changes.
-  // Track the current token id. Reset the static terrain if the token id changes.
+  // Track the current elevation. Null indicates the elevation has not been set or terrain must be updated.
+  // Track the current token id. "" indicates the subject terrain must be modified.
 
   /** @type {number} */
   static currentElevationZ = null;
@@ -1025,8 +1015,11 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
    * Static terrain represents all blocking walls in the scene and all closed doors.
    * Doors can also be marked opened/closed individually or groups.
    */
-  static async updateStaticTerrain({ walls, clear = true } = {}) {
-    const elevationZ = this.currentElevationZ;
+  static async updateStaticTerrain({ elevationZ = null, walls, clear = true } = {}) {
+    elevationZ ??= this.currentElevationZ;
+    if ( elevationZ == null ) return;
+
+    this.currentElevationZ = elevationZ;
     const bufferType = "static";
     const blockingWalls = [...this.blockingWalls({ walls, elevationZ }), ...this.closedDoors({ walls, elevationZ })];
     if ( blockingWalls.length ) {
@@ -1039,10 +1032,10 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
   }
 
   /**
-   * Open 1+ doors in the terrain.
+   * Open 1+ doors in the terrain at the current elevation.
    */
-  static async openDoors({ walls }) {
-    const elevationZ = this.currentElevationZ;
+  static async openDoors({  walls }) {
+    if ( this.currentElevationZ == null ) return;
     const bufferType = "static";
     const openDoors = this.openedDoors({ walls, elevationZ });
     if ( !openDoors.length ) return;
@@ -1051,9 +1044,10 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
   }
 
   /**
-   * Close 1+ doors in the terrain.
+   * Close 1+ doors in the terrain at the current elevation.
    */
   static async closeDoors({ walls }) {
+    if ( this.currentElevationZ == null ) return;
     const elevationZ = this.currentElevationZ;
     const bufferType = "static";
     const closedDoors = this.closedDoors({ walls, elevationZ });
@@ -1068,7 +1062,7 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
    * Update data that does not constantly move (e.g. tokens) but requires a subject token.
    */
   async updateSubjectTerrain({ clear = true } = {}) {
-    // Unused? const elevationZ = this.token.bottomZ;
+    this.constructor.currentTokenId = this.token.id;
     const bufferType = "subject";
     const terrainRegions = this.terrainRegions();
     if ( !terrainRegions.length ) return clear ? this.constructor.worker.clearBuffer(bufferType) : null; // Async.
@@ -1105,15 +1099,8 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
   async startPathfinding(start) {
     const worker = this.constructor.worker;
 
-    if ( start.z !== this.constructor.currentElevationZ ) {
-      this.constructor.currentElevationZ = start.z;
-      await this.constructor.updateStaticTerrain();
-    }
-
-    if ( this.token.id !== this.constructor.currentTokenId ) {
-      this.constructor.currentTokenId = this.token.id;
-      await this.updateSubjectTerrain();
-    }
+    if ( start.z !== this.constructor.currentElevationZ ) await this.constructor.updateStaticTerrain({ elevationZ: start.z });
+    if ( this.token.id !== this.constructor.currentTokenId ) await this.updateSubjectTerrain();
 
     await this.updateTransientTerrain();
     await worker.calculateDistanceMap(start);
@@ -1126,6 +1113,20 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
   }
 
   // ----- NOTE: End pathfinding ----- //
+
+  static async destroy() {
+    if ( !this.worker ) return;
+    await this.worker.destroy();
+    this.currentElevationZ = null;
+    this.currentTokenId = "";
+    this._initialized = false;
+  }
+
+  static async terminate() {
+    await this.destroy();
+    if ( this.worker ) await this.worker.terminate();
+    this.worker = null;
+  }
 }
 
 // !!!WebGPUPathfinderWithWorker
@@ -1155,7 +1156,8 @@ export class GPUPathfinder {
 
   // ----- NOTE: Initialize ----- //
 
-  async initialize({ resolution = 1, sceneWidth, sceneHeight, translationX = 0, translationY = 0, debug = false } = {}) { /* eslint-disable-line max-len */
+  async initialize({ resolution = 1, sceneWidth, sceneHeight, translationX = 0, translationY = 0, debug = CONFIG[MODULE_ID].debug } = {}) { /* eslint-disable-line max-len */
+    this.destroy();
     await this.constructor.initializeDevice();
     if ( debug ) console.debug("WebGPUPathfinderWorker|Initialized device.");
     this.terrainMapper = new GPUTerrainMap(sceneWidth, sceneHeight, this.constructor.device, {
@@ -1187,7 +1189,7 @@ export class GPUPathfinder {
 
   get distanceMapStatus() { return this.#distanceMapStatus; }
 
-  async calculateDistanceMap(start, _signal = {}, debug = false) {
+  async calculateDistanceMap(start, _signal = {}, debug = CONFIG[MODULE_ID].debug) {
     this.#distanceMapStatus = this.constructor.STATUS.CALCULATING;
     this.buffers.read.unmap();
 
@@ -2874,9 +2876,12 @@ let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
 
+await WebGPUPathfinder.initialize(1);
+await WebGPUPathfinderWithWorker.initialize(1);
+
 pf = new WebGPUPathfinder(randal);
 pf = new WebGPUPathfinderWithWorker(randal)
-
+pf = randal.elevationruler.pathfinding
 
 await pf.initialize(1);
 await pf.constructor.updateStaticTerrain();
@@ -2901,6 +2906,23 @@ terrain.translation = pf.constructor.worker.sceneTranslation
 terrain.draw({ skip: 20, local: false })
 
 bufferData[pf.constructor.worker.pf.terrainMapper.indexAtCanvas(1997, 2699)]
+
+
+// Change the resolution of the worker
+WebGPUPathfinderWithWorker.worker.resolution
+await WebGPUPathfinderWithWorker.destroy()
+await WebGPUPathfinderWithWorker.initialize(2/100)
+
+
+
+worker = WebGPUPathfinderWithWorker.worker
+await worker.destroy();
+await worker.initialize(2/100)
+WebGPUPathfinderWithWorker.currentElevationZ = null
+WebGPUPathfinderWithWorker.currentTokenId = ""
+
+await WebGPUPathfinderWithWorker.updateStaticTerrain();
+
 
 */
 

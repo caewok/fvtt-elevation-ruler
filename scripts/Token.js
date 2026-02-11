@@ -24,6 +24,7 @@ import { tokenTopLeftFromCenter } from "./util.js";
  * @param {PlaceableObject} object    The object instance being drawn
  */
 function drawToken(token) {
+  if ( token.isPreview ) return;
   Settings.updateTokenPathfinder(token);
 }
 
@@ -37,9 +38,9 @@ function drawToken(token) {
  * @param {PlaceableObject} object    The object instance being destroyed
  */
 function destroyToken(token) {
-  const pf = token[MODULE_ID]?.[PATHFINDING_ID];
-  if ( !pf ) return;
-  pf.destroy();
+  const obj = token[MODULE_ID];
+  if ( !obj ) return;
+  delete obj[PATHFINDING_ID];
 }
 PATCHES.BASIC.HOOKS = { drawToken, destroyToken };
 
@@ -106,6 +107,8 @@ async function pathfind(path, wrapped, waypoints, options, token) {
   if ( foundPath ) {
     const foundryEnd = waypoints.pop();
     const foundryStart = waypoints.at(-1);
+    if ( PIXI.Point.distanceBetween(foundryStart, foundryEnd) > (6 * canvas.grid.size) ) { console.debug("Long path", foundPath); }
+
     for ( let i = 1, iMax = foundPath.length - 1; i < iMax; i += 1 ) {
       // const pt = canvas.grid.getTopLeftPoint(foundPath[i]); // Foundry ruler uses top left coordinates.
       const pt = tokenTopLeftFromCenter(token, foundPath[i]);
