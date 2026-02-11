@@ -289,3 +289,29 @@ export function roundMultiple(num) {
   return num;
 }
 
+/**
+ * Get the top left for a token given a center point.
+ * @param {Token} token
+ * @param {PIXI.Point|Point3d} center
+ * @returns {PIXI.Point|Point3d}
+ */
+export function tokenTopLeftFromCenter(token, center) {
+  // See Token.document.getCenterPoint
+  const out = center.clone();
+  if ( canvas.grid.isHexagonal ) {
+    const shape = token.getShape();
+    if ( shape.type === PIXI.SHAPES.POLY ) {
+      const center = shape.center;
+      out.x -= (center.x * grid.sizeX);
+      out.y -= (center.y * grid.sizeY);
+      return out;
+    }
+  }
+
+  // Otherwise use a token rectangle.
+  const { width, height } = token.document.getSize();
+  out.x -= (width * 0.5);
+  out.y -= (height * 0.5);
+  return out;
+}
+

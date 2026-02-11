@@ -15,6 +15,7 @@ import { ObstacleOcclusionTest } from "../geometry/ObstacleOcclusionTest.js";
 import { GridCoordinates } from "../geometry/GridCoordinates.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix, Mixin } from "../geometry/mixwith.js";
+import { Settings } from "../settings.js";
 
 /* Basic pathfinding algorithms.
 
@@ -110,7 +111,7 @@ class AbstractGridPathfindingWorld {
    * @param {Node} goal
    * @returns {number}
    */
-  maxIterations(start, goal) {
+  maxIterations(start, _goal) {
     // Number of steps from start to the edge of the scene.
     // For a grid, 1 step is one grid square.
     const { sceneRect, size } = canvas.scene.dimensions;
@@ -303,36 +304,7 @@ class ObstacleSweep extends foundry.canvas.geometry.ClockwiseSweepPolygon {
       if ( !aabb.overlapsEdge(edge) ) continue;
       this.edges.add(edge);
     }
-
-    // Add token edges. Must be temporary wall edges.
-    const blockingCfg = {
-      dead: false,
-      live: true,
-      prone: false,
-      enemies: true,
-      allies: false,
-    };
-    const occlusionCfg = { blockingCfg, subjectToken: this.config.source.object };
-    const Edge = foundry.canvas.geometry.edges.Edge;
-    for ( const token of canvas.tokens.placeables ) {
-      if ( !ObstacleOcclusionTest.includeToken(token, occlusionCfg) ) continue;
-      for ( const edge of token.constrainedTokenBorder.iterateEdges({ closed: false }) ) {
-        this.edges.add(new Edge(edge.A, edge.B, {
-          object: { flags: {
-            "wall-height": {
-              top: token.topZ,
-              bottom: token.bottomZ,
-            }
-          }},
-          type: `${MODULE_ID}.ObstacleSweep`,
-          id: token.id,
-          move: CONST.WALL_SENSE_TYPES.NORMAL,
-        }));
-      }
-    }
-    // Edge.identifyEdgeIntersections([...this.edges]);
   }
-
 }
 
 
@@ -356,12 +328,14 @@ export const ClockwiseSweepFilter = superclass => class extends superclass {
 
   _identifyBlockingTokenEdges(subjectToken) {
     // Add token edges. Must be temporary wall edges.
+    const PATHFINDING = Settings.KEYS.PATHFINDING;
+    const blocking = Settings.get(PATHFINDING.TOKENS_BLOCK);
     const blockingCfg = {
       dead: false,
-      live: true,
+      live: blocking !== PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
       prone: false,
-      enemies: true,
-      allies: false,
+      enemies: blocking !== PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
+      allies: blocking === PATHFINDING.TOKENS_BLOCK_CHOICES.ALL,
     };
     const occlusionCfg = { blockingCfg, subjectToken };
     const Edge = foundry.canvas.geometry.edges.Edge;

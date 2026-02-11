@@ -1,5 +1,6 @@
 /* globals
 game,
+CONFIG,
 CONST,
 canvas,
 foundry,
@@ -8,14 +9,17 @@ ui
 */
 "use strict";
 
-import { MODULE_ID } from "./const.js";
+import { MODULE_ID, PATHFINDING_ID } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { log } from "./util.js";
 import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
+import { TestPathfinder } from "./pathfinding/AbstractPathfinder.js";
+import { BFSPathfinder, UniformCostPathfinder, GreedyBestFirstPathfinder, AStarPathfinder } from "./pathfinding/SimplePathfinding.js";
 import { PATCHER } from "./patching.js";
 import { BorderEdge } from "./pathfinding/BorderTriangle.js";
 import { updatePathfindingControl } from "./module.js";
+import { WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 
 const SETTINGS = {
   CONTROLS: {
@@ -40,6 +44,7 @@ const SETTINGS = {
     ALGORITHM: "pathfinding-algorithm",
     ALGORITHM_CHOICES: {
       SIMPLE: "pathfinding-algorithm-simple",
+      WEBGPU: "pathfinding-algorithm-webgpu",
       // TRIANGLEMESH: pathfinding-algorithm-trianglemesh,
       // POLYMESH: "pathfinding-algorithm-polymesh",
       // NAVMESH: "pathfinding-algorithm-navmesh", // recast-detour library
@@ -55,7 +60,6 @@ const KEYBINDINGS = {
   FORCE_TO_GROUND: "forceToGround",
   TELEPORT: "teleport"
 };
-
 
 export class Settings extends ModuleSettingsAbstract {
   /** @type {object} */
@@ -87,6 +91,8 @@ export class Settings extends ModuleSettingsAbstract {
 
     const pathfindingAlgChoices = {};
     Object.values(KEYS.PATHFINDING.ALGORITHM_CHOICES).forEach(alg => pathfindingAlgChoices[alg] = localize(alg));
+    if ( !GPUPathfinder.device ) delete pathfindingAlgChoices[KEYS.PATHFINDING.ALGORITHM_CHOICES.WEBGPU];
+
     register(KEYS.PATHFINDING.ALGORITHM, {
       name: localize(`${KEYS.PATHFINDING.ALGORITHM}.name`),
       // Currently unused hint: localize(`${KEYS.PATHFINDING.ALGORITHM}.hint`),
@@ -99,7 +105,7 @@ export class Settings extends ModuleSettingsAbstract {
         choices: pathfindingAlgChoices,
       }),
       requiresReload: false,
-      // onChange: value => this.set(value) // TODO: Initialize the pathfinding algorithm?
+      onChange: value => this.updateTokensPathfinder({ algorithm: value }), // TODO: Initialize the pathfinding algorithm?
     });
 
     register(KEYS.PATHFINDING.ENABLE, {
@@ -109,7 +115,7 @@ export class Settings extends ModuleSettingsAbstract {
       config: true,
       type: new foundry.data.fields.BooleanField({ initial: true }),
       requiresReload: false,
-      onChange: value => this.togglePathfinding(value)
+      onChange: value => this.initializePathfinding(value)
     });
 
     register(KEYS.PATHFINDING.TOKENS_BLOCK, {
@@ -136,8 +142,7 @@ export class Settings extends ModuleSettingsAbstract {
       hint: localize(`${KEYS.PATHFINDING.TOKEN_DIFFICULTY.FRIENDLY}.hint`),
       scope: "world",
       config: true,
-      type: new foundry.data.fields.NumberField({ nullable: false, min: 0 }),
-      default: 0,
+      type: new foundry.data.fields.NumberField({ nullable: false, min: 1, initial: 1 }),
     });
 
     register(KEYS.PATHFINDING.TOKEN_DIFFICULTY.HOSTILE, {
@@ -145,8 +150,7 @@ export class Settings extends ModuleSettingsAbstract {
       hint: localize(`${KEYS.PATHFINDING.TOKEN_DIFFICULTY.HOSTILE}.hint`),
       scope: "world",
       config: true,
-      type: new foundry.data.fields.NumberField({ nullable: false, min: 0 }),
-      default: 0,
+      type: new foundry.data.fields.NumberField({ nullable: false, min: 1, initial: 1 }),
     });
 
 
@@ -165,7 +169,8 @@ export class Settings extends ModuleSettingsAbstract {
       scope: "world",
       config: true,
       type: new foundry.data.fields.BooleanField({ initial: false }),
-      requiresReload: false
+      onChange: value => this.toggleSnapToGrid(value),
+      requiresReload: false,
     });
   }
 
@@ -217,43 +222,36 @@ export class Settings extends ModuleSettingsAbstract {
     });
   }
 
+  static async initializePathfinding(algorithm) {
+    // Destroy prior pathfinding.
+    await WebGPUPathfinderWithWorker.terminate();
+
+    // Initialize pathfinding.
+    const ALG = Settings.KEYS.PATHFINDING.ALGORITHM_CHOICES;
+    algorithm ??= Settings.get(Settings.KEYS.PATHFINDING.ALGORITHM);
+    if ( algorithm === ALG.SIMPLE ) algorithm = CONFIG[MODULE_ID].simplePathfinding.algorithm;
+    switch ( algorithm ) {
+      case ALG.WEBGPU:
+      case "webgpu": await WebGPUPathfinderWithWorker.initialize(); break;
+    }
+
+    // Set up pathfinding for each token on the canvas.
+    this.updateTokensPathfinder({ algorithm });
+  }
+
+  static async toggleSnapToGrid(enable) {
+    const PF = Settings.KEYS.PATHFINDING;
+    if ( Settings.get(PF.ALGORITHM) === PF.ALGORITHM_CHOICES.WEBGPU ) await WebGPUPathfinderWithWorker.initialize();
+  }
+
   static togglePathfinding(enable) {
-    enable ??= Settings.get(Settings.KEYS.PATHFINDING.ENABLE);
-    if ( enable ) this.#enablePathfinding();
-    else this.#disablePathfinding();
-    updatePathfindingControl();
+    updatePathfindingControl(enable);
     ui.controls.render(true);
   }
 
-  static #enablePathfinding() {
-    PATCHER.registerGroup("PATHFINDING");
-
-    const t0 = performance.now();
-    SCENE_GRAPH._reset();
-    this.setTokenBlocksPathfinding();
-    const t1 = performance.now();
-
-    // Use the scene graph to initialize Pathfinder triangulation.
-    Pathfinder.dirty = true;
-    Pathfinder.initialize();
-    const t2 = performance.now();
-
-    console.group(`${MODULE_ID}|Initialized scene graph and pathfinding.`);
-    console.debug(`${MODULE_ID}|Constructed scene graph in ${t1 - t0} ms.`);
-    console.debug(`${MODULE_ID}|Tracked ${SCENE_GRAPH.wallIds.size} walls.`);
-    console.debug(`Tracked ${SCENE_GRAPH.tokenIds.size} tokens.`);
-    console.debug(`Located ${SCENE_GRAPH.edges.size} distinct edges.`);
-    console.debug(`${MODULE_ID}|Initialized pathfinding in ${t2 - t1} ms.`);
-    console.groupEnd();
+  static pathfindingActive() {
+    return ui.controls.tools[SETTINGS.CONTROLS.PATHFINDING].active;
   }
-
-  static #disablePathfinding() {
-    PATCHER.deregisterGroup("PATHFINDING_TOKENS");
-    PATCHER.deregisterGroup("PATHFINDING");
-    SCENE_GRAPH.clear();
-    Pathfinder.dirty = true;
-  }
-
 
   static setTokenBlocksPathfinding(blockSetting) {
     blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
@@ -288,4 +286,44 @@ export class Settings extends ModuleSettingsAbstract {
       : blockSetting === C.HOSTILE ? D.HOSTILE
         : D.SECRET;
   }
+
+  static pathfinderReady = false;
+
+  static updateTokensPathfinder({ tokens, algorithm } = {}) {
+    if ( !this.pathfinderReady ) return;
+    tokens ??= canvas.tokens.placeables;
+    algorithm ??= this.get(this.KEYS.PATHFINDING.ALGORITHM);
+    const cl = pathfinderClass(algorithm);
+    tokens.forEach(token => this.updateTokenPathfinder(token, { algorithm, cl }));
+  }
+
+  static updateTokenPathfinder(token, { cl, algorithm } = {}) {
+    if ( !this.pathfinderReady ) return;
+    if ( !cl ) {
+      algorithm ??= this.get(this.KEYS.PATHFINDING.ALGORITHM);
+      cl = pathfinderClass(algorithm);
+    }
+    const obj = token[MODULE_ID] ??= {};
+    const pf = obj[PATHFINDING_ID];
+    if ( pf && pf.constructor === cl ) return;
+    obj[PATHFINDING_ID] = new cl(token);
+    obj[PATHFINDING_ID].initialize(); // Async.
+  }
 }
+
+function pathfinderClass(algorithm) {
+  const ALG = Settings.KEYS.PATHFINDING.ALGORITHM_CHOICES;
+  algorithm ??= Settings.get(Settings.KEYS.PATHFINDING.ALGORITHM);
+  if ( algorithm === ALG.SIMPLE ) algorithm = CONFIG[MODULE_ID].simplePathfinding.algorithm;
+  switch ( algorithm ) {
+    case ALG.WEBGPU: return WebGPUPathfinderWithWorker;
+    case "astar": return AStarPathfinder;
+    case "breadth": return BFSPathfinder;
+    case "uniform": return UniformCostPathfinder;
+    case "greedy": return GreedyBestFirstPathfinder;
+    case "test": return TestPathfinder;
+    case "webgpu": return WebGPUPathfinderWithWorker;
+    default: return AStarPathfinder;
+  }
+}
+

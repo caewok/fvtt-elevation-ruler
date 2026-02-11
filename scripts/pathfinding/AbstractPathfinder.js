@@ -1,6 +1,7 @@
 /* globals
 canvas,
 foundry,
+PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
@@ -20,17 +21,16 @@ Very basic.
 
 */
 
+
 export class AbstractPathfinder {
+
   /** @type {Token} token */
   token;
 
   /** @type {Map<string, AbortController>} */
   activeJobs = new Map();
 
-  /** @type {AbstractPathfindingWorld} */
-  world;
-
-  constructor(token, world) { this.token = token; this.world = world; }
+  constructor(token) { this.token = token; }
 
   cachedPaths = new Map();
 
@@ -44,18 +44,30 @@ export class AbstractPathfinder {
     this.#start.copyFrom(value);
   }
 
+  #initialized = false;
+
   /**
    * Initialize the pathfinder algorithm.
    */
-  initialize() {
-    this.world.initialize(this.token);
+  async initialize() {
     this.cachedPaths.clear();
+    this.#initialized = true;
   }
 
   /**
-   * Update the scene-related objects for the pathfinder algorithm.
+   * Initialize pathfinding. From this point, assume the scene will not change but
+   * starting point and elevation might.
+   * @param {GridCoordinates3d} start     May be updated by findPath
    */
-  updateScene() { }
+  startPathfinding(start) { }
+
+  /**
+   * Stop pathfinding.
+   */
+  endPathfinding() {
+    this.activeJobs.values().forEach(job => job.abort());
+    this.activeJobs.clear();
+  }
 
   cancelJob(jobId) {
     if ( this.activeJobs.has(jobId) ) {
@@ -63,8 +75,6 @@ export class AbstractPathfinder {
       this.activeJobs.delete(jobId);
     }
   }
-
-
 
   /**
    * Get a job id and associated job runner to find a path.
@@ -90,12 +100,31 @@ export class AbstractPathfinder {
 
   /**
    * Find the path between startPoint and endPoint using the chosen algorithm.
-   * @param {Point} startPoint      Start point for the graph
-   * @param {Point} endPoint        End point for the graph
+   * @param {Point} start      Start point for the graph
+   * @param {Point} goal        End point for the graph
    */
-  async findPath(startPoint, endPoint, signal = {}) {
+  async findPath(start, goal, signal = {}) {
+    if ( !this.#initialized ) return null;
+    this.start = start;
+    if ( this.cachedPaths.has(goal.key) ) return this.cachedPaths.get(goal.key);
+    if ( !(start || goal) || start.almostEqual(goal) ) return null;
+
+    const id = foundry.utils.randomID();
     if ( signal.aborted ) return null;
-    return canvas.grid.getDirectPath([startPoint, endPoint]);
+    console.time(`${id}|findPath`);
+    const path = await this._findPath(start, goal, signal);
+    console.timeEnd(`${id}|findPath`);
+
+    this.cachedPaths.set(goal.key, path);
+
+    console.debug(`Pathfinder ${id}|${start.x},${start.y} --> ${goal.x},${goal.y}\n\tdistance: ${PIXI.Point.distanceBetween(start, goal).toPrecision(3)} pixels\n\tpath length: ${path?.length} pixels.`);
+
+    return path;
+  }
+
+  destroy() {
+    this.activeJobs.values().forEach(job => job.abort());
+    this.activeJobs.clear();
   }
 
   /**
@@ -146,4 +175,3 @@ export class TestPathfinder extends AbstractPathfinder {
     return canvas.grid.getDirectPath([startPoint, endPoint]);
   }
 }
-

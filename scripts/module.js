@@ -31,7 +31,7 @@ import {
 import { worldBuilder } from "./pathfinding/GriddedPathfindingWorld.js";
 
 // WebGPU Pathfinding
-import { Terrain, WebGPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
+import { Terrain, WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 
 // Load the geometry library.
 import "./geometry/registration.js";
@@ -40,6 +40,8 @@ import "./geometry/registration.js";
 import { SCENE_GRAPH, WallTracer, WallTracerEdge, WallTracerVertex } from "./pathfinding/WallTracer.js";
 
 Hooks.once("init", function() {
+  // Test for WebGPU device.
+  GPUPathfinder.initializeDevice(); // Async.
 
   // Configuration
   CONFIG[MODULE_ID] = {
@@ -136,6 +138,8 @@ Hooks.once("init", function() {
 
       Terrain,
       WebGPUPathfinder,
+      WebGPUPathfinderWithWorker,
+
     },
 
     WallTracer, WallTracerEdge, WallTracerVertex,
@@ -156,19 +160,22 @@ Hooks.once("setup", function() {
 });
 
 Hooks.once("canvasReady", function() {
-  // Need geometry tracking to test collisions when pathfinding.
-  const tracking = CONFIG.GeometryLib.lib.placeableGeometryTracking;
-  tracking.TileGeometryTracker.registerPlaceableHooks();
-  tracking.TileGeometryTracker.registerExistingPlaceables();
+  // Placeable Geometry for collision testing.
+  const geometryTracking = CONFIG.GeometryLib.lib.placeableGeometryTracking;
+  const geometryTypes = [
+    "Tile",
+    "Wall",
+    "Token",
+    "Region",
+  ];
+  for ( const type of geometryTypes ) {
+    const cl = geometryTracking[`${type}GeometryTracker`];
+    cl.registerPlaceableHooks();
+    cl.registerExistingPlaceables();
+  }
 
-  tracking.WallGeometryTracker.registerPlaceableHooks();
-  tracking.WallGeometryTracker.registerExistingPlaceables();
-
-  tracking.TokenGeometryTracker.registerPlaceableHooks();
-  tracking.TokenGeometryTracker.registerExistingPlaceables();
-
-  tracking.RegionGeometryTracker.registerPlaceableHooks();
-  tracking.RegionGeometryTracker.registerExistingPlaceables();
+  Settings.pathfinderReady = true;
+  Settings.initializePathfinding();
 });
 
 // For https://github.com/League-of-Foundry-Developers/foundryvtt-devMode
