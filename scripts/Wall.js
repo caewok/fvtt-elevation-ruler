@@ -1,8 +1,11 @@
 /* globals
-canvas,
+CONFIG,
+CONST,
+foundry,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
+import { MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { WebGPUPathfinderWithWorker } from "./pathfinding/WebGPUPathfinding.js";
 
@@ -40,7 +43,15 @@ const DOCUMENT_KEYS = new Set([
   "door",
 ]);
 
-function updateWall(wallD, changed, options, userId) {
+function updateWall(wallD, changed, _options, _userId) {
+  // Update scene graph.
+  const graph = CONFIG[MODULE_ID].sceneGraph;
+  if ( graph ) {
+    graph.removePlaceable(wallD.object);
+    graph.addWall(wallD.object);
+  }
+
+
   const PF = Settings.KEYS.PATHFINDING;
   if ( Settings.get(PF.ALGORITHM) !== PF.ALGORITHM_CHOICES.WEBGPU ) return;
   if ( WebGPUPathfinderWithWorker.currentElevationZ === null ) return;
@@ -59,6 +70,37 @@ function updateWall(wallD, changed, options, userId) {
   }
 }
 
+/**
+ * On wall creation, update scene graph.
+ * @event
+ * @category Document
+ * @param {Document} document                       The new Document instance which has been created
+ * @param {Partial<DatabaseCreateOperation>} options Additional options which modified the creation request
+ * @param {string} userId                           The ID of the User who triggered the creation workflow
+ */
+function createWall(wallD, _options, _userId) {
+  const graph = CONFIG[MODULE_ID].sceneGraph;
+  if ( graph ) graph.addWall(wallD.object);
+}
+
+/**
+ * On wall destruction, update scene graph.
+ * Cannot use deleteWall because cannot access the placeable there.
+ * GC is not collecting the deleted wall, so cannot simply rely on weakset to remove it.
+ * @event
+ * @category PlaceableObject
+ * @param {PlaceableObject} object    The object instance being destroyed
+ */
+function destroyWall(wall) {
+  // Cannot access the wall placeable, but it should be removed from graph placeables weak set already.
+  // Update the scene graph.
+  const graph = CONFIG[MODULE_ID].sceneGraph;
+  if ( graph ) graph.removePlaceable(wall);
+}
+
+
 PATCHES.BASIC.HOOKS = {
+  createWall,
   updateWall,
+  destroyWall,
 };

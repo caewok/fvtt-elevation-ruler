@@ -12,11 +12,9 @@ ui
 import { MODULE_ID, PATHFINDING_ID } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { log } from "./util.js";
-import { Pathfinder } from "./pathfinding/pathfinding.js";
 import { TestPathfinder } from "./pathfinding/AbstractPathfinder.js";
 import { BFSPathfinder, UniformCostPathfinder, GreedyBestFirstPathfinder, AStarPathfinder } from "./pathfinding/SimplePathfinding.js";
 import { PATCHER } from "./patching.js";
-import { BorderEdge } from "./pathfinding/BorderTriangle.js";
 import { updatePathfindingControl } from "./module.js";
 import { WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 
@@ -242,14 +240,15 @@ export class Settings extends ModuleSettingsAbstract {
     return ui.controls.tools[SETTINGS.CONTROLS.PATHFINDING].active;
   }
 
+  // TODO: Update.
   static setTokenBlocksPathfinding(blockSetting) {
-    blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
-    BorderEdge.tokenBlockType = this._tokenBlockType(blockSetting);
-
-    registerSceneGraph(MODULE_ID, { tokensOnly: this.useTokensInPathfinding });
-    if ( this.useTokensInPathfinding ) PATCHER.registerGroup("PATHFINDING_TOKENS");
-    else PATCHER.deregisterGroup("PATHFINDING_TOKENS");
-    Pathfinder.dirty = true;
+//     blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
+//     BorderEdge.tokenBlockType = this._tokenBlockType(blockSetting);
+//
+//     registerSceneGraph(MODULE_ID, { tokensOnly: this.useTokensInPathfinding });
+//     if ( this.useTokensInPathfinding ) PATCHER.registerGroup("PATHFINDING_TOKENS");
+//     else PATCHER.deregisterGroup("PATHFINDING_TOKENS");
+//     Pathfinder.dirty = true;
   }
 
   static get useTokensInPathfinding() {

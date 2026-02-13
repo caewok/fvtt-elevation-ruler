@@ -101,7 +101,9 @@ class AbstractGridPathfindingWorld {
    * @returns {boolean}
    */
   nodeIsUnreachable(node, _start) {
-    return !canvas.scene.dimensions.sceneRect.contains(node.x, node.y);
+    if ( !canvas.scene.dimensions.sceneRect.contains(node.x, node.y) ) return true;
+    if ( CONFIG[MODULE_ID].sceneGraph.pointIsInFace(node) ) return true;
+    return false;
   }
 
   /**

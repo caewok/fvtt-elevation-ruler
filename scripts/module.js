@@ -165,6 +165,11 @@ Hooks.once("canvasReady", function() {
 
   Settings.pathfinderReady = true;
   Settings.initializePathfinding();
+
+  CONFIG[MODULE_ID].sceneGraph = EdgeGraph.buildFromCanvas({
+    useWalls: true,
+    useTokens: false,
+  });
 });
 
 // For https://github.com/League-of-Foundry-Developers/foundryvtt-devMode
