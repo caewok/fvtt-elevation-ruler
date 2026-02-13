@@ -15,10 +15,6 @@ import { MODULE_ID, TEMPLATES } from "./const.js";
 import { log, gridShape } from "./util.js";
 
 // Pathfinding
-import { BorderTriangle, BorderEdge } from "./pathfinding/BorderTriangle.js";
-import { Pathfinder } from "./pathfinding/pathfinding.js";
-import { BreadthFirstPathSearch, UniformCostPathSearch, GreedyPathSearch, AStarPathSearch } from "./pathfinding/algorithms.js";
-import { PriorityQueue } from "./pathfinding/PriorityQueue.js";
 import { benchPathfinding } from "./pathfinding/benchmark.js";
 
 import { AbstractPathfinder } from "./pathfinding/AbstractPathfinder.js";
@@ -33,11 +29,14 @@ import { worldBuilder } from "./pathfinding/GriddedPathfindingWorld.js";
 // WebGPU Pathfinding
 import { Terrain, WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 
+// Scene graph
+import { EdgeGraph } from "./EdgeGraph.js";
+
 // Load the geometry library.
 import "./geometry/registration.js";
 
-// Wall updates for pathfinding
-import { SCENE_GRAPH, WallTracer, WallTracerEdge, WallTracerVertex } from "./pathfinding/WallTracer.js";
+// Tests
+import "./tests/EdgeGraph.test.js";
 
 Hooks.once("init", function() {
   // Test for WebGPU device.
@@ -117,16 +116,7 @@ Hooks.once("init", function() {
     PATCHER,
 
     pathfinding: {
-      BorderTriangle,
-      BorderEdge,
-      Pathfinder,
-      BreadthFirstPathSearch,
-      UniformCostPathSearch,
-      GreedyPathSearch,
-      AStarPathSearch,
-      PriorityQueue,
       benchPathfinding,
-      SCENE_GRAPH,
 
       AbstractPathfinder,
       BFSPathfinder,
@@ -142,8 +132,7 @@ Hooks.once("init", function() {
 
     },
 
-    WallTracer, WallTracerEdge, WallTracerVertex,
-
+    EdgeGraph,
     Settings
   };
 
