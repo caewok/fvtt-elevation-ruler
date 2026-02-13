@@ -12,7 +12,6 @@ ui
 import { MODULE_ID, PATHFINDING_ID } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { log } from "./util.js";
-import { SCENE_GRAPH } from "./pathfinding/WallTracer.js";
 import { Pathfinder } from "./pathfinding/pathfinding.js";
 import { TestPathfinder } from "./pathfinding/AbstractPathfinder.js";
 import { BFSPathfinder, UniformCostPathfinder, GreedyBestFirstPathfinder, AStarPathfinder } from "./pathfinding/SimplePathfinding.js";
@@ -247,20 +246,10 @@ export class Settings extends ModuleSettingsAbstract {
     blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
     BorderEdge.tokenBlockType = this._tokenBlockType(blockSetting);
 
-    if ( this.useTokensInPathfinding ) {
-      PATCHER.registerGroup("PATHFINDING_TOKENS");
-      for ( const token of canvas.tokens.placeables ) SCENE_GRAPH.addToken(token);
-    } else {
-      PATCHER.deregisterGroup("PATHFINDING_TOKENS");
-      SCENE_GRAPH.tokenIds.forEach(id => SCENE_GRAPH.removeToken(id));
-    }
-
+    registerSceneGraph(MODULE_ID, { tokensOnly: this.useTokensInPathfinding });
+    if ( this.useTokensInPathfinding ) PATCHER.registerGroup("PATHFINDING_TOKENS");
+    else PATCHER.deregisterGroup("PATHFINDING_TOKENS");
     Pathfinder.dirty = true;
-    const res = SCENE_GRAPH._checkInternalConsistency();
-    if ( !res.allConsistent ) {
-      log("WallTracer|setTokenBlocksPathfinding resulted in inconsistent graph.", SCENE_GRAPH, res);
-      SCENE_GRAPH._reset();
-    }
   }
 
   static get useTokensInPathfinding() {

@@ -1,12 +1,8 @@
 /* globals
-canvas,
-CanvasQuadtree,
 CONFIG,
 CONST,
 foundry,
-PIXI,
-Token,
-Wall
+game
 */
 "use strict";
 
@@ -14,114 +10,11 @@ Wall
 
 // WallTracer3
 
-import { groupBy, segmentBounds } from "../util.js";
-import { Draw } from "../geometry/Draw.js";
-import { Graph, GraphVertex, GraphEdge } from "../geometry/Graph.js";
 import { Settings } from "../settings.js";
 import { doSegmentsOverlap, IX_TYPES, segmentCollision, roundDecimals } from "../geometry/util.js";
 import { MODULE_ID, OTHER_MODULES, FLAGS } from "../const.js";
 
-/* WallTracerVertex
-
-Represents the endpoint of a WallTracerEdge.
-Like with Walls, these vertices use integer values and keys.
-
-The vertex provides links to connected WallTracerEdges.
-
-*/
-
-/* WallTracerEdge
-
-Represents a portion of a Wall between two collisions:
-- endpoint -- endpoint
-- endpoint -- intersection
-- intersection -- intersection
-
-Properties include:
-- wall
-- A and B, where each store the t ratio corresponding to a point on the wall
-- Array? of WallTracerEdge that share an endpoint, organized from cw --> ccw angle
-
-If the wall overlaps a collinear wall?
-- single edge should represent both
-
-Wall type: currently ignored
-
-*/
-
-/* Connected WallTracerEdge identification
-
-A closed polygon formed from WallTracerEdge can only be formed from edges that have
-connecting edges at both A and B endpoints.
-
-Store the set of connected WallTracerEdges. For a given set of edges, one can find the
-set of connected edges by repeatedly removing edges with zero or 1 connected endpoints,
-then updating the remainder and repeating until no more edges are removed.
-
-The connected edges remaining must form 1+ closed polygons. All dangling lines will have
-been removed.
-
-*/
-
-/* Wall updating
-
-1. Wall creation
-- Locate collision walls (edges) using QuadTree.
-- Split wall into edges.
-- Split colliding edges.
-- Update the set of connected edges.
-
-2. Wall update
-- A changed: redo as in wall creation (1)
-- B changed: change B endpoint. Possibly drop edges if shrinking (use t values).
-
-3. Wall deletion
-- remove from set of edges
-- remove from set of connected edges
-- remove from shared endpoint edges
-- redo set of connected edges
-
-*/
-
-/* Angles
-Foundry canvas angles using Ray:
---> e: 0
---> se: π / 4
---> s: π / 2
---> sw: π * 3/4
---> w: π
---> nw: -π * 3/4
---> n: -π / 2
---> ne: -π / 4
-
-So northern hemisphere is negative, southern is positive.
-0 --> π moves from east to west clockwise.
-0 --> -π moves from east to west counterclockwise.
-*/
-
-// NOTE: Testing
-/*
-api = game.modules.get("elevatedvision").api
-SCENE_GRAPH = api.SCENE_GRAPH
-WallTracer = api.WallTracer
-WallTracerEdge = api.WallTracerEdge
-WallTracerVertex = api.WallTracerVertex
-
-origin = _token.center
-*/
-
-
-// Wall Tracer tracks all edges and vertices that make up walls/wall intersections.
-
-/**
- * Represents either a wall endpoint or the intersection between two walls.
- * Collinear walls are considered to "intersect" at each overlapping endpoint.
- * Cached, so that vertices may not repeat. Because of this, the object is used as its own key.
- */
-export class WallTracerVertex extends GraphVertex {
-
-  /** @type {PIXI.Point} */
-  #vertex = new PIXI.Point(); // Stored separately so vertices can be added, etc.
+export class ERSceneGraph extends SceneGraph {
 
   /**
    * @param {number} x
@@ -360,26 +253,11 @@ export class WallTracerEdge extends GraphEdge {
    * Tested "live" and not cached so door or wall orientation changes need not be tracked.
    * @param {Wall} wall         Wall to test
    * @param {Point} origin      Measure wall blocking from perspective of this origin point.
-   * @param {number} [elevation=0]  Elevation of the point or origin to test, in pixel units.
+   * @param {number} [elevation=0]  Elevation of the point or origin to test.
    * @returns {boolean}
    */
   static wallBlocks(wall, origin, moveToken, elevation = 0) {
-    if ( !wall.document.move || wall.isOpen ) return false;
-
-    // Ignore one-directional walls which are facing away from the center
-    const side = wall.edge.orientPoint(origin);
-
-    /* Unneeded?
-    const wdm = PointSourcePolygon.WALL_DIRECTION_MODES;
-    if ( wall.document.dir
-      && (wallDirectionMode === wdm.NORMAL) === (side === wall.document.dir) ) return false;
-    */
-
-    if ( wall.document.dir
-      && side === wall.document.dir ) return false;
-
-    // Test for wall height. If elevation at the wall bottom, wall blocks; if at wall top it does not.
-    if ( !elevation.between(wall.bottomZ, wall.topZ, false) && elevation !== wall.bottomZ ) return false;
+    if ( !SceneGraph.wallBlocks(wall, origin, elevation) ) return false;
 
     // If Wall Height vaulting is enabled, walls less than token vision height do not block.
     const wh = OTHER_MODULES.WALL_HEIGHT;
@@ -387,23 +265,17 @@ export class WallTracerEdge extends GraphEdge {
     return true;
   }
 
+
   /**
    * Could edges of this token block the moving token?
    * @param {Token} token             Token whose edges will be tested
    * @param {Token} moveToken         Token doing the move
-   * @param {string} tokenBlockType   What test to use for comparing token dispositions for blocking
    * @param {number} [elevation=0]  Elevation of the point or origin to test.
+   * @param {string} tokenBlockType   What test to use for comparing token dispositions for blocking
    * @returns {boolean}
    */
-  static tokenEdgeBlocks(token, moveToken, tokenBlockType, elevation = 0) {
-    // Don't block hidden tokens.
-    if ( token.document.hidden ) return false;
-
-    // Don't block oneself.
-    if ( !moveToken || moveToken === token ) return false;
-
-    // Must be within the elevation bounds.
-    if ( !elevation.between(token.topZ, token.bottomZ) ) return false;
+  static tokenEdgeBlocks(token, moveToken, elevation = 0, tokenBlockType) {
+    if ( !SceneGraph.tokenEdgeBlocks(token, moveToken, elevation) ) return false;
 
     // Don't block dead tokens (HP <= 0).
     const { tokenHPAttribute, pathfindingIgnoreStatuses } = CONFIG[MODULE_ID];
@@ -444,7 +316,6 @@ export class WallTracerEdge extends GraphEdge {
       default: return true;
     }
   }
-}
 
 export class WallTracer extends Graph {
   /**
@@ -1001,62 +872,4 @@ export class WallTracer extends Graph {
 
     return { modelGraph, consistencyChecks, allConsistent };
   }
-}
-
-
-// Must declare this variable after defining WallTracer.
-export const SCENE_GRAPH = new WallTracer();
-
-/* Debugging
-api = game.modules.get("elevationruler").api
-Draw = CONFIG.GeometryLib.Draw
-let { Graph, GraphVertex, GraphEdge } = CONFIG.GeometryLib.Graph
-
-SCENE_GRAPH = api.pathfinding.SCENE_GRAPH
-
-// Do we have all the tokens?
-canvas.tokens.placeables.filter(t => !SCENE_GRAPH.tokenIds.has(t.id))
-
-// do we have all the walls?
-canvas.walls.placeables.filter(w => !SCENE_GRAPH.wallIds.has(w.id))
-
-// Every object edge id should be in one of the three sets and vice versa.
-objectEdgeKeys = new Set(SCENE_GRAPH.objectEdges.keys())
-SCENE_GRAPH.canvasEdgeIds.difference(objectEdgeKeys).size
-SCENE_GRAPH.tokenIds.difference(objectEdgeKeys).size
-SCENE_GRAPH.wallIds.difference(objectEdgeKeys).size
-objectEdgeKeys.equals(SCENE_GRAPH.canvasEdgeIds.union(SCENE_GRAPH.tokenIds).union(SCENE_GRAPH.wallIds))
-
-
-
-
-
-// Draw all edges
-SCENE_GRAPH.drawEdges()
-
-
-// Construct a test graph and add all tokens
-wt = new api.WallTracer()
-
-canvas.walls.placeables.forEach(w => wt.addWall(w))
-canvas.tokens.placeables.forEach(t => wt.addToken(t))
-wt.tokenEdges.forEach(s => s.forEach(e => e.draw({color: Draw.COLORS.orange})))
-
-*/
-
-// NOTE: Helper functions
-
-/**
- * Prorate a t value based on some preexisting split.
- * Example: Split a segment length 10 at .2 and .8.
- *  - Split at .2: Segments length 2 and length 8.
- *  - Split second segment: (.8 - .2) / .8 = .75. Split length 8 segment at .7 to get length 6.
- *  - Segments 2, 6, 2
- * Handles when the segment is split moving from 1 --> 0, indicated by secondT < firstT.
- */
-function prorateTSplit(firstT, secondT) {
-  if ( secondT.almostEqual(0) ) return 1;
-  if ( firstT.almostEqual(secondT) ) return 0;
-  if ( secondT < firstT ) return secondT / firstT;
-  return (secondT - firstT) / (1 - firstT);
 }
