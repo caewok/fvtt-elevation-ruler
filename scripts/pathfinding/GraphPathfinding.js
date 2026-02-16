@@ -1,14 +1,19 @@
 /* globals
 canvas,
+CONFIG,
+foundry,
 PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
+import { MODULE_ID } from "../const.js";
 import { Draw } from "../geometry/Draw.js";
 import { AbstractPathfinder } from "./AbstractPathfinder.js";
 import { PriorityQueue } from "./PriorityQueue.js";
-import { worldBuilder } from "./GriddedPathfindingWorld.js";
+import { Settings } from "../settings.js";
+import { worldBuilder as worldBuilderGridded } from "./GriddedPathfindingWorld.js";
+import { worldBuilder as worldBuilderClockwise } from "./ClockwiseSweepPathfindingWorld.js";
 
 /* Basic pathfinding algorithms.
 
@@ -22,6 +27,42 @@ Abstract
 - initialize
 - closestNode
 */
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+
+
+
+// Each pathfinding should create a new GraphPathfinder, so properties are not mixed up
+// between async jobs.
+
+export class GraphingPathfinder extends AbstractPathfinder {
+
+  lastGraph; // For debugging.
+
+
+  async _findPath(start, goal, signal) {
+    const PF = Settings.KEYS.PATHFINDING;
+    const worldCl = Settings.get(PF.ALGORITHM) === PF.ALGORITHM_CHOICES.CLOCKWISE_SWEEP
+      ? worldBuilderClockwise() : worldBuilderGridded();
+    const world = new worldCl();
+    world.initialize(this.token);
+
+    let graphCl;
+    switch ( CONFIG[MODULE_ID].simplePathfinding.algorithm ) {
+      case "astar": graphCl = AStarGraph; break;
+      case "breadth": graphCl = BFSGraph; break;
+      case "uniform": graphCl = UniformCostGraph; break;
+      case "greedy": graphCl = GreedyBestFirstGraph; break;
+      case "test": graphCl = TestGraph; break;
+      default: graphCl = AStarGraph;
+    }
+    const graph = this.lastGraph = new graphCl(world);
+    graph.debug = this.debug;
+    graph.debugDelay = this.debugDelay;
+    return graph.findPath(start, goal, signal);
+  }
+}
 
 
 /**
@@ -37,66 +78,21 @@ class Frontier extends Array {
   clear() { this.length = 0; }
 }
 
-/**
- * BFS explores neighbors layer by layer.
- * It is optimal for unweighted graphs (where every step costs exactly 1).
- */
-export class BFSPathfinder extends AbstractPathfinder {
+
+class AbstractGraph {
+
+  /** @type {AbstractPathfindingWorld} */
+  world;
 
   _cameFrom = new Map();
 
   _frontier = new Frontier();
 
-  /** @type {AbstractPathfindingWorld} */
-  world;
+  debug = false;
 
-  constructor(token, world) {
-    super(token);
-    world ??= new (worldBuilder())();
-    this.world = world;
-  }
+  debugDelay = 0;
 
-  async initialize() {
-    this.world.initialize(this.token);
-    return super.initialize();
-  }
-
-  /**
-   * Find the path between startPoint and endPoint using the chosen algorithm.
-   * @param {Point} start       Start point for the graph
-   * @param {Point} goal        End point for the graph
-   */
-  async _findPath(start, goal, signal = {}) {
-    start = this.world.buildNode(start);
-    goal = this.world.buildNode(goal);
-    if ( this.world.nodeIsUnreachable(goal, start) ) {
-      console.error(`${this.constructor.name}|Node unreachable.`, { start, goal });
-      this.cachedPaths.set(goal.key, null);
-      return null;
-    }
-
-    // Frontier tracks next neighbors to be visited.
-    this._initializePathfindingRun(start);
-
-    let iter = 0;
-    let MAX_ITER = this.world.maxIterations(start, goal) || 1e03;
-    let reachedGoal = false;
-    while ( this._frontier.length > 0 && iter < MAX_ITER ) {
-      if ( signal.aborted ) return null;
-      iter += 1;
-      const current = this._frontier.dequeue();
-      // console.debug(`${this.constructor.name}|Processing frontier ${current.x},${current.y}`)
-      if ( (reachedGoal = current.almostEqual(goal)) ) break;
-      await this._processFrontierNeighbors(current, goal);
-    }
-
-    if ( iter >= MAX_ITER ) {
-      console.error(`${this.constructor.name}|findPath stuck in loop.`, { start, goal });
-    }
-    start.release();
-    const path = reachedGoal ? this.constructor.reconstructPath(this._cameFrom, goal) : null;
-    return path;
-  }
+  constructor(world) { this.world = world; }
 
   /**
    * Initialize the pathfinding run.
@@ -127,6 +123,54 @@ export class BFSPathfinder extends AbstractPathfinder {
   }
 
   /**
+   * Find the path between startPoint and endPoint using the chosen algorithm.
+   * @param {Point} start       Start point for the graph
+   * @param {Point} goal        End point for the graph
+   */
+  async findPath(start, goal, signal = {}) {
+    start = this.world.buildNode(start);
+    goal = this.world.buildNode(goal);
+    if ( this.world.nodeIsUnreachable(goal, start) ) {
+      console.error(`${this.constructor.name}|Node unreachable.`, { start, goal });
+      return null;
+    }
+    this.world.startPathfinding(start, goal);
+
+    // Frontier tracks next neighbors to be visited.
+    this._initializePathfindingRun(start);
+
+    let iter = 0;
+    let MAX_ITER = 1e03; // this.world.maxIterations(start, goal) || 1e03;
+    let reachedGoal = false;
+    if ( this.debug ) {
+      this.world.drawNode(start, { color: Draw.COLORS.yellow });
+      this.world.drawNode(goal, { color: Draw.COLORS.green });
+    }
+    while ( this._frontier.length > 0 && iter < MAX_ITER ) {
+      // if ( signal.aborted ) return null;
+      iter += 1;
+      const current = this._frontier.dequeue();
+      if ( this.debug ) {
+        if ( this.debugDelay ) await sleep(this.debugDelay);
+        this.world.drawNode(current, { color: Draw.COLORS.blue, alpha: 0.2, radius: 3 });
+      }
+      // console.debug(`${this.constructor.name}|Processing frontier ${current.x},${current.y}`)
+      if ( (reachedGoal = this.world.reachedGoal(current, goal)) ) {
+        if ( !this._cameFrom.has(goal.key) ) this._cameFrom.set(goal.key, current); // CWSweep, for example, does not use current.key === goal.key.
+        break;
+      }
+      await this._processFrontierNeighbors(current, goal);
+    }
+
+    if ( iter >= MAX_ITER ) {
+      console.error(`${this.constructor.name}|findPath stuck in loop.`, { start, goal });
+    }
+    start.release();
+    const path = reachedGoal ? this.constructor.reconstructPath(this._cameFrom, goal) : null;
+    return path;
+  }
+
+  /**
    * Asynchronously process all the neighbors for the current node of the frontier.
    * Async so it can be stopped.
    * @param {Point} current
@@ -144,12 +188,7 @@ export class BFSPathfinder extends AbstractPathfinder {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  async _processFrontierNeighbor(current, next) {
-    if ( !this._cameFrom.has(next.key) ) {
-      this._frontier.enqueue(next);
-      this._cameFrom.set(next.key, current);
-    }
-  }
+  async _processFrontierNeighbor(_current, _next) { console.error("_processFrontierNeighbor must be defined by child class."); }
 
   /**
    * For a given goal, reconstruct the path to the beginning.
@@ -183,11 +222,47 @@ export class BFSPathfinder extends AbstractPathfinder {
   }
 }
 
+export class TestGraph extends AbstractGraph {
+  async findPath(startPoint, endPoint, signal = {}) {
+    const id = foundry.utils.randomID();
+    console.debug(`TestPathfinder ${id}|starting.`);
+    let iter = 0;
+    while ( iter < 100 ) {
+      if ( signal.aborted ) {
+        console.debug(`\tTestPathfinder ${id}|stopped at iteration ${iter}.`);
+        return null;
+      }
+      await sleep(100);
+      iter += 1;
+      console.debug(`\tTestPathfinder ${id}|iteration ${iter}.`);
+    }
+    console.debug(`\tTestPathfinder ${id}|Reached iteration ${iter}.`);
+    return canvas.grid.getDirectPath([startPoint, endPoint]);
+  }
+}
+
+/**
+ * BFS explores neighbors layer by layer.
+ * It is optimal for unweighted graphs (where every step costs exactly 1).
+ */
+export class BFSGraph extends AbstractGraph {
+
+  /**
+   * Apply a given algorithm to process neighbors along the frontier.
+   */
+  async _processFrontierNeighbor(current, next) {
+    if ( !this._cameFrom.has(next.key) ) {
+      this._frontier.enqueue(next);
+      this._cameFrom.set(next.key, current);
+    }
+  }
+}
+
 /**
  * UCS is essentially Dijkstra’s Algorithm.
  * It expands the node with the lowest cumulative cost g(n) from the start.
  */
-export class UniformCostPathfinder extends BFSPathfinder {
+export class UniformCostGraph extends BFSGraph {
 
   _costSoFar = new Map();
 
@@ -248,7 +323,7 @@ export class UniformCostPathfinder extends BFSPathfinder {
  * This algorithm uses a heuristic $h(n)$ to estimate the distance to the goal.
  * It is fast but not guaranteed to find the shortest path because it ignores the cost already traveled.
  */
-export class GreedyBestFirstPathfinder extends BFSPathfinder {
+export class GreedyBestFirstGraph extends BFSGraph {
 
   _frontier = new PriorityQueue("low");
 
@@ -291,7 +366,7 @@ export class GreedyBestFirstPathfinder extends BFSPathfinder {
  * It uses f(n) = g(n) + h(n) to stay efficient while guaranteeing the shortest path
  * (provided the heuristic is admissible).
  */
-export class AStarPathfinder extends UniformCostPathfinder {
+export class AStarGraph extends UniformCostGraph {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
@@ -334,17 +409,40 @@ export class AStarPathfinder extends UniformCostPathfinder {
 Draw = CONFIG.GeometryLib.lib.Draw;
 GridCoordinates3d = CONFIG.GeometryLib.lib.threeD.GridCoordinates3d
 api = game.modules.get("elevationruler").api
-let { BFSPathfinder,
-      UniformCostPathfinder,
-      GreedyBestFirstPathfinder,
-      AStarPathfinder, worldBuilder } = api.pathfinding;
+let { GraphingPathfinder } = api.pathfinding;
 
 let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
 
-pf = new AStarPathfinder(randal)
+pf = new GraphingPathfinder(randal)
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
+
+pf.debug = true
+pf.debugDelay = 1000;
+
+pf.startPathfinding(start);
+path = await pf._findPath(start, end) // Skip caching
+pf.constructor.drawPath(path)
+Draw.clearDrawings()
+
+
+nodes = [...pf.world.existingNodes.values()]
+colors = Object.values(Draw.COLORS)
+i = 0
+Draw.point(nodes[i], { color: colors[i], radius: 3 })
+nodes[i].drawShape({ fill: colors[i], fillAlpha: 0.1, width: 0 })
+nodes[i].drawGapEdges({ color: colors[i] })
+nodes[i].drawGapPoints({ color: colors[i], alpha: 0.5 })
+
+
+nodes.forEach(node => Draw.point(node))
+
+AbstractPathfinder.js:111 Pathfinder n6NyA9oqnU8UZIlM|{x: 1650, y: 2750, z: 0} --> {x: 1550, y: 3350, z: 0} path has collision at 2:
+	{x: 1650, y: 2750, z: 0}
+	{x: 1397, y: 2834, z: 0}
+	{x: 1260, y: 2896, z: 0}
+	{x: 1550, y: 3350, z: 0}
 
 
 pf.world = new (worldBuilder())()

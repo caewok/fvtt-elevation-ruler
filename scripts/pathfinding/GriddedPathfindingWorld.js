@@ -16,6 +16,7 @@ import { GridCoordinates } from "../geometry/GridCoordinates.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix, Mixin } from "../geometry/mixwith.js";
 import { Settings } from "../settings.js";
+import { Draw } from "../geometry/Draw.js";
 
 /* Basic pathfinding algorithms.
 
@@ -30,8 +31,7 @@ Abstract
 - closestNode
 */
 
-
-class AbstractGridPathfindingWorld {
+export class GraphPathfindingWorld {
 
   /** @type {object} */
   config = {};
@@ -46,7 +46,7 @@ class AbstractGridPathfindingWorld {
    * @param {Node} a
    * @param {Node} b
    */
-  cost;
+  cost() { return 0; }
 
   /**
    * Estimated cost to move from a -> b.
@@ -54,7 +54,7 @@ class AbstractGridPathfindingWorld {
    * @param {Node} a
    * @param {Node} b
    */
-  heuristic;
+  heuristic() { return 0; }
 
   /**
    * From a location on the canvas, construct the corresponding node.
@@ -105,6 +105,15 @@ class AbstractGridPathfindingWorld {
     if ( CONFIG[MODULE_ID].sceneGraph.pointIsInFace(node) ) return true;
     return false;
   }
+
+  startPathfinding(_start, _goal) { }
+
+  /**
+   * Did we reach the goal node?
+   * @param {Node} curr
+   * @param {Node} goal
+   */
+  reachedGoal(curr, goal) { return curr.key === goal.key; }
 
   /**
    * Maximum number of iterations given a start and end coordinate.
@@ -165,6 +174,8 @@ class AbstractGridPathfindingWorld {
     });
     return { min, max };
   }
+
+  drawNode(node, opts = {}) { Draw.point(node, opts); }
 }
 
 
@@ -297,10 +308,11 @@ export const Node3d = superclass => class extends superclass {
 
 // ----- NOTE: Filter Neighbors ----- //
 
-class ObstacleSweep extends foundry.canvas.geometry.ClockwiseSweepPolygon {
+export class ObstacleSweep extends foundry.canvas.geometry.ClockwiseSweepPolygon {
 
   _identifyEdges() {
     super._identifyEdges();
+    if ( !this.config.addedEdges ) return;
     const aabb = AABB2d.fromRectangle(this.config.boundingBox);
     for ( const edge of this.config.addedEdges ) {
       if ( !aabb.overlapsEdge(edge) ) continue;
@@ -312,11 +324,12 @@ class ObstacleSweep extends foundry.canvas.geometry.ClockwiseSweepPolygon {
 
 export const ClockwiseSweepFilter = superclass => class extends superclass {
   /** @type {PointSourcePolygon} */
-  // #poly = new foundry.canvas.geometry.ClockwiseSweepPolygon();
   #sweep = new ObstacleSweep();
 
+  /** @type {Edge[]} */
   #addedEdges = [];
 
+  /** @type {PointMovementSource} */
   source;
 
   initialize(token) {
@@ -376,7 +389,7 @@ export const ClockwiseSweepFilter = superclass => class extends superclass {
     });
     return neighbors.filter(n => {
       const ray = new foundry.canvas.geometry.Ray(node, n);
-      return !this.#sweep._testCollision(ray, "any", n);
+      return !this.#sweep._testCollision(ray, "any");
     });
   }
 
@@ -595,5 +608,5 @@ export function worldBuilder({ cost, use3d, heuristic, pt3d, neighborFilter } = 
   }
   const classes = [...base, nodeCl, costCl, heuristicCl, neighborsCl, neighborFilterCl];
   // return mix(AbstractGridPathfindingWorld).with(...classes, Mixin); // Mixin caches the classes.
-  return mix(AbstractGridPathfindingWorld).with(...classes);
+  return mix(GraphPathfindingWorld).with(...classes);
 }

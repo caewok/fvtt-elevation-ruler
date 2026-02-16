@@ -569,7 +569,7 @@ export class EdgeGraph {
    * @param {Token} token
    */
   addToken(newToken) {
-    this.addSegments(this._tokenSegments(newToken));
+    this.addSegments(this.constructor._tokenSegments(newToken));
   }
 
   addSegments(newSegments) {
@@ -664,7 +664,7 @@ export class EdgeGraph {
 
   pointIsInFace(pt) {
     for ( const face of this.faces ) {
-      if ( face.type === Face.ENCLOSING_TYPES.OUTSIDE ) continue;
+      if ( face.type === Face.ENCLOSURE_TYPES.OUTSIDE ) continue;
       if ( face.polygon.contains(pt.x, pt.y) ) return true;
     }
     return false;
@@ -673,7 +673,7 @@ export class EdgeGraph {
   enclosedFacesForPoint(pt) {
     const faces = [];
     for ( const face of this.faces ) {
-      if ( face.type === Face.ENCLOSING_TYPES.OUTSIDE ) continue;
+      if ( face.type === Face.ENCLOSURE_TYPES.OUTSIDE ) continue;
       if ( face.polygon.contains(pt.x, pt.y) ) faces.push(face);
     }
     return faces;

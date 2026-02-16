@@ -19,12 +19,16 @@ import { benchPathfinding } from "./pathfinding/benchmark.js";
 
 import { AbstractPathfinder } from "./pathfinding/AbstractPathfinder.js";
 import {
-  BFSPathfinder,
-  UniformCostPathfinder,
-  GreedyBestFirstPathfinder,
-  AStarPathfinder,
-} from "./pathfinding/SimplePathfinding.js";
+  BFSGraph,
+  UniformCostGraph,
+  GreedyBestFirstGraph,
+  AStarGraph,
+  GraphingPathfinder,
+} from "./pathfinding/GraphPathfinding.js";
 import { worldBuilder } from "./pathfinding/GriddedPathfindingWorld.js";
+
+// ClockwiseSweep Pathfinding
+import { ClockwiseSweepPathfindingNode, ClockwiseSweepPathfindingWorld } from "./pathfinding/ClockwiseSweepPathfindingWorld.js";
 
 // WebGPU Pathfinding
 import { Terrain, WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
@@ -119,16 +123,20 @@ Hooks.once("init", function() {
       benchPathfinding,
 
       AbstractPathfinder,
-      BFSPathfinder,
-      UniformCostPathfinder,
-      GreedyBestFirstPathfinder,
-      AStarPathfinder,
+      BFSGraph,
+      UniformCostGraph,
+      GreedyBestFirstGraph,
+      AStarGraph,
+      GraphingPathfinder,
 
       worldBuilder,
 
       Terrain,
       WebGPUPathfinder,
       WebGPUPathfinderWithWorker,
+
+      ClockwiseSweepPathfindingNode,
+      ClockwiseSweepPathfindingWorld,
 
     },
 

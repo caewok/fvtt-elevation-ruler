@@ -29,6 +29,7 @@
 
     "elevationruler.settings.pathfinding-algorithm.name": "Pathfinding Algorithm",
     "elevationruler.settings.pathfinding-algorithm-simple": "Simple",
+    "elevationruler.settings.pathfinding-algorithm-cwsweep": "Clockwise Sweep",
     "elevationruler.settings.pathfinding-algorithm-trianglemesh": "Triangle Mesh",
     "elevationruler.settings.pathfinding-algorithm-polymesh": "Polygon Mesh",
     "elevationruler.settings.pathfinding-algorithm-navmesh": "Navigation Mesh (Recast/Detour)",
