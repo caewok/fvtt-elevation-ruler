@@ -16,6 +16,8 @@ import { GraphingPathfinder } from "./pathfinding/GraphPathfinding.js";
 import { PATCHER } from "./patching.js";
 import { updatePathfindingControl } from "./module.js";
 import { WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
+import { worldBuilderClockwise } from "./pathfinding/ClockwiseSweepPathfindingWorld.js";
+import { worldBuilderCollision } from "./pathfinding/CollisionPathfindingWorld.js";
 
 const SETTINGS = {
   CONTROLS: {
@@ -284,6 +286,12 @@ export class Settings extends ModuleSettingsAbstract {
     const pf = obj[PATHFINDING_ID];
     if ( pf && pf.constructor === cl ) return;
     obj[PATHFINDING_ID] = new cl(token);
+  }
+
+  static get pathfindingWorldClass() {
+    const PF = this.KEYS.PATHFINDING;
+    return this.get(PF.ALGORITHM) === PF.ALGORITHM_CHOICES.CLOCKWISE_SWEEP
+      ? worldBuilderClockwise() : worldBuilderCollision();
   }
 }
 

@@ -84,8 +84,8 @@ export class AbstractPathfinder {
    * @param {Point} goal        End point for the graph
    */
   async findPath(start, goal, signal = {}) {
-    start = GridCoordinates3d.fromObject(start);
-    goal = GridCoordinates3d.fromObject(goal);
+    start = GridCoordinates3d.fromObject(start).roundDecimals();
+    goal = GridCoordinates3d.fromObject(goal).roundDecimals();
 
     if ( this.cachedPaths.has(goal.key) ) return this.cachedPaths.get(goal.key);
     if ( !(start || goal) || start.almostEqual(goal) ) return null;

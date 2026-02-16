@@ -25,7 +25,6 @@ import {
   AStarGraph,
   GraphingPathfinder,
 } from "./pathfinding/GraphPathfinding.js";
-import { worldBuilder } from "./pathfinding/GriddedPathfindingWorld.js";
 
 // ClockwiseSweep Pathfinding
 import { ClockwiseSweepPathfindingNode, ClockwiseSweepPathfindingWorld } from "./pathfinding/ClockwiseSweepPathfindingWorld.js";
@@ -128,8 +127,6 @@ Hooks.once("init", function() {
       GreedyBestFirstGraph,
       AStarGraph,
       GraphingPathfinder,
-
-      worldBuilder,
 
       Terrain,
       WebGPUPathfinder,

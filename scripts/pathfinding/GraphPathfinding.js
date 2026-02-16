@@ -12,8 +12,6 @@ import { Draw } from "../geometry/Draw.js";
 import { AbstractPathfinder } from "./AbstractPathfinder.js";
 import { PriorityQueue } from "./PriorityQueue.js";
 import { Settings } from "../settings.js";
-import { worldBuilder as worldBuilderGridded } from "./GriddedPathfindingWorld.js";
-import { worldBuilder as worldBuilderClockwise } from "./ClockwiseSweepPathfindingWorld.js";
 
 /* Basic pathfinding algorithms.
 
@@ -31,23 +29,27 @@ Abstract
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 
-
-
 // Each pathfinding should create a new GraphPathfinder, so properties are not mixed up
 // between async jobs.
-
 export class GraphingPathfinder extends AbstractPathfinder {
-
+  /** @type {AbstractGraph} */
   lastGraph; // For debugging.
 
+  world = null;
 
-  async _findPath(start, goal, signal) {
-    const PF = Settings.KEYS.PATHFINDING;
-    const worldCl = Settings.get(PF.ALGORITHM) === PF.ALGORITHM_CHOICES.CLOCKWISE_SWEEP
-      ? worldBuilderClockwise() : worldBuilderGridded();
-    const world = new worldCl();
-    world.initialize(this.token);
+  static get worldClass() { return Settings.pathfindingWorldClass; }
 
+  graphClass = AStarGraph;
+
+  startPathfinding(start) {
+    super.startPathfinding(start);
+
+    // Set up world
+    this.world = new this.constructor.worldClass;
+    this.world.initialize(this.token);
+    this.world.startPathfinding(start);
+
+    // Determine the graph class to use.
     let graphCl;
     switch ( CONFIG[MODULE_ID].simplePathfinding.algorithm ) {
       case "astar": graphCl = AStarGraph; break;
@@ -57,11 +59,167 @@ export class GraphingPathfinder extends AbstractPathfinder {
       case "test": graphCl = TestGraph; break;
       default: graphCl = AStarGraph;
     }
-    const graph = this.lastGraph = new graphCl(world);
+    this.graphClass = graphCl;
+  }
+
+  async _findPath(start, goal, signal) {
+    const graph = this.lastGraph = new this.graphClass(this.world);
     graph.debug = this.debug;
     graph.debugDelay = this.debugDelay;
     return graph.findPath(start, goal, signal);
   }
+}
+
+/**
+ * Settings specific to the algorithm used with the graph to define nodes.
+ * This is ostensibly stateless. Only saved values should be objects that can be
+ * cached over multiple find paths for a single start point (e.g., single token drag).
+ */
+export class GraphPathfindingWorld {
+
+  /** @type {object} */
+  config = {};
+
+  /**
+   * @typedef {GridCoordinates|GridCoordinates3d} Node
+   */
+
+  /**
+   * Cost to move from a -> b.
+   * @type {function}
+   * @param {Node} a
+   * @param {Node} b
+   */
+  cost() { return 0; }
+
+  /**
+   * Estimated cost to move from a -> b.
+   * @type {function}
+   * @param {Node} a
+   * @param {Node} b
+   */
+  heuristic() { return 0; }
+
+  /**
+   * From a location on the canvas, construct the corresponding node.
+   * @param {Point|Point3d} pt
+   * @returns {Node}
+   */
+  buildNode(pt) { return pt; }
+
+  /**
+   * Initialize this world for a given path construction.
+   * @param {Token} token     Token doing the movement
+   */
+  initialize(_token) { }
+
+  /**
+   * Filter the neighbors for this node, keeping only valid neighbors.
+   * @param {Node[]} neighbors    Neighbors to the originating node
+   * @param {Node} node           The originating node
+   * @returns {Node[]}
+   */
+  filterNeighbors(neighbors, _node) { return neighbors; }
+
+  /**
+   * Determine adjacent offsets to a node.
+   * @param {Node} node
+   * @returns {Node[]}
+   */
+  adjacentOffsets(node) { return canvas.grid.getAdjacentOffsets(node); }
+
+  /**
+   * Get valid adjacent neighbors to a node.
+   * @param {Node} node
+   * @returns {Node[]}
+   */
+  getNeighbors(node) {
+    const neighbors = this.adjacentOffsets(node);
+    return this.filterNeighbors(neighbors, node);
+  }
+
+  /**
+   * Check if a node is definitely unreachable. For example, within a blocking token.
+   * @param {Node} node
+   * @param {Node} start
+   * @returns {boolean}
+   */
+  nodeIsUnreachable(node, _start) {
+    if ( !canvas.scene.dimensions.sceneRect.contains(node.x, node.y) ) return true;
+    if ( CONFIG[MODULE_ID].sceneGraph.pointIsInFace(node) ) return true;
+    return false;
+  }
+
+  startPathfinding(_start, _goal) { }
+
+  /**
+   * Did we reach the goal node?
+   * @param {Node} curr
+   * @param {Node} goal
+   */
+  reachedGoal(curr, goal) { return curr.key === goal.key; }
+
+  /**
+   * Maximum number of iterations given a start and end coordinate.
+   * Used to stop if no path.
+   * @param {Node} start
+   * @param {Node} goal
+   * @returns {number}
+   */
+  maxIterations(start, _goal) {
+    // Number of steps from start to the edge of the scene.
+    // For a grid, 1 step is one grid square.
+    const { sceneRect, size } = canvas.scene.dimensions;
+    if ( canvas.grid.isGridless ) {
+      const maxDist = Math.max(
+        sceneRect.width - start.x,
+        start.x - sceneRect.x,
+        sceneRect.height - start.y,
+        start.y - sceneRect.y,
+      );
+      return Math.ceil(maxDist / (this.resolution || 1)); // TODO: Resolution for gridless.
+
+    } else {
+      const maxDist = Math.max(
+        sceneRect.width - start.x,
+        start.x - sceneRect.x,
+        sceneRect.height - start.y,
+        start.y - sceneRect.y,
+      );
+      return Math.ceil(maxDist / size);
+    }
+  }
+
+  /**
+   * Given obstacles in the world, determine what the maximum and minimum z values should be
+   * for obstacle avoidance in 3d.
+   * @returns {object}
+   * - @prop {number} min
+   * - @prop {number} max
+   */
+  static zMaxMin() {
+    const token0 = canvas.tokens.placeables[0];
+    let min = token0.bottomZ;
+    let max = token0.topZ;
+
+    canvas.walls.placeables.forEach(wall => {
+      ({ min, max } = Math.minMax(min, max, isFinite(wall.bottomZ)
+        ? wall.bottomZ : min, isFinite(wall.topZ) ? wall.topZ : max));
+    });
+    canvas.tiles.placeables.forEach(tile => {
+      ({ min, max } = Math.minMax(min, max, tile.elevationZ));
+    });
+    canvas.regions.placeables.forEach(region => {
+      ({ min, max } = Math.minMax(min, max, isFinite(region.bottomZ)
+        ? region.bottomZ : min, isFinite(region.topZ) ? region.topZ : max));
+    });
+    canvas.tokens.placeables.forEach(token => {
+      ({ min, max } = Math.minMax(min, max, token.topZ, token.bottomZ));
+    });
+    return { min, max };
+  }
+
+  drawNode(node, opts = {}) { Draw.point(node, opts); }
 }
 
 
@@ -127,14 +285,13 @@ class AbstractGraph {
    * @param {Point} start       Start point for the graph
    * @param {Point} goal        End point for the graph
    */
-  async findPath(start, goal, signal = {}) {
+  async findPath(start, goal, _signal = {}) {
     start = this.world.buildNode(start);
     goal = this.world.buildNode(goal);
     if ( this.world.nodeIsUnreachable(goal, start) ) {
       console.error(`${this.constructor.name}|Node unreachable.`, { start, goal });
       return null;
     }
-    this.world.startPathfinding(start, goal);
 
     // Frontier tracks next neighbors to be visited.
     this._initializePathfindingRun(start);
@@ -165,7 +322,6 @@ class AbstractGraph {
     if ( iter >= MAX_ITER ) {
       console.error(`${this.constructor.name}|findPath stuck in loop.`, { start, goal });
     }
-    start.release();
     const path = reachedGoal ? this.constructor.reconstructPath(this._cameFrom, goal) : null;
     return path;
   }
@@ -431,19 +587,29 @@ nodes = [...pf.world.existingNodes.values()]
 colors = Object.values(Draw.COLORS)
 i = 0
 Draw.point(nodes[i], { color: colors[i], radius: 3 })
-nodes[i].drawShape({ fill: colors[i], fillAlpha: 0.1, width: 0 })
+nodes[i].drawShape({ fill: colors[i], width: 0 })
 nodes[i].drawGapEdges({ color: colors[i] })
 nodes[i].drawGapPoints({ color: colors[i], alpha: 0.5 })
 
 
 nodes.forEach(node => Draw.point(node))
 
-AbstractPathfinder.js:111 Pathfinder n6NyA9oqnU8UZIlM|{x: 1650, y: 2750, z: 0} --> {x: 1550, y: 3350, z: 0} path has collision at 2:
-	{x: 1650, y: 2750, z: 0}
-	{x: 1397, y: 2834, z: 0}
-	{x: 1260, y: 2896, z: 0}
-	{x: 1550, y: 3350, z: 0}
+Pathfinder VKC3FgTw46ki8yHD|{x: 2650, y: 2550, z: 0} --> {x: 1950, y: 2650, z: 0} path has collision at 3:
+	{x: 2650, y: 2550, z: 0}
+	{x: 2177.885437667892, y: 3042.2040753400374, z: 0}
+	{x: 2170.4, y: 3040.2, z: 0}
+	{x: 2004.0249223594997, y: 2696.8695048315003, z: 0}
+	{x: 1950, y: 2650, z: 0}
 
+
+AbstractPathfinder.js:111 Pathfinder V4s4gx9T3tSXwgzv|{x: 2150, y: 3050, z: 0} --> {x: 1750, y: 2650, z: 0} path has collision at 4:
+	{x: 2150, y: 3050, z: 0}
+	{x: 2183, y: 2824, z: 0}
+	{x: 1888, y: 2915, z: 0}
+	{x: 1710, y: 2920, z: 0}
+	{x: 1749, y: 2976, z: 0}
+	{x: 1560, y: 2700, z: 0}
+	{x: 1750, y: 2650, z: 0}
 
 pf.world = new (worldBuilder())()
 pf.initialize()

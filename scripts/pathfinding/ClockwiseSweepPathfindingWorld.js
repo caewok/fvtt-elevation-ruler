@@ -1,7 +1,5 @@
 /* globals
-canvas,
 CONFIG,
-CONST,
 foundry,
 PIXI,
 */
@@ -9,11 +7,10 @@ PIXI,
 "use strict";
 
 import { MODULE_ID } from "../const.js";
-import { GraphPathfindingWorld, ObstacleSweep } from "./GriddedPathfindingWorld.js";
 import { ElevatedPoint } from "../geometry/3d/ElevatedPoint.js";
-import { Settings } from "../settings.js";
-import { ObstacleOcclusionTest } from "../geometry/ObstacleOcclusionTest.js";
 import { Draw } from "../geometry/Draw.js";
+import { GraphPathfindingWorld } from "./GraphPathfinding.js";
+import { ClockwisePathfindingSweep } from "./ClockwiseSweep.js";
 
 /* Clockwise sweep pathfinding
 
@@ -26,33 +23,6 @@ Stop when the point is within the end sweep.
 
 
 /**
- * Extend Clockwise Sweep to track when the sweep hits wall corners.
- */
-class ClockwisePathfindingSweep extends ObstacleSweep {
-  /**
-   * Corners are when the sweep hits a non-limited wall
-   * and must extend the sweep beyond that point.
-   * In addition, corners where the walls simply continue are ignored
-   * @type {Point[]}
-   */
-  cornersEncountered = new Set();
-
-  /** @type {object} */
-  sweepOpts = {};
-
-  /** @inheritdoc */
-  _compute() {
-    this.cornersEncountered.clear();
-    super._compute();
-  }
-
-  _switchEdge(result, activeEdges) {
-    this.cornersEncountered.add(result.target.key);
-    super._switchEdge(result, activeEdges);
-  }
-}
-
-/**
  * Nodes for the ClockwiseSweep store the sweep polygon.
  */
 export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
@@ -61,6 +31,7 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
 
   static create(pt, sweepOpts = {}) {
     const node = this.fromObject(pt);
+    node.roundDecimals();
     node.sweepOpts = sweepOpts; // Here we want to link the same sweep opts object.
     return node;
   }
@@ -96,10 +67,18 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
     this.#sweep.initialize(this, this.sweepOpts);
     this.#sweep.compute();
     this.#computedSweep = true;
+
+    // const color = randomColor();
+    // this.drawShape({ fill: color, });
   }
 
+  static SPACERS = {
+    WALL: 1,
+    END2: 10**2,
+  };
+
   calculateGapPoints() {
-    const SPACER = 5;
+    const { WALL, END2 } = this.constructor.SPACERS;
 
     this.#gapPoints.length = 0; // Just in case.
     this.#gapEdges.length = 0;
@@ -111,8 +90,8 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
       if ( typeof curr.key === "undefined" ) console.error("Gap curr key undefined", { curr });
       if ( this.sweep.cornersEncountered.has(curr.key) ) {
         let nearPoint = PIXI.Point.tmp;
-        let farPoint = PIXI.Point.tmp;
         let midPoint = PIXI.Point.tmp;
+        // let farPoint = PIXI.Point.tmp;
         let b;
 
         // Identify the far gap edge point and the correct normal.
@@ -120,29 +99,52 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
           // Origin --> curr -> prev. CCW is normal direction.
           b = prev;
           prev.subtract(curr, dir).normalize(dir);
-          dir.set(dir.y, -dir.x).multiplyScalar(SPACER, dir);
+          dir.set(dir.y, -dir.x).multiplyScalar(WALL, dir);
         } else {
           // Origin --> curr -> next
           b = next;
           next.subtract(curr, dir).normalize(dir);
-          dir.set(-dir.y, dir.x).multiplyScalar(SPACER, dir);
+          dir.set(-dir.y, dir.x).multiplyScalar(WALL, dir);
         }
 
         // Near point: 1 in from curr.
         // Far point: 1 in from prev/next.
         // Mid point: midway between curr, prev/next.
-        curr.towardsPointSquared(b, 1, nearPoint);
-        // b.towardsPointSquared(curr, 1, farPoint);
-        PIXI.Point.midPoint(curr, b, midPoint);
+        curr.towardsPointSquared(b, END2, nearPoint);
         nearPoint.add(dir, nearPoint);
-        farPoint.add(dir, farPoint);
+
+        // b.towardsPointSquared(curr, END2, farPoint);
+        // farPoint.add(dir, farPoint);
+
+        PIXI.Point.midPoint(curr, b, midPoint);
         midPoint.add(dir, midPoint);
 
-        this.#gapPoints.push(nearPoint, midPoint, farPoint);
+        // Test if the gap point is valid. Must not be on a wall and must be within the sweep after rounding.
+        const potentialGapPoints = [nearPoint, midPoint /*, farPoint */].filter(gapPoint => {
+          // For collisions, all points are rounded. Do same here.
+          gapPoint.roundDecimals(); // Done in place.
+
+          // Skip any gap points that are no longer within the sweep.
+          if ( !this.sweep.contains(gapPoint.x, gapPoint.y) ) return false;
+
+          // Skip any gap points that are on a wall.
+          // Need only check walls considered within the sweep.
+          const collinearEdges = [...this.sweep.edgesEncountered].filter(e => foundry.utils.orient2dFast(e.a, e.b, gapPoint).almostEqual(0));
+          for ( const collinearEdge of collinearEdges ) {
+            // Check if gap point lies within segment bounds.
+            const xMinMax = Math.minMax(collinearEdge.a.x, collinearEdge.b.x);
+            const yMinMax = Math.minMax(collinearEdge.a.y, collinearEdge.b.y);
+            if ( gapPoint.x >= xMinMax.min && gapPoint.x <= xMinMax.max
+              && gapPoint.y >= yMinMax.min && gapPoint.y <= yMinMax.max ) return false;
+          }
+          return true;
+        });
+        this.#gapPoints.push(...potentialGapPoints.map(pt => this.constructor.create(pt, this.sweepOpts)));
 
         // Keep b if testing gapEdges.
         this.#gapEdges.push({ a: curr, b });
         // b.release();
+
       }
       prev = curr;
       curr = next;
@@ -156,11 +158,19 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
     }) ) console.error("Gap points collide with wall.", this.#gapPoints, this);
 
     this.#computedNeighbors = true;
+
+    /*
+    const color = randomColor();
+    this.drawGapEdges({ color });
+    this.drawGapPoints({ color });
+    */
   }
 
   drawShape(opts = {}) {
     opts.fill ??= opts.color;
+    opts.fill ??= Draw.COLORS.blue;
     opts.fillAlpha ??= 0.2;
+    opts.width ??= 0;
     Draw.shape(this.sweep, opts);
   }
 
@@ -203,6 +213,8 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
    * @returns {ClockwiseSweepPathfindingNode}
    */
   buildNode(pt) {
+    const key = ClockwiseSweepPathfindingNode.key(pt);
+    if ( this.existingNodes.has(ClockwiseSweepPathfindingNode.key(pt)) ) return this.existingNodes.get(key);
     return ClockwiseSweepPathfindingNode.create(pt, this._sweepOpts);
   }
 
@@ -219,41 +231,6 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
    */
   reachedGoal(curr, goal) { return curr.sweep.contains(goal.x, goal.y); }
 
-  // From ClockwiseSweepFilter.
-  // TODO: Export from one place.
-  _identifyBlockingTokenEdges(subjectToken) {
-    // Add token edges. Must be temporary wall edges.
-    const PATHFINDING = Settings.KEYS.PATHFINDING;
-    const blocking = Settings.get(PATHFINDING.TOKENS_BLOCK);
-    const blockingCfg = {
-      dead: false,
-      live: blocking !== PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
-      prone: false,
-      enemies: blocking !== PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
-      allies: blocking === PATHFINDING.TOKENS_BLOCK_CHOICES.ALL,
-    };
-    const occlusionCfg = { blockingCfg, subjectToken };
-    const Edge = foundry.canvas.geometry.edges.Edge;
-    const edges = [];
-    for ( const token of canvas.tokens.placeables ) {
-      if ( !ObstacleOcclusionTest.includeToken(token, occlusionCfg) ) continue;
-      for ( const edge of token.constrainedTokenBorder.iterateEdges({ closed: false }) ) {
-        edges.push(new Edge(edge.A, edge.B, {
-          object: { flags: {
-            "wall-height": {
-              top: token.topZ,
-              bottom: token.bottomZ,
-            }
-          }},
-          type: `${MODULE_ID}.ObstacleSweep`,
-          id: token.id,
-          move: CONST.WALL_SENSE_TYPES.NORMAL,
-        }));
-      }
-    }
-    return edges;
-  }
-
   _sweepOpts = {
     type: "move",     /** @type {CONST.WALL_RESTRICTION_TYPES} */
     source: null,     /** @type {PointMovementSource} */
@@ -266,15 +243,16 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
    */
   initialize(token) {
     super.initialize(token);
-    this._sweepOpts.addedEdges = this._identifyBlockingTokenEdges(token);
+    this._sweepOpts.addedEdges = ClockwisePathfindingSweep.identifyBlockingTokenEdges(token);
     this._sweepOpts.source = new foundry.canvas.sources.PointMovementSource({ object: token }); // See Token##getMovementSource
-    this.existingNodes.clear(); // TODO: Could store nodes during the entire token drag, except for goal.
+    this.existingNodes.clear();
   }
 
-  startPathfinding(start, goal) {
+  startPathfinding(start) {
     this._sweepOpts.source.initialize(start); // See Token##getMovementSource
-    super.startPathfinding(start, goal);
-    this.existingNodes.set(PIXI.Point.key(start), start); // Nodes all take 2d keys for now.
+    super.startPathfinding(start);
+    start = this.buildNode(start);
+    this.existingNodes.set(start.key, start); // 3d key.
   }
 
   /**
@@ -285,46 +263,45 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
   existingNodes = new Map();
 
   /**
-   * Determine adjacent offsets to a node.
+   * Determine where we can move to from this node.
+   * Any pixel within the node sweep is potentially available.
+   * Trim to existing nodes within the sweep or gap points that are not covered elsewhere.
    * @param {Node} node
    * @returns {Node[]}
    */
   adjacentOffsets(node) {
-    const nodeKey = PIXI.Point.key(node);
+    const nodeKey = node.key;
     if ( typeof nodeKey === "undefined" ) console.error("Node key must be defined.");
+    if ( !(node instanceof ClockwiseSweepPathfindingNode) ) console.error("Node must be ClockwiseSweepPathfindingNode.");
     if ( !node.sweep.points.length ) return [];
 
     const neighbors = [];
-    gapLoop: for ( const gapPoint of node.gapPoints ) {
-      // If the node already exists, use it.
-      const gapPointKey = PIXI.Point.key(gapPoint);
-      if ( this.existingNodes.has(gapPointKey) ) {
-        neighbors.push(this.existingNodes.get(gapPointKey));
-        continue;
+    const gapPointSet = new Set(node.gapPoints);
+
+    for ( const [existingKey, existingNode] of this.existingNodes.entries() ) {
+      if ( existingKey === nodeKey ) continue;
+
+      // Any nodes within this node sweep are neighbors.
+      if ( node.sweep.contains(existingNode.x, existingNode.y) ) neighbors.push(existingNode);
+
+      // Check the existing node against the gap points.
+      for ( const gapPoint of gapPointSet ) {
+        if ( existingNode.sweep.contains(gapPoint.x, gapPoint.y) ) gapPointSet.delete(gapPoint);
       }
-
-      // Must use the gap point key, in case rounding to nearest integer modifies its location.
-      const roundedGapPoint = PIXI.Point.invertKey(gapPointKey);
-
-      // Must be within the parent node after rounding.
-      if ( !node.sweep.contains(roundedGapPoint.x, roundedGapPoint.y) ) continue gapLoop;
-
-      // Skip gap points contained in an existing node polygon other than the current node.
-      for ( const [existingKey, existingNode] of this.existingNodes.entries() ) {
-        if ( nodeKey === existingKey ) continue;
-        if ( existingNode.sweep.contains(roundedGapPoint.x, roundedGapPoint.y) ) continue gapLoop;
-      }
-      neighbors.push(this.buildNode(roundedGapPoint)); // TODO: Or gapPoint?
     }
+    neighbors.push(...gapPointSet);
+
+    // gapPointSet.forEach(pt => Draw.point(pt, { color: Draw.COLORS.yellow, alpha: 0.2 }));
+
     return neighbors;
   }
 
   drawNode(node, opts = {}) {
     super.drawNode(node, opts);
-    const color = randomColor();
-    node.drawShape({ fill: color, });
-    node.drawGapEdges({ color });
-    node.drawGapPoints({ color });
+    // const color = randomColor();
+    // node.drawShape({ fill: color, });
+    // node.drawGapEdges({ color });
+    // node.drawGapPoints({ color });
   }
 
 }
@@ -343,7 +320,7 @@ function randomColor() {
  * algorithm to use.
  * @returns {AbstractGridPathfindingWorld}
  */
-export function worldBuilder({ cost, use3d, heuristic, pt3d, neighborFilter } = {}) {
+export function worldBuilderClockwise({ cost, use3d, heuristic, pt3d, neighborFilter } = {}) {
   const pathCfg = CONFIG[MODULE_ID].simplePathfinding;
   use3d ??= pathCfg.use3d;
   pt3d ??= pathCfg.pt3d;
@@ -356,7 +333,7 @@ export function worldBuilder({ cost, use3d, heuristic, pt3d, neighborFilter } = 
 }
 
 /** Testing
-    Draw.point(sweep.origin, { color: Draw.COLORS.blue })
+  Draw.point(sweep.origin, { color: Draw.COLORS.blue })
   Draw.shape(sweep)
   sweep.cornersEncountered.forEach(key => Draw.point(PIXI.Point.invertKey(key)))
 
