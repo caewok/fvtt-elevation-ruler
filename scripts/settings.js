@@ -12,11 +12,12 @@ ui
 import { MODULE_ID, PATHFINDING_ID } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { log } from "./util.js";
-import { TestPathfinder } from "./pathfinding/AbstractPathfinder.js";
-import { BFSPathfinder, UniformCostPathfinder, GreedyBestFirstPathfinder, AStarPathfinder } from "./pathfinding/SimplePathfinding.js";
+import { GraphingPathfinder } from "./pathfinding/GraphPathfinding.js";
 import { PATCHER } from "./patching.js";
 import { updatePathfindingControl } from "./module.js";
 import { WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
+import { worldBuilderClockwise } from "./pathfinding/ClockwiseSweepPathfindingWorld.js";
+import { worldBuilderCollision } from "./pathfinding/CollisionPathfindingWorld.js";
 
 const SETTINGS = {
   CONTROLS: {
@@ -41,6 +42,7 @@ const SETTINGS = {
     ALGORITHM: "pathfinding-algorithm",
     ALGORITHM_CHOICES: {
       SIMPLE: "pathfinding-algorithm-simple",
+      CLOCKWISE_SWEEP: "pathfinding-algorithm-cwsweep",
       WEBGPU: "pathfinding-algorithm-webgpu",
       // TRIANGLEMESH: pathfinding-algorithm-trianglemesh,
       // POLYMESH: "pathfinding-algorithm-polymesh",
@@ -284,23 +286,23 @@ export class Settings extends ModuleSettingsAbstract {
     const pf = obj[PATHFINDING_ID];
     if ( pf && pf.constructor === cl ) return;
     obj[PATHFINDING_ID] = new cl(token);
-    obj[PATHFINDING_ID].initialize(); // Async.
+  }
+
+  static get pathfindingWorldClass() {
+    const PF = this.KEYS.PATHFINDING;
+    return this.get(PF.ALGORITHM) === PF.ALGORITHM_CHOICES.CLOCKWISE_SWEEP
+      ? worldBuilderClockwise() : worldBuilderCollision();
   }
 }
 
 function pathfinderClass(algorithm) {
   const ALG = Settings.KEYS.PATHFINDING.ALGORITHM_CHOICES;
   algorithm ??= Settings.get(Settings.KEYS.PATHFINDING.ALGORITHM);
-  if ( algorithm === ALG.SIMPLE ) algorithm = CONFIG[MODULE_ID].simplePathfinding.algorithm;
   switch ( algorithm ) {
     case ALG.WEBGPU: return WebGPUPathfinderWithWorker;
-    case "astar": return AStarPathfinder;
-    case "breadth": return BFSPathfinder;
-    case "uniform": return UniformCostPathfinder;
-    case "greedy": return GreedyBestFirstPathfinder;
-    case "test": return TestPathfinder;
-    case "webgpu": return WebGPUPathfinderWithWorker;
-    default: return AStarPathfinder;
+    case ALG.SIMPLE:
+    case ALG.CLOCKWISE_SWEEP: return GraphingPathfinder;
+    default: return GraphingPathfinder;
   }
 }
 

@@ -18,38 +18,39 @@ Hooks.on("quenchReady", quench => {
     // --- NOTE: Initial canvas graph ---
     describe("Initial canvas graph", () => {
       const graph = EdgeGraph.buildFromCanvas();
-      for ( const wall of canvas.walls.placeables ) {
-        expect(graph.hasPlaceable(wall)).to.be.true;
-      }
-      for ( const token of canvas.tokens.placeables ) {
-        expect(graph.hasPlaceable(token)).to.be.true;
-      }
-    });
 
-    // --- NOTE: Remove wall from canvas ---
-    describe("Remove wall from graph", () => {
-      const graph = EdgeGraph.buildFromCanvas();
-      const wall = canvas.walls.placeables[0];
-      if ( wall ) {
-        graph.removePlaceable(wall);
-        expect(graph.hasPlaceable(wall)).to.be.false;
+      it("should have all canvas placeables in the graph", () => {
+        for ( const wall of canvas.walls.placeables ) {
+          expect(graph.hasPlaceable(wall)).to.be.true;
+        }
+        for ( const token of canvas.tokens.placeables ) {
+          expect(graph.hasPlaceable(token)).to.be.true;
+        }
+      });
 
-        graph.addPlaceable(wall);
-        expect(graph.hasPlaceable(wall)).to.be.true;
-      }
-    });
+      // --- NOTE: Remove wall from canvas ---
+      it("should be able to remove and add wall from graph", () => {
+        const wall = canvas.walls.placeables[0];
+        if ( wall ) {
+          graph.removePlaceable(wall);
+          expect(graph.hasPlaceable(wall)).to.be.false;
 
-     // --- NOTE: Remove wall from canvas ---
-    describe("Remove token from graph", () => {
-      const graph = EdgeGraph.buildFromCanvas();
-      const token = canvas.tokens.placeables[0];
-      if ( token ) {
-        graph.removePlaceable(token);
-        expect(graph.hasPlaceable(token)).to.be.false;
+          graph.addWall(wall);
+          expect(graph.hasPlaceable(wall)).to.be.true;
+        }
+      });
 
-        graph.addPlaceable(token);
-        expect(graph.hasPlaceable(token)).to.be.true;
-      }
+       // --- NOTE: Remove wall from canvas ---
+      it("should be able to remove and add token from graph", () => {
+        const token = canvas.tokens.placeables[0];
+        if ( token ) {
+          graph.removePlaceable(token);
+          expect(graph.hasPlaceable(token)).to.be.false;
+
+          graph.addToken(token);
+          expect(graph.hasPlaceable(token)).to.be.true;
+        }
+      });
     });
 
   }, { displayName: "EdgeGraph" });

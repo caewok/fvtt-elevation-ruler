@@ -21,7 +21,6 @@ Very basic.
 
 */
 
-
 export class AbstractPathfinder {
 
   /** @type {Token} token */
@@ -34,32 +33,13 @@ export class AbstractPathfinder {
 
   cachedPaths = new Map();
 
-  #start = new GridCoordinates3d();
-
-  get start() { return this.#start; }
-
-  set start(value) {
-    if ( this.#start.equals(value) ) return;
-    this.cachedPaths.clear();
-    this.#start.copyFrom(value);
-  }
-
-  #initialized = false;
-
   /**
-   * Initialize the pathfinder algorithm.
+   * Start pathfinding. From this point, assume the scene and starting point will not change.
+   * @param {GridCoordinates3d} start
    */
-  async initialize() {
+  startPathfinding(_start) {
     this.cachedPaths.clear();
-    this.#initialized = true;
   }
-
-  /**
-   * Initialize pathfinding. From this point, assume the scene will not change but
-   * starting point and elevation might.
-   * @param {GridCoordinates3d} start     May be updated by findPath
-   */
-  startPathfinding(start) { }
 
   /**
    * Stop pathfinding.
@@ -104,23 +84,41 @@ export class AbstractPathfinder {
    * @param {Point} goal        End point for the graph
    */
   async findPath(start, goal, signal = {}) {
-    if ( !this.#initialized ) return null;
-    this.start = start;
+    start = GridCoordinates3d.fromObject(start).roundDecimals();
+    goal = GridCoordinates3d.fromObject(goal).roundDecimals();
+
     if ( this.cachedPaths.has(goal.key) ) return this.cachedPaths.get(goal.key);
     if ( !(start || goal) || start.almostEqual(goal) ) return null;
 
     const id = foundry.utils.randomID();
     if ( signal.aborted ) return null;
     console.time(`${id}|findPath`);
+    if ( PIXI.Point.distanceBetween(start, goal) > (6 * canvas.grid.size) ) { console.debug(`Pathfinder ${id}|${start} --> ${goal}:`); }
     const path = await this._findPath(start, goal, signal);
     console.timeEnd(`${id}|findPath`);
 
+    /* Debugging: Check that path is valid. */
+    if ( path ) {
+      const pathStr = [];
+      path.forEach(pt => pathStr.push(`\t${pt}`));
+      console.debug(`Pathfinder ${id}|${start} --> ${goal}:\n${pathStr.join("\n")}`);
+      if ( !path[0].almostEqual(start) ) console.error(`Pathfinder ${id}|${start} --> ${goal} start incorrect:\n${pathStr.join("\n")}`);
+      if ( !path.at(-1).almostEqual(goal) ) console.error(`Pathfinder ${id}|${start} --> ${goal} end incorrect:\n${pathStr.join("\n")}`);
+
+      const ClockwiseSweepPolygon = foundry.canvas.geometry.ClockwiseSweepPolygon;
+      for ( let i = 0, iMax = path.length - 1; i < iMax; i += 1 ) {
+        if ( ClockwiseSweepPolygon.testCollision(path[i], path[i + 1], { mode: "any", type: "move" }) ) {
+          console.error(`Pathfinder ${id}|${start} --> ${goal} path has collision at ${i}:\n${pathStr.join("\n")}`);
+          return null;
+        }
+      }
+    } else console.debug(`Pathfinder ${id}|${start} --> ${goal}: null`);
+
     this.cachedPaths.set(goal.key, path);
-
-    console.debug(`Pathfinder ${id}|${start.x},${start.y} --> ${goal.x},${goal.y}\n\tdistance: ${PIXI.Point.distanceBetween(start, goal).toPrecision(3)} pixels\n\tpath length: ${path?.length} pixels.`);
-
     return path;
   }
+
+  async _findPath(_start, _goal, _signal) { console.error("Child class must define _findPath."); }
 
   destroy() {
     this.activeJobs.values().forEach(job => job.abort());
@@ -152,26 +150,4 @@ export class AbstractPathfinder {
    * @param {object} [opts]
    */
   drawDebug(_startPoint, _endPoint, _opts) { }
-}
-
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms)); // eslint-disable-line no-promise-executor-return
-
-
-export class TestPathfinder extends AbstractPathfinder {
-  async findPath(startPoint, endPoint, signal = {}) {
-    const id = foundry.utils.randomID();
-    console.debug(`TestPathfinder ${id}|starting.`);
-    let iter = 0;
-    while ( iter < 100 ) {
-      if ( signal.aborted ) {
-        console.debug(`\tTestPathfinder ${id}|stopped at iteration ${iter}.`);
-        return null;
-      }
-      await sleep(100);
-      iter += 1;
-      console.debug(`\tTestPathfinder ${id}|iteration ${iter}.`);
-    }
-    console.debug(`\tTestPathfinder ${id}|Reached iteration ${iter}.`);
-    return canvas.grid.getDirectPath([startPoint, endPoint]);
-  }
 }

@@ -107,8 +107,6 @@ async function pathfind(path, wrapped, waypoints, options, token) {
   if ( foundPath ) {
     const foundryEnd = waypoints.pop();
     const foundryStart = waypoints.at(-1);
-    if ( PIXI.Point.distanceBetween(foundryStart, foundryEnd) > (6 * canvas.grid.size) ) { console.debug("Long path", foundPath); }
-
     for ( let i = 1, iMax = foundPath.length - 1; i < iMax; i += 1 ) {
       // const pt = canvas.grid.getTopLeftPoint(foundPath[i]); // Foundry ruler uses top left coordinates.
       const pt = tokenTopLeftFromCenter(token, foundPath[i]);
@@ -119,6 +117,15 @@ async function pathfind(path, wrapped, waypoints, options, token) {
     const prevW = waypoints.at(-1);
     if ( prevW.x.almostEqual(foundryEnd.x) && prevW.y.almostEqual(foundryEnd.y) ) waypoints.pop();
     waypoints.push(foundryEnd);
+    if ( PIXI.Point.distanceBetween(foundryStart, foundryEnd) > (6 * canvas.grid.size) ) { console.debug("Long path", { foundPath, waypoints }); }
+
+    const pathStr = [];
+    foundPath.forEach(pt => pathStr.push(`\t${pt}`));
+    const waypointStr = [];
+    waypoints.forEach(pt => waypointStr.push(`\t${GridCoordinates3d.fromLocationWithElevation(pt, pt.elevation)}`));
+    const start = GridCoordinates3d.fromLocationWithElevation(foundryStart, foundryStart.elevation);
+    const end = GridCoordinates3d.fromLocationWithElevation(foundryEnd, foundryEnd.elevation);
+    console.debug(`Found path for ${start} --> ${end}\n${pathStr.join("\n")}\nWaypoints:\n${waypointStr.join("\n")}`);
   }
 
   // Rerun findMovementPath to account for regions, etc.

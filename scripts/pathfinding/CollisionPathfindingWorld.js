@@ -1,7 +1,6 @@
 /* globals
 canvas,
 CONFIG,
-CONST,
 foundry,
 PIXI,
 */
@@ -15,7 +14,9 @@ import { ObstacleOcclusionTest } from "../geometry/ObstacleOcclusionTest.js";
 import { GridCoordinates } from "../geometry/GridCoordinates.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix, Mixin } from "../geometry/mixwith.js";
-import { Settings } from "../settings.js";
+import { Draw } from "../geometry/Draw.js";
+import { GraphPathfindingWorld } from "./GraphPathfinding.js";
+import { ObstacleSweep } from "./ClockwiseSweep.js";
 
 /* Basic pathfinding algorithms.
 
@@ -31,142 +32,11 @@ Abstract
 */
 
 
-class AbstractGridPathfindingWorld {
-
-  /** @type {object} */
-  config = {};
-
-  /**
-   * @typedef {GridCoordinates|GridCoordinates3d} Node
-   */
-
-  /**
-   * Cost to move from a -> b.
-   * @type {function}
-   * @param {Node} a
-   * @param {Node} b
-   */
-  cost;
-
-  /**
-   * Estimated cost to move from a -> b.
-   * @type {function}
-   * @param {Node} a
-   * @param {Node} b
-   */
-  heuristic;
-
-  /**
-   * From a location on the canvas, construct the corresponding node.
-   * @param {Point|Point3d} pt
-   * @returns {Node}
-   */
-  buildNode(pt) { return pt; }
-
-  /**
-   * Initialize this world for a given path construction.
-   * @param {Token} token     Token doing the movement
-   */
-  initialize(_token) { }
-
-  /**
-   * Filter the neighbors for this node, keeping only valid neighbors.
-   * @param {Node[]} neighbors    Neighbors to the originating node
-   * @param {Node} node           The originating node
-   * @returns {Node[]}
-   */
-  filterNeighbors(neighbors, _node) { return neighbors; }
-
-  /**
-   * Determine adjacent offsets to a node.
-   * @param {Node} node
-   * @returns {Node[]}
-   */
-  adjacentOffsets(node) { return canvas.grid.getAdjacentOffsets(node); }
-
-  /**
-   * Get valid adjacent neighbors to a node.
-   * @param {Node} node
-   * @returns {Node[]}
-   */
-  getNeighbors(node) {
-    const neighbors = this.adjacentOffsets(node);
-    return this.filterNeighbors(neighbors, node);
-  }
-
-  /**
-   * Check if a node is definitely unreachable. For example, within a blocking token.
-   * @param {Node} node
-   * @param {Node} start
-   * @returns {boolean}
-   */
-  nodeIsUnreachable(node, _start) {
-    if ( !canvas.scene.dimensions.sceneRect.contains(node.x, node.y) ) return true;
-    if ( CONFIG[MODULE_ID].sceneGraph.pointIsInFace(node) ) return true;
-    return false;
-  }
-
-  /**
-   * Maximum number of iterations given a start and end coordinate.
-   * Used to stop if no path.
-   * @param {Node} start
-   * @param {Node} goal
-   * @returns {number}
-   */
-  maxIterations(start, _goal) {
-    // Number of steps from start to the edge of the scene.
-    // For a grid, 1 step is one grid square.
-    const { sceneRect, size } = canvas.scene.dimensions;
-    if ( canvas.grid.isGridless ) {
-      const maxDist = Math.max(
-        sceneRect.width - start.x,
-        start.x - sceneRect.x,
-        sceneRect.height - start.y,
-        start.y - sceneRect.y,
-      );
-      return Math.ceil(maxDist / (this.resolution || 1)); // TODO: Resolution for gridless.
-
-    } else {
-      const maxDist = Math.max(
-        sceneRect.width - start.x,
-        start.x - sceneRect.x,
-        sceneRect.height - start.y,
-        start.y - sceneRect.y,
-      );
-      return Math.ceil(maxDist / size);
-    }
-  }
-
-  /**
-   * Given obstacles in the world, determine what the maximum and minimum z values should be
-   * for obstacle avoidance in 3d.
-   * @returns {object}
-   * - @prop {number} min
-   * - @prop {number} max
-   */
-  static zMaxMin() {
-    const token0 = canvas.tokens.placeables[0];
-    let min = token0.bottomZ;
-    let max = token0.topZ;
-
-    canvas.walls.placeables.forEach(wall => {
-      ({ min, max } = Math.minMax(min, max, isFinite(wall.bottomZ)
-        ? wall.bottomZ : min, isFinite(wall.topZ) ? wall.topZ : max));
-    });
-    canvas.tiles.placeables.forEach(tile => {
-      ({ min, max } = Math.minMax(min, max, tile.elevationZ));
-    });
-    canvas.regions.placeables.forEach(region => {
-      ({ min, max } = Math.minMax(min, max, isFinite(region.bottomZ)
-        ? region.bottomZ : min, isFinite(region.topZ) ? region.topZ : max));
-    });
-    canvas.tokens.placeables.forEach(token => {
-      ({ min, max } = Math.minMax(min, max, token.topZ, token.bottomZ));
-    });
-    return { min, max };
-  }
-}
-
+/**
+ * Settings specific to the algorithm used with the graph to define nodes.
+ * This is ostensibly stateless. Only saved values should be objects that can be
+ * cached over multiple find paths for a single start point (e.g., single token drag).
+ */
 
 // ----- NOTE: Base cost/heuristic methods ----- //
 
@@ -297,69 +167,32 @@ export const Node3d = superclass => class extends superclass {
 
 // ----- NOTE: Filter Neighbors ----- //
 
-class ObstacleSweep extends foundry.canvas.geometry.ClockwiseSweepPolygon {
 
-  _identifyEdges() {
-    super._identifyEdges();
-    const aabb = AABB2d.fromRectangle(this.config.boundingBox);
-    for ( const edge of this.config.addedEdges ) {
-      if ( !aabb.overlapsEdge(edge) ) continue;
-      this.edges.add(edge);
-    }
-  }
-}
 
 
 export const ClockwiseSweepFilter = superclass => class extends superclass {
   /** @type {PointSourcePolygon} */
-  // #poly = new foundry.canvas.geometry.ClockwiseSweepPolygon();
   #sweep = new ObstacleSweep();
 
+  /** @type {Edge[]} */
   #addedEdges = [];
 
+  /** @type {PointMovementSource} */
   source;
 
   initialize(token) {
     super.initialize(token);
     this.source = new foundry.canvas.sources.PointMovementSource({ object: token });
-    this.#addedEdges = this._identifyBlockingTokenEdges(token);
+    this.#addedEdges = ObstacleSweep.identifyBlockingTokenEdges(token);
     if ( this.#addedEdges.length ) foundry.canvas.geometry.edges.Edge.identifyEdgeIntersections(
       [...this.#addedEdges, ...canvas.edges.getEdges(canvas.scene.dimensions.rect)]);
-
   }
 
-  _identifyBlockingTokenEdges(subjectToken) {
-    // Add token edges. Must be temporary wall edges.
-    const PATHFINDING = Settings.KEYS.PATHFINDING;
-    const blocking = Settings.get(PATHFINDING.TOKENS_BLOCK);
-    const blockingCfg = {
-      dead: false,
-      live: blocking !== PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
-      prone: false,
-      enemies: blocking !== PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
-      allies: blocking === PATHFINDING.TOKENS_BLOCK_CHOICES.ALL,
-    };
-    const occlusionCfg = { blockingCfg, subjectToken };
-    const Edge = foundry.canvas.geometry.edges.Edge;
-    const edges = [];
-    for ( const token of canvas.tokens.placeables ) {
-      if ( !ObstacleOcclusionTest.includeToken(token, occlusionCfg) ) continue;
-      for ( const edge of token.constrainedTokenBorder.iterateEdges({ closed: false }) ) {
-        edges.push(new Edge(edge.A, edge.B, {
-          object: { flags: {
-            "wall-height": {
-              top: token.topZ,
-              bottom: token.bottomZ,
-            }
-          }},
-          type: `${MODULE_ID}.ObstacleSweep`,
-          id: token.id,
-          move: CONST.WALL_SENSE_TYPES.NORMAL,
-        }));
-      }
-    }
-    return edges;
+  startPathfinding(start) {
+    this.source.initialize(start);
+    super.startPathfinding(start);
   }
+
 
   /**
    * Filter the neighbors
@@ -376,7 +209,7 @@ export const ClockwiseSweepFilter = superclass => class extends superclass {
     });
     return neighbors.filter(n => {
       const ray = new foundry.canvas.geometry.Ray(node, n);
-      return !this.#sweep._testCollision(ray, "any", n);
+      return !this.#sweep._testCollision(ray, "any");
     });
   }
 
@@ -540,7 +373,7 @@ export const Neighbors3d = superclass => class extends superclass {
  * algorithm to use.
  * @returns {AbstractGridPathfindingWorld}
  */
-export function worldBuilder({ cost, use3d, heuristic, pt3d, neighborFilter } = {}) {
+export function worldBuilderCollision({ cost, use3d, heuristic, pt3d, neighborFilter } = {}) {
   const pathCfg = CONFIG[MODULE_ID].simplePathfinding;
   use3d ??= pathCfg.use3d;
   pt3d ??= pathCfg.pt3d;
@@ -595,5 +428,5 @@ export function worldBuilder({ cost, use3d, heuristic, pt3d, neighborFilter } = 
   }
   const classes = [...base, nodeCl, costCl, heuristicCl, neighborsCl, neighborFilterCl];
   // return mix(AbstractGridPathfindingWorld).with(...classes, Mixin); // Mixin caches the classes.
-  return mix(AbstractGridPathfindingWorld).with(...classes);
+  return mix(GraphPathfindingWorld).with(...classes);
 }
