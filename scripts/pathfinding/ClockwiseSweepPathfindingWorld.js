@@ -9,7 +9,7 @@ PIXI,
 import { MODULE_ID } from "../const.js";
 import { ElevatedPoint } from "../geometry/3d/ElevatedPoint.js";
 import { Draw } from "../geometry/Draw.js";
-import { GraphPathfindingWorld } from "./GraphPathfinding.js";
+import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
 import { ClockwisePathfindingSweep } from "./ClockwiseSweep.js";
 import { mix, Mixin } from "../geometry/mixwith.js";
 import {
@@ -40,6 +40,39 @@ Mark the middle point and the near point (to the sweep origin) of each such edge
 Conduct sweep from those points.
 Stop when the point is within the end sweep.
 */
+
+export class ClockwiseSweepPathfinder extends GraphingPathfinder {
+
+  static get worldClass() { return worldBuilderClockwise(); }
+
+  /**
+   * Clean the path, which may include straightening it, snapping it to a grid, or removing unnecessary points.
+   * @param {Node[]} path
+   * @returns {Point[]}
+   */
+  cleanPath(path) {
+    // Already straightened and has limited points, so simply return.
+    return path;
+  }
+
+  /**
+   * Snap the path to the grid.
+   * @param {Node[]} path
+   * @returns {Point[]}
+   */
+  snapPathToGrid(path) {
+    // TODO: Could use specialized version that limits collision tests between a and b
+    //       to edges encountered in a's sweep.
+
+    // TODO: Could run collision pathfinding within a's sweep to find best grid path to b.
+
+    // path = alignPathToGrid(path, this.token);
+    // return cleanGridPathPoints(path);
+    return super.snapPathToGrid(path);
+  }
+
+
+}
 
 
 /**
@@ -338,8 +371,8 @@ function randomColor() {
  * algorithm to use.
  * @returns {AbstractGridPathfindingWorld}
  */
-export function worldBuilderClockwise({ cost, use3d, heuristic, pt3d, neighborFilter } = {}) {
-  const pathCfg = CONFIG[MODULE_ID].simplePathfinding;
+function worldBuilderClockwise({ cost, use3d, heuristic } = {}) {
+  const pathCfg = CONFIG[MODULE_ID].graphPathfinding;
   use3d ??= pathCfg.use3d;
   cost ??= pathCfg.cost;
   heuristic ??= pathCfg.heuristic;

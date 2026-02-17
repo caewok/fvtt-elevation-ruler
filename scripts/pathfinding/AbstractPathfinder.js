@@ -7,8 +7,9 @@ PIXI,
 "use strict";
 
 import { Draw } from "../geometry/Draw.js";
+import { Settings } from "../settings.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
-
+import { alignPathToGrid, cleanGridPathPoints, straightenPath } from "./path_cleaning.js";
 import { log } from "../util.js";
 
 /* Pathfinding class.
@@ -106,6 +107,9 @@ export class AbstractPathfinder {
 
     // Debugging: Check that path is valid.
     if ( !this.validatePath(path, start, goal, prefix) ) return null;
+    // path = Settings.get(Settings.KEYS.PATHFINDING.SNAP_TO_GRID) ? this.snapPathToGrid(path) : this.cleanPath(path);
+    // if ( !this.validatePath(path, start, goal, `${prefix}|Cleaned`) ) return null;
+
     this.cachedPaths.set(goal.key, path);
     return path;
   }
@@ -139,6 +143,26 @@ export class AbstractPathfinder {
   }
 
   async _findPath(_start, _goal, _signal) { console.error("Child class must define _findPath."); }
+
+  /**
+   * Clean the path, which may include straightening it, snapping it to a grid, or removing unnecessary points.
+   * @param {Node[]} path
+   * @returns {Point[]}
+   */
+  cleanPath(path) {
+    path = cleanGridPathPoints(path);
+    return straightenPath(path, this.token);
+  }
+
+  /**
+   * Snap the path to the grid.
+   * @param {Node[]} path
+   * @returns {Point[]}
+   */
+  snapPathToGrid(path) {
+    path = alignPathToGrid(path, this.token);
+    return cleanGridPathPoints(path);
+  }
 
   destroy() {
     this.activeJobs.values().forEach(job => job.abort());

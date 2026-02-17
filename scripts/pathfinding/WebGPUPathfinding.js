@@ -1136,6 +1136,21 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
     return this.constructor.worker.findPath(start, goal);
   }
 
+  // ----- NOTE: Path cleaning ----- //
+
+  // Path can be cleaned like normal.
+
+  /**
+   * Snap the path to the grid.
+   * @param {Node[]} path
+   * @returns {Point[]}
+   */
+  snapPathToGrid(path) {
+    // Already done.
+    return path;
+  }
+
+
   // ----- NOTE: End pathfinding ----- //
 
   static async destroy() {

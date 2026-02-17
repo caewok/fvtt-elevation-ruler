@@ -2,7 +2,6 @@
 canvas,
 CONFIG,
 foundry,
-PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
@@ -14,8 +13,7 @@ import { ObstacleOcclusionTest } from "../geometry/ObstacleOcclusionTest.js";
 import { GridCoordinates } from "../geometry/GridCoordinates.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix, Mixin } from "../geometry/mixwith.js";
-import { Draw } from "../geometry/Draw.js";
-import { GraphPathfindingWorld } from "./GraphPathfinding.js";
+import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
 import { ObstacleSweep } from "./ClockwiseSweep.js";
 import {
   Manhattan2dCost,
@@ -49,6 +47,12 @@ Abstract
 - initialize
 - closestNode
 */
+
+export class GriddedCollisionPathfinder extends GraphingPathfinder {
+
+  static get worldClass() { return worldBuilderGriddedCollision(); }
+
+}
 
 
 /**
@@ -101,7 +105,17 @@ export const Node3d = superclass => class extends superclass {
 
 // ----- NOTE: Filter Neighbors ----- //
 
-
+export const SceneGraphFilter = superclass => class extends superclass {
+  /**
+   * Filter the neighbors
+   * @param {GridCoordinates} node
+   * @returns {GridCoordinates[]}
+   */
+  filterNeighbors(neighbors, node) {
+    const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+    return neighbors.filter(n => !sceneGraph.hasCollision(node, n, this.token));
+  }
+};
 
 
 export const ClockwiseSweepFilter = superclass => class extends superclass {
@@ -308,8 +322,8 @@ export const Neighbors3d = superclass => class extends superclass {
  * algorithm to use.
  * @returns {AbstractGridPathfindingWorld}
  */
-export function worldBuilderCollision({ cost, use3d, heuristic, pt3d, neighborFilter } = {}) {
-  const pathCfg = CONFIG[MODULE_ID].simplePathfinding;
+function worldBuilderGriddedCollision({ cost, use3d, heuristic, pt3d, neighborFilter } = {}) {
+  const pathCfg = CONFIG[MODULE_ID].graphPathfinding;
   use3d ??= pathCfg.use3d;
   pt3d ??= pathCfg.pt3d;
   cost ??= pathCfg.cost;
@@ -339,7 +353,7 @@ export function worldBuilderCollision({ cost, use3d, heuristic, pt3d, neighborFi
   switch ( neighborFilter ) {
     case "occlusion": neighborFilter = (use3d || pt3d) ? OcclusionFilter3d : OcclusionFilter2d; break;
     case "clockwise": neighborFilter = ClockwiseSweepFilter; break;
-    neighborsCl = Neighbors2d;
+    case "sceneGraph": neighborFilter = SceneGraphFilter; break;
   }
 
   const classes = [nodeCl, costCl, heuristicCl, neighborsCl, neighborFilterCl];

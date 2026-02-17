@@ -51,7 +51,7 @@ export class GraphingPathfinder extends AbstractPathfinder {
 
     // Determine the graph class to use.
     let graphCl;
-    switch ( CONFIG[MODULE_ID].simplePathfinding.algorithm ) {
+    switch ( CONFIG[MODULE_ID].graphPathfinding.algorithm ) {
       case "astar": graphCl = AStarGraph; break;
       case "breadth": graphCl = BFSGraph; break;
       case "uniform": graphCl = UniformCostGraph; break;
@@ -67,6 +67,12 @@ export class GraphingPathfinder extends AbstractPathfinder {
     graph.debug = this.debug;
     graph.debugDelay = this.debugDelay;
     return graph.findPath(start, goal, signal);
+  }
+
+  destroy() {
+    this.world = null;
+    this.lastGraph = null;
+    super.destroy();
   }
 }
 
@@ -289,7 +295,7 @@ class AbstractGraph {
     start = this.world.buildNode(start);
     goal = this.world.buildNode(goal);
     if ( this.world.nodeIsUnreachable(goal, start) ) {
-      console.error(`${this.constructor.name}|Node unreachable.`, { start, goal });
+      console.warn(`${this.constructor.name}|Node unreachable.`, { start, goal });
       return null;
     }
 
@@ -611,6 +617,13 @@ AbstractPathfinder.js:111 Pathfinder V4s4gx9T3tSXwgzv|{x: 2150, y: 3050, z: 0} -
 	{x: 1560, y: 2700, z: 0}
 	{x: 1750, y: 2650, z: 0}
 
+AbstractPathfinder.js:111 Pathfinder NKZT67jDDiyacusU|{x: 1750, y: 2550, z: 0} --> {x: 1850, y: 2550, z: 0} path has collision at 3:
+	{x: 1750, y: 2550, z: 0}
+	{x: 1590, y: 2498, z: 0}
+	{x: 1600, y: 2290, z: 0}
+	{x: 1810, y: 2300, z: 0}
+	{x: 1850, y: 2550, z: 0}
+
 pf.world = new (worldBuilder())()
 pf.initialize()
 path = await pf.findPath(start, end)
@@ -636,8 +649,8 @@ path = await pf.findPath(start, end)
 AStarPathfinder.drawPath(path)
 
 // Test with token dragging
-CONFIG.elevationruler.simplePathfinding.cost = "terrain"
-CONFIG.elevationruler.simplePathfinding.neighborFilter = "occlusion"
+CONFIG.elevationruler.graphPathfinding.cost = "terrain"
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion"
 
 
 geom = randal.GeometryLib.geometry
@@ -648,7 +661,7 @@ randal.measureMovementPath(waypoints)
 // end.y += 25
 
 
-pathfindingCfg = CONFIG.elevationruler.simplePathfinding;
+pathfindingCfg = CONFIG.elevationruler.graphPathfinding;
 
 pf = new BFSPathfinder(randal)
 pf = new UniformCostPathfinder(randal)

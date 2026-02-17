@@ -26,10 +26,13 @@ import {
   GraphingPathfinder,
 } from "./pathfinding/GraphPathfinding.js";
 
-// ClockwiseSweep Pathfinding
-import { ClockwiseSweepPathfindingNode, ClockwiseSweepPathfindingWorld } from "./pathfinding/ClockwiseSweepPathfindingWorld.js";
+// Gridded collision pathfinding
+import { GriddedCollisionPathfinder } from "./pathfinding/CollisionPathfindingWorld.js";
 
-// WebGPU Pathfinding
+// ClockwiseSweep pathfinding
+import { ClockwiseSweepPathfinder } from "./pathfinding/ClockwiseSweepPathfindingWorld.js";
+
+// WebGPU pathfinding
 import { Terrain, WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 
 // Scene graph
@@ -97,13 +100,13 @@ Hooks.once("init", function() {
      * occlusion
      * }
      */
-    simplePathfinding: {
+    graphPathfinding: {
       algorithm: "astar",   // @type {"astar"|"greedy"|"breadth"|"uniform"}
       use3d: false,         // @type {true|false}
       cost: "foundry",      // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
       heuristic: "foundry", // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
       pt3d: false,          // @type {true|false} Will be true if use3d is true;
-      neighborFilter: "clockwiseSweep",    // @type{"clockwiseSweep"|"occlusion"}
+      neighborFilter: "clockwiseSweep",    // @type{"clockwiseSweep"|"occlusion"|"sceneGraph"}
     },
 
     /**
@@ -132,9 +135,9 @@ Hooks.once("init", function() {
       WebGPUPathfinder,
       WebGPUPathfinderWithWorker,
 
-      ClockwiseSweepPathfindingNode,
-      ClockwiseSweepPathfindingWorld,
+      GriddedCollisionPathfinder,
 
+      ClockwiseSweepPathfinder,
     },
 
     EdgeGraph,
