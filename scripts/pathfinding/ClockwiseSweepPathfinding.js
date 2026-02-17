@@ -70,10 +70,7 @@ export class ClockwiseSweepPathfinder extends GraphingPathfinder {
     // return cleanGridPathPoints(path);
     return super.snapPathToGrid(path);
   }
-
-
 }
-
 
 /**
  * Nodes for the ClockwiseSweep store the sweep polygon.

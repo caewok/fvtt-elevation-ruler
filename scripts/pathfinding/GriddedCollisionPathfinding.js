@@ -54,7 +54,6 @@ export class GriddedCollisionPathfinder extends GraphingPathfinder {
 
 }
 
-
 /**
  * Settings specific to the algorithm used with the graph to define nodes.
  * This is ostensibly stateless. Only saved values should be objects that can be

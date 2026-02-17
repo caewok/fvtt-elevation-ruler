@@ -15,8 +15,8 @@ import { log } from "./util.js";
 import { PATCHER } from "./patching.js";
 import { updatePathfindingControl } from "./module.js";
 import { WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
-import { ClockwiseSweepPathfinder } from "./pathfinding/ClockwiseSweepPathfindingWorld.js";
-import { GriddedCollisionPathfinder } from "./pathfinding/CollisionPathfindingWorld.js";
+import { ClockwiseSweepPathfinder } from "./pathfinding/ClockwiseSweepPathfinding.js";
+import { GriddedCollisionPathfinder } from "./pathfinding/GriddedCollisionPathfinding.js";
 
 const SETTINGS = {
   CONTROLS: {

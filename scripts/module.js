@@ -27,10 +27,10 @@ import {
 } from "./pathfinding/GraphPathfinding.js";
 
 // Gridded collision pathfinding
-import { GriddedCollisionPathfinder } from "./pathfinding/CollisionPathfindingWorld.js";
+import { GriddedCollisionPathfinder } from "./pathfinding/GriddedCollisionPathfinding.js";
 
 // ClockwiseSweep pathfinding
-import { ClockwiseSweepPathfinder } from "./pathfinding/ClockwiseSweepPathfindingWorld.js";
+import { ClockwiseSweepPathfinder } from "./pathfinding/ClockwiseSweepPathfinding.js";
 
 // WebGPU pathfinding
 import { Terrain, WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
