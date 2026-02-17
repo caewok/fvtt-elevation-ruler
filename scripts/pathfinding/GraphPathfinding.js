@@ -571,12 +571,12 @@ export class AStarGraph extends UniformCostGraph {
 Draw = CONFIG.GeometryLib.lib.Draw;
 GridCoordinates3d = CONFIG.GeometryLib.lib.threeD.GridCoordinates3d
 api = game.modules.get("elevationruler").api
-let { GraphingPathfinder } = api.pathfinding;
+let { ClockwiseSweepPathfinder, GriddedCollisionPathfinder, WebGPUPathfinderWithWorker } = api.pathfinding;
 
 let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
 
-pf = new GraphingPathfinder(randal)
+pf = new ClockwiseSweepPathfinder(randal)
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
 
@@ -587,6 +587,9 @@ pf.startPathfinding(start);
 path = await pf._findPath(start, end) // Skip caching
 pf.constructor.drawPath(path)
 Draw.clearDrawings()
+
+
+let { alignPathToGrid, cleanGridPathPoints, straightenPath, fogIsExplored } = api.pathCleaning
 
 
 nodes = [...pf.world.existingNodes.values()]

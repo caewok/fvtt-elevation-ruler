@@ -8,7 +8,7 @@ PIXI,
 "use strict";
 
 import { MODULE_ID } from "../const.js";
-import { GridCoordinates } from "../geometry/GridCoordinates.js";
+import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { PixelCache } from "../geometry/PixelCache.js";
 
 // Assortment of functions used to clean generated paths.
@@ -49,9 +49,7 @@ export function alignPathToGrid(pathPoints, token) {
   // For each segment, retrieve the grid points that do not result in collisions.
   let gridPoints = new Array(pathPoints.length - 1);
   for ( let i = 0, n = pathPoints.length - 1; i < n; i += 1 ) {
-    const a = { x: pathPoints[i].x, y: pathPoints[i].y, isEndpoint: true }; // Drop z for now.
-    const b = { x: pathPoints[i + 1].x, y: pathPoints[i + 1].y, isEndpoint: true };
-    gridPoints[i] = alignSegmentToGrid(a, b, token);
+    gridPoints[i] = alignSegmentToGrid(pathPoints[i], pathPoints[i + 1], token);
   }
 
   // Check dropping the connections between segments.
@@ -60,7 +58,7 @@ export function alignPathToGrid(pathPoints, token) {
   // Deduplicate the remaining points, combining into single array.
   let prev = finalPoints[0];
   const deDupedPoints = [prev];
-  for ( let i = 1, iMax = deDupedPoints.length; i < iMax; i += 1 ) {
+  for ( let i = 1, iMax = finalPoints.length; i < iMax; i += 1 ) {
     const potentialPt = finalPoints[i];
     if ( prev.almostEqual(potentialPt) ) continue;
     deDupedPoints.push(potentialPt);
@@ -73,11 +71,11 @@ export function alignPathToGrid(pathPoints, token) {
  * Shorten connections between segments.
  * Grid points are [gridPt0,... gridPt1, a].
  * Next grid points are [a, gridPt0, ... gridPt1]
- * Connect the b's, dropping all duplicates and converting to grid centers unles.
+ * Connect the b's, dropping all duplicates and converting to grid centers unless collision is found.
  * @param {PIXI.Point[][]} gridPoints
  * @returns {PIXI.Point[]}
  */
-function cleanSegmentGridConnections(gridPoints, token) {
+export function cleanSegmentGridConnections(gridPoints, token) {
   const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
 
   // Drop empty arrays.
@@ -143,14 +141,14 @@ function cleanSegmentGridConnections(gridPoints, token) {
  * Align a single segment of a path to the grid.
  * Keeps the a and b endpoints.
  */
-function alignSegmentToGrid(a, b, token) {
+export function alignSegmentToGrid(a, b, token) {
   const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
   if ( sceneGraph.hasCollision(a, b, token) ) return [a, b];
 
   const gridPoints = canvas.grid.getDirectPath([a, b]);
   const allPoints = [
-    GridCoordinates.fromObject(a),
-    ...gridPoints.map(offset => GridCoordinates.fromOffset(offset)), GridCoordinates.fromObject(b)];
+    GridCoordinates3d.fromObject(a),
+    ...gridPoints.map(offset => GridCoordinates3d.fromOffset(offset)), GridCoordinates3d.fromObject(b)];
   const nPts = allPoints.length;
   if ( nPts < 3 ) return allPoints;
 
@@ -163,7 +161,7 @@ function alignSegmentToGrid(a, b, token) {
     const a2 = allPoints[i + 1];
     if ( sceneGraph.hasCollision(a0, a1, token)
       || sceneGraph.hasCollision(a1, a2, token) ) {
-      allPoints[i] = GridCoordinates.fromObject(foundry.utils.closestPointToSegment(a1, a, b));
+      allPoints[i] = GridCoordinates3d.fromObject(foundry.utils.closestPointToSegment(a1, a, b));
     }
 
     if ( i === j ) break;
@@ -172,7 +170,7 @@ function alignSegmentToGrid(a, b, token) {
     const b2 = allPoints[j - 1];
     if ( sceneGraph.hasCollision(b0, b1, token)
       || sceneGraph.hasCollision(b1, b2, token) ) {
-      allPoints[j] = GridCoordinates.fromObject(foundry.utils.closestPointToSegment(b1, a, b));
+      allPoints[j] = GridCoordinates3d.fromObject(foundry.utils.closestPointToSegment(b1, a, b));
     }
   }
 
@@ -260,7 +258,7 @@ function distanceSquaredToSegment(a, b, pt) {
  *   - @param {number} y
  *   - @returns {boolean}  True if explored, false if unexplored. If no fog, always true.
  */
-export function fogIsExploredFn() {
+export function fogIsExplored() {
   const tex = canvas.fog.exploration?.getTexture();
   if ( !tex || !tex.valid ) return undefined;
 

@@ -38,6 +38,9 @@ import { Terrain, WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } 
 // Scene graph
 import { EdgeGraph } from "./EdgeGraph.js";
 
+// Path cleaning
+import { cleanGridPathPoints, alignPathToGrid, straightenPath, fogIsExplored } from "./pathfinding/path_cleaning.js";
+
 // Load the geometry library.
 import "./geometry/registration.js";
 
@@ -138,6 +141,14 @@ Hooks.once("init", function() {
       GriddedCollisionPathfinder,
 
       ClockwiseSweepPathfinder,
+    },
+
+    pathCleaning: {
+      cleanGridPathPoints,
+      alignPathToGrid,
+      alignSegmentToGrid,
+      straightenPath,
+      fogIsExplored,
     },
 
     EdgeGraph,

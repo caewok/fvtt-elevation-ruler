@@ -107,8 +107,8 @@ export class AbstractPathfinder {
 
     // Debugging: Check that path is valid.
     if ( !this.validatePath(path, start, goal, prefix) ) return null;
-    // path = Settings.get(Settings.KEYS.PATHFINDING.SNAP_TO_GRID) ? this.snapPathToGrid(path) : this.cleanPath(path);
-    // if ( !this.validatePath(path, start, goal, `${prefix}|Cleaned`) ) return null;
+    path = Settings.get(Settings.KEYS.PATHFINDING.SNAP_TO_GRID) ? this.snapPathToGrid(path) : this.cleanPath(path);
+    if ( !this.validatePath(path, start, goal, `${prefix}|Cleaned`) ) return null;
 
     this.cachedPaths.set(goal.key, path);
     return path;
