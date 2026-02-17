@@ -95,7 +95,7 @@ export class AbstractPathfinder {
     const prefix = `${this.constructor.name} ${id}`;
     if ( signal.aborted ) return null;
     console.time(`${prefix}|findPath`);
-    if ( PIXI.Point.distanceBetween(start, goal) > (6 * canvas.grid.size) ) { console.debug(`${prefix}|${start} --> ${goal}:`); }
+    if ( PIXI.Point.distanceBetween(start, goal) > (6 * canvas.grid.size) ) log(`${prefix}|${start} --> ${goal}:`); // For debugging.
     let path = await this._findPath(start, goal, signal);
     console.timeEnd(`${prefix}|findPath`);
 
@@ -106,9 +106,6 @@ export class AbstractPathfinder {
 
     // Debugging: Check that path is valid.
     if ( !this.validatePath(path, start, goal, prefix) ) return null;
-
-      const ClockwiseSweepPolygon = foundry.canvas.geometry.ClockwiseSweepPolygon;
-
     this.cachedPaths.set(goal.key, path);
     return path;
   }
@@ -138,6 +135,7 @@ export class AbstractPathfinder {
         return false;
       }
     }
+    return true;
   }
 
   async _findPath(_start, _goal, _signal) { console.error("Child class must define _findPath."); }

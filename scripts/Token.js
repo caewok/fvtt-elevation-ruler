@@ -10,7 +10,7 @@ PATCHES.BASIC = {};
 import { Settings } from "./settings.js";
 import { MODULE_ID, PATHFINDING_ID } from "./const.js";
 import { GridCoordinates3d } from "./geometry/3d/GridCoordinates3d.js";
-import { tokenTopLeftFromCenter } from "./util.js";
+import { tokenTopLeftFromCenter, log } from "./util.js";
 
 // ----- NOTE: Hooks ----- //
 
@@ -125,7 +125,7 @@ async function pathfind(path, wrapped, waypoints, options, token) {
     waypoints.forEach(pt => waypointStr.push(`\t${GridCoordinates3d.fromLocationWithElevation(pt, pt.elevation)}`));
     const start = GridCoordinates3d.fromLocationWithElevation(foundryStart, foundryStart.elevation);
     const end = GridCoordinates3d.fromLocationWithElevation(foundryEnd, foundryEnd.elevation);
-    console.debug(`Found path for ${start} --> ${end}\n${pathStr.join("\n")}\nWaypoints:\n${waypointStr.join("\n")}`);
+    log(`Found path for ${start} --> ${end}\n${pathStr.join("\n")}\nWaypoints:\n${waypointStr.join("\n")}`);
   }
 
   // Rerun findMovementPath to account for regions, etc.
