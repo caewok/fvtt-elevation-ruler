@@ -1,6 +1,7 @@
 /* globals
 canvas,
 CONFIG,
+CONST,
 foundry,
 PIXI,
 */
@@ -193,6 +194,7 @@ export function removeDuplicatePoints(points) {
  * @returns {number}
  */
 function distanceSquaredToSegment(a, b, pt) {
+  if ( a.almostEqual(b) ) return PIXI.Point.distanceSquaredBetween(a, pt); // closestPoint throws error if a = b.
   const closestPt = foundry.utils.closestPointToSegment(pt, a, b);
   return PIXI.Point.distanceSquaredBetween(pt, closestPt);
 }
@@ -226,28 +228,164 @@ function *neighbors(offsetPt, a, b, token, reverse = false) {
   }
 }
 
+
 /**
  * Clean a set of grid path points by dropping intermediate points in the same direction.
  * So if moving diagonally NE, drop all points until direction changes.
- * @param {PIXI.Point[]} pathPoints
- * @returns {PIXI.Point[]}
+ *
+ * Also removes U-turns. E.g., A -> B -> A becomes A.
+ *
+ * If diagonal movement is allowed, will change A -> B -> C to A -> C if A and C are neighbors
+ * and collision-free.
+ *
+ * @param {GridCoordinates[]} path
+ * @returns {GridCoordinates[]}
  */
-export function cleanGridPathPoints(pathPoints) {
-  if ( pathPoints.length < 3 ) return pathPoints;
-  let a = pathPoints[0];
-  let b = pathPoints[1];
+export function optimizeGridPath(path, { token, checkDiagonals = Boolean(token), dropIntermediate = true } = {}) {
+  if ( path.length < 3 ) return path;
+  checkDiagonals &&= canvas.grid.diagonals !== CONST.GRID_DIAGONALS.ILLEGAL;
+
+  const testFn = checkDiagonals && dropIntermediate ? composeOr(isUTurn, skipIntermediate, canShortcutDiagonal)
+    : checkDiagonals ? composeOr(isUTurn, canShortcutDiagonal)
+      : dropIntermediate ? composeOr(isUTurn, skipIntermediate)
+        : isUTurn;
+  let a = path[0];
+  let b = path[1];
   const cleanedPts = [a];
-  for ( let i = 2, n = pathPoints.length - 1; i < n; i += 1 ) {
-    const c = pathPoints[i];
-    const abDir = { x: b.x - a.x, y: b.y - a.y };
-    const cbDir = { x: c.x - b.x, y: c.y - b.y};
-    if ( !(abDir.x.almostEqual(cbDir.x) && abDir.y.almostEqual(cbDir.y)) ) cleanedPts.push(b);
+  for ( let i = 2, n = path.length - 1; i < n; i += 1 ) {
+    const c = path[i];
+    if ( testFn(a, b, c, token) ) { // Skip b; don't update a.
+      b = c;
+      continue;
+    }
+    cleanedPts.push(b);
     a = b;
     b = c;
   }
-  cleanedPts.push(pathPoints.at(-1));
+  cleanedPts.push(path.at(-1));
   return cleanedPts;
 }
+
+const composeOr = (...funcs) => (...args) => funcs.some(func => func(...args));
+
+/** Helper to cleanGridPath */
+function skipIntermediate(a, b, c) {
+  const abDelta = b.subtract(a);
+  const bcDelta = c.subtract(b);
+  const out = abDelta.almostEqual(bcDelta);
+  abDelta.release();
+  bcDelta.release();
+  return out;
+}
+
+/** Helper to removePathUTurns */
+function isUTurn(a, _b, c) { return a.almostEqual(c); }
+
+/** Helper to removePathUTurns */
+function canShortcutDiagonal(a, _b, c, token) {
+  return is2dDiagonal(a, c) && !CONFIG[MODULE_ID].sceneGraph.hasCollision(a, c, token);
+}
+
+
+/**
+ * Clean a set of grid path points by dropping intermediate points in the same direction.
+ * So if moving diagonally NE, drop all points until direction changes.
+ * @param {GridCoordinates[]} path
+ * @returns {GridCoordinates[]}
+ */
+
+export function cleanGridPath(path) {
+  if ( path.length < 3 ) return path;
+  let a = path[0];
+  let b = path[1];
+  const cleanedPts = [a];
+  const abDelta = a.constructor.tmp;
+  const bcDelta = b.constructor.tmp;
+  for ( let i = 2, n = path.length - 1; i < n; i += 1 ) {
+    const c = path[i];
+    b.subtract(a, abDelta);
+    c.subtract(b, bcDelta);
+    if ( abDelta.almostEqual(bcDelta) ) { // Skip b; don't update a.
+      b = c;
+      continue;
+    }
+    cleanedPoints.push(b);
+    a = b;
+    b = c;
+  }
+  abDelta.release();
+  bcDelta.release();
+  cleanedPts.push(path.at(-1)); // Add last c.
+  return cleanedPts;
+}
+
+
+/**
+ * Remove u-turns from a path
+ * @param {GridCoordinates[]} path
+ * @returns {GridCoordinates[]}
+ */
+/* function removePathUTurns(path) {
+  if ( path.length < 3 ) return path;
+  let a = path[0];
+  let b = path[1];
+  const cleanedPts = [a];
+  for ( let i = 2, n = path.length - 1; i < n; i += 1 ) {
+    const c = path[i];
+    if ( a.almostEqual(c) ) { // Skip b; don't update a.
+      b = c;
+      continue;
+    }
+    cleanedPts.push(b);
+    a = b;
+    b = c;
+  }
+  cleanedPts.push(path.at(-1)); // Add last c.
+  return cleanedPts;
+}
+*/
+
+/**
+ * Shortcut grid corners.
+ * A -> B -> C becomes A -> C.
+ * A -> B -> C -> D
+ * Only done if no collision and A and C .
+ * @param {GridCoordinates[]} path
+ * @returns {GridCoordinates[]}
+ */
+/* function shortcutGridCorners(path, token) {
+  if ( path.length < 3
+    || !token
+    || canvas.grid.diagonals === CONST.GRID_DIAGONALS.ILLEGAL ) return path;
+  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+  let a = path[0];
+  let b = path[1];
+  const cleanedPts = [a];
+  for ( let i = 2, n = path.length - 1; i < n; i += 1 ) {
+    const c = path[i];
+    if ( is2dDiagonal(a, c) && !sceneGraph.hasCollision(a, c, token) ) {  // Skip b; don't update a.
+      b = c;
+      continue;
+    }
+    cleanedPts.push(b);
+    a = b;
+    b = c;
+  }
+  cleanedPts.push(path.at(-1)); // Add last c.
+  return cleanedPts;
+}
+*/
+
+/**
+ * Returns true if point b is diagonal to point a.
+ * @param {GridCoordinates} a
+ * @param {GridCoordinates} b
+ * @returns {boolean}
+ */
+function is2dDiagonal(a, b) {
+  return Math.abs(a.i - b.i) === 1 && Math.abs(a.j - b.j) === 1;
+}
+
 
 /**
  * Reverse Ramer–Douglas–Peucker algorithm to straighten points.
