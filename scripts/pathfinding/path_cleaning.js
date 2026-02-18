@@ -8,11 +8,223 @@ PIXI,
 "use strict";
 
 import { MODULE_ID } from "../const.js";
+import { GridCoordinates } from "../geometry/GridCoordinates.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { PixelCache } from "../geometry/PixelCache.js";
 
 // Assortment of functions used to clean generated paths.
 // Straighten, snap-to-grid, fog test.
+
+/**
+ * Check the path for collisions
+ * @param {Point[]} path
+ * @param {Token} token
+ * @returns {boolean}
+ */
+export function pathIsValid(path, token) {
+  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+  for ( let i = 0, iMax = path.length - 1; i < iMax; i += 1 ) {
+    if ( sceneGraph.hasCollision(path[i], path[i + 1], token) ) return false;
+  }
+  return true;
+}
+
+/**
+ * @param {Point[]} path
+ * @param {Token} token
+ * @returns {GridCoordinates3d[]}
+ */
+export function snapPathToGrid(path, token) {
+  if ( path.length < 2 ) return path;
+
+  // Get grid points between each segment of the path.
+  const gridPointsArr = [];
+  for ( let i = 0, iMax = path.length - 1; i < iMax; i += 1 ) {
+    gridPointsArr.push(snapSegmentToGrid(path[i], path[i + 1], token));
+  }
+
+  // Combine the segments ends, converting to grid points where possible.
+  while ( gridPointsArr.length > 1 ) {
+    const gridPoints2 = gridPointsArr.pop();
+    const gridPoints1 = gridPointsArr.pop();
+    gridPointsArr.push(cleanSegmentGridConnections(gridPoints1, gridPoints2, token));
+  }
+  return removeDuplicatePoints(gridPointsArr[0]);
+}
+
+
+/**
+ * Helper for snapPathToGrid.
+ * Takes arrays of points and joins them.
+ * E.g., [a, ..., b] and [b, ..., c]
+ * Reduce to [a, ..., gridded b or b, ... c]
+ * Drops all duplicates and converts sub-endpoints to grid centers unless collision is found.
+ * @param {GridCoordinates3d[][]} gridPoints
+ * @returns {GridCoordinates3d[]}
+ */
+function cleanSegmentGridConnections(gridPoints1, gridPoints2, token) {
+  // Options:
+  // [][] --> return []
+  // [...][] or [][...]--> return [...]
+  if ( !gridPoints1.length ) return gridPoints2;
+  if ( !gridPoints2.length ) return gridPoints1;
+
+  // [..., b1][b2, ...]
+  // • if a === b, return [..., offset a, ... ]
+  // • if a ≠ b, return [..., offset a -> offset b, ...]
+  const b1 = gridPoints1.pop();
+  const b2 = gridPoints2.shift();
+  const adjB1 = b1.clone().centerToOffset();
+  if ( b1.almostEqual(b2) ) {
+    const n = locateValidOffset(adjB1, gridPoints1.at(-1) || b1, gridPoints2.at(0) || b2, token);
+    return n ? [...gridPoints1, n, ...gridPoints2] : [...gridPoints1, b1, ...gridPoints2];
+  }
+
+  const adjB2 = b2.clone().centerToOffset();
+  const [aN, bN] = locateValidABOffset(adjB1, adjB2, gridPoints1.at(-1) || b1, gridPoints2.at(0) || b2, token);
+  if ( aN && bN ) return [...gridPoints1, aN, bN, ...gridPoints2];
+  else if ( aN ) return [...gridPoints1, aN, b2, ...gridPoints2];
+  else if ( bN ) return [...gridPoints1, b1, bN, ...gridPoints2];
+  else return [...gridPoints1, b1, b2, ...gridPoints2];
+}
+
+/**
+ * Get the valid (2d) neighbors to a grid point.
+ * Uses canvas.grid so it respects diagonal rules.
+ */
+function gridNeighbors(pt) {
+  const pt2d = GridCoordinates.fromObject(pt);
+  const offsets = canvas.grid.getAdjacentOffsets(pt2d);
+  pt2d.release();
+  return offsets.map(offset => GridCoordinates3d.fromOffset(offset));
+}
+
+/**
+ * Between a and b, find grid center points that will create a path without colliding.
+ * @param {Point} a
+ * @param {Point} b
+ * @param {Token} token
+ * @returns {GridCoordinates3d[a, ..., b]}
+ */
+function snapSegmentToGrid(a, b, token) {
+  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+  if ( sceneGraph.hasCollision(a, b, token) ) return [a, b];
+  const gridPoints = canvas.grid.getDirectPath([a, b]);
+  const allPoints = removeDuplicatePoints([
+    GridCoordinates3d.fromObject(a),
+    ...gridPoints.map(offset => GridCoordinates3d.fromOffset(offset)), GridCoordinates3d.fromObject(b)]);
+
+  // Could do either middle-out or outside-in.
+  // Here, trying outside-in.
+  // Adjust points at either end, and walk to middle.
+  // At each step, test variations on
+  // a --> adjA does not collide.
+  // adjB --> b does not collide.
+  // adjA --> adjB does not collide.
+  allPointsLoop: for ( let i = 1, j = allPoints.length - 2; i <= j; i += 1, j -= 1 ) {
+    const a0 = allPoints[i - 1];
+    const b0 = allPoints[j + 1];
+    const adjA = allPoints[i];
+
+    // Neighbors gives options for a0 --> aN that do not have a collision.
+    // Test whether aN --> b0 has collision.
+    if ( i === j ) {
+      allPoints[i] = locateValidOffset(adjA, a0, b0, token);
+      if ( !allPoints[i] ) console.warn(`snapSegmentToGrid failed to find valid path for ${i}.`, { a, b });
+      continue;
+    }
+
+    // Neighbors gives options for a0 --> aN that do not have a collision.
+    // Neighbors gives options for bN --> b0 that do not have a collision.
+    // Test whether aN --> bN has a collision. Try different combinations.
+    const adjB = allPoints[j];
+    const [aN, bN] = locateValidABOffset(adjA, adjB, a, b, token);
+    allPoints[i] = aN;
+    allPoints[j] = bN;
+    if ( !(aN || bN) ) console.warn(`snapSegmentToGrid failed to find valid path for ${i}, ${j}.`, { a, b });
+  }
+  return allPoints.filter(pt => Boolean(pt));
+}
+
+function locateValidOffset(adjA, a, b, token) {
+  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+  for ( const aN of neighbors(adjA, a, b, token, false) ) {
+    if ( sceneGraph.hasCollision(aN, b, token) ) continue;
+    return aN;
+  }
+  return null;
+}
+
+function locateValidABOffset(adjA, adjB, a, b, token) {
+  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+  for ( const aN of neighbors(adjA, a, b, token, false) ) {
+    for ( const bN of neighbors(adjB, a, b, token, true) ) {
+      if ( sceneGraph.hasCollision(aN, bN, token) ) continue;
+      return [aN, bN];
+    }
+  }
+  return [];
+}
+
+/**
+ * Remove duplicate points in an array.
+ * @param {PIXI.Point[]|Point3d[]} points
+ * @returns {PIXI.Point[]|Point3d[]} New array with duplicates removed.
+ */
+export function removeDuplicatePoints(points) {
+  let prev = points[0];
+  const deDupedPoints = [prev];
+  for ( let i = 1, iMax = points.length; i < iMax; i += 1 ) {
+    const potentialPoint = points[i];
+    if ( prev.almostEqual(potentialPoint) ) continue;
+    deDupedPoints.push(potentialPoint);
+    prev = potentialPoint;
+  }
+  return deDupedPoints;
+}
+
+/**
+ * Distance squared from point to a segment a|b.
+ * If point is between a and b, this is the perpendicular distance squared.
+ * Otherwise, it is the distance squared to the closer of a or b.
+ * @param {Point} a
+ * @param {Point} b
+ * @param {Point} pt
+ * @returns {number}
+ */
+function distanceSquaredToSegment(a, b, pt) {
+  const closestPt = foundry.utils.closestPointToSegment(pt, a, b);
+  return PIXI.Point.distanceSquaredBetween(pt, closestPt);
+}
+
+
+/**
+ * For a given offset point to the segment a|b, determine if it or its neighbors
+ * have no collisions between a and the proposed offset.
+ * @param {GridCoordinates3d} a
+ * @param {GridCoordinates3d} b
+ * @param {GridCoordinates3d} offsetPt
+ * @param {Token} token
+ * @param {boolean} [reverse=false]         If reverse, test the collision for offset -> b instead of a --> offset.
+ * @returns {GridCoordinates3d} Point that does not have a collision in a --> offset (or offset --> b).
+ */
+function *neighbors(offsetPt, a, b, token, reverse = false) {
+  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+  const collisionFn = reverse
+    ? n => sceneGraph.hasCollision(n, b, token)
+    : n => sceneGraph.hasCollision(a, n, token);
+
+  if ( !collisionFn(offsetPt) ) yield offsetPt;
+
+  // Test each neighbor in turn. Prioritize by closest to the line a|b.
+  // Don't repeat a or b.
+  const neighbors = gridNeighbors(offsetPt).filter(n => !(a.almostEqual(n) || b.almostEqual(n)));
+  neighbors.sort((n0, n1) => distanceSquaredToSegment(a, b, n0) - distanceSquaredToSegment(a, b, n1));
+  for ( const n of neighbors ) {
+    if ( collisionFn(n) ) continue;
+    yield n;
+  }
+}
 
 /**
  * Clean a set of grid path points by dropping intermediate points in the same direction.
@@ -35,157 +247,6 @@ export function cleanGridPathPoints(pathPoints) {
   }
   cleanedPts.push(pathPoints.at(-1));
   return cleanedPts;
-}
-
-/**
- * Align the path to the grid.
- * Will only align path to the extent it does not collide with a wall.
- * @param {PIXI.Point[]} pathPoints
- * @returns {PIXI.Point[]}
- */
-export function alignPathToGrid(pathPoints, token) {
-  if ( pathPoints.length < 2 ) return pathPoints;
-
-  // For each segment, retrieve the grid points that do not result in collisions.
-  let gridPoints = new Array(pathPoints.length - 1);
-  for ( let i = 0, n = pathPoints.length - 1; i < n; i += 1 ) {
-    gridPoints[i] = alignSegmentToGrid(pathPoints[i], pathPoints[i + 1], token);
-  }
-
-  // Check dropping the connections between segments.
-  const finalPoints = cleanSegmentGridConnections(gridPoints, token);
-
-  // Deduplicate the remaining points, combining into single array.
-  let prev = finalPoints[0];
-  const deDupedPoints = [prev];
-  for ( let i = 1, iMax = finalPoints.length; i < iMax; i += 1 ) {
-    const potentialPt = finalPoints[i];
-    if ( prev.almostEqual(potentialPt) ) continue;
-    deDupedPoints.push(potentialPt);
-    prev = potentialPt;
-  }
-  return deDupedPoints;
-}
-
-/**
- * Shorten connections between segments.
- * Grid points are [gridPt0,... gridPt1, a].
- * Next grid points are [a, gridPt0, ... gridPt1]
- * Connect the b's, dropping all duplicates and converting to grid centers unless collision is found.
- * @param {PIXI.Point[][]} gridPoints
- * @returns {PIXI.Point[]}
- */
-export function cleanSegmentGridConnections(gridPoints, token) {
-  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
-
-  // Drop empty arrays.
-  gridPoints = gridPoints.filter(arr => arr.length);
-
-  // Store the final array of combined points.
-  const finalPoints = gridPoints[0];
-
-  // Compare two of the point arrays and attempt to combine.
-  for ( let i = 1, n = gridPoints.length; i < n; i += 1 ) {
-    const nextPts = gridPoints[i];
-
-    // Examine 3 points into the segment at the linked ends.
-    let a0 = finalPoints.at(-1);
-    let b0 = finalPoints.at(-2); // 1, -2 may be undefined.
-    let a1 = nextPts.at(0);
-    let b1 = nextPts.at(1);
-
-    // If a0 and a1 are equal, can remove a0.
-    if ( !a0.x.almostEqual(a1.x) || !a0.y.almostEqual(a1.y) ) {
-      // At this point, [...b0, a0], [a1, b1, ...].
-      // Attempt to center each in turn.
-      const a0c = a0.center;
-      const a1c = a1.center;
-      if ( !(sceneGraph.hasCollision(b0, a0c, a1) || sceneGraph.hasCollision(b0, a0, a1)) ) a0 = a0c;
-      if ( !sceneGraph.hasCollision(a0, a1c, b1) ) a1 = a1c;
-      if ( !a0.x.almostEqual(a1.x) || !a0.y.almostEqual(a1.y) ) {
-        finalPoints.push(...nextPts);
-        continue;
-      }
-    }
-    finalPoints.pop(); // Remove a0.
-
-    // If no collision between the next two points, can remove a1.
-    if ( !b0 || !b1 || sceneGraph.hasCollision(b0, b1, token) ) {
-      finalPoints.push(...nextPts);
-      continue;
-    }
-    nextPts.shift(); // Remove a1.
-
-    if ( !b0.x.almostEqual(b1.x) || !b0.y.almostEqual(b1.y) ) {
-      // At this point, b0 --> b1.
-      // Attempt to center each in turn.
-      const b0c = b0.center;
-      const b1c = b1.center;
-      const prevPt = finalPoints.at(-2); // Points a0, a1 already removed, so [...prevPt, b0], [b1, nextPt,...]
-      const nextPt = nextPts.at(1);
-      if ( !(sceneGraph.hasCollision(prevPt, b0c, b1c) || sceneGraph.hasCollision(prevPt, b0c, b1)) ) b0 = b0c;
-      if ( !sceneGraph.hasCollision(b0, b1c, nextPt) ) b1 = b1c;
-      if ( !b0.x.almostEqual(b1.x) || !b0.y.almostEqual(b1.y) ) {
-        finalPoints.push(...nextPts);
-        continue;
-      }
-    }
-    finalPoints.pop(); // Remove b0.
-    finalPoints.push(...nextPts);
-  }
-  return finalPoints;
-}
-
-
-/**
- * Align a single segment of a path to the grid.
- * Keeps the a and b endpoints.
- */
-export function alignSegmentToGrid(a, b, token) {
-  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
-  if ( sceneGraph.hasCollision(a, b, token) ) return [a, b];
-
-  const gridPoints = canvas.grid.getDirectPath([a, b]);
-  const allPoints = [
-    GridCoordinates3d.fromObject(a),
-    ...gridPoints.map(offset => GridCoordinates3d.fromOffset(offset)), GridCoordinates3d.fromObject(b)];
-  const nPts = allPoints.length;
-  if ( nPts < 3 ) return allPoints;
-
-  // To maximize grid spaces, move from outside in at both ends of the segment.
-  // Adjust points at either end, and walk to middle.
-  // Test if a --> b has collision. If so, change a to the line.
-  for ( let i = 1, j = nPts - 2; i <= j; i += 1, j -= 1 ) {
-    const a0 = allPoints[i - 1];
-    const a1 = allPoints[i];
-    const a2 = allPoints[i + 1];
-    if ( sceneGraph.hasCollision(a0, a1, token)
-      || sceneGraph.hasCollision(a1, a2, token) ) {
-      allPoints[i] = GridCoordinates3d.fromObject(foundry.utils.closestPointToSegment(a1, a, b));
-    }
-
-    if ( i === j ) break;
-    const b0 = allPoints[j + 1];
-    const b1 = allPoints[j];
-    const b2 = allPoints[j - 1];
-    if ( sceneGraph.hasCollision(b0, b1, token)
-      || sceneGraph.hasCollision(b1, b2, token) ) {
-      allPoints[j] = GridCoordinates3d.fromObject(foundry.utils.closestPointToSegment(b1, a, b));
-    }
-  }
-
-  // For any non-centered points, check if we can move to an adjacent grid square. (Skip start and end.)
-  for ( let i = 1, n = nPts - 2; i < n; i += 1 ) {
-    const a1 = allPoints[i];
-    const center = a1.center;
-    if ( a1.almostEqual(center) ) continue;
-
-    const a0 = allPoints[i - 1];
-    const a2 = allPoints[i + 1];
-    if ( sceneGraph.hasCollision(a0, center, token) || sceneGraph.hasCollision(a2, center, token) ) continue;
-    allPoints[i] = center;
-  }
-  return allPoints;
 }
 
 /**
@@ -233,20 +294,6 @@ export function straightenPath(pathPoints, token, _depth = 0) {
   const firstHalf = straightenPath(pathPoints.slice(0, farthestIndex + 1), token, _depth += 1);
   const secondHalf = straightenPath(pathPoints.slice(farthestIndex), token, _depth += 1);
   return [...firstHalf, ...secondHalf.slice(1)];
-}
-
-/**
- * Distance squared from point to a segment a|b.
- * If point is between a and b, this is the perpendicular distance squared.
- * Otherwise, it is the distance squared to the closer of a or b.
- * @param {Point} a
- * @param {Point} b
- * @param {Point} pt
- * @returns {number}
- */
-function distanceSquaredToSegment(a, b, pt) {
-  const closestPt = foundry.utils.closestPointToSegment(pt, a, b);
-  return PIXI.Point.distanceSquaredBetween(pt, closestPt);
 }
 
 /**

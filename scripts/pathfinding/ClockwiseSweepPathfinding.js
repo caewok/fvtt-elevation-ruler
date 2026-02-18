@@ -66,7 +66,7 @@ export class ClockwiseSweepPathfinder extends GraphingPathfinder {
 
     // TODO: Could run collision pathfinding within a's sweep to find best grid path to b.
 
-    // path = alignPathToGrid(path, this.token);
+    // path = snapPathToGrid(path, this.token);
     // return cleanGridPathPoints(path);
     return super.snapPathToGrid(path);
   }

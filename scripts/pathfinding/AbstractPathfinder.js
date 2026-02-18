@@ -9,7 +9,7 @@ PIXI,
 import { Draw } from "../geometry/Draw.js";
 import { Settings } from "../settings.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
-import { alignPathToGrid, cleanGridPathPoints, straightenPath } from "./path_cleaning.js";
+import { snapPathToGrid, cleanGridPathPoints, straightenPath } from "./path_cleaning.js";
 import { log } from "../util.js";
 
 /* Pathfinding class.
@@ -120,26 +120,31 @@ export class AbstractPathfinder {
    * @returns {boolean}
    */
   validatePath(path, start, goal, prefix = "Pathfinder") {
-    const pathStr = [];
-    path.forEach(pt => pathStr.push(`\t${pt}`));
-    log(`${prefix}|${start} --> ${goal}:\n${pathStr.join("\n")}`);
+    const pathString = this.pathString(path);
+    log(`${prefix}|${start} --> ${goal}:\n${pathString}`);
     if ( !path[0].almostEqual(start) ) {
-      console.error(`${prefix}|${start} --> ${goal} start incorrect:\n${pathStr.join("\n")}`);
+      console.error(`${prefix}|${start} --> ${goal} start incorrect:\n${pathString}`);
       return false;
     }
     if ( !path.at(-1).almostEqual(goal) ) {
-      console.error(`${prefix}|${start} --> ${goal} end incorrect:\n${pathStr.join("\n")}`);
+      console.error(`${prefix}|${start} --> ${goal} end incorrect:\n${pathString}`);
       return false;
     }
 
     const ClockwiseSweepPolygon = foundry.canvas.geometry.ClockwiseSweepPolygon;
     for ( let i = 0, iMax = path.length - 1; i < iMax; i += 1 ) {
       if ( ClockwiseSweepPolygon.testCollision(path[i], path[i + 1], { mode: "any", type: "move" }) ) {
-        console.error(`${prefix}|${start} --> ${goal} path has collision at ${i}:\n${pathStr.join("\n")}`);
+        console.error(`${prefix}|${start} --> ${goal} path has collision at ${i}:\n${pathString}`);
         return false;
       }
     }
     return true;
+  }
+
+  pathString(path) {
+    const pathStr = [];
+    path.forEach(pt => pathStr.push(`\t${pt}`));
+    return pathStr.join("\n");
   }
 
   async _findPath(_start, _goal, _signal) { console.error("Child class must define _findPath."); }
@@ -160,7 +165,7 @@ export class AbstractPathfinder {
    * @returns {Point[]}
    */
   snapPathToGrid(path) {
-    path = alignPathToGrid(path, this.token);
+    path = snapPathToGrid(path, this.token);
     return cleanGridPathPoints(path);
   }
 
