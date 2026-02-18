@@ -157,7 +157,6 @@ export function segmentBounds(a, b) {
   return new PIXI.Rectangle(xMinMax.min, yMinMax.min, xMinMax.max - xMinMax.min, yMinMax.max - yMinMax.min);
 }
 
-
 /**
  * Helper to inject configuration html into the application config.
  */

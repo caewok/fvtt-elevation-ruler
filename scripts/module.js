@@ -33,13 +33,13 @@ import { GriddedCollisionPathfinder } from "./pathfinding/GriddedCollisionPathfi
 import { ClockwiseSweepPathfinder } from "./pathfinding/ClockwiseSweepPathfinding.js";
 
 // WebGPU pathfinding
-import { Terrain, WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
+import { Terrain, WebGPUPathfinderWithFakeWorker, WebGPUPathfinder, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 
 // Scene graph
 import { EdgeGraph } from "./EdgeGraph.js";
 
 // Path cleaning
-import { cleanGridPathPoints, alignPathToGrid, straightenPath, fogIsExplored } from "./pathfinding/path_cleaning.js";
+import { cleanGridPathPoints, pathIsValid, snapPathToGrid, removeDuplicatePoints, straightenPath, fogIsExplored } from "./pathfinding/path_cleaning.js";
 
 // Load the geometry library.
 import "./geometry/registration.js";
@@ -136,7 +136,7 @@ Hooks.once("init", function() {
 
       Terrain,
       WebGPUPathfinder,
-      WebGPUPathfinderWithWorker,
+      WebGPUPathfinderWithFakeWorker,
 
       GriddedCollisionPathfinder,
 
@@ -144,10 +144,11 @@ Hooks.once("init", function() {
     },
 
     pathCleaning: {
+      pathIsValid,
       cleanGridPathPoints,
-      alignPathToGrid,
-      alignSegmentToGrid,
+      snapPathToGrid,
       straightenPath,
+      removeDuplicatePoints,
       fogIsExplored,
     },
 

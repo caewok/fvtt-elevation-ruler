@@ -14,7 +14,7 @@ import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { log } from "./util.js";
 import { PATCHER } from "./patching.js";
 import { updatePathfindingControl } from "./module.js";
-import { WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
+import { WebGPUPathfinder, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 import { ClockwiseSweepPathfinder } from "./pathfinding/ClockwiseSweepPathfinding.js";
 import { GriddedCollisionPathfinder } from "./pathfinding/GriddedCollisionPathfinding.js";
 
@@ -212,7 +212,7 @@ export class Settings extends ModuleSettingsAbstract {
 
   static async initializePathfinding(algorithm) {
     // Destroy prior pathfinding.
-    await WebGPUPathfinderWithWorker.terminate();
+    await WebGPUPathfinder.terminate();
 
     // Initialize pathfinding.
     const ALG = Settings.KEYS.PATHFINDING.ALGORITHM_CHOICES;
@@ -220,7 +220,7 @@ export class Settings extends ModuleSettingsAbstract {
     if ( algorithm === ALG.SIMPLE ) algorithm = CONFIG[MODULE_ID].graphPathfinding.algorithm;
     switch ( algorithm ) {
       case ALG.WEBGPU:
-      case "webgpu": await WebGPUPathfinderWithWorker.initialize(); break;
+      case "webgpu": await WebGPUPathfinder.initialize(); break;
     }
 
     // Set up pathfinding for each token on the canvas.
@@ -229,7 +229,7 @@ export class Settings extends ModuleSettingsAbstract {
 
   static async toggleSnapToGrid(enable) {
     const PF = Settings.KEYS.PATHFINDING;
-    if ( Settings.get(PF.ALGORITHM) === PF.ALGORITHM_CHOICES.WEBGPU ) await WebGPUPathfinderWithWorker.initialize();
+    if ( Settings.get(PF.ALGORITHM) === PF.ALGORITHM_CHOICES.WEBGPU ) await WebGPUPathfinder.initialize();
   }
 
   static togglePathfinding(enable) {
@@ -292,7 +292,7 @@ function pathfinderClass(algorithm) {
   const ALG = Settings.KEYS.PATHFINDING.ALGORITHM_CHOICES;
   algorithm ??= Settings.get(Settings.KEYS.PATHFINDING.ALGORITHM);
   switch ( algorithm ) {
-    case ALG.WEBGPU: return WebGPUPathfinderWithWorker;
+    case ALG.WEBGPU: return WebGPUPathfinder;
     case ALG.COLLISION: return GriddedCollisionPathfinder;
     case ALG.CLOCKWISE_SWEEP: return ClockwiseSweepPathfinder;
     default: throw Error("Pathfinder class not recognized.");
