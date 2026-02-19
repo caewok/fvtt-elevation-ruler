@@ -35,31 +35,45 @@ export class GraphingPathfinder extends AbstractPathfinder {
   /** @type {AbstractGraph} */
   lastGraph; // For debugging.
 
-  world = null;
+  #world;
+
+  get world() {
+    if ( !this.#world ) this.world = new this.constructor.worldClass();
+    return this.#world;
+  }
+
+  set world(value) {
+    this.#world = value;
+    this.#world.initialize(this.token);
+  }
 
   static get worldClass() { return Settings.pathfindingWorldClass; }
 
-  graphClass = AStarGraph;
+  #graphClass;
+
+  get graphClass() {
+    if ( this.#graphClass ) return this.#graphClass;
+
+    // If none set, go with current CONFIG.
+    switch ( CONFIG[MODULE_ID].graphPathfinding.algorithm ) {
+      case "astar": return AStarGraph;
+      case "breadth": return BFSGraph;
+      case "uniform": return UniformCostGraph;
+      case "greedy": return GreedyBestFirstGraph;
+      case "test": return TestGraph;
+      default: return AStarGraph;
+    }
+  }
+
+  // Allow override of the graph class.
+  set graphClass(value) { this.#graphClass = value; }
+
 
   startPathfinding(start) {
     super.startPathfinding(start);
 
     // Set up world
-    this.world = new this.constructor.worldClass;
-    this.world.initialize(this.token);
     this.world.startPathfinding(start);
-
-    // Determine the graph class to use.
-    let graphCl;
-    switch ( CONFIG[MODULE_ID].graphPathfinding.algorithm ) {
-      case "astar": graphCl = AStarGraph; break;
-      case "breadth": graphCl = BFSGraph; break;
-      case "uniform": graphCl = UniformCostGraph; break;
-      case "greedy": graphCl = GreedyBestFirstGraph; break;
-      case "test": graphCl = TestGraph; break;
-      default: graphCl = AStarGraph;
-    }
-    this.graphClass = graphCl;
   }
 
   async _findPath(start, goal, signal) {
@@ -570,8 +584,9 @@ export class AStarGraph extends UniformCostGraph {
 /* Testing
 Draw = CONFIG.GeometryLib.lib.Draw;
 GridCoordinates3d = CONFIG.GeometryLib.lib.threeD.GridCoordinates3d
+GridCoordinates = CONFIG.GeometryLib.lib.GridCoordinates
 api = game.modules.get("elevationruler").api
-let { ClockwiseSweepPathfinder, GriddedCollisionPathfinder, WebGPUPathfinder } = api.pathfinding;
+let { ClockwiseSweepPathfinder, GriddedCollisionPathfinder, WebGPUPathfinder, worldBuilderGriddedCollision } = api.pathfinding;
 
 let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
@@ -589,8 +604,52 @@ pf.constructor.drawPath(path)
 Draw.clearDrawings()
 
 
-let { alignPathToGrid, cleanGridPathPoints, straightenPath, alignSegmentToGrid, cleanSegmentGridConnections, fogIsExplored } = api.pathCleaning
-gridPath = alignPathToGrid(path, randal)
+
+
+let { pathIsValid,
+      optimizeGridPath,
+      cleanGridPath,
+      snapPathToGrid,
+      straightenPath,
+      removeDuplicatePoints,
+      fogIsExplored,
+      snapSegmentToGrid,} = api.pathCleaning
+gridPath = snapPathToGrid(path, randal)
+gridPath.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
+
+
+gridPath0 = snapSegmentToGrid(path[0], path[1], randal)
+
+
+
+// Simple world to get a gridded pathfind.
+pf = new GriddedCollisionPathfinder(randal)
+
+
+let cost = "foundry"; // Would account for terrain.
+let heuristic;
+switch ( canvas.grid.diagonals ) {
+  case CONST.GRID_DIAGONALS.ILLEGAL:
+  case CONST.GRID_DIAGONALS.EQUIDISTANT: heuristic = "manhattan"; break;
+
+  case CONST.GRID_DIAGONALS.EXACT: heuristic = "euclidean"; break;
+  case CONST.GRID_DIAGONALS.APPROXIMATE: heuristic = "euclidean"; break;
+
+  default: heuristic = "foundry"; break;
+}
+
+worldClass = worldBuilderGriddedCollision({ cost, heuristic, use3d: false, pt3d: true, neighborFilter: "sceneGraph" })
+pf.world = new worldClass()
+
+
+pf.startPathfinding(path[0])
+gridPath0 = await pf._findPath(path[0], path[1])
+
+pf.startPathfinding(path[1])
+gridPath1 = await pf.findPath(path[1], path[2])
+
+pf.startPathfinding(path[2])
+gridPath2 = await pf.findPath(path[2], path[3])
 
 
 nodes = [...pf.world.existingNodes.values()]

@@ -76,10 +76,12 @@ export const Node2d = superclass => class extends superclass {
     pt.release();
     if ( !validNeighbors.length ) {
       tmp.release();
-      return null;
+      return pt;
     }
     return tmp;
   }
+
+  reachedGoal(current, goal) { return current.offsetsEqual(goal); }
 };
 
 // NOTE: Node3d
@@ -95,16 +97,26 @@ export const Node3d = superclass => class extends superclass {
     pt.release();
     if ( !validNeighbors.length ) {
       tmp.release();
-      return null;
+      return pt;
     }
     return tmp;
   }
+
+  reachedGoal(current, goal) { return current.offsetsEqual2d(goal); }
 };
 
 
 // ----- NOTE: Filter Neighbors ----- //
 
 export const SceneGraphFilter = superclass => class extends superclass {
+
+  token;
+
+  initialize(token) {
+    super.initialize(token);
+    this.token = token;
+  }
+
   /**
    * Filter the neighbors
    * @param {GridCoordinates} node
@@ -321,13 +333,13 @@ export const Neighbors3d = superclass => class extends superclass {
  * algorithm to use.
  * @returns {AbstractGridPathfindingWorld}
  */
-function worldBuilderGriddedCollision({ cost, use3d, heuristic, pt3d, neighborFilter } = {}) {
+export function worldBuilderGriddedCollision({ cost, use3d, heuristic, pt3d, neighborFilter } = {}) {
   const pathCfg = CONFIG[MODULE_ID].graphPathfinding;
-  use3d ??= pathCfg.use3d;
-  pt3d ??= pathCfg.pt3d;
-  cost ??= pathCfg.cost;
-  heuristic ??= pathCfg.heuristic;
-  neighborFilter ??= pathCfg.neighborFilter;
+  use3d ??= pathCfg.use3d ?? false;
+  pt3d ??= pathCfg.pt3d ?? false;
+  cost ||= pathCfg.cost || "euclidean";
+  heuristic ||= pathCfg.heuristic || "euclidean";
+  neighborFilter ||= pathCfg.neighborFilter || "occlusion";
 
   let costCl;
   let heuristicCl;
@@ -350,9 +362,9 @@ function worldBuilderGriddedCollision({ cost, use3d, heuristic, pt3d, neighborFi
     case "terrain": heuristicCl = TokenTerrainHeuristic; break;
   }
   switch ( neighborFilter ) {
-    case "occlusion": neighborFilter = (use3d || pt3d) ? OcclusionFilter3d : OcclusionFilter2d; break;
-    case "clockwise": neighborFilter = ClockwiseSweepFilter; break;
-    case "sceneGraph": neighborFilter = SceneGraphFilter; break;
+    case "occlusion": neighborFilterCl = (use3d || pt3d) ? OcclusionFilter3d : OcclusionFilter2d; break;
+    case "clockwiseSweep": neighborFilterCl = ClockwiseSweepFilter; break;
+    case "sceneGraph": neighborFilterCl = SceneGraphFilter; break;
   }
 
   const classes = [nodeCl, costCl, heuristicCl, neighborsCl, neighborFilterCl];

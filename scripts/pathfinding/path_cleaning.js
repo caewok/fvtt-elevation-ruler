@@ -53,7 +53,6 @@ export function snapPathToGrid(path, token) {
   return removeDuplicatePoints(gridPointsArr[0]);
 }
 
-
 /**
  * Helper for snapPathToGrid.
  * Takes arrays of points and joins them.
@@ -107,44 +106,214 @@ function gridNeighbors(pt) {
  * @param {Token} token
  * @returns {GridCoordinates3d[a, ..., b]}
  */
-function snapSegmentToGrid(a, b, token) {
+export function snapSegmentToGrid(a, b, token) {
+  a = GridCoordinates3d.fromObject(a);
+  b = GridCoordinates3d.fromObject(b);
+  if ( a.almostEqual(b) ) return [a];
+
   const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
   if ( sceneGraph.hasCollision(a, b, token) ) return [a, b];
-  const gridPoints = canvas.grid.getDirectPath([a, b]);
-  const allPoints = removeDuplicatePoints([
-    GridCoordinates3d.fromObject(a),
-    ...gridPoints.map(offset => GridCoordinates3d.fromOffset(offset)), GridCoordinates3d.fromObject(b)]);
 
-  // Could do either middle-out or outside-in.
-  // Here, trying outside-in.
-  // Adjust points at either end, and walk to middle.
-  // At each step, test variations on
-  // a --> adjA does not collide.
-  // adjB --> b does not collide.
-  // adjA --> adjB does not collide.
-  allPointsLoop: for ( let i = 1, j = allPoints.length - 2; i <= j; i += 1, j -= 1 ) {
-    const a0 = allPoints[i - 1];
-    const b0 = allPoints[j + 1];
-    const adjA = allPoints[i];
+  /* Algorithm
+  Could use astar but that would create a path all the way around obstacles instead of just
+  sticking with a straight-line path.
 
-    // Neighbors gives options for a0 --> aN that do not have a collision.
-    // Test whether aN --> b0 has collision.
-    if ( i === j ) {
-      allPoints[i] = locateValidOffset(adjA, a0, b0, token);
-      if ( !allPoints[i] ) console.warn(`snapSegmentToGrid failed to find valid path for ${i}.`, { a, b });
-      continue;
+  1. Get grid offset points for the segment.
+  At each offset point, starting with offset a:
+  • If diagonal move:
+    - Check collision with previous. If none, continue to next offset.
+    - Check adjacent cardinal moves. If no collision, use in lieu of original offset.
+  • If cardinal move:
+    - Same as diagonal, but check the two diagonals next to the cardinal and then the two cardinal moves to the side.
+  • If failed, fall back to valid point on the line. Closest point to line from original offset.
+    Round, then floor, then ceil to find point that does not collide with b.
+  • If collision or failed, redo the grid offset points from here to b.
+
+  If fails, run algorithm backward. If still fails, return [a, b]
+  */
+  const out = [];
+  let reverse = false;
+  for ( const [testA, testB] of [[a, b], [b, a]] ) {
+
+    // Try various offsets of a to start.
+    for ( const aOffset of validOffsets(testA, testB, token) ) {
+      out.length = 0;
+      out.push(testA);
+      if ( !testA.almostEqual(aOffset) ) out.push(aOffset);
+
+      // Walk along each grid point in turn. Use either it or a neighboring offset or a point on the a|b segment.
+      let gridPoints = directGridPath(aOffset, testB);
+      let prev = aOffset;
+      for ( let i = 0; i < gridPoints.length; i += 1 ) {
+        const proposedGridOffset = gridPoints[i];
+        if ( sceneGraph.hasCollision(prev, proposedGridOffset, token) ) {
+          for ( const next of alternateGridMoves(prev, proposedGridOffset, testA, testB) ) {
+            if ( sceneGraph.hasCollision(prev, next, token) ) continue;
+            out.push(next);
+            gridPoints = directGridPath(next, testB);
+            prev = next;
+            i = 0;
+            break;
+          }
+          // TODO: Currently ignores this point if no alternate found. Do we need to give up and return [a, b] here?
+        } else {
+          out.push(proposedGridOffset);
+          prev = proposedGridOffset;
+        }
+      }
+
+      // At end. Try various b offsets.
+      for ( const bOffset of validOffsets(testB, testA, token) ) {
+        if ( !(sceneGraph.hasCollision(prev, bOffset, token) || sceneGraph.hasCollision(bOffset, testB, token)) ) {
+          if ( !prev.almostEqual(bOffset) ) out.push(bOffset);
+          if ( !bOffset.almostEqual(testB) ) out.push(testB);
+          return reverse ? out.reverse() : out;
+        }
+      }
     }
-
-    // Neighbors gives options for a0 --> aN that do not have a collision.
-    // Neighbors gives options for bN --> b0 that do not have a collision.
-    // Test whether aN --> bN has a collision. Try different combinations.
-    const adjB = allPoints[j];
-    const [aN, bN] = locateValidABOffset(adjA, adjB, a, b, token);
-    allPoints[i] = aN;
-    allPoints[j] = bN;
-    if ( !(aN || bN) ) console.warn(`snapSegmentToGrid failed to find valid path for ${i}, ${j}.`, { a, b });
+    reverse = true;
   }
-  return allPoints.filter(pt => Boolean(pt));
+}
+
+
+
+/**
+ * Iterate valid offsets to a point.
+ * To be valid, the point|offset segment must not have a collision.
+ * @param {GridCoordinates3d} a     Point to offset
+ * @param {GridCoordinates3d} b     Destination, used to sort the offsets.
+ * @param {Token} token             Token to use for collision test.
+ * @yields {GridCoordinates3d}
+ */
+function *validOffsets(a, b, token) {
+  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+
+  // First, try the basic offset.
+  const aOffset = a.clone().centerToOffset();
+  if ( !sceneGraph.hasCollision(a, aOffset, token) ) yield aOffset;
+
+  // Second, get offsets around this one, sorted by distance to b.
+  const neighbors = gridNeighbors(aOffset);
+  neighbors.sort((n1, n2) => PIXI.Point.distanceSquaredBetween(n1, b) - PIXI.Point.distanceSquaredBetween(n2, b));
+  for ( const n of neighbors ) {
+    if ( !sceneGraph.hasCollision(a, n, token) ) yield n;
+  }
+}
+
+/**
+ * Iterate valid offsets to test for a given grid move.
+ * @param {GridCoordinates3d} prev
+ * @param {GridCoordinates3d} curr
+ * @yields {GridCoordinates3d}
+ */
+function *validMoves(prev, curr) {
+  if ( is2dDiagonal(prev, curr) ) {
+    for ( const offset of offsetsToDiagonalMove(prev, curr) ) yield offset;
+  } else {
+    if ( canvas.grid.diagonals !== CONST.GRID_DIAGONALS.ILLEGAL ) {
+      for ( const offset of diagonalOffsetsToCardinalMove(prev, curr) ) yield offset;
+    }
+    for ( const offset of sideOffsetsToCardinalMove(prev, curr) ) yield offset;
+  }
+}
+
+/**
+ * Return all grid points between a and b. Do not duplicate a and b if either are already gridded.
+ */
+function directGridPath(a, b) {
+  const gridPoints = canvas.grid.getDirectPath([a, b]);
+  const allPoints = gridPoints.map(offset => GridCoordinates3d.fromOffset(offset));
+  if ( allPoints[0].almostEqual(a) ) allPoints.shift();
+  if ( allPoints.at(-1).almostEqual(b) ) allPoints.pop();
+  return allPoints;
+}
+
+function *alternateGridMoves(prev, proposedGridOffset, a, b) {
+  // Try neighbors to that grid move.
+  yield* validMoves(prev, proposedGridOffset);
+
+  // Finally, fall back on a rounded point on the line closest to the proposedGridOffset.
+  const closestPt = GridCoordinates3d.fromObject(foundry.utils.closestPointToSegment(proposedGridOffset, a, b));
+  yield* roundedPointsOptions(closestPt);
+}
+
+/**
+ * Iterate valid rounded points to test for a given (failed) grid move.
+ * @param {GridCoordinates3d} pt
+ * @yields {GridCoordinates3d}
+ */
+function *roundedPointsOptions(closestPt) {
+  const rounded = closestPt.clone();
+  rounded.x = Math.round(closestPt);
+  rounded.y = Math.round(closestPt);
+  yield rounded;
+
+  const floor = closestPt.clone();
+  floor.x = Math.floor(closestPt);
+  floor.y = Math.floor(closestPt);
+  yield floor;
+
+  const ceil = closestPt.clone();
+  ceil.x = Math.ceil(closestPt);
+  ceil.y = Math.ceil(closestPt);
+  yield ceil;
+}
+
+
+
+
+/**
+ * Get valid points to test in a diagonal move to an offset.
+ *
+ */
+function offsetsToDiagonalMove(prev, curr) {
+  const tmp1 = curr.clone();
+  const tmp2 = curr.clone();
+  tmp1.i += (prev.i - curr.i);
+  tmp2.j += (prev.j - curr.j);
+
+  // Sort by closest to line.
+  const out = distanceSquaredToSegment(prev, curr, tmp1) < distanceSquaredToSegment(prev, curr, tmp2)
+    ? [tmp1, tmp2] : [tmp2, tmp1];
+  return out;
+}
+
+/**
+ * Get valid points to test in a cardinal move to an offset.
+ */
+function diagonalOffsetsToCardinalMove(prev, curr) {
+  // First the two diagonals on either side of currOffset.
+
+  const di = (prev.i - curr.i);
+  const dj = (prev.j - curr.j);
+  const tmp1 = curr.clone();
+  const tmp2 = curr.clone();
+  tmp1.j += di;  // Note the flip from i to j.
+  tmp1.i += dj;
+
+  tmp2.j -= di;  // Note the flip from i to j.
+  tmp2.i -= dj;
+
+  const out = distanceSquaredToSegment(prev, curr, tmp1) < distanceSquaredToSegment(prev, curr, tmp2)
+    ? [tmp1, tmp2] : [tmp2, tmp1];
+  return out;
+}
+
+function sideOffsetsToCardinalMove(prev, curr) {
+  const di = (prev.i - curr.i);
+  const dj = (prev.j - curr.j);
+
+  // Side cardinal moves.
+  const tmp1 = prev.clone();
+  const tmp2 = prev.clone();
+  tmp1.j += di;  // Note the flip from i to j.
+  tmp1.i += dj;
+
+  tmp2.j -= di;  // Note the flip from i to j.
+  tmp2.i -= dj;
+  const out = distanceSquaredToSegment(prev, curr, tmp1) < distanceSquaredToSegment(prev, curr, tmp2)
+    ? [tmp1, tmp2] : [tmp2, tmp1];
+  return out;
 }
 
 function locateValidOffset(adjA, a, b, token) {
@@ -298,7 +467,7 @@ export function cleanGridPath(path) {
   if ( path.length < 3 ) return path;
   let a = path[0];
   let b = path[1];
-  const cleanedPts = [a];
+  const cleanedPoints = [a];
   const abDelta = a.constructor.tmp;
   const bcDelta = b.constructor.tmp;
   for ( let i = 2, n = path.length - 1; i < n; i += 1 ) {
@@ -315,8 +484,8 @@ export function cleanGridPath(path) {
   }
   abDelta.release();
   bcDelta.release();
-  cleanedPts.push(path.at(-1)); // Add last c.
-  return cleanedPts;
+  cleanedPoints.push(path.at(-1)); // Add last c.
+  return cleanedPoints;
 }
 
 

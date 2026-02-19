@@ -368,7 +368,7 @@ function randomColor() {
  * algorithm to use.
  * @returns {AbstractGridPathfindingWorld}
  */
-function worldBuilderClockwise({ cost, use3d, heuristic } = {}) {
+export function worldBuilderClockwise({ cost, use3d, heuristic } = {}) {
   const pathCfg = CONFIG[MODULE_ID].graphPathfinding;
   use3d ??= pathCfg.use3d;
   cost ??= pathCfg.cost;
