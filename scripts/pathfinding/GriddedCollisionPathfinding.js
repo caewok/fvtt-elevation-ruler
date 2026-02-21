@@ -2,7 +2,6 @@
 canvas,
 CONFIG,
 foundry,
-PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
@@ -14,9 +13,28 @@ import { ObstacleOcclusionTest } from "../geometry/ObstacleOcclusionTest.js";
 import { GridCoordinates } from "../geometry/GridCoordinates.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix, Mixin } from "../geometry/mixwith.js";
-import { Draw } from "../geometry/Draw.js";
-import { GraphPathfindingWorld } from "./GraphPathfinding.js";
+import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
 import { ObstacleSweep } from "./ClockwiseSweep.js";
+import { optimizeGridPath } from "./path_cleaning.js";
+import {
+  Manhattan2dCost,
+  Manhattan3dCost,
+
+  Euclidean2dCost,
+  Euclidean3dCost,
+
+  FoundryMeasureCost,
+  TokenTerrainCost,
+
+  Manhattan2dHeuristic,
+  Manhattan3dHeuristic,
+
+  Euclidean2dHeuristic,
+  Euclidean3dHeuristic,
+
+  FoundryMeasureHeuristic,
+  TokenTerrainHeuristic,
+} from "./cost_measurement.js";
 
 /* Basic pathfinding algorithms.
 
@@ -31,6 +49,20 @@ Abstract
 - closestNode
 */
 
+export class GriddedCollisionPathfinder extends GraphingPathfinder {
+
+  static get worldClass() { return worldBuilderGriddedCollision(); }
+
+  /**
+   * Snap the path to the grid.
+   * @param {Node[]} path
+   * @returns {Point[]}
+   */
+  snapPathToGrid(path) {
+    return optimizeGridPath(path, { token: this.token });
+  }
+
+}
 
 /**
  * Settings specific to the algorithm used with the graph to define nodes.
@@ -38,91 +70,6 @@ Abstract
  * cached over multiple find paths for a single start point (e.g., single token drag).
  */
 
-// ----- NOTE: Base cost/heuristic methods ----- //
-
-// Cost parameters: current, next, token.
-export const Euclidean2d = superclass => class extends superclass {
-  static euclidean(a, b) { return PIXI.Point.distanceBetween(a, b); }
-};
-
-export const Euclidean3d = superclass => class extends superclass {
-  static euclidean3d(a, b) { return Point3d.distanceBetween(a, b); }
-};
-
-export const Manhattan2d = superclass => class extends superclass {
-  static manhattan(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
-};
-
-export const Manhattan3d = superclass => class extends superclass {
-  static manhattan3d(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y) + Math.abs(a.z - b.z); }
-};
-
-export const FoundryMeasure = superclass => class extends superclass {
-  static foundryMeasure(a, b) { return canvas.grid.measurePath([a, b]).cost; }
-};
-
-export const TokenTerrain = superclass => class extends superclass {
-  static tokenTerrainCost(a, b, token) {
-    const terrainWaypoints = token.createTerrainMovementPath([a, b]);
-    return token.measureMovementPath(terrainWaypoints).cost;
-  }
-};
-
-// ----- NOTE: Cost ----- //
-export const Euclidean2dCost = superclass => class extends superclass {
-  /** @type {function} */
-  cost = this.constructor.euclidean;
-};
-
-export const Euclidean3dCost = superclass => class extends superclass {
-  /** @type {function} */
-  cost = this.constructor.euclidean3d;
-};
-
-export const Manhattan2dCost = superclass => class extends superclass {
-  /** @type {function} */
-  cost = this.constructor.manhattan;
-};
-
-export const Manhattan3dCost = superclass => class extends superclass {
-  /** @type {function} */
-  cost = this.constructor.manhattan3d;
-};
-
-export const FoundryMeasureCost = superclass => class extends superclass {
-  cost = this.constructor.foundryMeasure;
-};
-
-export const TokenTerrainCost = superclass => class extends superclass {
-  cost = this.constructor.tokenTerrainCost;
-};
-
-// ----- NOTE: Heuristic ----- //
-export const Euclidean2dHeuristic = superclass => class extends superclass {
-  /** @type {function} */
-  heuristic = this.constructor.euclidean;
-};
-
-export const Euclidean3dHeuristic = superclass => class extends superclass {
-  /** @type {function} */
-  heuristic = this.constructor.euclidean3d;
-};
-
-export const Manhattan2dHeuristic = superclass => class extends superclass {
-  heuristic = this.constructor.manhattan;
-};
-
-export const Manhattan3dHeuristic = superclass => class extends superclass {
-  heuristic = this.constructor.manhattan3d;
-};
-
-export const TokenTerrainHeuristic = superclass => class extends superclass {
-  heuristic = this.constructor.tokenTerrainCost;
-};
-
-export const FoundryMeasureHeuristic = superclass => class extends superclass {
-  heuristic = this.constructor.foundryMeasure;
-};
 
 // ----- NOTE: Node construction ----- //
 
@@ -139,10 +86,12 @@ export const Node2d = superclass => class extends superclass {
     pt.release();
     if ( !validNeighbors.length ) {
       tmp.release();
-      return null;
+      return pt;
     }
     return tmp;
   }
+
+  reachedGoal(current, goal) { return current.offsetsEqual(goal); }
 };
 
 // NOTE: Node3d
@@ -158,16 +107,36 @@ export const Node3d = superclass => class extends superclass {
     pt.release();
     if ( !validNeighbors.length ) {
       tmp.release();
-      return null;
+      return pt;
     }
     return tmp;
   }
+
+  reachedGoal(current, goal) { return current.offsetsEqual2d(goal); }
 };
 
 
 // ----- NOTE: Filter Neighbors ----- //
 
+export const SceneGraphFilter = superclass => class extends superclass {
 
+  token;
+
+  initialize(token) {
+    super.initialize(token);
+    this.token = token;
+  }
+
+  /**
+   * Filter the neighbors
+   * @param {GridCoordinates} node
+   * @returns {GridCoordinates[]}
+   */
+  filterNeighbors(neighbors, node) {
+    const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+    return neighbors.filter(n => !sceneGraph.hasCollision(node, n, this.token));
+  }
+};
 
 
 export const ClockwiseSweepFilter = superclass => class extends superclass {
@@ -368,65 +337,47 @@ export const Neighbors3d = superclass => class extends superclass {
 
 // TODO: Eventually tie this to Settings or CONFIG and rebuild the class only when settings/CONFIG change.
 
+
 /**
  * For the current configuration settings, build a pathfinding world class for the path
  * algorithm to use.
  * @returns {AbstractGridPathfindingWorld}
  */
-export function worldBuilderCollision({ cost, use3d, heuristic, pt3d, neighborFilter } = {}) {
-  const pathCfg = CONFIG[MODULE_ID].simplePathfinding;
-  use3d ??= pathCfg.use3d;
-  pt3d ??= pathCfg.pt3d;
-  cost ??= pathCfg.cost;
-  heuristic ??= pathCfg.heuristic;
-  neighborFilter ??= pathCfg.neighborFilter;
+export function worldBuilderGriddedCollision({ cost, use3d, heuristic, pt3d, neighborFilter } = {}) {
+  const pathCfg = CONFIG[MODULE_ID].graphPathfinding;
+  use3d ??= pathCfg.use3d ?? false;
+  pt3d ??= pathCfg.pt3d ?? false;
+  cost ||= pathCfg.cost || "euclidean";
+  heuristic ||= pathCfg.heuristic || "euclidean";
+  neighborFilter ||= pathCfg.neighborFilter || "occlusion";
 
-  let base = new Set();
   let costCl;
   let heuristicCl;
   let nodeCl;
-  let neighborFilterCl = ClockwiseSweepFilter;
+  let neighborFilterCl;
   let neighborsCl;
-  if ( use3d ) {
-    nodeCl = Node3d;
-    neighborsCl = Neighbors3d;
-    switch ( cost ) {
-      case "manhattan": base.add(Manhattan3d); costCl = Manhattan3dCost; break;
-      case "euclidean": base.add(Euclidean3d); costCl = Euclidean3dCost; break;
-      case "foundry": base.add(FoundryMeasure); costCl = FoundryMeasureCost; break;
-      case "terrain": base.add(TokenTerrain); costCl = TokenTerrainCost; break;
-    }
-    switch ( heuristic ) {
-      case "manhattan": base.add(Manhattan3d); heuristicCl = Manhattan3dHeuristic; break;
-      case "euclidean": base.add(Euclidean3d); heuristicCl = Euclidean3dHeuristic; break;
-      case "foundry": base.add(FoundryMeasure); heuristicCl = FoundryMeasureHeuristic; break;
-      case "terrain": base.add(TokenTerrain); heuristicCl = TokenTerrainHeuristic; break;
-    }
-    if ( neighborFilter === "occlusion" ) neighborFilterCl = OcclusionFilter3d;
 
-  } else { // 2d
-    neighborsCl = Neighbors2d;
-    switch ( cost ) {
-      case "manhattan": base.add(Manhattan2d); costCl = Manhattan2dCost; break;
-      case "euclidean": base.add(Euclidean2d); costCl = Euclidean2dCost; break;
-      case "foundry": base.add(FoundryMeasure); costCl = FoundryMeasureCost; break;
-      case "terrain": base.add(TokenTerrain); costCl = TokenTerrainCost; break;
-    }
-    switch ( heuristic ) {
-      case "manhattan": base.add(Manhattan2d); heuristicCl = Manhattan2dHeuristic; break;
-      case "euclidean": base.add(Euclidean2d); heuristicCl = Euclidean2dHeuristic; break;
-      case "foundry": base.add(FoundryMeasure); heuristicCl = FoundryMeasureHeuristic; break;
-      case "terrain": base.add(TokenTerrain); heuristicCl = TokenTerrainHeuristic; break;
-    }
-    if ( pt3d ) {
-      nodeCl = Node3d;
-      if ( neighborFilter === "occlusion" ) neighborFilterCl = OcclusionFilter3d;
-    } else {
-      nodeCl = Node2d;
-      if ( neighborFilter === "occlusion" ) neighborFilterCl = OcclusionFilter2d;
-    }
+  nodeCl = (use3d || pt3d) ? Node3d : Node2d;
+  neighborsCl = use3d ? Neighbors3d : Neighbors2d;
+  switch ( cost ) {
+    case "manhattan": costCl = use3d ? Manhattan3dCost : Manhattan2dCost; break;
+    case "euclidean": costCl = use3d ? Euclidean3dCost : Euclidean2dCost; break;
+    case "foundry": costCl = FoundryMeasureCost; break;
+    case "terrain": costCl = TokenTerrainCost; break;
   }
-  const classes = [...base, nodeCl, costCl, heuristicCl, neighborsCl, neighborFilterCl];
+  switch ( heuristic ) {
+    case "manhattan": heuristicCl = use3d ? Manhattan3dHeuristic : Manhattan2dHeuristic; break;
+    case "euclidean": heuristicCl = use3d ? Euclidean3dHeuristic : Euclidean2dHeuristic; break;
+    case "foundry": heuristicCl = FoundryMeasureHeuristic; break;
+    case "terrain": heuristicCl = TokenTerrainHeuristic; break;
+  }
+  switch ( neighborFilter ) {
+    case "occlusion": neighborFilterCl = (use3d || pt3d) ? OcclusionFilter3d : OcclusionFilter2d; break;
+    case "clockwiseSweep": neighborFilterCl = ClockwiseSweepFilter; break;
+    case "sceneGraph": neighborFilterCl = SceneGraphFilter; break;
+  }
+
+  const classes = [nodeCl, costCl, heuristicCl, neighborsCl, neighborFilterCl];
   // return mix(AbstractGridPathfindingWorld).with(...classes, Mixin); // Mixin caches the classes.
   return mix(GraphPathfindingWorld).with(...classes);
 }

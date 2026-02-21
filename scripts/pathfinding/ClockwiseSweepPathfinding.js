@@ -9,8 +9,28 @@ PIXI,
 import { MODULE_ID } from "../const.js";
 import { ElevatedPoint } from "../geometry/3d/ElevatedPoint.js";
 import { Draw } from "../geometry/Draw.js";
-import { GraphPathfindingWorld } from "./GraphPathfinding.js";
+import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
 import { ClockwisePathfindingSweep } from "./ClockwiseSweep.js";
+import { mix, Mixin } from "../geometry/mixwith.js";
+import {
+  Manhattan2dCost,
+  Manhattan3dCost,
+
+  Euclidean2dCost,
+  Euclidean3dCost,
+
+  FoundryMeasureCost,
+  TokenTerrainCost,
+
+  Manhattan2dHeuristic,
+  Manhattan3dHeuristic,
+
+  Euclidean2dHeuristic,
+  Euclidean3dHeuristic,
+
+  FoundryMeasureHeuristic,
+  TokenTerrainHeuristic,
+} from "./cost_measurement.js";
 
 /* Clockwise sweep pathfinding
 
@@ -21,6 +41,36 @@ Conduct sweep from those points.
 Stop when the point is within the end sweep.
 */
 
+export class ClockwiseSweepPathfinder extends GraphingPathfinder {
+
+  static get worldClass() { return worldBuilderClockwise(); }
+
+  /**
+   * Clean the path, which may include straightening it, snapping it to a grid, or removing unnecessary points.
+   * @param {Node[]} path
+   * @returns {Point[]}
+   */
+  cleanPath(path) {
+    // Already straightened and has limited points, so simply return.
+    return path;
+  }
+
+  /**
+   * Snap the path to the grid.
+   * @param {Node[]} path
+   * @returns {Point[]}
+   */
+  snapPathToGrid(path) {
+    // TODO: Could use specialized version that limits collision tests between a and b
+    //       to edges encountered in a's sweep.
+
+    // TODO: Could run collision pathfinding within a's sweep to find best grid path to b.
+
+    // path = snapPathToGrid(path, this.token);
+    // return cleanGridPathPoints(path);
+    return super.snapPathToGrid(path);
+  }
+}
 
 /**
  * Nodes for the ClockwiseSweep store the sweep polygon.
@@ -189,8 +239,6 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
 
 export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
 
-  // TODO: Use mixers for cost and heuristic.
-
   /**
    * Cost to move from a -> b.
    * @type {function}
@@ -320,16 +368,30 @@ function randomColor() {
  * algorithm to use.
  * @returns {AbstractGridPathfindingWorld}
  */
-export function worldBuilderClockwise({ cost, use3d, heuristic, pt3d, neighborFilter } = {}) {
-  const pathCfg = CONFIG[MODULE_ID].simplePathfinding;
+export function worldBuilderClockwise({ cost, use3d, heuristic } = {}) {
+  const pathCfg = CONFIG[MODULE_ID].graphPathfinding;
   use3d ??= pathCfg.use3d;
-  pt3d ??= pathCfg.pt3d;
   cost ??= pathCfg.cost;
   heuristic ??= pathCfg.heuristic;
-  neighborFilter ??= pathCfg.neighborFilter;
 
-  // TODO: Modify for cost, heuristic, etc.
-  return ClockwiseSweepPathfindingWorld;
+  let costCl;
+  let heuristicCl;
+  switch ( cost ) {
+    case "manhattan": costCl = use3d ? Manhattan3dCost : Manhattan2dCost; break;
+    case "euclidean": costCl = use3d ? Euclidean3dCost : Euclidean2dCost; break;
+    case "foundry": costCl = FoundryMeasureCost; break;
+    case "terrain": costCl = TokenTerrainCost; break;
+  }
+  switch ( heuristic ) {
+    case "manhattan": heuristicCl = use3d ? Manhattan3dHeuristic : Manhattan2dHeuristic; break;
+    case "euclidean": heuristicCl = use3d ? Euclidean3dHeuristic : Euclidean2dHeuristic; break;
+    case "foundry": heuristicCl = FoundryMeasureHeuristic; break;
+    case "terrain": heuristicCl = TokenTerrainHeuristic; break;
+  }
+
+  const classes = [costCl, heuristicCl];
+  // return mix(AbstractGridPathfindingWorld).with(...classes, Mixin); // Mixin caches the classes.
+  return mix(ClockwiseSweepPathfindingWorld).with(...classes);
 }
 
 /** Testing

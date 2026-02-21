@@ -24,6 +24,7 @@ import { HorizontalQuadVertices, Polygon3dVertices } from "../geometry/placeable
 import { VertexObject } from "../geometry/placeable_geometry/GeometryDesc.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix } from "../geometry/mixwith.js";
+import { cleanGridPath } from "./path_cleaning.js";
 
 // TODO: import { FastBitSet } from "../FastBitSet/FastBitSet.js";
 
@@ -738,13 +739,6 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
 
 export class WebGPUPathfinderFakeWorker {
 
-  /**
-   * @param {string} [name="WebGPUPathfinder"]
-   * @param {object} [config]                        Worker initialization options
-   * @param {boolean} [config.debug=false]           Should the worker run in debug mode?
-   */
-  constructor(_name = `${MODULE_ID}.WebGPUPathfinder`, _config = {}) {}
-
   /** @type {number} */
   #resolution = 1;
 
@@ -974,7 +968,7 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
 
   // ----- NOTE: Static worker creation ----- //
 
-  static get workerClass() { return WebGPUPathfinderFakeWorker; }
+  static get workerClass() { return WebGPUPathfinderWorker; }
 
   /**
    * For a given number of canvas pixels to represent one local pixel, what resolution?
@@ -1058,8 +1052,9 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
   /**
    * Open 1+ doors in the terrain at the current elevation.
    */
-  static async openDoors({  walls }) {
+  static async openDoors({ walls } = {}) {
     if ( this.currentElevationZ == null ) return;
+    const elevationZ = this.currentElevationZ;
     const bufferType = "static";
     const openDoors = this.openedDoors({ walls, elevationZ });
     if ( !openDoors.length ) return;
@@ -1070,7 +1065,7 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
   /**
    * Close 1+ doors in the terrain at the current elevation.
    */
-  static async closeDoors({ walls }) {
+  static async closeDoors({ walls } = {}) {
     if ( this.currentElevationZ == null ) return;
     const elevationZ = this.currentElevationZ;
     const bufferType = "static";
@@ -1136,6 +1131,21 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
     return this.constructor.worker.findPath(start, goal);
   }
 
+  // ----- NOTE: Path cleaning ----- //
+
+  // Path can be cleaned like normal.
+
+  /**
+   * Snap the path to the grid.
+   * @param {Node[]} path
+   * @returns {Point[]}
+   */
+  snapPathToGrid(path) {
+    // Already done.
+    return cleanGridPath(path);
+  }
+
+
   // ----- NOTE: End pathfinding ----- //
 
   static async destroy() {
@@ -1153,10 +1163,10 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
   }
 }
 
-// !!!WebGPUPathfinderWithWorker
-export class WebGPUPathfinderWithWorker extends WebGPUPathfinder {
+// !!!WebGPUPathfinderFakeWorker
+export class WebGPUPathfinderWithFakeWorker extends WebGPUPathfinder {
 
-  static get workerClass() { return WebGPUPathfinderWorker; }
+  static get workerClass() { return WebGPUPathfinderFakeWorker; }
 
 }
 
@@ -1607,7 +1617,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     // We multiply the base movement (10/14) by the tile's weight.
     // Example: Road(1) -> Straight=10. Swamp(5) -> Straight=50.
     let COST_STRAIGHT = 10u * tileCost;
-    let COST_DIAGONAL = 14u * tileCost;
+    let COST_DIAGONAL = 14u * tileCost; // Or 99/140
     let MAX_VAL = 0xFFFFFFFFu;
 
     // ----- Check straight neighbors (cost 10) ----- //
@@ -2892,7 +2902,7 @@ Draw = CONFIG.GeometryLib.lib.Draw
 GridCoordinates3d = CONFIG.GeometryLib.lib.threeD.GridCoordinates3d
 api = game.modules.get("elevationruler").api
 WebGPUPathfinder = api.pathfinding.WebGPUPathfinder
-WebGPUPathfinderWithWorker = api.pathfinding.WebGPUPathfinderWithWorker
+WebGPUPathfinderFakeWorker = api.pathfinding.WebGPUPathfinderFakeWorker
 
 let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
@@ -2901,10 +2911,10 @@ start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
 
 await WebGPUPathfinder.initialize(1);
-await WebGPUPathfinderWithWorker.initialize(1);
+await WebGPUPathfinderFakeWorker.initialize(1);
 
 pf = new WebGPUPathfinder(randal);
-pf = new WebGPUPathfinderWithWorker(randal)
+pf = new WebGPUPathfinderFakeWorker(randal)
 pf = randal.elevationruler.pathfinding
 
 await pf.initialize(1);
@@ -2933,19 +2943,19 @@ bufferData[pf.constructor.worker.pf.terrainMapper.indexAtCanvas(1997, 2699)]
 
 
 // Change the resolution of the worker
-WebGPUPathfinderWithWorker.worker.resolution
-await WebGPUPathfinderWithWorker.destroy()
-await WebGPUPathfinderWithWorker.initialize(2/100)
+WebGPUPathfinderFakeWorker.worker.resolution
+await WebGPUPathfinderFakeWorker.destroy()
+await WebGPUPathfinderFakeWorker.initialize(2/100)
 
 
 
-worker = WebGPUPathfinderWithWorker.worker
+worker = WebGPUPathfinderFakeWorker.worker
 await worker.destroy();
 await worker.initialize(2/100)
-WebGPUPathfinderWithWorker.currentElevationZ = null
-WebGPUPathfinderWithWorker.currentTokenId = ""
+WebGPUPathfinderFakeWorker.currentElevationZ = null
+WebGPUPathfinderFakeWorker.currentTokenId = ""
 
-await WebGPUPathfinderWithWorker.updateStaticTerrain();
+await WebGPUPathfinderFakeWorker.updateStaticTerrain();
 
 
 */

@@ -35,31 +35,45 @@ export class GraphingPathfinder extends AbstractPathfinder {
   /** @type {AbstractGraph} */
   lastGraph; // For debugging.
 
-  world = null;
+  #world;
+
+  get world() {
+    if ( !this.#world ) this.world = new this.constructor.worldClass();
+    return this.#world;
+  }
+
+  set world(value) {
+    this.#world = value;
+    this.#world.initialize(this.token);
+  }
 
   static get worldClass() { return Settings.pathfindingWorldClass; }
 
-  graphClass = AStarGraph;
+  #graphClass;
+
+  get graphClass() {
+    if ( this.#graphClass ) return this.#graphClass;
+
+    // If none set, go with current CONFIG.
+    switch ( CONFIG[MODULE_ID].graphPathfinding.algorithm ) {
+      case "astar": return AStarGraph;
+      case "breadth": return BFSGraph;
+      case "uniform": return UniformCostGraph;
+      case "greedy": return GreedyBestFirstGraph;
+      case "test": return TestGraph;
+      default: return AStarGraph;
+    }
+  }
+
+  // Allow override of the graph class.
+  set graphClass(value) { this.#graphClass = value; }
+
 
   startPathfinding(start) {
     super.startPathfinding(start);
 
     // Set up world
-    this.world = new this.constructor.worldClass;
-    this.world.initialize(this.token);
     this.world.startPathfinding(start);
-
-    // Determine the graph class to use.
-    let graphCl;
-    switch ( CONFIG[MODULE_ID].simplePathfinding.algorithm ) {
-      case "astar": graphCl = AStarGraph; break;
-      case "breadth": graphCl = BFSGraph; break;
-      case "uniform": graphCl = UniformCostGraph; break;
-      case "greedy": graphCl = GreedyBestFirstGraph; break;
-      case "test": graphCl = TestGraph; break;
-      default: graphCl = AStarGraph;
-    }
-    this.graphClass = graphCl;
   }
 
   async _findPath(start, goal, signal) {
@@ -67,6 +81,12 @@ export class GraphingPathfinder extends AbstractPathfinder {
     graph.debug = this.debug;
     graph.debugDelay = this.debugDelay;
     return graph.findPath(start, goal, signal);
+  }
+
+  destroy() {
+    this.world = null;
+    this.lastGraph = null;
+    super.destroy();
   }
 }
 
@@ -289,7 +309,7 @@ class AbstractGraph {
     start = this.world.buildNode(start);
     goal = this.world.buildNode(goal);
     if ( this.world.nodeIsUnreachable(goal, start) ) {
-      console.error(`${this.constructor.name}|Node unreachable.`, { start, goal });
+      console.warn(`${this.constructor.name}|Node unreachable.`, { start, goal });
       return null;
     }
 
@@ -320,7 +340,7 @@ class AbstractGraph {
     }
 
     if ( iter >= MAX_ITER ) {
-      console.error(`${this.constructor.name}|findPath stuck in loop.`, { start, goal });
+      console.warn(`${this.constructor.name}|findPath stuck in loop.`, { start, goal });
     }
     const path = reachedGoal ? this.constructor.reconstructPath(this._cameFrom, goal) : null;
     return path;
@@ -562,17 +582,40 @@ export class AStarGraph extends UniformCostGraph {
 }
 
 /* Testing
+MODULE_ID = "elevationruler"
 Draw = CONFIG.GeometryLib.lib.Draw;
 GridCoordinates3d = CONFIG.GeometryLib.lib.threeD.GridCoordinates3d
+GridCoordinates = CONFIG.GeometryLib.lib.GridCoordinates
 api = game.modules.get("elevationruler").api
-let { GraphingPathfinder } = api.pathfinding;
+let { ClockwiseSweepPathfinder, GriddedCollisionPathfinder, WebGPUPathfinder, worldBuilderGriddedCollision } = api.pathfinding;
+let { solveSegment,
+      pathIsValid,
+      optimizeGridPath,
+      cleanGridPath,
+      snapPathToGrid,
+      straightenPath,
+      removeDuplicatePoints,
+      fogIsExplored,
+} = api.pathCleaning
 
 let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
-
-pf = new GraphingPathfinder(randal)
+pf = new ClockwiseSweepPathfinder(randal)
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
+
+let beiro = canvas.tokens.placeables.find(t => t.name === "Beiro")
+let bandit = canvas.tokens.placeables.find(t => t.name === "Bandit")
+pf = new ClockwiseSweepPathfinder(beiro)
+start = GridCoordinates3d.fromObject(beiro.center)
+end = GridCoordinates3d.fromObject(bandit.center)
+
+let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
+let lizard = canvas.tokens.placeables.find(t => t.name === "Giant Lizard")
+pf = new ClockwiseSweepPathfinder(akra)
+start = GridCoordinates3d.fromObject(akra.center)
+end = GridCoordinates3d.fromObject(lizard.center)
+
 
 pf.debug = true
 pf.debugDelay = 1000;
@@ -580,7 +623,61 @@ pf.debugDelay = 1000;
 pf.startPathfinding(start);
 path = await pf._findPath(start, end) // Skip caching
 pf.constructor.drawPath(path)
-Draw.clearDrawings()
+
+gridPath = snapPathToGrid(path, pf.token)
+pf.constructor.drawPath(gridPath, { color: Draw.COLORS.lightgreen, alpha: 0.5 })
+pf.constructor.drawPath(optimizeGridPath(gridPath, { token: pf.token }), { color: Draw.COLORS.green })
+
+gridPath.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
+
+
+token = randal
+a = GridCoordinates3d.fromObject(path[0]);
+b = GridCoordinates3d.fromObject(path[1]);
+
+
+
+gridPath = snapPathToGrid(path, randal)
+gridPath.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
+
+
+gridPath0 = snapSegmentToGrid(path[0], path[1], randal)
+gridPath1 = snapSegmentToGrid(path[1], path[2], randal)
+gridPath2 = snapSegmentToGrid(path[2], path[3], randal)
+
+gridPath0.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
+gridPath1.forEach(pt => Draw.point(pt, { radius: 2, color: Draw.COLORS.orange }))
+gridPath2.forEach(pt => Draw.point(pt, { radius: 3, color: Draw.COLORS.red }))
+
+
+// Simple world to get a gridded pathfind.
+pf = new GriddedCollisionPathfinder(randal)
+
+
+let cost = "foundry"; // Would account for terrain.
+let heuristic;
+switch ( canvas.grid.diagonals ) {
+  case CONST.GRID_DIAGONALS.ILLEGAL:
+  case CONST.GRID_DIAGONALS.EQUIDISTANT: heuristic = "manhattan"; break;
+
+  case CONST.GRID_DIAGONALS.EXACT: heuristic = "euclidean"; break;
+  case CONST.GRID_DIAGONALS.APPROXIMATE: heuristic = "euclidean"; break;
+
+  default: heuristic = "foundry"; break;
+}
+
+worldClass = worldBuilderGriddedCollision({ cost, heuristic, use3d: false, pt3d: true, neighborFilter: "sceneGraph" })
+pf.world = new worldClass()
+
+
+pf.startPathfinding(path[0])
+gridPath0 = await pf._findPath(path[0], path[1])
+
+pf.startPathfinding(path[1])
+gridPath1 = await pf.findPath(path[1], path[2])
+
+pf.startPathfinding(path[2])
+gridPath2 = await pf.findPath(path[2], path[3])
 
 
 nodes = [...pf.world.existingNodes.values()]
@@ -611,6 +708,27 @@ AbstractPathfinder.js:111 Pathfinder V4s4gx9T3tSXwgzv|{x: 2150, y: 3050, z: 0} -
 	{x: 1560, y: 2700, z: 0}
 	{x: 1750, y: 2650, z: 0}
 
+AbstractPathfinder.js:111 Pathfinder NKZT67jDDiyacusU|{x: 1750, y: 2550, z: 0} --> {x: 1850, y: 2550, z: 0} path has collision at 3:
+	{x: 1750, y: 2550, z: 0}
+	{x: 1590, y: 2498, z: 0}
+	{x: 1600, y: 2290, z: 0}
+	{x: 1810, y: 2300, z: 0}
+	{x: 1850, y: 2550, z: 0}
+
+AbstractPathfinder.js:137 ClockwiseSweepPathfinder UDY8OEpN0gXbyYqb|Cleaned|{x: 1750, y: 2750, z: 0} --> {x: 2650, y: 2550, z: 0} path has collision at 9:
+	{x: 1750, y: 2750, z: 0}
+	{x: 1950, y: 2750, z: 0}
+	{x: 2050, y: 2750, z: 0}
+	{x: 2050, y: 2550, z: 0}
+	{x: 2050, y: 2350, z: 0}
+	{x: 2250, y: 2350, z: 0}
+	{x: 2250, y: 2350, z: 0}
+	{x: 2350, y: 2450, z: 0}
+	{x: 2450, y: 2450, z: 0}
+	{x: 2550, y: 2550, z: 0}
+	{x: 2650, y: 2550, z: 0}
+
+
 pf.world = new (worldBuilder())()
 pf.initialize()
 path = await pf.findPath(start, end)
@@ -636,8 +754,8 @@ path = await pf.findPath(start, end)
 AStarPathfinder.drawPath(path)
 
 // Test with token dragging
-CONFIG.elevationruler.simplePathfinding.cost = "terrain"
-CONFIG.elevationruler.simplePathfinding.neighborFilter = "occlusion"
+CONFIG.elevationruler.graphPathfinding.cost = "terrain"
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion"
 
 
 geom = randal.GeometryLib.geometry
@@ -648,7 +766,7 @@ randal.measureMovementPath(waypoints)
 // end.y += 25
 
 
-pathfindingCfg = CONFIG.elevationruler.simplePathfinding;
+pathfindingCfg = CONFIG.elevationruler.graphPathfinding;
 
 pf = new BFSPathfinder(randal)
 pf = new UniformCostPathfinder(randal)

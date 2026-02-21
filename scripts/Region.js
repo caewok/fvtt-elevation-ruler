@@ -5,7 +5,7 @@ canvas,
 
 import { MODULE_ID, PATHFINDING_ID } from "./const.js";
 import { Settings } from "./settings.js";
-import { WebGPUPathfinderWithWorker } from "./pathfinding/WebGPUPathfinding.js";
+import { WebGPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 
 // Patches for the Region class
 export const PATCHES = {};
@@ -39,11 +39,11 @@ const DOCUMENT_KEYS = new Set([
 function updateRegion(regionD, changed, options, userId) {
   const PF = Settings.KEYS.PATHFINDING;
   if ( !canvas.regions.active || Settings.get(PF.ALGORITHM) !== PF.ALGORITHM_CHOICES.WEBGPU ) return;
-  if ( WebGPUPathfinderWithWorker.currentTokenId === "" ) return;
+  if ( WebGPUPathfinder.currentTokenId === "" ) return;
 
   const changeKeys = Object.keys(foundry.utils.flattenObject(changed));
   if ( changeKeys.some(key => DOCUMENT_KEYS.has(key)) ) {
-    WebGPUPathfinderWithWorker.currentTokenId = "";
+    WebGPUPathfinder.currentTokenId = "";
     return;
   }
 }

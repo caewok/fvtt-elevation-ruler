@@ -1,12 +1,19 @@
 /* globals
-canvas
+canvas,
+CanvasQuadtree,
+CONFIG,
+CONST,
 foundry,
+game,
 PIXI,
 */
 "use strict";
 
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
+import { OTHER_MODULES, MODULE_ID } from "./const.js";
+import { Settings } from "./settings.js";
+import { segmentBounds } from "./util.js";
 import { almostLessThan } from "./geometry/util.js";
 import { Draw } from "./geometry/Draw.js";
 
@@ -108,6 +115,9 @@ class HalfEdge {
   /** @type {Set<string>} */
   objects = new foundry.utils.IterableWeakSet(); // Placeable objects represented by this edge
 
+  /** @type {PIXI.Rectangle} */
+  get bounds() { return segmentBounds(this.origin, this.twin.origin); }
+
   /**
    * Copy the point
    */
@@ -141,7 +151,122 @@ class HalfEdge {
     Draw.segment({ a: this.origin.add(spacer), b: this.twin.origin.add(spacer) }, opts);
     PIXI.Point.release(delta, spacer);
   }
+
+  /**
+   * Does this edge block?
+   * @param {ElevatedPoint} origin      Origin of the move
+   * @param {Token} moveToken           The token doing the moving
+   * @param {number} [elevationZ]       Elevation of the point or origin to test;
+   *                                    will be inferred from origin or moveToken
+   * @returns {boolean}
+   */
+  placeableBlocks(origin, moveToken, elevationZ) {
+    elevationZ ??= origin.z || moveToken.bottomZ; // For consistency.
+    for ( let placeable of this.objects ) {
+      if ( placeable instanceof foundry.canvas.geometry.edges.Edge ) placeable = placeable.object;
+      if ( placeable instanceof foundry.canvas.placeables.Wall
+        && this.constructor.wallBlocks(placeable, origin, moveToken, elevationZ) ) return true;
+      else if ( placeable instanceof foundry.canvas.placeables.Token
+        && this.constructor.tokenBlocks(placeable, moveToken, elevationZ) ) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Does this edge wall block from an origin somewhere?
+   * Tested "live" and not cached so door or wall orientation changes need not be tracked.
+   * @param {Wall} wall               Wall to test
+   * @param {ElevatedPoint} origin    Measure wall blocking from perspective of this origin point.
+   * @param {Token} moveToken         Token doing the move
+   * @param {number} [elevationZ]     Elevation of the point or origin to test;
+   *                                  will be inferred from origin or moveToken
+   * @returns {boolean}
+   */
+  static wallBlocks(wall, origin, moveToken, elevationZ) {
+    if ( !wall.document.move || wall.isOpen ) return false;
+
+    // Ignore one-directional walls which are facing away from the center
+    const side = wall.edge.orientPoint(origin);
+
+    /* Unneeded?
+    const wdm = PointSourcePolygon.WALL_DIRECTION_MODES;
+    if ( wall.document.dir
+      && (wallDirectionMode === wdm.NORMAL) === (side === wall.document.dir) ) return false;
+    */
+
+    if ( wall.document.dir
+      && side === wall.document.dir ) return false;
+
+    // Test for wall height. If elevation at the wall bottom, wall blocks; if at wall top it does not.
+    elevationZ ??= origin.z || moveToken.bottomZ || 0;
+    if ( !elevationZ.between(wall.bottomZ, wall.topZ, false) && elevationZ !== wall.bottomZ ) return false;
+
+    // If Wall Height vaulting is enabled, walls less than token vision height do not block.
+    const wh = OTHER_MODULES.WALL_HEIGHT;
+    if ( wh.ACTIVE && moveToken.visionZ >= wall.topZ ) return false;
+    return true;
+  }
+
+  /**
+   * Could edges of this token block the moving token?
+   * @param {Token} token             Token whose edges will be tested
+   * @param {Token} moveToken         Token doing the move
+   * @param {number} [elevationZ]     Elevation of the point or origin to test; will be inferred from moveToken.
+   * @returns {boolean}
+   */
+  static tokenEdgeBlocks(token, moveToken, elevationZ) {
+    // Confirm token block setting.
+    const PF = Settings.KEYS.PATHFINDING;
+    const tokensBlock = Settings.get(PF.TOKENS_BLOCK);
+    if ( tokensBlock === PF.TOKENS_BLOCK_CHOICES.NO ) return false;
+
+    // Don't block hidden tokens.
+    if ( token.document.hidden ) return false;
+
+    // Don't block oneself.
+    if ( !moveToken || moveToken === token ) return false;
+
+    // Must be within the elevation bounds.
+    elevationZ ??= moveToken.bottomZ || 0;
+    if ( !elevationZ.between(token.topZ, token.bottomZ) ) return false;
+
+    // Don't block dead tokens (HP <= 0).
+    const { tokenHPAttribute, pathfindingIgnoreStatuses } = CONFIG[MODULE_ID];
+    let tokenHP = Number(foundry.utils.getProperty(token, tokenHPAttribute));
+
+    // DemonLord using damage system
+    if ( game.system.id === "demonlord") {
+      let health = Number(foundry.utils.getProperty(token, "actor.system.characteristics.health.max"));
+      let damage = Number(foundry.utils.getProperty(token, "actor.system.characteristics.health.value"));
+      tokenHP = health - damage;
+    }
+
+    if ( Number.isFinite(tokenHP) && tokenHP <= 0 ) return false;
+
+    // Don't block tokens with certain status.
+    if ( token.actor?.statuses && token.actor.statuses.intersects(pathfindingIgnoreStatuses) ) return false;
+
+    // Don't block tokens that share specific disposition with the moving token.
+    if ( tokensBlock === PF.TOKENS_BLOCK_CHOICES.HOSTILE ) {
+      // Hostile: Block if dispositions are secret or hostile/friendly. Neutrals do nothing.
+      const D = CONST.TOKEN_DISPOSITIONS;
+      const moveTokenD = moveToken.document.disposition;
+      const edgeTokenD = token.document.disposition;
+
+      // Looking for reasons not to block.
+      if ( moveTokenD === edgeTokenD ) return false;
+      if ( moveTokenD === D.NEUTRAL || edgeTokenD === D.NEUTRAL ) return false;
+
+      // At this point, either:
+      // 1. Either token is secret; or
+      // 2. One token is hostile and the other is friendly.
+    }
+
+    // At this point, the tokens block setting is ALL.
+    return true;
+  }
 }
+
 
 class Face {
   /** @type {enum} */
@@ -236,6 +361,9 @@ export class EdgeGraph {
 
   /** @type {Face[]} */
   faces = [];
+
+  /** @type {CanvasQuadtree} */
+  quadtree = new CanvasQuadtree();
 
   // ----- NOTE: Static factory methods ----- //
 
@@ -552,6 +680,8 @@ export class EdgeGraph {
 
     // If vertex is isolated, remove.
     if ( !v.incidentEdge ) this.vertices.delete(v.key);
+
+    this.quadtree.remove(halfEdge);
   }
 
   /**
@@ -656,6 +786,7 @@ export class EdgeGraph {
     delta.release();
 
     this.halfEdges.push(he1, he2);
+    this.quadtree.insert({ r: he1.bounds, t: he1 }); // Only insert one of the pair.
     v1.incidentEdge = he1;
     v2.incidentEdge = he2;
   }
@@ -677,6 +808,24 @@ export class EdgeGraph {
       if ( face.polygon.contains(pt.x, pt.y) ) faces.push(face);
     }
     return faces;
+  }
+
+  // ----- NOTE: Collision testing ----- //
+
+  /**
+   * Instead of a typical `token.checkCollision` test, test for collisions against the edge graph.
+   * With this approach, collisions with enemy tokens may trigger pathfinding based on settings.
+   * @param {PIXI.Point} a          Origin point for the move
+   * @param {PIXI.Point} b          Destination point for the move
+   * @param {Token} token           Token that is moving
+   * @param {CONST.TOKEN_DISPOSITIONS} tokenBlockType
+   * @returns {boolean}
+   */
+  hasCollision(a, b, token) {
+    const lineSegmentIntersects = foundry.utils.lineSegmentIntersects;
+    const edges = this.quadtree.getObjects(segmentBounds(a, b));
+    return edges.some(edge => lineSegmentIntersects(a, b, edge.origin, edge.twin.origin)
+      && edge.placeableBlocks(a, token));
   }
 
   // ----- NOTE: Drawing ----- //
@@ -760,12 +909,6 @@ for ( const token of canvas.tokens.placeables ) {
   graph.addToken(token)
 }
 
-
-
 // Build one wall and token at a time.
-
-
-
-
 
 */

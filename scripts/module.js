@@ -26,14 +26,29 @@ import {
   GraphingPathfinder,
 } from "./pathfinding/GraphPathfinding.js";
 
-// ClockwiseSweep Pathfinding
-import { ClockwiseSweepPathfindingNode, ClockwiseSweepPathfindingWorld } from "./pathfinding/ClockwiseSweepPathfindingWorld.js";
+// Gridded collision pathfinding
+import { GriddedCollisionPathfinder, worldBuilderGriddedCollision } from "./pathfinding/GriddedCollisionPathfinding.js";
 
-// WebGPU Pathfinding
-import { Terrain, WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
+// ClockwiseSweep pathfinding
+import { ClockwiseSweepPathfinder, worldBuilderClockwise } from "./pathfinding/ClockwiseSweepPathfinding.js";
+
+// WebGPU pathfinding
+import { Terrain, WebGPUPathfinderWithFakeWorker, WebGPUPathfinder, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 
 // Scene graph
 import { EdgeGraph } from "./EdgeGraph.js";
+
+// Path cleaning
+import {
+  optimizeGridPath,
+  cleanGridPath,
+  pathIsValid,
+  snapPathToGrid,
+  removeDuplicatePoints,
+  straightenPath,
+  fogIsExplored,
+  solveSegment,
+} from "./pathfinding/path_cleaning.js";
 
 // Load the geometry library.
 import "./geometry/registration.js";
@@ -97,13 +112,13 @@ Hooks.once("init", function() {
      * occlusion
      * }
      */
-    simplePathfinding: {
+    graphPathfinding: {
       algorithm: "astar",   // @type {"astar"|"greedy"|"breadth"|"uniform"}
       use3d: false,         // @type {true|false}
       cost: "foundry",      // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
       heuristic: "foundry", // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
       pt3d: false,          // @type {true|false} Will be true if use3d is true;
-      neighborFilter: "clockwiseSweep",    // @type{"clockwiseSweep"|"occlusion"}
+      neighborFilter: "clockwiseSweep",    // @type{"clockwiseSweep"|"occlusion"|"sceneGraph"}
     },
 
     /**
@@ -130,11 +145,24 @@ Hooks.once("init", function() {
 
       Terrain,
       WebGPUPathfinder,
-      WebGPUPathfinderWithWorker,
+      WebGPUPathfinderWithFakeWorker,
 
-      ClockwiseSweepPathfindingNode,
-      ClockwiseSweepPathfindingWorld,
+      GriddedCollisionPathfinder,
+      worldBuilderGriddedCollision,
 
+      ClockwiseSweepPathfinder,
+      worldBuilderClockwise
+    },
+
+    pathCleaning: {
+      pathIsValid,
+      optimizeGridPath,
+      cleanGridPath,
+      snapPathToGrid,
+      straightenPath,
+      removeDuplicatePoints,
+      fogIsExplored,
+      solveSegment,
     },
 
     EdgeGraph,

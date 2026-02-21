@@ -7,8 +7,10 @@ PIXI,
 "use strict";
 
 import { Draw } from "../geometry/Draw.js";
+import { Settings } from "../settings.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
-
+import { snapPathToGrid, optimizeGridPath, cleanGridPath, straightenPath } from "./path_cleaning.js";
+import { log } from "../util.js";
 
 /* Pathfinding class.
 
@@ -91,34 +93,81 @@ export class AbstractPathfinder {
     if ( !(start || goal) || start.almostEqual(goal) ) return null;
 
     const id = foundry.utils.randomID();
+    const prefix = `${this.constructor.name} ${id}`;
     if ( signal.aborted ) return null;
-    console.time(`${id}|findPath`);
-    if ( PIXI.Point.distanceBetween(start, goal) > (6 * canvas.grid.size) ) { console.debug(`Pathfinder ${id}|${start} --> ${goal}:`); }
-    const path = await this._findPath(start, goal, signal);
-    console.timeEnd(`${id}|findPath`);
+    console.time(`${prefix}|findPath`);
+    if ( PIXI.Point.distanceBetween(start, goal) > (6 * canvas.grid.size) ) log(`${prefix}|${start} --> ${goal}:`); // For debugging.
+    let path = await this._findPath(start, goal, signal);
+    console.timeEnd(`${prefix}|findPath`);
 
-    /* Debugging: Check that path is valid. */
-    if ( path ) {
-      const pathStr = [];
-      path.forEach(pt => pathStr.push(`\t${pt}`));
-      console.debug(`Pathfinder ${id}|${start} --> ${goal}:\n${pathStr.join("\n")}`);
-      if ( !path[0].almostEqual(start) ) console.error(`Pathfinder ${id}|${start} --> ${goal} start incorrect:\n${pathStr.join("\n")}`);
-      if ( !path.at(-1).almostEqual(goal) ) console.error(`Pathfinder ${id}|${start} --> ${goal} end incorrect:\n${pathStr.join("\n")}`);
+    if ( !path ) {
+      log(` ${prefix}|${start} --> ${goal}: null`);
+      return null;
+    }
 
-      const ClockwiseSweepPolygon = foundry.canvas.geometry.ClockwiseSweepPolygon;
-      for ( let i = 0, iMax = path.length - 1; i < iMax; i += 1 ) {
-        if ( ClockwiseSweepPolygon.testCollision(path[i], path[i + 1], { mode: "any", type: "move" }) ) {
-          console.error(`Pathfinder ${id}|${start} --> ${goal} path has collision at ${i}:\n${pathStr.join("\n")}`);
-          return null;
-        }
-      }
-    } else console.debug(`Pathfinder ${id}|${start} --> ${goal}: null`);
+    // Debugging: Check that path is valid.
+    if ( !this.validatePath(path, start, goal, prefix) ) return null;
+    path = Settings.get(Settings.KEYS.PATHFINDING.SNAP_TO_GRID) ? this.snapPathToGrid(path) : this.cleanPath(path);
+    if ( !this.validatePath(path, start, goal, `${prefix}|Cleaned`) ) return null;
 
     this.cachedPaths.set(goal.key, path);
     return path;
   }
 
+  /**
+   * Debugging: check that path is valid.
+   * @param {Node[]}
+   * @returns {boolean}
+   */
+  validatePath(path, start, goal, prefix = "Pathfinder") {
+    const pathString = this.pathString(path);
+    log(`${prefix}|${start} --> ${goal}:\n${pathString}`);
+    if ( !path[0].almostEqual(start) ) {
+      console.error(`${prefix}|${start} --> ${goal} start incorrect:\n${pathString}`);
+      return false;
+    }
+    if ( !path.at(-1).almostEqual(goal) ) {
+      console.error(`${prefix}|${start} --> ${goal} end incorrect:\n${pathString}`);
+      return false;
+    }
+
+    const ClockwiseSweepPolygon = foundry.canvas.geometry.ClockwiseSweepPolygon;
+    for ( let i = 0, iMax = path.length - 1; i < iMax; i += 1 ) {
+      if ( ClockwiseSweepPolygon.testCollision(path[i], path[i + 1], { mode: "any", type: "move" }) ) {
+        console.warn(`${prefix}|${start} --> ${goal} path has collision at ${i}:\n${pathString}`);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  pathString(path) {
+    const pathStr = [];
+    path.forEach(pt => pathStr.push(`\t${pt}`));
+    return pathStr.join("\n");
+  }
+
   async _findPath(_start, _goal, _signal) { console.error("Child class must define _findPath."); }
+
+  /**
+   * Clean the path, which may include straightening it, snapping it to a grid, or removing unnecessary points.
+   * @param {Node[]} path
+   * @returns {Point[]}
+   */
+  cleanPath(path) {
+    path = cleanGridPath(path);
+    return straightenPath(path, this.token);
+  }
+
+  /**
+   * Snap the path to the grid.
+   * @param {Node[]} path
+   * @returns {Point[]}
+   */
+  snapPathToGrid(path) {
+    path = snapPathToGrid(path, this.token);
+    return optimizeGridPath(path, { token: this.token }) ;
+  }
 
   destroy() {
     this.activeJobs.values().forEach(job => job.abort());

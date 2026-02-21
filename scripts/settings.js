@@ -12,12 +12,11 @@ ui
 import { MODULE_ID, PATHFINDING_ID } from "./const.js";
 import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { log } from "./util.js";
-import { GraphingPathfinder } from "./pathfinding/GraphPathfinding.js";
 import { PATCHER } from "./patching.js";
 import { updatePathfindingControl } from "./module.js";
-import { WebGPUPathfinder, WebGPUPathfinderWithWorker, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
-import { worldBuilderClockwise } from "./pathfinding/ClockwiseSweepPathfindingWorld.js";
-import { worldBuilderCollision } from "./pathfinding/CollisionPathfindingWorld.js";
+import { WebGPUPathfinder, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
+import { ClockwiseSweepPathfinder } from "./pathfinding/ClockwiseSweepPathfinding.js";
+import { GriddedCollisionPathfinder } from "./pathfinding/GriddedCollisionPathfinding.js";
 
 const SETTINGS = {
   CONTROLS: {
@@ -41,7 +40,7 @@ const SETTINGS = {
     SNAP_TO_GRID: "pathfinding_snap_to_grid",
     ALGORITHM: "pathfinding-algorithm",
     ALGORITHM_CHOICES: {
-      SIMPLE: "pathfinding-algorithm-simple",
+      COLLISION: "pathfinding-algorithm-collision",
       CLOCKWISE_SWEEP: "pathfinding-algorithm-cwsweep",
       WEBGPU: "pathfinding-algorithm-webgpu",
       // TRIANGLEMESH: pathfinding-algorithm-trianglemesh,
@@ -213,15 +212,15 @@ export class Settings extends ModuleSettingsAbstract {
 
   static async initializePathfinding(algorithm) {
     // Destroy prior pathfinding.
-    await WebGPUPathfinderWithWorker.terminate();
+    await WebGPUPathfinder.terminate();
 
     // Initialize pathfinding.
     const ALG = Settings.KEYS.PATHFINDING.ALGORITHM_CHOICES;
     algorithm ??= Settings.get(Settings.KEYS.PATHFINDING.ALGORITHM);
-    if ( algorithm === ALG.SIMPLE ) algorithm = CONFIG[MODULE_ID].simplePathfinding.algorithm;
+    if ( algorithm === ALG.SIMPLE ) algorithm = CONFIG[MODULE_ID].graphPathfinding.algorithm;
     switch ( algorithm ) {
       case ALG.WEBGPU:
-      case "webgpu": await WebGPUPathfinderWithWorker.initialize(); break;
+      case "webgpu": await WebGPUPathfinder.initialize(); break;
     }
 
     // Set up pathfinding for each token on the canvas.
@@ -230,7 +229,7 @@ export class Settings extends ModuleSettingsAbstract {
 
   static async toggleSnapToGrid(enable) {
     const PF = Settings.KEYS.PATHFINDING;
-    if ( Settings.get(PF.ALGORITHM) === PF.ALGORITHM_CHOICES.WEBGPU ) await WebGPUPathfinderWithWorker.initialize();
+    if ( Settings.get(PF.ALGORITHM) === PF.ALGORITHM_CHOICES.WEBGPU ) await WebGPUPathfinder.initialize();
   }
 
   static togglePathfinding(enable) {
@@ -287,22 +286,16 @@ export class Settings extends ModuleSettingsAbstract {
     if ( pf && pf.constructor === cl ) return;
     obj[PATHFINDING_ID] = new cl(token);
   }
-
-  static get pathfindingWorldClass() {
-    const PF = this.KEYS.PATHFINDING;
-    return this.get(PF.ALGORITHM) === PF.ALGORITHM_CHOICES.CLOCKWISE_SWEEP
-      ? worldBuilderClockwise() : worldBuilderCollision();
-  }
 }
 
 function pathfinderClass(algorithm) {
   const ALG = Settings.KEYS.PATHFINDING.ALGORITHM_CHOICES;
   algorithm ??= Settings.get(Settings.KEYS.PATHFINDING.ALGORITHM);
   switch ( algorithm ) {
-    case ALG.WEBGPU: return WebGPUPathfinderWithWorker;
-    case ALG.SIMPLE:
-    case ALG.CLOCKWISE_SWEEP: return GraphingPathfinder;
-    default: return GraphingPathfinder;
+    case ALG.WEBGPU: return WebGPUPathfinder;
+    case ALG.COLLISION: return GriddedCollisionPathfinder;
+    case ALG.CLOCKWISE_SWEEP: return ClockwiseSweepPathfinder;
+    default: throw Error("Pathfinder class not recognized.");
   }
 }
 

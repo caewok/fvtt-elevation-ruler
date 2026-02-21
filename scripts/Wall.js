@@ -7,7 +7,7 @@ foundry,
 
 import { MODULE_ID } from "./const.js";
 import { Settings } from "./settings.js";
-import { WebGPUPathfinderWithWorker } from "./pathfinding/WebGPUPathfinding.js";
+import { WebGPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 
 // Patches for the Wall class
 export const PATCHES = {};
@@ -54,11 +54,11 @@ function updateWall(wallD, changed, _options, _userId) {
 
   const PF = Settings.KEYS.PATHFINDING;
   if ( Settings.get(PF.ALGORITHM) !== PF.ALGORITHM_CHOICES.WEBGPU ) return;
-  if ( WebGPUPathfinderWithWorker.currentElevationZ === null ) return;
+  if ( WebGPUPathfinder.currentElevationZ === null ) return;
 
   const changeKeys = Object.keys(foundry.utils.flattenObject(changed));
   if ( changeKeys.some(key => DOCUMENT_KEYS.has(key)) ) {
-    WebGPUPathfinderWithWorker.currentElevationZ = null;
+    WebGPUPathfinder.currentElevationZ = null;
     return;
   }
 
@@ -66,7 +66,7 @@ function updateWall(wallD, changed, _options, _userId) {
   // Could do this update per-wall, but that would likely be overkill.
   if ( Object.hasOwn(changed, "ds") ) {
     const doorAction = changed.ds === CONST.WALL_DOOR_STATES.OPEN ? "openDoors" : "closeDoors";
-    WebGPUPathfinderWithWorker[doorAction]({ walls: wallD.object }); // Async.
+    WebGPUPathfinder[doorAction]({ walls: wallD.object }); // Async.
   }
 }
 
