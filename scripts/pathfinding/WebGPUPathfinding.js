@@ -173,7 +173,7 @@ const GPUTerrainMixin = superclass => class extends superclass {
     // Need to earcut faces but also handle holes.
     const vertices = [];
     for ( const faces of geom.combinedFaces ) {
-      if ( faces.top.matchesClass(Polygons3d) ) {
+      if ( faces.top instanceof CONFIG[GEOMETRY_LIB_ID].lib.threeD.Polygons3d ) {
         const paths = faces.top.toClipperPaths();
         const top = Polygon3dVertices.polygonTopFace(paths, { topZ: 0, stride: 3 });
         vertices.push(top);
@@ -950,7 +950,7 @@ export class WebGPUPathfinderFakeWorker {
   }
 }
 
-// !!! WebGPUPathfinder
+// NOTE: WebGPUPathfinder
 export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMixin) {
 
   static _initialized = false;
@@ -1126,7 +1126,7 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
 
   // ----- NOTE: Pathfind ----- //
 
-  async findPath(start, goal, _signal) {
+  async _findPath(start, goal, _signal) {
     return this.constructor.worker.findPath(start, goal);
   }
 
@@ -1616,7 +1616,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     // We multiply the base movement (10/14) by the tile's weight.
     // Example: Road(1) -> Straight=10. Swamp(5) -> Straight=50.
     let COST_STRAIGHT = 10u * tileCost;
-    let COST_DIAGONAL = 14u * tileCost; // Or 99/140
+    let COST_DIAGONAL = 100u * tileCost; // 14u * tileCost; // Or 99/140
     let MAX_VAL = 0xFFFFFFFFu;
 
     // ----- Check straight neighbors (cost 10) ----- //
@@ -2654,13 +2654,49 @@ pf.terrain.transientTerrain.draw({ maximumPixelValue: 255, local: false, skip: 5
 
 */
 
+/*
+function displayGridValues(distMap, nX, nY, tm) {
+  arr = [];
+  for ( let c = -1; c < 2; c += 1 ) {
+    for ( let r = -1; r < 2; r += 1 ) {
+      arr.push(distMap[tm.indexAtLocal(nX + r, nY + c - 1)]);
+      // arr.push({ x: nX + r, y: nY + c - 1})
+    }
+  }
+  // return arr;
+  return print(arr, 3, 3);
+}
+
+function print(arr, nrow, ncol) {
+  const startR = 0;
+  const startC = 0;
+  const endR = nrow;
+  const endC = ncol;
+
+  const getIndex = (row, col) => arr[(row * ncol) + col];
+
+  // console.table prints arrays of arrays nicely.
+  const out = new Array(endR - startR);
+  for ( let r = startR; r < endR; r += 1 ) out[r] = new Array(endC - startC);
+  for ( let r = startR; r < endR; r += 1 ) {
+    const arrR = out[r];
+    for ( let c = startC; c < endC; c += 1 ) arrR[c] = getIndex(r, c);
+  }
+  // return out;
+  console.table(out);
+}
+
+displayGridValues(distMap, nX, nY, this.terrainMapper)
+
+*/
+
 /* Test pathfinding
 PixelCache = CONFIG.GeometryLib.lib.PixelCache
 Draw = CONFIG.GeometryLib.lib.Draw
 GridCoordinates3d = CONFIG.GeometryLib.lib.threeD.GridCoordinates3d
 api = game.modules.get("elevationruler").api
 WebGPUPathfinder = api.pathfinding.WebGPUPathfinder
-await WebGPUPathfinder.initializeDevice();
+await WebGPUPathfinder.initialize();
 
 let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
@@ -2669,8 +2705,7 @@ start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
 
 pf = new WebGPUPathfinder(randal, 1);
-await pf.initialize()
-await pf.calculateDistanceMap(start)
+await pf.startPathfinding(start)
 path = await pf.findPath(start, end)
 WebGPUPathfinder.drawPath(path);
 
