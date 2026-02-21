@@ -44,12 +44,11 @@ import {
   cleanGridPath,
   pathIsValid,
   snapPathToGrid,
-  snapSegmentToGrid,
   removeDuplicatePoints,
   straightenPath,
   fogIsExplored,
-  approximateGridPath,
-  solveSegment, } from "./pathfinding/path_cleaning.js";
+  solveSegment,
+} from "./pathfinding/path_cleaning.js";
 
 // Load the geometry library.
 import "./geometry/registration.js";
@@ -160,11 +159,9 @@ Hooks.once("init", function() {
       optimizeGridPath,
       cleanGridPath,
       snapPathToGrid,
-      snapSegmentToGrid,
       straightenPath,
       removeDuplicatePoints,
       fogIsExplored,
-      approximateGridPath,
       solveSegment,
     },
 

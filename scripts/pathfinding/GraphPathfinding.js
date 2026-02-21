@@ -608,8 +608,7 @@ Draw.clearDrawings()
 
 
 
-let { approximateGridPath,
-      solveSegment,
+let { solveSegment,
       pathIsValid,
       optimizeGridPath,
       cleanGridPath,
@@ -617,9 +616,9 @@ let { approximateGridPath,
       straightenPath,
       removeDuplicatePoints,
       fogIsExplored,
-      snapSegmentToGrid,} = api.pathCleaning
+} = api.pathCleaning
 
-gridPath = approximateGridPath(path, randal)
+gridPath = snapPathToGrid(path, pf.token)
 gridPath.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
 pf.constructor.drawPath(gridPath, { color: Draw.COLORS.green })
 
