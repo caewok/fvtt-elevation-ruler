@@ -588,26 +588,6 @@ GridCoordinates3d = CONFIG.GeometryLib.lib.threeD.GridCoordinates3d
 GridCoordinates = CONFIG.GeometryLib.lib.GridCoordinates
 api = game.modules.get("elevationruler").api
 let { ClockwiseSweepPathfinder, GriddedCollisionPathfinder, WebGPUPathfinder, worldBuilderGriddedCollision } = api.pathfinding;
-
-let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
-let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
-
-pf = new ClockwiseSweepPathfinder(randal)
-start = GridCoordinates3d.fromObject(randal.center)
-end = GridCoordinates3d.fromObject(zanna.center)
-
-pf.debug = true
-pf.debugDelay = 1000;
-
-pf.startPathfinding(start);
-path = await pf._findPath(start, end) // Skip caching
-pf.constructor.drawPath(path)
-Draw.clearDrawings()
-
-
-
-
-
 let { solveSegment,
       pathIsValid,
       optimizeGridPath,
@@ -618,9 +598,38 @@ let { solveSegment,
       fogIsExplored,
 } = api.pathCleaning
 
+let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
+let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
+pf = new ClockwiseSweepPathfinder(randal)
+start = GridCoordinates3d.fromObject(randal.center)
+end = GridCoordinates3d.fromObject(zanna.center)
+
+let beiro = canvas.tokens.placeables.find(t => t.name === "Beiro")
+let bandit = canvas.tokens.placeables.find(t => t.name === "Bandit")
+pf = new ClockwiseSweepPathfinder(beiro)
+start = GridCoordinates3d.fromObject(beiro.center)
+end = GridCoordinates3d.fromObject(bandit.center)
+
+let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
+let lizard = canvas.tokens.placeables.find(t => t.name === "Giant Lizard")
+pf = new ClockwiseSweepPathfinder(akra)
+start = GridCoordinates3d.fromObject(akra.center)
+end = GridCoordinates3d.fromObject(lizard.center)
+
+
+pf.debug = true
+pf.debugDelay = 1000;
+
+pf.startPathfinding(start);
+path = await pf._findPath(start, end) // Skip caching
+pf.constructor.drawPath(path)
+
 gridPath = snapPathToGrid(path, pf.token)
+pf.constructor.drawPath(gridPath, { color: Draw.COLORS.lightgreen, alpha: 0.5 })
+pf.constructor.drawPath(optimizeGridPath(gridPath, { token: pf.token }), { color: Draw.COLORS.green })
+
 gridPath.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
-pf.constructor.drawPath(gridPath, { color: Draw.COLORS.green })
+
 
 token = randal
 a = GridCoordinates3d.fromObject(path[0]);
@@ -705,6 +714,20 @@ AbstractPathfinder.js:111 Pathfinder NKZT67jDDiyacusU|{x: 1750, y: 2550, z: 0} -
 	{x: 1600, y: 2290, z: 0}
 	{x: 1810, y: 2300, z: 0}
 	{x: 1850, y: 2550, z: 0}
+
+AbstractPathfinder.js:137 ClockwiseSweepPathfinder UDY8OEpN0gXbyYqb|Cleaned|{x: 1750, y: 2750, z: 0} --> {x: 2650, y: 2550, z: 0} path has collision at 9:
+	{x: 1750, y: 2750, z: 0}
+	{x: 1950, y: 2750, z: 0}
+	{x: 2050, y: 2750, z: 0}
+	{x: 2050, y: 2550, z: 0}
+	{x: 2050, y: 2350, z: 0}
+	{x: 2250, y: 2350, z: 0}
+	{x: 2250, y: 2350, z: 0}
+	{x: 2350, y: 2450, z: 0}
+	{x: 2450, y: 2450, z: 0}
+	{x: 2550, y: 2550, z: 0}
+	{x: 2650, y: 2550, z: 0}
+
 
 pf.world = new (worldBuilder())()
 pf.initialize()

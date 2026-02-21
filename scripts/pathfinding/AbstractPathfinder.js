@@ -166,7 +166,7 @@ export class AbstractPathfinder {
    */
   snapPathToGrid(path) {
     path = snapPathToGrid(path, this.token);
-    return optimizeGridPath(path, this.token);
+    return optimizeGridPath(path, { token: this.token }) ;
   }
 
   destroy() {

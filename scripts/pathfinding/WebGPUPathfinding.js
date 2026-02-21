@@ -24,6 +24,7 @@ import { HorizontalQuadVertices, Polygon3dVertices } from "../geometry/placeable
 import { VertexObject } from "../geometry/placeable_geometry/GeometryDesc.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix } from "../geometry/mixwith.js";
+import { cleanGridPath } from "./path_cleaning.js";
 
 // TODO: import { FastBitSet } from "../FastBitSet/FastBitSet.js";
 
@@ -1141,7 +1142,7 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
    */
   snapPathToGrid(path) {
     // Already done.
-    return path;
+    return cleanGridPath(path);
   }
 
 
@@ -1616,7 +1617,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     // We multiply the base movement (10/14) by the tile's weight.
     // Example: Road(1) -> Straight=10. Swamp(5) -> Straight=50.
     let COST_STRAIGHT = 10u * tileCost;
-    let COST_DIAGONAL = 14u * tileCost;
+    let COST_DIAGONAL = 14u * tileCost; // Or 99/140
     let MAX_VAL = 0xFFFFFFFFu;
 
     // ----- Check straight neighbors (cost 10) ----- //

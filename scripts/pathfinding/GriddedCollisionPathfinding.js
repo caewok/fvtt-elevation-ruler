@@ -15,6 +15,7 @@ import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix, Mixin } from "../geometry/mixwith.js";
 import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
 import { ObstacleSweep } from "./ClockwiseSweep.js";
+import { optimizeGridPath } from "./path_cleaning.js";
 import {
   Manhattan2dCost,
   Manhattan3dCost,
@@ -51,6 +52,15 @@ Abstract
 export class GriddedCollisionPathfinder extends GraphingPathfinder {
 
   static get worldClass() { return worldBuilderGriddedCollision(); }
+
+  /**
+   * Snap the path to the grid.
+   * @param {Node[]} path
+   * @returns {Point[]}
+   */
+  snapPathToGrid(path) {
+    return optimizeGridPath(path, { token: this.token });
+  }
 
 }
 

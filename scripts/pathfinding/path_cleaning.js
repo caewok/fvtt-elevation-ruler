@@ -27,15 +27,19 @@ export function snapPathToGrid(path, token, maxDepth = 4) {
   const collisionFn = (a, adjA) => sceneGraph.hasCollision(a, adjA, token);
   let candidate;
   for ( const candidateConnection of validOffsets(path[0], collisionFn) ) {
-    const candidatePath = path.slice(1,);
-    if ( !candidateConnection.almostEqual(candidatePath[0]) ) candidatePath.unshift(candidateConnection);
+    const candidatePath = candidateConnection.almostEqual(path[1])
+      ? path.slice(1,)
+      : [candidateConnection, ...path.slice(1,)];
     candidate = _approximateGridPath(candidatePath, token, maxDepth);
     if ( candidate.gridded ) break;
   }
 
   // TODO: Ever necessary to reverse the path and try again?
 
-  return candidate.path;
+  // Add back path start.
+  candidate.path.unshift(path[0]);
+
+  return removeDuplicatePoints(candidate.path);
 }
 
 /**
@@ -61,17 +65,20 @@ function _approximateGridPath(path, token, maxDepth = 4) {
 
   let otherSegments;
   for ( const candidateConnectionPath of connectSegment(firstSegment.path.at(-1), path[1], token) ) {
-    const candidatePath = path.slice(2,);
-
     // Drop duplicate point where the candidate offset meets the path.
-    if ( candidatePath[0].almostEqual(candidateConnectionPath.at(-1)) ) candidateConnectionPath.pop();
-    if ( firstSegment.path.at(-1).almostEqual(candidateConnectionPath[0]) ) candidateConnectionPath.shift();
+    if ( path[2].almostEqual(candidateConnectionPath.at(-1)) ) candidateConnectionPath.pop();
+    if ( candidateConnectionPath.length
+      && firstSegment.path.at(-1).almostEqual(candidateConnectionPath[0]) ) candidateConnectionPath.shift();
 
-    // Get the new path.
-    candidatePath.unshift(candidateConnectionPath.at(-1) || firstSegment.path.at(-1));
+    // Find a grid approximation for the new path.
+    const candidatePath = [candidateConnectionPath.at(-1) || firstSegment.path.at(-1), ...path.slice(2,)];
     otherSegments = _approximateGridPath(candidatePath, token, maxDepth);
     if ( candidateConnectionPath.length > 1 ) {
-      otherSegments.path.unshift(...candidateConnectionPath.slice(0, candidateConnectionPath.length - 1)); // Add back in any extra candidateConnectionPath points.
+      // Add back in any extra candidateConnectionPath points.
+      otherSegments.path = [
+        ...candidateConnectionPath.slice(0, candidateConnectionPath.length - 1),
+        ...otherSegments.path
+      ];
     }
     if ( !firstSegment.gridded ) break; // Just take the first path.
     if ( otherSegments.gridded ) break; // We found a fully gridded path.
@@ -220,7 +227,10 @@ function *connectSegment(prev, curr, token) {
         if ( pathIsValid(connectingPath, token) ) yield connectingPath;
       }
     }
-  } else yield* validOffsets(curr, (a, candidate) => sceneGraph.hasCollision(prev, candidate, token));
+  } else {
+    const collisionFn = (a, candidate) => sceneGraph.hasCollision(prev, candidate, token);
+    for ( const candidateOffset of validOffsets(curr, collisionFn) ) yield [candidateOffset];
+  }
   if ( !curr.clone().centerToOffset().almostEqual(curr) ) yield [curr]; // The non-offset point.
 }
 
@@ -294,7 +304,7 @@ function _solveSegment(a, b, token, maxDepth = 4, _depth) { /* eslint-disable-li
   const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
   const collisionFn = (pt, adjPt) => sceneGraph.hasCollision(adjPt, pt, token);
   for ( const offsetB of validOffsets(b, collisionFn) ) {
-    const candidate = [a, ...directGridPath(a, offsetB), offsetB];
+    const candidate = [a, ...directGridPath(a, offsetB), offsetB, b];
     if ( pathIsValid(candidate, token) ) return candidate;
   }
 
@@ -310,11 +320,11 @@ function _solveSegment(a, b, token, maxDepth = 4, _depth) { /* eslint-disable-li
   if ( mid == null ) return [a, b];
 
   const firstHalf = _solveSegment(a, mid, token, maxDepth, _depth + 1);
-  const secondHalf = _solveSegment(mid, a, token, maxDepth, _depth + 1);
+  const secondHalf = _solveSegment(mid, b, token, maxDepth, _depth + 1);
 
   // Combine halves; remove duplicate midpoint.
-  secondHalf.path.shift();
-  return [...firstHalf.path, ...secondHalf.path];
+  secondHalf.shift();
+  return [...firstHalf, ...secondHalf];
 }
 
 /**
@@ -425,18 +435,21 @@ function distanceSquaredToSegment(a, b, pt) {
  * @param {GridCoordinates[]} path
  * @returns {GridCoordinates[]}
  */
-export function optimizeGridPath(path, { token, checkDiagonals = Boolean(token), dropIntermediate = true } = {}) {
+export function optimizeGridPath(path, { token, checkDiagonals = Boolean(token), dropIntermediate = true, checkUTurn = true } = {}) {
   if ( path.length < 3 ) return path;
-  checkDiagonals &&= canvas.grid.diagonals !== CONST.GRID_DIAGONALS.ILLEGAL;
+  checkDiagonals &&= (canvas.grid.diagonals !== CONST.GRID_DIAGONALS.ILLEGAL);
 
-  const testFn = checkDiagonals && dropIntermediate ? composeOr(isUTurn, skipIntermediate, canShortcutDiagonal)
-    : checkDiagonals ? composeOr(isUTurn, canShortcutDiagonal)
-      : dropIntermediate ? composeOr(isUTurn, skipIntermediate)
-        : isUTurn;
+  const toTest = [];
+  if ( checkUTurn ) toTest.push(isUTurn);
+  if ( dropIntermediate ) toTest.push(skipIntermediate);
+  if ( checkDiagonals ) toTest.push(canShortcutDiagonal);
+  if ( !toTest.length ) return path;
+  const testFn = composeOr(...toTest);
+
   let a = path[0];
   let b = path[1];
   const cleanedPts = [a];
-  for ( let i = 2, n = path.length - 1; i < n; i += 1 ) {
+  for ( let i = 2, n = path.length; i < n; i += 1 ) {
     const c = path[i];
     if ( testFn(a, b, c, token) ) { // Skip b; don't update a.
       b = c;
