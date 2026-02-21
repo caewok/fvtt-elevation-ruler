@@ -582,6 +582,7 @@ export class AStarGraph extends UniformCostGraph {
 }
 
 /* Testing
+MODULE_ID = "elevationruler"
 Draw = CONFIG.GeometryLib.lib.Draw;
 GridCoordinates3d = CONFIG.GeometryLib.lib.threeD.GridCoordinates3d
 GridCoordinates = CONFIG.GeometryLib.lib.GridCoordinates
@@ -606,7 +607,10 @@ Draw.clearDrawings()
 
 
 
-let { pathIsValid,
+
+let { approximateGridPath,
+      solveSegment,
+      pathIsValid,
       optimizeGridPath,
       cleanGridPath,
       snapPathToGrid,
@@ -614,12 +618,28 @@ let { pathIsValid,
       removeDuplicatePoints,
       fogIsExplored,
       snapSegmentToGrid,} = api.pathCleaning
+
+gridPath = approximateGridPath(path, randal)
+gridPath.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
+pf.constructor.drawPath(gridPath, { color: Draw.COLORS.green })
+
+token = randal
+a = GridCoordinates3d.fromObject(path[0]);
+b = GridCoordinates3d.fromObject(path[1]);
+
+
+
 gridPath = snapPathToGrid(path, randal)
 gridPath.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
 
 
 gridPath0 = snapSegmentToGrid(path[0], path[1], randal)
+gridPath1 = snapSegmentToGrid(path[1], path[2], randal)
+gridPath2 = snapSegmentToGrid(path[2], path[3], randal)
 
+gridPath0.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
+gridPath1.forEach(pt => Draw.point(pt, { radius: 2, color: Draw.COLORS.orange }))
+gridPath2.forEach(pt => Draw.point(pt, { radius: 3, color: Draw.COLORS.red }))
 
 
 // Simple world to get a gridded pathfind.

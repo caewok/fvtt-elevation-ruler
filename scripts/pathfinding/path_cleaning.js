@@ -17,6 +17,317 @@ import { PixelCache } from "../geometry/PixelCache.js";
 // Straighten, snap-to-grid, fog test.
 
 /**
+ * Approximate a grid path over an array of line segments.
+ * Avoids obstacles and reverts to the line when collisions encountered.
+ */
+export function approximateGridPath(path, token, maxDepth = 4) {
+  if ( path.length < 2 ) return path;
+  path = path.map(pt => GridCoordinates3d.fromObject(pt));
+  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+  const collisionFn = (a, adjA) => sceneGraph.hasCollision(a, adjA, token);
+  let candidate;
+  for ( const candidateConnection of validOffsets(path[0], collisionFn) ) {
+    const candidatePath = path.slice(1,);
+    if ( !candidateConnection.almostEqual(candidatePath[0]) ) candidatePath.unshift(candidateConnection);
+    candidate = _approximateGridPath(candidatePath, token, maxDepth);
+    if ( candidate.gridded ) break;
+  }
+  return candidate.path;
+}
+
+/**
+ * Recursively approximate a grid path over an array of segments.
+ * The first segment is gridded, and then the start of each following segment is given a candidate offset
+ * based on the grid termination of the first segment, and then the rest of the path is constructed.
+ * Essentially, at end of each segment, different offsets are attempted
+ * @param {GridCoordinates3d[]} path
+ * @param {Token} token
+ * @param {number} [maxDepth=4]       Maximum depth passed to solveSegment
+ * @returns {GridPathResult}
+ */
+function _approximateGridPath(path, token, maxDepth = 4) {
+  if ( path.length < 2 ) return new GridPathResult(path);
+
+  let finalPath = [path[0]];
+  const firstSegment = new GridPathResult(solveSegment(path[0], path[1], token, maxDepth));
+  if ( path.length === 2 ) return firstSegment;
+
+  // First segment includes path endpoints a|b.
+  // Drop b, which is also path[1]
+  firstSegment.path.pop();
+
+  let otherSegments;
+  for ( const candidateConnectionPath of connectSegment(firstSegment.path.at(-1), path[1], token) ) {
+    const candidatePath = path.slice(2,);
+
+    // Drop duplicate point where the candidate offset meets the path.
+    if ( candidatePath[0].almostEqual(candidateConnectionPath.at(-1)) ) candidateConnectionPath.pop();
+    if ( firstSegment.path.at(-1).almostEqual(candidateConnectionPath[0]) ) candidateConnectionPath.shift();
+
+    // Get the new path.
+    candidatePath.unshift(candidateConnectionPath.at(-1) || firstSegment.path.at(-1));
+    otherSegments = _approximateGridPath(candidatePath, token, maxDepth);
+    if ( candidateConnectionPath.length > 1 ) {
+      otherSegments.path.unshift(...candidateConnectionPath.slice(0, candidateConnectionPath.length - 1)); // Add back in any extra candidateConnectionPath points.
+    }
+    if ( !firstSegment.gridded ) break; // Just take the first path.
+    if ( otherSegments.gridded ) break; // We found a fully gridded path.
+  }
+
+  // Take the first gridded option or last option run.
+  // Remove duplicates.
+  if ( finalPath[0].almostEqual(firstSegment.path[0]) ) finalPath.pop();
+  if ( firstSegment.path.at(-1).almostEqual(otherSegments.path[0]) ) firstSegment.path.pop();
+  finalPath.push(...firstSegment.path, ...otherSegments.path);
+  return new GridPathResult(finalPath);
+}
+
+class GridPathResult {
+  path;
+
+  constructor(path) {
+    this.path = path;
+  }
+
+  #gridded;
+
+  get gridded() { return (this.#gridded ??= this.constructor.isGridded(this.path)); }
+
+  static isGridded(path) {
+    const tmp = GridCoordinates3d.tmp;
+
+    // Test:
+    // 1. Each point is on the grid.
+    // 2. Each point is 1 offset away from the previous point.
+    const iter = path.values();
+    let prev = iter.next().value;
+    for ( const curr of iter ) {
+      curr.clone(tmp);
+      tmp.centerToOffset();
+      const gridded = curr.almostEqual(tmp)
+        && (Math.abs(prev.i - tmp.i) < 2 && Math.abs(prev.j - tmp.j) < 2);
+      if ( !gridded ) {
+        tmp.release();
+        return false;
+      }
+      prev = curr;
+    }
+    return true;
+  }
+
+  clear() {
+    this.#gridded = null;
+  }
+}
+
+/* Testing
+
+Essentially, the initial path is created by building a bunch of firstSegments.
+pf.constructor.drawPath(path)
+
+sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+maxDepth = 4
+token = randal
+collisionFn = (a, adjA) => sceneGraph.hasCollision(a, adjA, token);
+
+path = path.map(pt => GridCoordinates3d.fromObject(pt));
+
+// Start approximateGridPath loop
+allCandidateConnections = [...validOffsets(path[0], collisionFn)]
+candidateConnection = allCandidateConnections[0]
+candidatePath = path.slice(1,);
+if ( !candidateConnection.almostEqual(candidatePath[0]) ) candidatePath.unshift(candidateConnection);
+
+candidatePathsTracker = []
+candidateConnectionsTracker = []
+firstSegmentsTracker = []
+otherSegmentsTracker = []
+pathParameterTracker = []
+
+
+// Start __approximateGridPath
+proposedPath = _approximateGridPath(candidatePath, token, maxDepth)
+
+_approximateGridPath = (path, token, maxDepth = 4, depth) => {
+  depth ||= 0
+
+  pathParameterTracker.push({ depth, path: [...path] });
+  if ( path.length < 2 ) return new GridPathResult(path);
+
+  let finalPath = [path[0]];
+  const firstSegment = new GridPathResult(solveSegment(path[0], path[1], token, maxDepth));
+
+  firstSegmentsTracker.push({ depth, path: [...firstSegment] };
+
+  if ( path.length === 2 ) return firstSegment;
+
+  candidateConnectionsTracker.push({ depth, candidates: connectSegment(firstSegment.path.at(-1), path[1], token) });
+  let i = 0;
+  otherSegmentsTracker[_depth] = [];
+  candidatePathsTracker[_depth] = [];
+
+  let otherSegments;
+  for ( const candidateConnectionPath of connectSegment(firstSegment.path.at(-1), path[1], token) ) {
+    if ( candidateConnectionPath[0].almostEqual(path[1]) ) candidateConnectionPath.pop(); // Drop duplicate point where the candidate offset meets the path.
+    const candidatePath = [...candidateConnectionPath, ...path.slice(2,)];
+    otherSegments = _approximateGridPath(candidatePath, token, maxDepth, depth + 1);
+
+    otherSegmentsTracker.push({ depth, i, path: [...otherSegments] });
+    candidatePathsTracker.push({ depth, i, path: [...candidatePath] })
+
+    if ( !firstSegment.gridded ) break; // Just take the first path.
+    if ( otherSegments.gridded ) break; // We found a fully gridded path.
+  }
+  firstSegment.path.pop(); // The candidateConnection replaces the end of the first segment
+
+  // Take the first gridded option or last option run.
+  // Remove duplicates.
+  if ( finalPath[0].almostEqual(firstSegment.path[0]) ) finalPath.pop();
+  if ( firstSegment.path.at(-1).almostEqual(otherSegments.path[0]) ) firstSegment.path.pop();
+  finalPath.push(...firstSegment.path, ...otherSegments.path);
+  return new GridPathResult(finalPath);
+}
+
+
+// Drawing
+candidatePath1.forEach(pt => Draw.point(pt, { color: Draw.COLORS.yellow, radius: 2 }))
+candidateConnections1.forEach(pt => Draw.point(pt, { color: Draw.COLORS.white, radius: 1 }))
+Draw.star(candidateConnection1, { color: Draw.COLORS.white, radius: 2 })
+
+*/
+
+/**
+ * Given a prior point or grid point from a path and a current point in a path,
+ * determine viable options to replace the current point with a gridded point.
+ * @param {GridCoordinates3d} prev      Prior point or grid point that must connect
+ * @param {GridCoordinates3d} curr      Point to replace
+ * @param {Token} token                 Token used when testing collisions
+ * @yields {GridCoordinates3d[]}
+ */
+function *connectSegment(prev, curr, token) {
+  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+  if ( canvas.grid.diagonals === CONST.GRID_DIAGONALS.ILLEGAL ) {
+    // If no diagonals, then prev --> candidateOffset might require an extra step.
+    // Means the test is really whether prev --> ? --> candidateOffset are valid.
+    // Skip collision test in validOffsets and test later.
+    for ( const candidateOffset of validOffsets(curr) ) {
+      if ( candidateOffset.almostEqual(prev) ) yield [prev];
+      else {
+        const connectingPath = [prev, ...directGridPath(prev, candidateOffset), candidateOffset];
+        if ( pathIsValid(connectingPath, token) ) yield connectingPath;
+      }
+    }
+  } else yield* validOffsets(curr, (a, candidate) => sceneGraph.hasCollision(prev, candidate, token));
+  if ( !curr.clone().centerToOffset().almostEqual(curr) ) yield [curr]; // The non-offset point.
+}
+
+/**
+ * Iterate valid offsets to a point.
+ * To be valid, the point|offset segment must not have a collision.
+ * The point must also be within
+ * @param {GridCoordinates3d} a     Point to offset
+ * @param {Token} token             Token to use for collision test.
+ * @yields {GridCoordinates3d}
+ */
+function *validOffsets(a, collisionFn, sortFn) {
+  collisionFn ??= (_a, _candidate) => false;
+
+  // First, try the basic offset.
+  const aOffset = a.clone().centerToOffset();
+  if ( a.almostEqual(aOffset) || !collisionFn(a, aOffset) ) yield aOffset;
+
+  // Second, get offsets around this one, sorted by distance to a
+  // Only permit neighbors that are less than a full diagonal away from a.
+  sortFn ??= (n1, n2) => PIXI.Point.distanceSquaredBetween(n1, a) - PIXI.Point.distanceSquaredBetween(n2, a);
+  const maxDist2 = ((canvas.dimensions.size - 1) ** 2) * 2;  // (a - 1)^2 + (b - 1)^2
+  const neighbors = gridNeighbors(aOffset).filter(n => PIXI.Point.distanceSquaredBetween(a, n) < maxDist2);
+  neighbors.sort(sortFn);
+  for ( const n of neighbors ) {
+    if ( !collisionFn(a, n) ) yield n;
+  }
+}
+
+/**
+ * Get the valid (2d) neighbors to a grid point.
+ * Uses canvas.grid so it respects diagonal rules.
+ */
+function gridNeighbors(pt) {
+  const pt2d = GridCoordinates.fromObject(pt);
+  const offsets = canvas.grid.getAdjacentOffsets(pt2d);
+  pt2d.release();
+  return offsets.map(offset => GridCoordinates3d.fromOffset(offset));
+}
+
+
+/**
+ * Find a valid gridded route for a single segment a|b.
+ * @param {GridCoordinates3d} a       Starting point of segment
+ * @param {GridCoordinates3d} b       End point of segment
+ * @param {Token} token               Token to use when testing collisions
+ * @param {number} maxDepth           Limit to number of segment splits
+ * @returns {GridCoordinates3d[]} Returns a, ...gridded path, b.
+ *   Gridded path will not duplicate a or b.
+ */
+export function solveSegment(a, b, token, maxDepth = 4) {
+  const path = _solveSegment(a, b, token, maxDepth, 0);
+  if ( a.almostEqual(path[0]) ) path.shift();
+  if ( path.length && b.almostEqual(path.at(-1)) ) path.pop();
+  return [a, ...path, b];
+}
+
+/**
+ * Recursive helper to find a valid gridded route for a single segment a|b.
+ * @param {GridCoordinates3d} a       Starting point of segment
+ * @param {GridCoordinates3d} b       End point of segment
+ * @param {Token} token               Token to use when testing collisions
+ * @param {number} maxDepth           Limit to recursion (number of segment splits)
+ * @param {number} [_depth]           Current depth of the recursion
+ * @returns {GridCoordinates3d[]}
+ */
+function _solveSegment(a, b, token, maxDepth = 4, _depth) { /* eslint-disable-line default-param-last */
+  if ( a.almostEqual(b) ) return [a];
+
+  // Attempt simple gridded path first.
+  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+  const collisionFn = (pt, adjPt) => sceneGraph.hasCollision(adjPt, pt, token);
+  for ( const offsetB of validOffsets(b, collisionFn) ) {
+    const candidate = [a, ...directGridPath(a, offsetB), offsetB];
+    if ( pathIsValid(candidate, token) ) return candidate;
+  }
+
+  // Base case. Revert to direct line if reaching max depth or points are too close.
+  _depth ||= 0;
+  if ( _depth >= maxDepth
+    || PIXI.Point.distanceSquaredBetween(a, b) < (canvas.dimensions.size ** 2) ) return [a, b];
+
+
+  // Recursive step: Subdivide segment at midpoint.
+  // To ensure no collisions in future tests, need to round the midpoint and test for collisions.
+  const mid = findValidMidpoint(a, b, token);
+  if ( mid == null ) return [a, b];
+
+  const firstHalf = _solveSegment(a, mid, token, maxDepth, _depth + 1);
+  const secondHalf = _solveSegment(mid, a, token, maxDepth, _depth + 1);
+
+  // Combine halves; remove duplicate midpoint.
+  secondHalf.path.shift();
+  return [...firstHalf.path, ...secondHalf.path];
+}
+
+/**
+ * Return all grid points between a and b. Do not duplicate a and b if either are already gridded.
+ */
+function directGridPath(a, b) {
+  if ( a.almostEqual(b) ) return [a];
+
+  const gridPoints = canvas.grid.getDirectPath([a, b]);
+  const allPoints = gridPoints.map(offset => GridCoordinates3d.fromOffset(offset));
+  if ( allPoints[0].almostEqual(a) ) allPoints.shift();
+  if ( allPoints.length && allPoints.at(-1).almostEqual(b) ) allPoints.pop();
+  return allPoints;
+}
+
+/**
  * Check the path for collisions
  * @param {Point[]} path
  * @param {Token} token
@@ -29,6 +340,45 @@ export function pathIsValid(path, token) {
   }
   return true;
 }
+
+function *roundedPointsOptions(closestPt) {
+  const rounded = GridCoordinates3d.fromObject(closestPt);
+  rounded.roundDecimals();
+  yield rounded;
+
+  const floor = GridCoordinates3d.fromObject(closestPt);
+  floor.floor(floor);
+  yield floor;
+
+  const ceil = GridCoordinates3d.fromObject(closestPt);
+  ceil.ceil(ceil);
+  yield ceil;
+}
+
+/**
+ * Locate a rounded midpoint between a and b that has no collisions w/r/t a and b.
+ *
+ * @param {GridCoordinates3d} a       Starting point of segment
+ * @param {GridCoordinates3d} b       End point of segment
+ * @param {Token} token               Token to use when testing collisions
+ * @returns {GridCoordinates3d|null}
+ */
+function findValidMidpoint(a, b, token) {
+  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+  const mid = PIXI.Point.midPoint(a, b);
+  let candidateMid;
+  for ( candidateMid of roundedPointsOptions(mid) ) {
+    if ( !(sceneGraph.hasCollision(a, candidateMid, token) || sceneGraph.hasCollision(candidateMid, b, token)) ) {
+      mid.release();
+      return candidateMid;
+    }
+    candidateMid.release();
+  }
+  mid.release();
+  return null;
+}
+
+
 
 /**
  * @param {Point[]} path
@@ -88,16 +438,6 @@ function cleanSegmentGridConnections(gridPoints1, gridPoints2, token) {
   else return [...gridPoints1, b1, b2, ...gridPoints2];
 }
 
-/**
- * Get the valid (2d) neighbors to a grid point.
- * Uses canvas.grid so it respects diagonal rules.
- */
-function gridNeighbors(pt) {
-  const pt2d = GridCoordinates.fromObject(pt);
-  const offsets = canvas.grid.getAdjacentOffsets(pt2d);
-  pt2d.release();
-  return offsets.map(offset => GridCoordinates3d.fromOffset(offset));
-}
 
 /**
  * Between a and b, find grid center points that will create a path without colliding.
@@ -175,31 +515,6 @@ export function snapSegmentToGrid(a, b, token) {
   }
 }
 
-
-
-/**
- * Iterate valid offsets to a point.
- * To be valid, the point|offset segment must not have a collision.
- * @param {GridCoordinates3d} a     Point to offset
- * @param {GridCoordinates3d} b     Destination, used to sort the offsets.
- * @param {Token} token             Token to use for collision test.
- * @yields {GridCoordinates3d}
- */
-function *validOffsets(a, b, token) {
-  const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
-
-  // First, try the basic offset.
-  const aOffset = a.clone().centerToOffset();
-  if ( !sceneGraph.hasCollision(a, aOffset, token) ) yield aOffset;
-
-  // Second, get offsets around this one, sorted by distance to b.
-  const neighbors = gridNeighbors(aOffset);
-  neighbors.sort((n1, n2) => PIXI.Point.distanceSquaredBetween(n1, b) - PIXI.Point.distanceSquaredBetween(n2, b));
-  for ( const n of neighbors ) {
-    if ( !sceneGraph.hasCollision(a, n, token) ) yield n;
-  }
-}
-
 /**
  * Iterate valid offsets to test for a given grid move.
  * @param {GridCoordinates3d} prev
@@ -217,16 +532,6 @@ function *validMoves(prev, curr) {
   }
 }
 
-/**
- * Return all grid points between a and b. Do not duplicate a and b if either are already gridded.
- */
-function directGridPath(a, b) {
-  const gridPoints = canvas.grid.getDirectPath([a, b]);
-  const allPoints = gridPoints.map(offset => GridCoordinates3d.fromOffset(offset));
-  if ( allPoints[0].almostEqual(a) ) allPoints.shift();
-  if ( allPoints.at(-1).almostEqual(b) ) allPoints.pop();
-  return allPoints;
-}
 
 function *alternateGridMoves(prev, proposedGridOffset, a, b) {
   // Try neighbors to that grid move.
@@ -236,31 +541,6 @@ function *alternateGridMoves(prev, proposedGridOffset, a, b) {
   const closestPt = GridCoordinates3d.fromObject(foundry.utils.closestPointToSegment(proposedGridOffset, a, b));
   yield* roundedPointsOptions(closestPt);
 }
-
-/**
- * Iterate valid rounded points to test for a given (failed) grid move.
- * @param {GridCoordinates3d} pt
- * @yields {GridCoordinates3d}
- */
-function *roundedPointsOptions(closestPt) {
-  const rounded = closestPt.clone();
-  rounded.x = Math.round(closestPt);
-  rounded.y = Math.round(closestPt);
-  yield rounded;
-
-  const floor = closestPt.clone();
-  floor.x = Math.floor(closestPt);
-  floor.y = Math.floor(closestPt);
-  yield floor;
-
-  const ceil = closestPt.clone();
-  ceil.x = Math.ceil(closestPt);
-  ceil.y = Math.ceil(closestPt);
-  yield ceil;
-}
-
-
-
 
 /**
  * Get valid points to test in a diagonal move to an offset.
@@ -363,7 +643,7 @@ export function removeDuplicatePoints(points) {
  * @returns {number}
  */
 function distanceSquaredToSegment(a, b, pt) {
-  if ( a.almostEqual(b) ) return PIXI.Point.distanceSquaredBetween(a, pt); // closestPoint throws error if a = b.
+  if ( a.almostEqual(b) ) return PIXI.Point.distanceSquaredBetween(a, pt); // Note: closestPoint throws error if a = b.
   const closestPt = foundry.utils.closestPointToSegment(pt, a, b);
   return PIXI.Point.distanceSquaredBetween(pt, closestPt);
 }

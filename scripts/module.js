@@ -39,7 +39,17 @@ import { Terrain, WebGPUPathfinderWithFakeWorker, WebGPUPathfinder, GPUPathfinde
 import { EdgeGraph } from "./EdgeGraph.js";
 
 // Path cleaning
-import { optimizeGridPath, cleanGridPath, pathIsValid, snapPathToGrid, snapSegmentToGrid, removeDuplicatePoints, straightenPath, fogIsExplored } from "./pathfinding/path_cleaning.js";
+import {
+  optimizeGridPath,
+  cleanGridPath,
+  pathIsValid,
+  snapPathToGrid,
+  snapSegmentToGrid,
+  removeDuplicatePoints,
+  straightenPath,
+  fogIsExplored,
+  approximateGridPath,
+  solveSegment, } from "./pathfinding/path_cleaning.js";
 
 // Load the geometry library.
 import "./geometry/registration.js";
@@ -154,6 +164,8 @@ Hooks.once("init", function() {
       straightenPath,
       removeDuplicatePoints,
       fogIsExplored,
+      approximateGridPath,
+      solveSegment,
     },
 
     EdgeGraph,
