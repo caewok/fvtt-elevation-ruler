@@ -104,7 +104,7 @@ class GridPathResult {
   get gridded() { return (this.#gridded ??= this.constructor.isGridded(this.path)); }
 
   static isGridded(path) {
-    const tmp = GridCoordinates3d.tmp;
+    using tmp = GridCoordinates3d.tmp;
 
     // Test:
     // 1. Each point is on the grid.
@@ -116,10 +116,7 @@ class GridPathResult {
       tmp.centerToOffset();
       const gridded = curr.almostEqual(tmp)
         && (Math.abs(prev.i - tmp.i) < 2 && Math.abs(prev.j - tmp.j) < 2);
-      if ( !gridded ) {
-        tmp.release();
-        return false;
-      }
+      if ( !gridded ) return false;
       prev = curr;
     }
     return true;
@@ -265,9 +262,8 @@ function *validOffsets(a, collisionFn, sortFn) {
  * Uses canvas.grid so it respects diagonal rules.
  */
 function gridNeighbors(pt) {
-  const pt2d = GridCoordinates.fromObject(pt);
+  using pt2d = GridCoordinates.fromObject(pt);
   const offsets = canvas.grid.getAdjacentOffsets(pt2d);
-  pt2d.release();
   return offsets.map(offset => GridCoordinates3d.fromOffset(offset));
 }
 
@@ -378,16 +374,13 @@ function *roundedPointsOptions(closestPt) {
  */
 function findValidMidpoint(a, b, token) {
   const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
-  const mid = PIXI.Point.midPoint(a, b);
+  using mid = PIXI.Point.midPoint(a, b);
   let candidateMid;
   for ( candidateMid of roundedPointsOptions(mid) ) {
-    if ( !(sceneGraph.hasCollision(a, candidateMid, token) || sceneGraph.hasCollision(candidateMid, b, token)) ) {
-      mid.release();
-      return candidateMid;
-    }
+    if ( !(sceneGraph.hasCollision(a, candidateMid, token)
+      || sceneGraph.hasCollision(candidateMid, b, token)) ) return candidateMid;
     candidateMid.release();
   }
-  mid.release();
   return null;
 }
 
@@ -467,12 +460,9 @@ const composeOr = (...funcs) => (...args) => funcs.some(func => func(...args));
 
 /** Helper to cleanGridPath */
 function skipIntermediate(a, b, c) {
-  const abDelta = b.subtract(a);
-  const bcDelta = c.subtract(b);
-  const out = abDelta.almostEqual(bcDelta);
-  abDelta.release();
-  bcDelta.release();
-  return out;
+  using abDelta = b.subtract(a);
+  using bcDelta = c.subtract(b);
+  return abDelta.almostEqual(bcDelta);
 }
 
 /** Helper to removePathUTurns */
@@ -496,8 +486,8 @@ export function cleanGridPath(path) {
   let a = path[0];
   let b = path[1];
   const cleanedPoints = [a];
-  const abDelta = a.constructor.tmp;
-  const bcDelta = b.constructor.tmp;
+  using abDelta = a.constructor.tmp;
+  using bcDelta = b.constructor.tmp;
   for ( let i = 2, n = path.length - 1; i < n; i += 1 ) {
     const c = path[i];
     b.subtract(a, abDelta);
@@ -510,8 +500,6 @@ export function cleanGridPath(path) {
     a = b;
     b = c;
   }
-  abDelta.release();
-  bcDelta.release();
   cleanedPoints.push(path.at(-1)); // Add last c.
   return cleanedPoints;
 }

@@ -44,8 +44,8 @@ class Segment {
    * @returns {PIXI.Rectangle}
    */
   getBounds(out) {
-    const min = this.a.min(this.b);
-    const delta = PIXI.Point.tmp;
+    using min = this.a.min(this.b);
+    using delta = PIXI.Point.tmp;
     this.a.subtract(this.b, delta).abs(delta);
 
     // Ensure the bounds completely contain the segment.
@@ -60,7 +60,6 @@ class Segment {
     out.y = min.y;
     out.width = delta.x;
     out.height = delta.y;
-    PIXI.Point.release(min, delta);
     return out;
   }
 
@@ -145,11 +144,10 @@ class HalfEdge {
   drawTwin(opts = {}) {
     opts.color ??= Draw.COLORS.red;
     opts.alpha ??= 0.5;
-    const delta = this.twin.origin.subtract(this.origin);
+    using delta = this.twin.origin.subtract(this.origin);
     delta.normalize(delta);
-    const spacer = PIXI.Point.tmp.set(-delta.y * 2, delta.x * 2);
+    using spacer = PIXI.Point.tmp.set(-delta.y * 2, delta.x * 2);
     Draw.segment({ a: this.origin.add(spacer), b: this.twin.origin.add(spacer) }, opts);
-    PIXI.Point.release(delta, spacer);
   }
 
   /**
@@ -456,7 +454,7 @@ export class EdgeGraph {
     ptSet.add(s1.b.key);
 
     // Test candidate segments for intersection with this segment.
-    const tmpPt = PIXI.Point.tmp;
+    using tmpPt = PIXI.Point.tmp;
     for ( let s2 of candidateSegments ) {
       if ( iterableWeakSetIntersects(s1.objects, s2.objects) ) continue; // Do not compare with itself.
 
@@ -471,7 +469,6 @@ export class EdgeGraph {
       if ( s1.isPointOnSegment(s2.a) ) ptSet.add(s2.a.key);
       if ( s1.isPointOnSegment(s2.b) ) ptSet.add(s2.b.key);
     }
-    tmpPt.release();
     return ptSet;
   }
 
@@ -717,7 +714,7 @@ export class EdgeGraph {
 
     // Check intersections against one side of existing half-edges.
     const checked = new Set();
-    const tmpPt = PIXI.Point.tmp;
+    using tmpPt = PIXI.Point.tmp;
     for ( const edge of this.halfEdges ) {
       if ( checked.has(edge) || checked.has(edge.twin) ) continue;
       checked.add(edge);
@@ -734,7 +731,6 @@ export class EdgeGraph {
         if ( ixKey !== s2A.key && ixKey !== s2B.key ) this.#splitExistingEdge(edge, ixPt);
       }
     }
-    tmpPt.release();
 
     // Create the new fragments for the added wall.
     const pts = Array.from(pointsOnNewSegment).map(key => PIXI.Point.invertKey(key));
@@ -780,10 +776,9 @@ export class EdgeGraph {
     }
     he1.twin = he2;
     he2.twin = he1;
-    const delta = v2.subtract(v1);
+    using delta = v2.subtract(v1);
     he1.angle = Math.atan2(delta.y, delta.x);
     he2.angle = Math.atan2(-delta.y, -delta.x);
-    delta.release();
 
     this.halfEdges.push(he1, he2);
     this.quadtree.insert({ r: he1.bounds, t: he1 }); // Only insert one of the pair.

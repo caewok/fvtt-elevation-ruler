@@ -135,7 +135,7 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
     const iter = this.sweep.iteratePoints({ close: true });
     let prev = iter.next().value;
     let curr = iter.next().value;
-    let dir = PIXI.Point.tmp;
+    using dir = PIXI.Point.tmp;
     for ( const next of iter ) {
       if ( typeof curr.key === "undefined" ) console.error("Gap curr key undefined", { curr });
       if ( this.sweep.cornersEncountered.has(curr.key) ) {
@@ -190,16 +190,12 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
           return true;
         });
         this.#gapPoints.push(...potentialGapPoints.map(pt => this.constructor.create(pt, this.sweepOpts)));
-
-        // Keep b if testing gapEdges.
         this.#gapEdges.push({ a: curr, b });
-        // b.release();
 
       }
       prev = curr;
       curr = next;
     }
-    PIXI.Point.release(dir);
 
     // There should be no collisions between the origin and the gap points.
     if ( CONFIG[MODULE_ID].debug && this.#gapPoints.some(pt => {

@@ -18,11 +18,9 @@ const COST_FUNCTIONS = {
     euclidean: function(a, b) { return PIXI.Point.distanceBetween(a, b); },
 
     manhattan: function(a, b) { // Formula: abs(a.x - b.x) + abs(a.y - b.y)
-      const delta = PIXI.Point.tmp;
+      using delta = PIXI.Point.tmp;
       a.subtract(b, delta).abs(delta);
-      const out = delta.x + delta.y;
-      delta.release();
-      return out;
+      return delta.x + delta.y;
     },
   },
 
@@ -30,11 +28,9 @@ const COST_FUNCTIONS = {
     euclidean: function(a, b) { return Point3d.distanceBetween(a, b); },
 
     manhattan: function(a, b) { // Formula: abs(a.x - b.x) + abs(a.y - b.y) + abs(a.z - b.z)
-      const delta = Point3d.tmp;
+      using delta = Point3d.tmp;
       a.subtract(b, delta).abs(delta);
-      const out = delta.x + delta.y + delta.z;
-      delta.release();
-      return out;
+      return delta.x + delta.y + delta.z;
     },
   },
 

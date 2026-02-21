@@ -76,19 +76,14 @@ export class GriddedCollisionPathfinder extends GraphingPathfinder {
 // NOTE: Node2d
 export const Node2d = superclass => class extends superclass {
   buildNode(pt) {
-    pt = GridCoordinates.fromObject(pt);
-    const tmp = GridCoordinates.tmp.set(pt.x, pt.y);
-    tmp.setOffset(tmp.offset);
-    if ( tmp.almostEqual(pt) ) return tmp;
+    const gridPt = GridCoordinates.fromObject(pt);
+    gridPt.centerToOffset();
+    if ( gridPt.almostEqual(pt) ) return gridPt;
 
     // Don't walk through blocking obstacles.
-    const validNeighbors = this.filterNeighbors([tmp], pt);
-    pt.release();
-    if ( !validNeighbors.length ) {
-      tmp.release();
-      return pt;
-    }
-    return tmp;
+    const validNeighbors = this.filterNeighbors([gridPt], pt);
+    if ( !validNeighbors.length ) return pt;
+    return gridPt;
   }
 
   reachedGoal(current, goal) { return current.offsetsEqual(goal); }
@@ -97,19 +92,14 @@ export const Node2d = superclass => class extends superclass {
 // NOTE: Node3d
 export const Node3d = superclass => class extends superclass {
   buildNode(pt) {
-    pt = GridCoordinates3d.fromObject(pt);
-    const tmp = GridCoordinates3d.tmp.set(pt.x, pt.y, pt.z || 0);
-    tmp.setOffset(tmp.offset);
-    if ( tmp.almostEqual(pt) ) return tmp;
+    const gridPt = GridCoordinates3d.fromObject(pt);
+    gridPt.centerToOffset();
+    if ( gridPt.almostEqual(pt) ) return gridPt;
 
     // Don't walk through blocking obstacles.
-    const validNeighbors = this.filterNeighbors([tmp], pt);
-    pt.release();
-    if ( !validNeighbors.length ) {
-      tmp.release();
-      return pt;
-    }
-    return tmp;
+    const validNeighbors = this.filterNeighbors([gridPt], pt);
+    if ( !validNeighbors.length ) return pt;
+    return gridPt;
   }
 
   reachedGoal(current, goal) { return current.offsetsEqual2d(goal); }
@@ -219,21 +209,18 @@ export const OcclusionFilter2d = superclass => class extends superclass {
 
   filterNeighbors(neighbors, node2d) {
     const elev = this.config.elevationZ + this.config.zOffset;
-    const node3d = GridCoordinates3d.tmp.set(node2d.x, node2d.y, elev);
+    using node3d = GridCoordinates3d.tmp.set(node2d.x, node2d.y, elev);
     const ot = this.#occlusionTester;
     ot.frustum = AABB2d.fromPoints(neighbors);
     ot._initialize({ rayOrigin: node3d });
 
     // Test whether each neighbor is occluded w/r/t this node.
-    const tmpPt = Point3d.tmp;
-    const out = neighbors.filter(n => {
+    using tmpPt = Point3d.tmp;
+    return neighbors.filter(n => {
       tmpPt.set(n.x, n.y, elev);
       tmpPt.subtract(node3d, tmpPt);
       return !ot._rayIsOccluded(tmpPt);
     });
-    tmpPt.release();
-    node3d.release();
-    return out;
   }
 
   nodeIsUnreachable(node, start) {
@@ -279,22 +266,19 @@ export const OcclusionFilter3d = superclass => class extends superclass {
 
 
   filterNeighbors(neighbors, node) {
-    node = node.clone();
-    node.z += this.zOffset;
+    using rayOrigin = node.clone();
+    rayOrigin.z += this.zOffset;
     const ot = this.#occlusionTester;
     ot.frustum = AABB2d.fromPoints(neighbors);
-    ot._initialize({ rayOrigin: node });
+    ot._initialize({ rayOrigin });
 
     // Test whether each neighbor is occluded w/r/t this node.
-    const tmpPt = Point3d.tmp;
-    const out = neighbors.filter(n => {
+    using tmpPt = Point3d.tmp;
+    return neighbors.filter(n => {
       tmpPt.set(n.x, n.y, n.z + this.config.zOffset);
-      tmpPt.subtract(node, tmpPt);
+      tmpPt.subtract(rayOrigin, tmpPt);
       return !ot._rayIsOccluded(tmpPt);
     });
-    tmpPt.release();
-    node.release();
-    return out;
   }
 };
 
@@ -303,11 +287,9 @@ export const OcclusionFilter3d = superclass => class extends superclass {
 
 export const Neighbors2d = superclass => class extends superclass {
   adjacentOffsets(node) {
-    const node2d = GridCoordinates.tmp.set(node.x, node.y);
-    const out = canvas.grid.getAdjacentOffsets(node2d) // Offsets are at the center of the grid square.
+    using node2d = GridCoordinates.tmp.set(node.x, node.y);
+    return canvas.grid.getAdjacentOffsets(node2d) // Offsets are at the center of the grid square.
       .map(offset => node.constructor.fromOffset(offset, node.z));
-    node2d.release();
-    return out;
   }
 };
 

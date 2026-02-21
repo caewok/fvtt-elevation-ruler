@@ -415,7 +415,7 @@ export class Terrain extends PixelCache {
     }
 
     // Set each pixel under the region shapes, multiplying by the existing value.
-    const idx = PIXI.Point.tmp;
+    using idx = PIXI.Point.tmp;
     allIndices.values().forEach(key => {
       PIXI.Point.invertKey(key, idx);
       const i = this._indexAtLocal(idx.x, idx.y);
@@ -423,7 +423,6 @@ export class Terrain extends PixelCache {
       const newValue = Math.min(this.constructor.FEATURES.BLOCKING, currValue * value);
       this.pixels[i] = newValue;
     });
-    idx.release();
   }
 
   /**
