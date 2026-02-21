@@ -134,7 +134,7 @@ export class AbstractPathfinder {
     const ClockwiseSweepPolygon = foundry.canvas.geometry.ClockwiseSweepPolygon;
     for ( let i = 0, iMax = path.length - 1; i < iMax; i += 1 ) {
       if ( ClockwiseSweepPolygon.testCollision(path[i], path[i + 1], { mode: "any", type: "move" }) ) {
-        console.error(`${prefix}|${start} --> ${goal} path has collision at ${i}:\n${pathString}`);
+        console.warn(`${prefix}|${start} --> ${goal} path has collision at ${i}:\n${pathString}`);
         return false;
       }
     }

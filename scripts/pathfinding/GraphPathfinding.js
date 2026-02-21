@@ -340,7 +340,7 @@ class AbstractGraph {
     }
 
     if ( iter >= MAX_ITER ) {
-      console.error(`${this.constructor.name}|findPath stuck in loop.`, { start, goal });
+      console.warn(`${this.constructor.name}|findPath stuck in loop.`, { start, goal });
     }
     const path = reachedGoal ? this.constructor.reconstructPath(this._cameFrom, goal) : null;
     return path;
