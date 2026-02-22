@@ -33,7 +33,7 @@ import { GriddedCollisionPathfinder, worldBuilderGriddedCollision } from "./path
 import { ClockwiseSweepPathfinder, worldBuilderClockwise } from "./pathfinding/ClockwiseSweepPathfinding.js";
 
 // WebGPU pathfinding
-import { Terrain, WebGPUPathfinderWithFakeWorker, WebGPUPathfinder, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
+import { WebGPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 
 // Scene graph
 import { EdgeGraph } from "./EdgeGraph.js";
@@ -57,9 +57,6 @@ import "./geometry/registration.js";
 import "./tests/EdgeGraph.test.js";
 
 Hooks.once("init", function() {
-  // Test for WebGPU device.
-  GPUPathfinder.initializeDevice(); // Async.
-
   // Configuration
   CONFIG[MODULE_ID] = {
 
@@ -143,9 +140,7 @@ Hooks.once("init", function() {
       AStarGraph,
       GraphingPathfinder,
 
-      Terrain,
       WebGPUPathfinder,
-      WebGPUPathfinderWithFakeWorker,
 
       GriddedCollisionPathfinder,
       worldBuilderGriddedCollision,

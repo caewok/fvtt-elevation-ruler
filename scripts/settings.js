@@ -14,7 +14,7 @@ import { ModuleSettingsAbstract } from "./ModuleSettingsAbstract.js";
 import { log } from "./util.js";
 import { PATCHER } from "./patching.js";
 import { updatePathfindingControl } from "./module.js";
-import { WebGPUPathfinder, GPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
+import { WebGPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 import { ClockwiseSweepPathfinder } from "./pathfinding/ClockwiseSweepPathfinding.js";
 import { GriddedCollisionPathfinder } from "./pathfinding/GriddedCollisionPathfinding.js";
 
@@ -89,7 +89,7 @@ export class Settings extends ModuleSettingsAbstract {
 
     const pathfindingAlgChoices = {};
     Object.values(KEYS.PATHFINDING.ALGORITHM_CHOICES).forEach(alg => pathfindingAlgChoices[alg] = localize(alg));
-    if ( !GPUPathfinder.device ) delete pathfindingAlgChoices[KEYS.PATHFINDING.ALGORITHM_CHOICES.WEBGPU];
+    if ( !WebGPUPathfinder.supportsWebGPU ) delete pathfindingAlgChoices[KEYS.PATHFINDING.ALGORITHM_CHOICES.WEBGPU];
 
     register(KEYS.PATHFINDING.ALGORITHM, {
       name: localize(`${KEYS.PATHFINDING.ALGORITHM}.name`),

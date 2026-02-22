@@ -180,10 +180,11 @@ export class AbstractPathfinder {
    * @param {Point[]} pathPoints
    * @param {object} [opts]
    */
-  static drawPath(pathPoints, opts) {
+  static drawPath(pathPoints, opts = {}) {
+    opts.radius ??= 2;
     const nPts = pathPoints.length;
     let prior = pathPoints[0];
-    Draw.point(prior);
+    Draw.point(prior, opts);
     for ( let i = 1; i < nPts; i += 1 ) {
       const curr = pathPoints[i];
       Draw.segment({A: prior, B: curr}, opts);

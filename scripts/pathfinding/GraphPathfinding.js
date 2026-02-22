@@ -598,29 +598,31 @@ let { solveSegment,
       fogIsExplored,
 } = api.pathCleaning
 
+await WebGPUPathfinder.initialize();
+
 let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
-pf = new ClockwiseSweepPathfinder(randal)
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
+pf = new WebGPUPathfinder(randal)
 
 let beiro = canvas.tokens.placeables.find(t => t.name === "Beiro")
 let bandit = canvas.tokens.placeables.find(t => t.name === "Bandit")
-pf = new ClockwiseSweepPathfinder(beiro)
 start = GridCoordinates3d.fromObject(beiro.center)
 end = GridCoordinates3d.fromObject(bandit.center)
+pf = new WebGPUPathfinder(beiro)
 
 let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
 let lizard = canvas.tokens.placeables.find(t => t.name === "Giant Lizard")
-pf = new ClockwiseSweepPathfinder(akra)
 start = GridCoordinates3d.fromObject(akra.center)
 end = GridCoordinates3d.fromObject(lizard.center)
+pf = new WebGPUPathfinder(akra)
 
 
 pf.debug = true
 pf.debugDelay = 1000;
 
-pf.startPathfinding(start);
+await pf.startPathfinding(start);
 path = await pf._findPath(start, end) // Skip caching
 pf.constructor.drawPath(path)
 
