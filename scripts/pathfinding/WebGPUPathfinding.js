@@ -483,6 +483,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       endY: end.y,
       elevation: start.elevation,
       signal,
+      diagonalCost: this.constructor.diagonalCost,
     };
     params.debug = CONFIG[MODULE_ID].debug;
     const res = await this.executeFunction("findPath", [params]);
@@ -504,6 +505,19 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
 
   async terminate() {
     return this.executeFunction("terminate");
+  }
+
+  static get diagonalCost() {
+    const GD = CONST.GRID_DIAGONALS;
+    switch ( canvas.grid.diagonals ) {
+      case GD.EQUIDISTANT: return 1;
+      case GD.EXACT: return Math.SQRT2;
+      case GD.APPROXIMATE: return 1.5;
+      case GD.RECTILINEAR: return 2;
+      case GD.ALTERNATING_1: return -1;
+      case GD.ALTERNATING_2: return -2;
+      case GD.ILLEGAL: return Number.POSITIVE_INFINITY;
+    }
   }
 }
 
@@ -924,14 +938,15 @@ pf.terrain.transientTerrain.draw({ maximumPixelValue: 255, local: false, skip: 5
 /*
 function displayGridValues(distMap, nX, nY, tm) {
   arr = [];
-  for ( let c = -1; c < 2; c += 1 ) {
-    for ( let r = -1; r < 2; r += 1 ) {
-      arr.push(distMap[tm.indexAtLocal(nX + r, nY + c - 1)]);
+  for ( let c = -2; c < 3; c += 1 ) {
+    for ( let r = -2; r < 3; r += 1 ) {
+      arr.push(distMap[tm.indexAtLocal(nX + r, nY + c)]);
       // arr.push({ x: nX + r, y: nY + c - 1})
     }
   }
   // return arr;
-  return print(arr, 3, 3);
+  console.log(`Value at ${nX},${nY}: ${distMap[tm.indexAtLocal(nX, nY)]}`)
+  return print(arr, 5, 5);
 }
 
 function print(arr, nrow, ncol) {
@@ -953,7 +968,7 @@ function print(arr, nrow, ncol) {
   console.table(out);
 }
 
-displayGridValues(distMap, nX, nY, this.terrainMapper)
+displayGridValues(this.distanceMap, currDistMapPosition[0], currDistMapPosition[1], this.terrainMapper)
 
 */
 

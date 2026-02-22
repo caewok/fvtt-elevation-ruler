@@ -604,7 +604,7 @@ let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
-pf = new WebGPUPathfinder(randal, 1)
+pf = new WebGPUPathfinder(randal)
 
 let beiro = canvas.tokens.placeables.find(t => t.name === "Beiro")
 let bandit = canvas.tokens.placeables.find(t => t.name === "Bandit")

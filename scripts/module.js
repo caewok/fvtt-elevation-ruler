@@ -57,9 +57,6 @@ import "./geometry/registration.js";
 import "./tests/EdgeGraph.test.js";
 
 Hooks.once("init", function() {
-  // Test for WebGPU device.
-  if ( WebGPUPathfinder.supportsWebGPU ) WebGPUPathfinder.initialize(); // Async.
-
   // Configuration
   CONFIG[MODULE_ID] = {
 

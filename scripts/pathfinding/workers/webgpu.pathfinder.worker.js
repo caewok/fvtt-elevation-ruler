@@ -2,6 +2,7 @@
 GPUBufferUsage,
 GPUMapMode,
 GPUTextureUsage,
+self,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
@@ -124,11 +125,16 @@ async function calculateDistanceMap({ startX = 0, startY = 0, elevation = 0, sig
  * @param {number} options.elevation        Token elevation; if changed will
  * @param {AbortSignal} options.signal
  */
-async function findPath({ startX = 0, startY = 0, endX = 0, endY = 0, _elevation = 0, signal = {}, debug = false }) { /* eslint-disable-line no-unused-vars */
+async function findPath({ /* eslint-disable-line no-unused-vars */
+  startX = 0, startY = 0,
+  endX = 0, endY = 0,
+  diagonalCost = Math.SQRT2, _elevation = 0, signal = {}, debug = false
+}) {
   const start = { x: startX, y: startY };
   const goal = { x: endX, y: endY };
-  const path = await pf.findPath(start, goal, signal);
-  if ( debug ) console.debug(`WebGPUPathfinderWorker|Path length ${path.length} found for ${startX},${startY},${elevation}.`);
+  pf.diagonalCost = diagonalCost;
+  const path = await pf.findPath(start, goal, signal, diagonalCost);
+  if ( debug ) console.debug(`WebGPUPathfinderWorker|Path length ${path.length} found for ${startX},${startY}.`);
   return [{ path }, [path.buffer]];
 }
 
@@ -310,64 +316,114 @@ class GPUPathfinder {
 
   // ----- NOTE: Find path ----- //
 
-  async findPath(start, goal, _signal = {}) {
+  async findPath(start, goal, signal = {}, diagonalCost = Math.SQRT2) {
     if ( this.distanceMapStatus === this.constructor.STATUS.NOT_READY ) {
-      await this.calculateDistanceMap(start, _signal);
+      await this.calculateDistanceMap(start, signal);
     }
 
     // TODO: Check start elevation and switch buffer data accordingly.
-
-    return this.backtrackPath(goal, _signal);
+    return this.backtrackPath(goal, signal, diagonalCost);
   }
 
-  backtrackPath({ x, y } = {}) {
+  /**
+   * Backtrack from goal to start using a Manhattan-only distance map.
+   * @param {Point} {x, y}                    The end coordinates
+   * @param {AbortSignal} signal              Signal to cancel early
+   * @param {number} [diagonalCost=1.414]     Cost multiplier for diagonal moves.
+   * • 1.414: Normal Euclidean diagonals (will take shortcuts).
+   * • 2.0: Manhattan-equivalent (diagonals tie with 2 straight moves).
+   * • >2.0: Penalizes/prevents diagonal movement entirely.
+   */
+  backtrackPath({ x, y } = {}, signal, diagonalCost = Math.SQRT2) { /* eslint-disable-line default-param-last */
     const local = this.terrainMapper.fromCanvasCoordinates(x, y);
     x = local.x;
     y = local.y;
 
     const distMap = this.distanceMap;
     let idx = this.terrainMapper.indexAtLocal(x, y);
-    if ( distMap[idx] === 0xFFFFFFFF ) return new Uint16Array(); // No path found
+    if ( !~idx || distMap[idx] >= 0xFFFFFFFF ) return new Uint16Array(); // No path found
+
+    const neighborValueFn = isFinite(diagonalCost)
+      ? this.#neighborValueWithDiagonals.bind(this)
+      : this.#neighborValueManhattan.bind(this);
 
     // Move from the end point along the lowest-cost neighbors back to start.
     const [width, height] = this.terrainMapper.gridDims;
     const area = this.terrainMapper.area;
-    const path = [];
+    const path = [x, y];
+
     const neighborOffsets = this.constructor.neighborOffsets;
+    const neighborLength = neighborOffsets.length;
     const currDistMapPosition = new Int16Array(2);
     currDistMapPosition[0] = x;
     currDistMapPosition[1] = y;
-    path.push(x, y);
+
+    // Set the diagonal cost.
+    // If 1/2/1 or 2/1/2 is chosen, it doesn't work to simply alternate b/c
+    // once the value is "2", it never chooses diagonal again. Would need to look ahead,
+    // possibly the entire path, to determine if a second diagonal move makes it worth it.
+
+    const invDiagonalCostArr = Array(2);
+    switch ( diagonalCost ) {
+      case -1: // 1/2/1
+        invDiagonalCostArr[0] = 1;
+        invDiagonalCostArr[1] = 1 / 2;
+        break;
+      case -2: // 2/1/2
+        invDiagonalCostArr[0] = 1 / 2;
+        invDiagonalCostArr[1] = 1;
+        break;
+      default:
+        invDiagonalCostArr[0] = 1 / diagonalCost;
+        invDiagonalCostArr[1] = 1 / diagonalCost;
+    }
+
+    // Start with first and alternated
+    let diagonalOption = 0;
     let safety = 0; // Safety to break infinite loops in bad maps.
     while ( distMap[idx] !== 0 && safety < area ) {
       safety += 1;
       let bestX = null;
       let bestY = null;
-      let lowestDist = distMap[idx]; // Starts with the current distance.
-      for ( let i = 0; i < 16; i += 2 ) {
+      let maxDrop = Number.NEGATIVE_INFINITY;
+      let movedDiagonal = false;
+      for ( let i = 0; i < neighborLength; i += 2 ) {
         // Check bounds.
-        const nX = currDistMapPosition[0] + neighborOffsets[i];
+        const dx = neighborOffsets[i];
+        const currX = currDistMapPosition[0];
+        const nX = currX + dx;
         if ( nX < 0 || nX >= width ) continue;
-        const nY = currDistMapPosition[1] + neighborOffsets[i + 1];
+
+        const dy = neighborOffsets[i + 1];
+        const currY = currDistMapPosition[1];
+        const nY = currY + dy;
         if ( nY < 0 || nY >= height ) continue;
 
         // Get the cost for this neighbor.
-        const nIdx = this.terrainMapper.indexAtLocal(nX, nY);
-        const val = distMap[nIdx];
+        const neighborVal = neighborValueFn(currX, currY, dx, dy);
+
+        // Relative cost: 1.0 for straight, custom cost for diagonal.
+        const isDiagonal = !(dx === 0 || dy === 0);
+        const moveCost = isDiagonal ? invDiagonalCostArr[diagonalOption] : 1.0;
+
+        // Calculate efficiency of the move.
+        const drop = (distMap[idx] - neighborVal) * moveCost;
 
         // We just want to roll "downhill" to 0.
         // Any neighbor with a lower value is a valid step towards home.
-        if ( val < lowestDist ) {
-          lowestDist = val;
+        if ( drop > maxDrop ) {
+          maxDrop = drop;
           bestX = nX;
           bestY = nY;
+          movedDiagonal = isDiagonal;
         }
       }
-      if ( bestX === null ) break; // We got stuck. Shouldn't happen in valid wavefront.
+      if ( bestX === null || maxDrop <= 0 ) break; // We got stuck. Shouldn't happen in valid wavefront.
       currDistMapPosition[0] = bestX;
       currDistMapPosition[1] = bestY;
       idx = this.terrainMapper.indexAtLocal(currDistMapPosition[0], currDistMapPosition[1]);
       path.push(bestX, bestY);
+      if ( movedDiagonal ) diagonalOption = (diagonalOption + 1) % 2;
     }
 
     // Reverse the path, keeping x,y points in order.
@@ -379,6 +435,30 @@ class GPUPathfinder {
       out[j++] = canvas.y;
     }
     return out;
+  }
+
+  #neighborValueManhattan(currX, currY, dx, dy) {
+    const nX = currX + dx;
+    const nY = currY + dy;
+    const nIdx = this.terrainMapper.indexAtLocal(nX, nY);
+    return this.distanceMap[nIdx];
+  }
+
+  #neighborValueWithDiagonals(currX, currY, dx, dy) {
+    const isDiagonal = !(dx === 0 || dy === 0);
+    const distMap = this.distanceMap;
+    const nX = currX + dx;
+    const nY = currY + dy;
+    if ( isDiagonal ) {
+      const cardXIdx = this.terrainMapper.indexAtLocal(nX, currY);
+      const cardYIdx = this.terrainMapper.indexAtLocal(currX, nY);
+
+      // If either cardinal adjacent pixel is a wall, do not cut the corner.
+      if ( distMap[cardXIdx] >= 0xFFFFFFFF
+        || distMap[cardYIdx] >= 0xFFFFFFFF ) return 0xFFFFFFFF;
+    }
+    const nIdx = this.terrainMapper.indexAtLocal(nX, nY);
+    return distMap[nIdx];
   }
 
   /**
@@ -595,64 +675,33 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     var best = 0xFFFFFFFFu;
 
     // Base Movement Costs (Scaled up to keep integer precision)
-    // We multiply the base movement (10/14) by the tile's weight.
     // Example: Road(1) -> Straight=10. Swamp(5) -> Straight=50.
     let COST_STRAIGHT = 10u * tileCost;
-    let COST_DIAGONAL = 14u * tileCost;
     let MAX_VAL = 0xFFFFFFFFu;
 
     // ----- Check straight neighbors (cost 10) ----- //
     // Left
     if ( x > 0u ) {
-        let v = inputDist[get_idx(x - 1u, y)];
-        if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
+      let v = inputDist[get_idx(x - 1u, y)];
+      if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
     }
 
     // Right
     if ( x < grid.width - 1u ) {
-        let v = inputDist[get_idx(x + 1u, y)];
-        if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
+      let v = inputDist[get_idx(x + 1u, y)];
+      if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
     }
 
     // Up
     if ( y > 0u ) {
-        let v = inputDist[get_idx(x, y - 1u)];
-        if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
+      let v = inputDist[get_idx(x, y - 1u)];
+      if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
     }
 
     // Down
     if ( y < grid.height - 1u ) {
-        let v = inputDist[get_idx(x, y + 1u)];
-        if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
-    }
-
-    // --- Check Diagonal Neighbors (Cost 14) ---
-    // A diagonal move is only valid if we are not cutting a corner.
-    // E.g., to move (x - 1, y - 1), both (x - 1, y) and (x, y - 1) must not be walls.
-    // Prevents clipping wall endpoints.
-
-    // Top-Left
-    if ( x > 0u && y > 0u && !is_wall(x - 1u, y) && !is_wall(x, y - 1u) ) {
-        let v = inputDist[get_idx(x - 1u, y - 1u)];
-        if (v != MAX_VAL) { best = min(best, v + COST_DIAGONAL); }
-    }
-
-    // Top-Right
-    if ( x < grid.width - 1u && y > 0u && !is_wall(x + 1u, y) && !is_wall(x, y - 1u) ) {
-        let v = inputDist[get_idx(x + 1u, y - 1u)];
-        if (v != MAX_VAL) { best = min(best, v + COST_DIAGONAL); }
-    }
-
-    // Bottom-Left
-    if ( x > 0u && y < grid.height - 1u && !is_wall(x - 1u, y) && !is_wall(x, y + 1u) ) {
-        let v = inputDist[get_idx(x - 1u, y + 1u)];
-        if (v != MAX_VAL) { best = min(best, v + COST_DIAGONAL); }
-    }
-
-    // Bottom-Right
-    if ( x < grid.width - 1u && y < grid.height - 1u && !is_wall(x + 1u, y) && !is_wall(x, y + 1u) ) {
-        let v = inputDist[get_idx(x + 1u, y + 1u)];
-        if (v != MAX_VAL) { best = min(best, v + COST_DIAGONAL); }
+      let v = inputDist[get_idx(x, y + 1u)];
+      if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
     }
 
     // Update
@@ -666,13 +715,17 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 
 (() => {
+  // Store the cardinal moves.
   let i = 0;
-  for ( let x = -1; x < 2; x += 1 ) {
-    for ( let y = -1; y < 2; y += 1 ) {
-      if ( !(x || y) ) continue; // Skip 0,0.
-      GPUPathfinder.neighborOffsets[i++] = x;
-      GPUPathfinder.neighborOffsets[i++] = y;
-    }
+  for ( const [x, y] of [[1, 0], [-1, 0], [0, 1], [0, -1]] ) {
+    GPUPathfinder.neighborOffsets[i++] = x;
+    GPUPathfinder.neighborOffsets[i++] = y;
+  }
+
+  // Store diagonal moves. (Separate from cardinal in case diagonal value is infinite.)
+  for ( const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] ) {
+    GPUPathfinder.neighborOffsets[i++] = x;
+    GPUPathfinder.neighborOffsets[i++] = y;
   }
 })();
 
