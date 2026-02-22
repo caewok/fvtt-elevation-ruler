@@ -1,5 +1,6 @@
 /* globals
 canvas,
+PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -108,7 +109,6 @@ async function pathfind(path, wrapped, waypoints, options, token) {
     const foundryEnd = waypoints.pop();
     const foundryStart = waypoints.at(-1);
     for ( let i = 1, iMax = foundPath.length - 1; i < iMax; i += 1 ) {
-      // const pt = canvas.grid.getTopLeftPoint(foundPath[i]); // Foundry ruler uses top left coordinates.
       const pt = tokenTopLeftFromCenter(token, foundPath[i]);
       const prevW = waypoints[i - 1];
       if ( prevW.x.almostEqual(pt.x) && prevW.y.almostEqual(pt.y) ) continue;

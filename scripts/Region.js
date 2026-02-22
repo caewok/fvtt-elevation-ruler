@@ -1,9 +1,9 @@
 /* globals
 canvas,
+foundry,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
-import { MODULE_ID, PATHFINDING_ID } from "./const.js";
 import { Settings } from "./settings.js";
 import { WebGPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
 
@@ -36,16 +36,13 @@ const DOCUMENT_KEYS = new Set([
   "flags.terrainmapper.rampFloor",
 ]);
 
-function updateRegion(regionD, changed, options, userId) {
+function updateRegion(regionD, changed, _options, _userId) {
   const PF = Settings.KEYS.PATHFINDING;
   if ( !canvas.regions.active || Settings.get(PF.ALGORITHM) !== PF.ALGORITHM_CHOICES.WEBGPU ) return;
   if ( WebGPUPathfinder.currentTokenId === "" ) return;
 
   const changeKeys = Object.keys(foundry.utils.flattenObject(changed));
-  if ( changeKeys.some(key => DOCUMENT_KEYS.has(key)) ) {
-    WebGPUPathfinder.currentTokenId = "";
-    return;
-  }
+  if ( changeKeys.some(key => DOCUMENT_KEYS.has(key)) ) WebGPUPathfinder.currentTokenId = "";
 }
 
 PATCHES.BASIC.HOOKS = {
