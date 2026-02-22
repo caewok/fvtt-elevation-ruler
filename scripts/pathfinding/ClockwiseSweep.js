@@ -47,7 +47,7 @@ export class ObstacleSweep extends foundry.canvas.geometry.ClockwiseSweepPolygon
     for ( const token of canvas.tokens.placeables ) {
       if ( !ObstacleOcclusionTest.includeToken(token, occlusionCfg) ) continue;
       for ( const edge of token.constrainedTokenBorder.iterateEdges({ closed: false }) ) {
-        edges.push(new Edge(edge.A, edge.B, {
+        edges.push(new Edge(edge.a, edge.b, {
           object: { flags: {
             "wall-height": {
               top: token.topZ,
