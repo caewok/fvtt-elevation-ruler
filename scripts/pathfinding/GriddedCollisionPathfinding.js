@@ -132,7 +132,7 @@ export const SceneGraphFilter = superclass => class extends superclass {
    */
   filterNeighbors(neighbors, node) {
     const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
-    return neighbors.filter(n => !sceneGraph.hasCollision(node, n, this.token));
+    return neighbors.filter(n => !sceneGraph.pathBlocked(node, n, this.token));
   }
 };
 

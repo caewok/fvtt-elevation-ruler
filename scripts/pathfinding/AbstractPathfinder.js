@@ -9,7 +9,7 @@ PIXI,
 import { Draw } from "../geometry/Draw.js";
 import { Settings } from "../settings.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
-import { snapPathToGrid, optimizeGridPath, dropIntermediatePoints, straightenPath } from "./path_cleaning.js";
+import { snapPathToGrid, optimizeGridPath, dropIntermediatePoints, straightenPath, pathIsValid } from "./path_cleaning.js";
 import { log } from "../util.js";
 
 /* Pathfinding class.
@@ -138,6 +138,11 @@ export class AbstractPathfinder {
         return false;
       }
     }
+    if ( !pathIsValid(path, this.token) ) {
+      console.warn(`${prefix}|${start} --> ${goal} path is not valid.`);
+      return false;
+    }
+
     return true;
   }
 

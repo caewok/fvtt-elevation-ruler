@@ -24,7 +24,7 @@ export function snapPathToGrid(path, token, maxDepth = 4) {
   if ( path.length < 2 ) return path;
   path = path.map(pt => GridCoordinates3d.fromObject(pt));
   const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
-  const collisionFn = (a, adjA) => sceneGraph.hasCollision(a, adjA, token);
+  const collisionFn = (a, adjA) => sceneGraph.pathBlocked(a, adjA, token);
   let candidate;
   for ( const candidateConnection of validOffsets(path[0], collisionFn) ) {
     const candidatePath = candidateConnection.almostEqual(path[1])
@@ -135,7 +135,7 @@ pf.constructor.drawPath(path)
 sceneGraph = CONFIG[MODULE_ID].sceneGraph;
 maxDepth = 4
 token = randal
-collisionFn = (a, adjA) => sceneGraph.hasCollision(a, adjA, token);
+collisionFn = (a, adjA) => sceneGraph.pathBlocked(a, adjA, token);
 
 path = path.map(pt => GridCoordinates3d.fromObject(pt));
 
@@ -226,7 +226,7 @@ function *connectSegment(prev, curr, token) {
       }
     }
   } else {
-    const collisionFn = (a, candidate) => sceneGraph.hasCollision(prev, candidate, token);
+    const collisionFn = (a, candidate) => sceneGraph.pathBlocked(prev, candidate, token);
     for ( const candidateOffset of validOffsets(curr, collisionFn) ) yield [candidateOffset];
   }
   if ( !curr.clone().centerToOffset().almostEqual(curr) ) yield [curr]; // The non-offset point.
@@ -299,7 +299,7 @@ function _solveSegment(a, b, token, maxDepth = 4, _depth = 0) {
 
   // Attempt simple gridded path first.
   const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
-  const collisionFn = (pt, adjPt) => sceneGraph.hasCollision(adjPt, pt, token);
+  const collisionFn = (pt, adjPt) => sceneGraph.pathBlocked(adjPt, pt, token);
   for ( const offsetB of validOffsets(b, collisionFn) ) {
     const candidate = [a, ...directGridPath(a, offsetB), offsetB, b];
     if ( pathIsValid(candidate, token) ) return candidate;
@@ -345,7 +345,7 @@ function directGridPath(a, b) {
 export function pathIsValid(path, token) {
   const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
   for ( let i = 0, iMax = path.length - 1; i < iMax; i += 1 ) {
-    if ( sceneGraph.hasCollision(path[i], path[i + 1], token) ) return false;
+    if ( sceneGraph.pathBlocked(path[i], path[i + 1], token) ) return false;
   }
   return true;
 }
@@ -377,8 +377,8 @@ function findValidMidpoint(a, b, token) {
   using mid = PIXI.Point.midPoint(a, b);
   let candidateMid;
   for ( candidateMid of roundedPointsOptions(mid) ) {
-    if ( !(sceneGraph.hasCollision(a, candidateMid, token)
-      || sceneGraph.hasCollision(candidateMid, b, token)) ) return candidateMid;
+    if ( !(sceneGraph.pathBlocked(a, candidateMid, token)
+      || sceneGraph.pathBlocked(candidateMid, b, token)) ) return candidateMid;
     candidateMid.release();
   }
   return null;
@@ -472,7 +472,7 @@ function isUTurn(a, _b, c) { return a.almostEqual(c); }
 
 /** Helper to removePathUTurns */
 function canShortcutDiagonal(a, _b, c, token) {
-  return is2dDiagonal(a, c) && !CONFIG[MODULE_ID].sceneGraph.hasCollision(a, c, token);
+  return is2dDiagonal(a, c) && !CONFIG[MODULE_ID].sceneGraph.pathBlocked(a, c, token);
 }
 
 
@@ -549,7 +549,7 @@ export function dropIntermediatePoints(path) {
   const cleanedPts = [a];
   for ( let i = 2, n = path.length - 1; i < n; i += 1 ) {
     const c = path[i];
-    if ( is2dDiagonal(a, c) && !sceneGraph.hasCollision(a, c, token) ) {  // Skip b; don't update a.
+    if ( is2dDiagonal(a, c) && !sceneGraph.pathBlocked(a, c, token) ) {  // Skip b; don't update a.
       b = c;
       continue;
     }
@@ -598,7 +598,7 @@ export function straightenPath(pathPoints, token, _depth = 0) {
   // Test for collision between first and last points.
   const a = pathPoints.at(0);
   const b = pathPoints.at(-1);
-  if ( !CONFIG[MODULE_ID].sceneGraph.hasCollision(a, b, token) ) return [a, b];
+  if ( !CONFIG[MODULE_ID].sceneGraph.pathBlocked(a, b, token) ) return [a, b];
 
   // Locate the index of the farthest point from segment a|b.
   let farthestIndex = 0;
