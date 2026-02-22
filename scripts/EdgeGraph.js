@@ -842,11 +842,13 @@ export class EdgeGraph {
    * @returns {boolean} True if blocked
    */
   static tokenBlocksSegment(a, b, moveToken) {
+    // NOTE: rayIntersectionConstrained will return false if a.z is at the edge of the token.
+    // For example, if a.z === 0, tokens at elevation 0 will not block.
     using dir = b.subtract(a);
     for ( const token of canvas.tokens.placeables ) {
       const geom = token[GEOMETRY_LIB_ID][GEOMETRY_ID];
       if ( !geom ) continue;
-      if ( HalfEdge.tokenBlocks(token, moveToken) ) continue;
+      if ( !HalfEdge.tokenBlocks(token, moveToken) ) continue;
       const ix = geom.rayIntersectionConstrained(a, dir);
       if ( ix ) return true;
     }
