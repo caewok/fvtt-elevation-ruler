@@ -316,6 +316,26 @@ class GPUPathfinder {
 
   // ----- NOTE: Find path ----- //
 
+  /**
+   * Helper for backtrackPath.
+   * Stores the neighbor offsets.
+   * @type {number[]{dx, dy}}
+   */
+  static neighborOffsets = [
+    // Diagonal. First so it gets preference in case of tie. Important for 1/2/1 diagonals.
+    { dx: 1, dy: 1 },
+    { dx: -1, dy: -1 },
+    { dx: 1, dy: -1 },
+    { dx: -1, dy: 1 },
+
+    // Cardinal.
+    { dx: 0, dy: 1 },
+    { dx: 0, dy: -1 },
+    { dx: 1, dy: 0 },
+    { dx: -1, dy: 0 },
+  ];
+
+
   async findPath(start, goal, signal = {}, diagonalCost = Math.SQRT2) {
     if ( this.distanceMapStatus === this.constructor.STATUS.NOT_READY ) {
       await this.calculateDistanceMap(start, signal);
@@ -335,12 +355,9 @@ class GPUPathfinder {
    * • >2.0: Penalizes/prevents diagonal movement entirely.
    */
   backtrackPath({ x, y } = {}, signal, diagonalCost = Math.SQRT2) { /* eslint-disable-line default-param-last */
-    const local = this.terrainMapper.fromCanvasCoordinates(x, y);
-    x = local.x;
-    y = local.y;
-
+    let { x: currX, y: currY } = this.terrainMapper.fromCanvasCoordinates(x, y);
     const distMap = this.distanceMap;
-    let idx = this.terrainMapper.indexAtLocal(x, y);
+    let idx = this.terrainMapper.indexAtLocal(currX, currY);
     if ( !~idx || distMap[idx] >= 0xFFFFFFFF ) return new Uint16Array(); // No path found
 
     const neighborValueFn = isFinite(diagonalCost)
@@ -350,19 +367,16 @@ class GPUPathfinder {
     // Move from the end point along the lowest-cost neighbors back to start.
     const [width, height] = this.terrainMapper.gridDims;
     const area = this.terrainMapper.area;
-    const path = [x, y];
+    const path = [currX, currY];
 
-    const neighborOffsets = this.constructor.neighborOffsets;
-    const neighborLength = neighborOffsets.length;
-    const currDistMapPosition = new Int16Array(2);
-    currDistMapPosition[0] = x;
-    currDistMapPosition[1] = y;
+    const neighborOffsets = isFinite(diagonalCost)
+      ? this.constructor.neighborOffsets
+      : this.constructor.neighborOffsets.slice(4);
 
     // Set the diagonal cost.
     // If 1/2/1 or 2/1/2 is chosen, it doesn't work to simply alternate b/c
     // once the value is "2", it never chooses diagonal again. Would need to look ahead,
     // possibly the entire path, to determine if a second diagonal move makes it worth it.
-
     const invDiagonalCostArr = Array(2);
     switch ( diagonalCost ) {
       case -1: // 1/2/1
@@ -377,9 +391,9 @@ class GPUPathfinder {
         invDiagonalCostArr[0] = 1 / diagonalCost;
         invDiagonalCostArr[1] = 1 / diagonalCost;
     }
-
-    // Start with first and alternated
     let diagonalOption = 0;
+
+    // Walk from goal back to start, flowing "downhill."
     let safety = 0; // Safety to break infinite loops in bad maps.
     while ( distMap[idx] !== 0 && safety < area ) {
       safety += 1;
@@ -387,15 +401,11 @@ class GPUPathfinder {
       let bestY = null;
       let maxDrop = Number.NEGATIVE_INFINITY;
       let movedDiagonal = false;
-      for ( let i = 0; i < neighborLength; i += 2 ) {
+      for ( const { dx, dy } of neighborOffsets ) {
         // Check bounds.
-        const dx = neighborOffsets[i];
-        const currX = currDistMapPosition[0];
         const nX = currX + dx;
         if ( nX < 0 || nX >= width ) continue;
 
-        const dy = neighborOffsets[i + 1];
-        const currY = currDistMapPosition[1];
         const nY = currY + dy;
         if ( nY < 0 || nY >= height ) continue;
 
@@ -419,9 +429,9 @@ class GPUPathfinder {
         }
       }
       if ( bestX === null || maxDrop <= 0 ) break; // We got stuck. Shouldn't happen in valid wavefront.
-      currDistMapPosition[0] = bestX;
-      currDistMapPosition[1] = bestY;
-      idx = this.terrainMapper.indexAtLocal(currDistMapPosition[0], currDistMapPosition[1]);
+      currX = bestX;
+      currY = bestY;
+      idx = this.terrainMapper.indexAtLocal(currX, currY);
       path.push(bestX, bestY);
       if ( movedDiagonal ) diagonalOption = (diagonalOption + 1) % 2;
     }
@@ -460,13 +470,6 @@ class GPUPathfinder {
     const nIdx = this.terrainMapper.indexAtLocal(nX, nY);
     return distMap[nIdx];
   }
-
-  /**
-   * Helper for backtrackPath.
-   * Stores the neighbor offsets.
-   * @type {Int16Array[16]}
-   */
-  static neighborOffsets = new Int16Array(16);
 
   // ----- NOTE: WebGPU Setup ----- //
 
@@ -713,22 +716,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 `;
 }
-
-(() => {
-  // Store the cardinal moves.
-  let i = 0;
-  for ( const [x, y] of [[1, 0], [-1, 0], [0, 1], [0, -1]] ) {
-    GPUPathfinder.neighborOffsets[i++] = x;
-    GPUPathfinder.neighborOffsets[i++] = y;
-  }
-
-  // Store diagonal moves. (Separate from cardinal in case diagonal value is infinite.)
-  for ( const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] ) {
-    GPUPathfinder.neighborOffsets[i++] = x;
-    GPUPathfinder.neighborOffsets[i++] = y;
-  }
-})();
-
 
 /**
  * Test using the GPU to write the terrain map.
