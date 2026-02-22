@@ -54,12 +54,20 @@ export class GriddedCollisionPathfinder extends GraphingPathfinder {
   static get worldClass() { return worldBuilderGriddedCollision(); }
 
   /**
+   * Path cleaning.
+   *
+   * GriddedCollisionPathfinder will return gridded paths if on gridded scene; linear otherwise.
+   */
+  // cleanPath(path); // Handled by super.cleanPath.
+
+  /**
    * Snap the path to the grid.
    * @param {Node[]} path
    * @returns {Point[]}
    */
   snapPathToGrid(path) {
-    return optimizeGridPath(path, { token: this.token });
+    // The Foundry offsets already snap-to-grid. Drop intermediate points.
+    return dropIntermediatePoints(path);
   }
 
 }

@@ -9,7 +9,7 @@ PIXI,
 import { Draw } from "../geometry/Draw.js";
 import { Settings } from "../settings.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
-import { snapPathToGrid, optimizeGridPath, cleanGridPath, straightenPath } from "./path_cleaning.js";
+import { snapPathToGrid, optimizeGridPath, dropIntermediatePoints, straightenPath } from "./path_cleaning.js";
 import { log } from "../util.js";
 
 /* Pathfinding class.
@@ -150,12 +150,12 @@ export class AbstractPathfinder {
   async _findPath(_start, _goal, _signal) { console.error("Child class must define _findPath."); }
 
   /**
-   * Clean the path, which may include straightening it, snapping it to a grid, or removing unnecessary points.
+   * Remove unnecessary path points and straighten the path.
    * @param {Node[]} path
    * @returns {Point[]}
    */
   cleanPath(path) {
-    path = cleanGridPath(path);
+    path = dropIntermediatePoints(path);
     return straightenPath(path, this.token);
   }
 
@@ -166,7 +166,7 @@ export class AbstractPathfinder {
    */
   snapPathToGrid(path) {
     path = snapPathToGrid(path, this.token);
-    return optimizeGridPath(path, { token: this.token }) ;
+    return optimizeGridPath(path, this.token) ;
   }
 
   destroy() {

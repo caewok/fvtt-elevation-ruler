@@ -41,7 +41,7 @@ import { EdgeGraph } from "./EdgeGraph.js";
 // Path cleaning
 import {
   optimizeGridPath,
-  cleanGridPath,
+  dropIntermediatePoints,
   pathIsValid,
   snapPathToGrid,
   removeDuplicatePoints,
@@ -152,7 +152,7 @@ Hooks.once("init", function() {
     pathCleaning: {
       pathIsValid,
       optimizeGridPath,
-      cleanGridPath,
+      dropIntermediatePoints,
       snapPathToGrid,
       straightenPath,
       removeDuplicatePoints,

@@ -591,7 +591,7 @@ let { ClockwiseSweepPathfinder, GriddedCollisionPathfinder, WebGPUPathfinder, wo
 let { solveSegment,
       pathIsValid,
       optimizeGridPath,
-      cleanGridPath,
+      dropIntermediatePoints,
       snapPathToGrid,
       straightenPath,
       removeDuplicatePoints,
@@ -625,10 +625,49 @@ pf.debugDelay = 1000;
 await pf.startPathfinding(start);
 path = await pf._findPath(start, end) // Skip caching
 pf.constructor.drawPath(path)
+pathIsValid(path)
+pf.validatePath(path, start, end)
+
+// Straightened path for collision
+gridPath = dropIntermediatePoints(path)
+gridPath = straightenPath(gridPath, pf.token);
+pathIsValid(gridPath)
+pf.validatePath(gridPath, start, end)
+
+// Gridded path for collision
+gridPath = dropIntermediatePoints(path)
+pathIsValid(gridPath)
+pf.validatePath(gridPath, start, end)
+
+// Straightened path for clockwise is just clockwise path.
+// Gridded path for clockwise
+gridPath = snapPathToGrid(path, pf.token);
+gridPath = optimizeGridPath(gridPath, pf.token) ;
+pathIsValid(gridPath)
+pf.validatePath(gridPath, start, end)
+
+// Straightened path for webgpu
+gridPath = dropIntermediatePoints(path)
+gridPath = straightenPath(gridPath, pf.token);
+pathIsValid(gridPath)
+pf.validatePath(gridPath, start, end)
+
+// Gridded path for webgpu
+gridPath = dropIntermediatePoints(path)
+pathIsValid(gridPath)
+pf.validatePath(gridPath, start, end)
+
+// Gridded path for webgpu, change resolution
+await WebGPUPathfinder.initialize(2 / canvas.dimensions.size);
+
+
+gridPath = dropIntermediatePoints(path)
+pathIsValid(gridPath)
+pf.validatePath(gridPath, start, end)
 
 gridPath = snapPathToGrid(path, pf.token)
 pf.constructor.drawPath(gridPath, { color: Draw.COLORS.lightgreen, alpha: 0.5 })
-pf.constructor.drawPath(optimizeGridPath(gridPath, { token: pf.token }), { color: Draw.COLORS.green })
+pf.constructor.drawPath(gridPath, { color: Draw.COLORS.green })
 
 gridPath.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
 

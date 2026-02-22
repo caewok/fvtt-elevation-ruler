@@ -18,7 +18,7 @@ import { HorizontalQuadVertices, Polygon3dVertices } from "../geometry/placeable
 import { VertexObject } from "../geometry/placeable_geometry/GeometryDesc.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix } from "../geometry/mixwith.js";
-import { cleanGridPath } from "./path_cleaning.js";
+import { dropIntermediatePoints } from "./path_cleaning.js";
 
 // TODO: import { FastBitSet } from "../FastBitSet/FastBitSet.js";
 
@@ -716,7 +716,7 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
    */
   snapPathToGrid(path) {
     // Already done.
-    return cleanGridPath(path);
+    return dropIntermediatePoints(path);
   }
 
 

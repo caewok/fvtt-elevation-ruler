@@ -175,7 +175,8 @@ _approximateGridPath = (path, token, maxDepth = 4, depth) => {
 
   let otherSegments;
   for ( const candidateConnectionPath of connectSegment(firstSegment.path.at(-1), path[1], token) ) {
-    if ( candidateConnectionPath[0].almostEqual(path[1]) ) candidateConnectionPath.pop(); // Drop duplicate point where the candidate offset meets the path.
+    // Drop duplicate point where the candidate offset meets the path.
+    if ( candidateConnectionPath[0].almostEqual(path[1]) ) candidateConnectionPath.pop();
     const candidatePath = [...candidateConnectionPath, ...path.slice(2,)];
     otherSegments = _approximateGridPath(candidatePath, token, maxDepth, depth + 1);
 
@@ -293,7 +294,7 @@ export function solveSegment(a, b, token, maxDepth = 4) {
  * @param {number} [_depth]           Current depth of the recursion
  * @returns {GridCoordinates3d[]}
  */
-function _solveSegment(a, b, token, maxDepth = 4, _depth) { /* eslint-disable-line default-param-last */
+function _solveSegment(a, b, token, maxDepth = 4, _depth = 0) {
   if ( a.almostEqual(b) ) return [a];
 
   // Attempt simple gridded path first.
@@ -305,7 +306,6 @@ function _solveSegment(a, b, token, maxDepth = 4, _depth) { /* eslint-disable-li
   }
 
   // Base case. Revert to direct line if reaching max depth or points are too close.
-  _depth ||= 0;
   if ( _depth >= maxDepth
     || PIXI.Point.distanceSquaredBetween(a, b) < (canvas.dimensions.size ** 2) ) return [a, b];
 
@@ -428,7 +428,9 @@ function distanceSquaredToSegment(a, b, pt) {
  * @param {GridCoordinates[]} path
  * @returns {GridCoordinates[]}
  */
-export function optimizeGridPath(path, { token, checkDiagonals = Boolean(token), dropIntermediate = true, checkUTurn = true } = {}) {
+export function optimizeGridPath(path, token, {
+  checkDiagonals = Boolean(token), dropIntermediate = true, checkUTurn = true
+} = {}) {
   if ( path.length < 3 ) return path;
   checkDiagonals &&= (canvas.grid.diagonals !== CONST.GRID_DIAGONALS.ILLEGAL);
 
@@ -458,7 +460,7 @@ export function optimizeGridPath(path, { token, checkDiagonals = Boolean(token),
 
 const composeOr = (...funcs) => (...args) => funcs.some(func => func(...args));
 
-/** Helper to cleanGridPath */
+/** Helper to dropIntermediatePoints */
 function skipIntermediate(a, b, c) {
   using abDelta = b.subtract(a);
   using bcDelta = c.subtract(b);
@@ -481,22 +483,21 @@ function canShortcutDiagonal(a, _b, c, token) {
  * @returns {GridCoordinates[]}
  */
 
-export function cleanGridPath(path) {
+export function dropIntermediatePoints(path) {
   if ( path.length < 3 ) return path;
   let a = path[0];
   let b = path[1];
   const cleanedPoints = [a];
   using abDelta = a.constructor.tmp;
   using bcDelta = b.constructor.tmp;
-  for ( let i = 2, n = path.length - 1; i < n; i += 1 ) {
+  for ( let i = 2, n = path.length; i < n; i += 1 ) {
     const c = path[i];
     b.subtract(a, abDelta);
     c.subtract(b, bcDelta);
-    if ( abDelta.almostEqual(bcDelta) ) { // Skip b; don't update a.
-      b = c;
-      continue;
-    }
-    cleanedPoints.push(b);
+    // Use orient2d b/c faster than normalizing the deltas and comparing them.
+    // Allows comparison when not gridded and the distance from a --> b is different than b --> c.
+    if ( !(abDelta.almostEqual(bcDelta)
+        || foundry.utils.orient2dFast(a, b, c).almostEqual(0)) ) cleanedPoints.push(b);
     a = b;
     b = c;
   }
