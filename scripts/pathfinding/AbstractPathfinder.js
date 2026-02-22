@@ -82,8 +82,8 @@ export class AbstractPathfinder {
 
   /**
    * Find the path between startPoint and endPoint using the chosen algorithm.
-   * @param {Point} start      Start point for the graph
-   * @param {Point} goal        End point for the graph
+   * @param {ElevatedPoint} start      Start point for the graph
+   * @param {ElevatedPoint} goal       End point for the graph
    */
   async findPath(start, goal, signal = {}) {
     start = GridCoordinates3d.fromObject(start).roundDecimals();

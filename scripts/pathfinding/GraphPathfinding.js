@@ -618,6 +618,10 @@ start = GridCoordinates3d.fromObject(akra.center)
 end = GridCoordinates3d.fromObject(perrin.center)
 pf = new WebGPUPathfinder(akra)
 
+midE = pf.token.topE - pf.token.bottomE;
+start.elevation += midE;
+end.elevation += midE;
+
 
 pf.debug = true
 pf.debugDelay = 1000;
