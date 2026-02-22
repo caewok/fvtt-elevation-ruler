@@ -670,7 +670,7 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
     const bufferType = "transient";
     const blockingTokens = this.blockingTokens();
     if ( blockingTokens.length ) {
-      const blockingSegments = this.constructor.convertWallsToFlatArray(blockingTokens);
+      const blockingSegments = this.constructor.convertTokenEdgesToFlatArray(blockingTokens);
       await this.constructor.worker.updateBufferBlockingSegments(blockingSegments, { bufferType, clear });
       clear = false;
     }
