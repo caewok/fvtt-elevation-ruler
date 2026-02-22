@@ -232,7 +232,7 @@ Hooks.on("canvasInit", function(_canvas) {
 
 Hooks.on("renderSceneControls", async function(controls, _html, _data) {
   // Monitor enabling/disabling of custom controls.
-  if ( controls.activeControl !== "token" ) return;
+  if ( controls.control.name !== "token" ) return;
   const toggle = controls.tokens.tools[PATHFINDING_CONTROL.name];
   if ( toggle ) await Settings.set(Settings.KEYS.CONTROLS.PATHFINDING, toggle.active);
 });
