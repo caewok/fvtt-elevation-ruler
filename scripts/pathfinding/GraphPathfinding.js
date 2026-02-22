@@ -607,15 +607,15 @@ end = GridCoordinates3d.fromObject(zanna.center)
 pf = new WebGPUPathfinder(randal)
 
 let beiro = canvas.tokens.placeables.find(t => t.name === "Beiro")
-let bandit = canvas.tokens.placeables.find(t => t.name === "Bandit")
+let riswynn = canvas.tokens.placeables.find(t => t.name === "Riswynn")
 start = GridCoordinates3d.fromObject(beiro.center)
-end = GridCoordinates3d.fromObject(bandit.center)
+end = GridCoordinates3d.fromObject(riswynn.center)
 pf = new WebGPUPathfinder(beiro)
 
 let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
-let lizard = canvas.tokens.placeables.find(t => t.name === "Giant Lizard")
+let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 start = GridCoordinates3d.fromObject(akra.center)
-end = GridCoordinates3d.fromObject(lizard.center)
+end = GridCoordinates3d.fromObject(perrin.center)
 pf = new WebGPUPathfinder(akra)
 
 

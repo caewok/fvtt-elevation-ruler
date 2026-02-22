@@ -94,12 +94,12 @@ const GPUTerrainMixin = superclass => class extends superclass {
   /**
    * Convert token edges to flat segment array.
    * Used to treat a token as having walls.
-   * @param {Token} token
+   * @param {Token[]} tokens
    * @returns {Float32Array}
    */
-  static convertTokenEdgesToFlatArray(token) {
-    const border = token.constrainedTokenBorder;
-    return this.convertEdgesToFlatArray([...border.iterateEdges({ close: true })]);
+  static convertTokenEdgesToFlatArray(tokens) {
+    const edges = tokens.flatMap(t => [...t.constrainedTokenBorder.iterateEdges( { close: true })])
+    return this.convertEdgesToFlatArray(edges);
   }
 
   /**
