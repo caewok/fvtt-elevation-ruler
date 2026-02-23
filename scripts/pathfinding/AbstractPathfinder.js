@@ -33,11 +33,12 @@ export class AbstractPathfinder {
 
   constructor(token) { this.token = token; }
 
+  /** @type {Map<key, ElevatedPoint[]>} */
   cachedPaths = new Map();
 
   /**
    * Start pathfinding. From this point, assume the scene and starting point will not change.
-   * @param {GridCoordinates3d} start
+   * @param {Point3d} start
    */
   startPathfinding(_start) {
     this.cachedPaths.clear();
@@ -82,12 +83,14 @@ export class AbstractPathfinder {
 
   /**
    * Find the path between startPoint and endPoint using the chosen algorithm.
-   * @param {ElevatedPoint} start      Start point for the graph
-   * @param {ElevatedPoint} goal       End point for the graph
+   * @param {Point3d} start         Start point for the graph
+   * @param {Point3d} goal          End point for the graph
+   * @param {AbortSignal} signal    Signal to end pathfinding early
+   * @returns {Point3d[]}
    */
   async findPath(start, goal, signal = {}) {
-    start = GridCoordinates3d.fromObject(start).roundDecimals();
-    goal = GridCoordinates3d.fromObject(goal).roundDecimals();
+    start = start.clone().roundDecimals();
+    goal = end.clone().roundDecimals();
 
     if ( this.cachedPaths.has(goal.key) ) return this.cachedPaths.get(goal.key);
     if ( !(start || goal) || start.almostEqual(goal) ) return null;

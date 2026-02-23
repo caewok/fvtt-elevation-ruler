@@ -275,7 +275,7 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
    * @param {Node} curr
    * @param {Node} goal
    */
-  reachedGoal(curr, goal) { return curr.sweep.contains(goal.x, goal.y); }
+  reachedGoal(curr, goalNode, _goal) { return curr.sweep.contains(goalNode.x, goalNode.y); }
 
   _sweepOpts = {
     type: "move",     /** @type {CONST.WALL_RESTRICTION_TYPES} */

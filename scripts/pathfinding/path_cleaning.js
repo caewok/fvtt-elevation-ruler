@@ -113,7 +113,7 @@ class GridPathResult {
     let prev = iter.next().value;
     for ( const curr of iter ) {
       curr.clone(tmp);
-      tmp.centerToOffset();
+      tmp.centerToGrid();
       const gridded = curr.almostEqual(tmp)
         && (Math.abs(prev.i - tmp.i) < 2 && Math.abs(prev.j - tmp.j) < 2);
       if ( !gridded ) return false;
@@ -229,7 +229,7 @@ function *connectSegment(prev, curr, token) {
     const collisionFn = (a, candidate) => sceneGraph.pathBlocked(prev, candidate, token);
     for ( const candidateOffset of validOffsets(curr, collisionFn) ) yield [candidateOffset];
   }
-  if ( !curr.clone().centerToOffset().almostEqual(curr) ) yield [curr]; // The non-offset point.
+  if ( !curr.clone().centerToGrid().almostEqual(curr) ) yield [curr]; // The non-offset point.
 }
 
 /**
@@ -244,7 +244,7 @@ function *validOffsets(a, collisionFn, sortFn) {
   collisionFn ??= (_a, _candidate) => false;
 
   // First, try the basic offset.
-  const aOffset = a.clone().centerToOffset();
+  const aOffset = a.clone().centerToGrid();
   if ( a.almostEqual(aOffset) || !collisionFn(a, aOffset) ) yield aOffset;
 
   // Second, get offsets around this one, sorted by distance to a

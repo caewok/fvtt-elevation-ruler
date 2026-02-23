@@ -15,7 +15,7 @@ import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix, Mixin } from "../geometry/mixwith.js";
 import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
 import { ObstacleSweep } from "./ClockwiseSweep.js";
-import { optimizeGridPath } from "./path_cleaning.js";
+import { dropIntermediatePoints } from "./path_cleaning.js";
 import {
   Manhattan2dCost,
   Manhattan3dCost,
@@ -81,28 +81,11 @@ export class GriddedCollisionPathfinder extends GraphingPathfinder {
 
 // ----- NOTE: Node construction ----- //
 
-// NOTE: Node2d
-export const Node2d = superclass => class extends superclass {
-  buildNode(pt) {
-    const gridPt = GridCoordinates.fromObject(pt);
-    gridPt.centerToOffset();
-    if ( gridPt.almostEqual(pt) ) return gridPt;
-
-    // Don't walk through blocking obstacles.
-    const validNeighbors = this.filterNeighbors([gridPt], pt);
-    if ( !validNeighbors.length ) return pt;
-    return gridPt;
-  }
-
-  reachedGoal(current, goal) { return current.offsetsEqual(goal); }
-};
-
-// NOTE: Node3d
-export const Node3d = superclass => class extends superclass {
+export const Node = superclass => class extends superclass {
   buildNode(pt) {
     const gridPt = GridCoordinates3d.fromObject(pt);
-    gridPt.centerToOffset();
-    if ( gridPt.almostEqual(pt) ) return gridPt;
+    gridPt.centerTo2dGrid();
+    if ( gridPt.almostEqualXY(pt) ) return gridPt;
 
     // Don't walk through blocking obstacles.
     const validNeighbors = this.filterNeighbors([gridPt], pt);
@@ -110,9 +93,15 @@ export const Node3d = superclass => class extends superclass {
     return gridPt;
   }
 
-  reachedGoal(current, goal) { return current.offsetsEqual2d(goal); }
+  /**
+   * @param {Node} current
+   * @param {Node} goalNode
+   * @param {Point3d} goal
+   * @returns {boolean}
+   */
+  // The buildNode method provides an appropriate goalNode that can connect to goal.
+  reachedGoal(current, goalNode) { return current.offsetsEqual(goalNode); }
 };
-
 
 // ----- NOTE: Filter Neighbors ----- //
 
@@ -193,40 +182,31 @@ export const ClockwiseSweepFilter = superclass => class extends superclass {
     const occlusionCfg = { blockingCfg, subjectToken: this.source.object };
     for ( const token of canvas.tokens.placeables ) {
       if ( !ObstacleOcclusionTest.includeToken(token, occlusionCfg) ) continue;
+      if ( !node.z.between(token.bottomZ, token.topZ) ) continue;
       return token.constrainedTokenBorder.contains(node.x, node.y);
     }
   }
 };
 
-export const OcclusionFilter2d = superclass => class extends superclass {
+export const OcclusionFilter = superclass => class extends superclass {
   #occlusionTester = new ObstacleOcclusionTest();
 
-  config = {
-    ...super.config,
-    zOffset: 5,
-    elevationZ: null,
-  };
-
   initialize(token) {
-    this.config.elevationZ = token.bottomZ;
     this.#occlusionTester._config.blocking.tokens.live = true;
-    this.#occlusionTester.subjectToken = token;
     super.initialize(token);
   }
 
-
-  filterNeighbors(neighbors, node2d) {
-    const elev = this.config.elevationZ + this.config.zOffset;
-    using node3d = GridCoordinates3d.tmp.set(node2d.x, node2d.y, elev);
+  filterNeighbors(neighbors, node) {
+    using rayOrigin = node.clone();
     const ot = this.#occlusionTester;
     ot.frustum = AABB2d.fromPoints(neighbors);
-    ot._initialize({ rayOrigin: node3d });
+    ot._initialize({ rayOrigin });
 
     // Test whether each neighbor is occluded w/r/t this node.
     using tmpPt = Point3d.tmp;
     return neighbors.filter(n => {
-      tmpPt.set(n.x, n.y, elev);
-      tmpPt.subtract(node3d, tmpPt);
+      tmpPt.set(n.x, n.y, n.z || node.z);
+      tmpPt.subtract(rayOrigin, tmpPt);
       return !ot._rayIsOccluded(tmpPt);
     });
   }
@@ -254,39 +234,7 @@ export const OcclusionFilter2d = superclass => class extends superclass {
     }
 
     // Possible to be within a confined wall shape but not worth checking. Avoid elsewhere.
-
     return false;
-  }
-};
-
-export const OcclusionFilter3d = superclass => class extends superclass {
-  #occlusionTester = new ObstacleOcclusionTest();
-
-  config = {
-    ...super.config,
-    zOffset: 0,
-  };
-
-  initialize(token) {
-    this.#occlusionTester._config.blocking.tokens.live = true;
-    super.initialize(token);
-  }
-
-
-  filterNeighbors(neighbors, node) {
-    using rayOrigin = node.clone();
-    rayOrigin.z += this.zOffset;
-    const ot = this.#occlusionTester;
-    ot.frustum = AABB2d.fromPoints(neighbors);
-    ot._initialize({ rayOrigin });
-
-    // Test whether each neighbor is occluded w/r/t this node.
-    using tmpPt = Point3d.tmp;
-    return neighbors.filter(n => {
-      tmpPt.set(n.x, n.y, n.z + this.config.zOffset);
-      tmpPt.subtract(rayOrigin, tmpPt);
-      return !ot._rayIsOccluded(tmpPt);
-    });
   }
 };
 
@@ -297,7 +245,7 @@ export const Neighbors2d = superclass => class extends superclass {
   adjacentOffsets(node) {
     using node2d = GridCoordinates.tmp.set(node.x, node.y);
     return canvas.grid.getAdjacentOffsets(node2d) // Offsets are at the center of the grid square.
-      .map(offset => node.constructor.fromOffset(offset, node.z));
+      .map(offset => node.constructor.fromOffset(offset, node.elevation));
   }
 };
 
@@ -333,10 +281,9 @@ export const Neighbors3d = superclass => class extends superclass {
  * algorithm to use.
  * @returns {AbstractGridPathfindingWorld}
  */
-export function worldBuilderGriddedCollision({ cost, use3d, heuristic, pt3d, neighborFilter } = {}) {
+export function worldBuilderGriddedCollision({ cost, use3d, heuristic, neighborFilter } = {}) {
   const pathCfg = CONFIG[MODULE_ID].graphPathfinding;
   use3d ??= pathCfg.use3d ?? false;
-  pt3d ??= pathCfg.pt3d ?? false;
   cost ||= pathCfg.cost || "euclidean";
   heuristic ||= pathCfg.heuristic || "euclidean";
   neighborFilter ||= pathCfg.neighborFilter || "occlusion";
@@ -347,7 +294,7 @@ export function worldBuilderGriddedCollision({ cost, use3d, heuristic, pt3d, nei
   let neighborFilterCl;
   let neighborsCl;
 
-  nodeCl = (use3d || pt3d) ? Node3d : Node2d;
+  nodeCl = Node;
   neighborsCl = use3d ? Neighbors3d : Neighbors2d;
   switch ( cost ) {
     case "manhattan": costCl = use3d ? Manhattan3dCost : Manhattan2dCost; break;
@@ -362,7 +309,7 @@ export function worldBuilderGriddedCollision({ cost, use3d, heuristic, pt3d, nei
     case "terrain": heuristicCl = TokenTerrainHeuristic; break;
   }
   switch ( neighborFilter ) {
-    case "occlusion": neighborFilterCl = (use3d || pt3d) ? OcclusionFilter3d : OcclusionFilter2d; break;
+    case "occlusion": neighborFilterCl = OcclusionFilter; break;
     case "clockwiseSweep": neighborFilterCl = ClockwiseSweepFilter; break;
     case "sceneGraph": neighborFilterCl = SceneGraphFilter; break;
   }
