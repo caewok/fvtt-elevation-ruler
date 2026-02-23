@@ -1,5 +1,6 @@
 /* globals
 canvas,
+PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
@@ -79,12 +80,17 @@ function findMovementPath(wrapped, waypoints, options) {
   // const dist = canvas.grid.measurePath(waypoints).euclidean;
   // if ( dist > 20 ) console.log("\nfindMovementPath", ...waypoints);
 
-
   // Only pathfind over the last waypoints.
-  const start = GridCoordinates3d.fromObject(this.getCenterPoint(waypoints.at(-2)));
-  const end = GridCoordinates3d.fromObject(this.getCenterPoint(waypoints.at(-1)));
-  start.elevation = waypoints.at(-2).elevation;
-  end.elevation = waypoints.at(-1).elevation;
+  const start = GridCoordinates3d.fromObject(waypoints.at(-2)).centerToGrid();
+  const end = GridCoordinates3d.fromObject(waypoints.at(-1)).centerToGrid();
+
+  // Add half the token elevation.
+  // Different elevation amounts will result in different hurdling ability.
+  // NOTE: Right now, token side faces are 1 pixel short, so a token at bottomZ === 0 will
+  //       not intersect a line at 0. Same for top faces measuring along sides.
+  const midE = (this.topE - this.bottomE) * 0.5;
+  start.elevation = waypoints.at(-2).elevation + midE;
+  end.elevation = waypoints.at(-1).elevation + midE;
 
   const pathfindingJob = pf.startJob();
   const path = pathfindingJob.findPath(start, end);
@@ -108,7 +114,11 @@ async function pathfind(path, wrapped, waypoints, options, token) {
     const foundryEnd = waypoints.pop();
     const foundryStart = waypoints.at(-1);
     for ( let i = 1, iMax = foundPath.length - 1; i < iMax; i += 1 ) {
-      // const pt = canvas.grid.getTopLeftPoint(foundPath[i]); // Foundry ruler uses top left coordinates.
+      // Adjust back the elevation of the path to account for token.
+      const midE = (token.topE - token.bottomE) * 0.5;
+      foundPath.elevation -= midE;
+
+      // Adjust the path to the token TL.
       const pt = tokenTopLeftFromCenter(token, foundPath[i]);
       const prevW = waypoints[i - 1];
       if ( prevW.x.almostEqual(pt.x) && prevW.y.almostEqual(pt.y) ) continue;

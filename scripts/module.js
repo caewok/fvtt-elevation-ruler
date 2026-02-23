@@ -41,7 +41,7 @@ import { EdgeGraph } from "./EdgeGraph.js";
 // Path cleaning
 import {
   optimizeGridPath,
-  cleanGridPath,
+  dropIntermediatePoints,
   pathIsValid,
   snapPathToGrid,
   removeDuplicatePoints,
@@ -111,10 +111,9 @@ Hooks.once("init", function() {
      */
     graphPathfinding: {
       algorithm: "astar",   // @type {"astar"|"greedy"|"breadth"|"uniform"}
-      use3d: false,         // @type {true|false}
+      use3d: false,         // @type {true|false}. TODO: Currently non-functional.
       cost: "foundry",      // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
       heuristic: "foundry", // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
-      pt3d: false,          // @type {true|false} Will be true if use3d is true;
       neighborFilter: "clockwiseSweep",    // @type{"clockwiseSweep"|"occlusion"|"sceneGraph"}
     },
 
@@ -152,7 +151,7 @@ Hooks.once("init", function() {
     pathCleaning: {
       pathIsValid,
       optimizeGridPath,
-      cleanGridPath,
+      dropIntermediatePoints,
       snapPathToGrid,
       straightenPath,
       removeDuplicatePoints,
@@ -232,7 +231,7 @@ Hooks.on("canvasInit", function(_canvas) {
 
 Hooks.on("renderSceneControls", async function(controls, _html, _data) {
   // Monitor enabling/disabling of custom controls.
-  if ( controls.activeControl !== "token" ) return;
+  if ( controls.control.name !== "token" ) return;
   const toggle = controls.tokens.tools[PATHFINDING_CONTROL.name];
   if ( toggle ) await Settings.set(Settings.KEYS.CONTROLS.PATHFINDING, toggle.active);
 });

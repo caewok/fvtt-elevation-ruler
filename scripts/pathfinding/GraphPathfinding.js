@@ -69,6 +69,11 @@ export class GraphingPathfinder extends AbstractPathfinder {
   set graphClass(value) { this.#graphClass = value; }
 
 
+  /**
+   * Start pathfinding.
+   * From this point, assume the scene and starting point will not change.
+   * @param {Point3d} start
+   */
   startPathfinding(start) {
     super.startPathfinding(start);
 
@@ -76,6 +81,13 @@ export class GraphingPathfinder extends AbstractPathfinder {
     this.world.startPathfinding(start);
   }
 
+  /**
+   * Find the path between startPoint and endPoint using the chosen algorithm.
+   * @param {Point3d} start      Start point for the graph
+   * @param {Point3d} goal       End point for the graph
+   * @param {AbortSignal} signal    Signal to end pathfinding early
+   * @returns {Point3d[]}
+   */
   async _findPath(start, goal, signal) {
     const graph = this.lastGraph = new this.graphClass(this.world);
     graph.debug = this.debug;
@@ -306,22 +318,22 @@ class AbstractGraph {
    * @param {Point} goal        End point for the graph
    */
   async findPath(start, goal, _signal = {}) {
-    start = this.world.buildNode(start);
-    goal = this.world.buildNode(goal);
-    if ( this.world.nodeIsUnreachable(goal, start) ) {
-      console.warn(`${this.constructor.name}|Node unreachable.`, { start, goal });
+    const startNode = this.world.buildNode(start);
+    const goalNode = this.world.buildNode(goal);
+    if ( this.world.nodeIsUnreachable(goalNode, startNode) ) {
+      console.warn(`${this.constructor.name}|Node unreachable.`, { startNode, goalNode });
       return null;
     }
 
     // Frontier tracks next neighbors to be visited.
-    this._initializePathfindingRun(start);
+    this._initializePathfindingRun(startNode);
 
     let iter = 0;
     let MAX_ITER = 1e03; // this.world.maxIterations(start, goal) || 1e03;
     let reachedGoal = false;
     if ( this.debug ) {
-      this.world.drawNode(start, { color: Draw.COLORS.yellow });
-      this.world.drawNode(goal, { color: Draw.COLORS.green });
+      this.world.drawNode(startNode, { color: Draw.COLORS.yellow });
+      this.world.drawNode(goalNode, { color: Draw.COLORS.green });
     }
     while ( this._frontier.length > 0 && iter < MAX_ITER ) {
       // if ( signal.aborted ) return null;
@@ -332,17 +344,21 @@ class AbstractGraph {
         this.world.drawNode(current, { color: Draw.COLORS.blue, alpha: 0.2, radius: 3 });
       }
       // console.debug(`${this.constructor.name}|Processing frontier ${current.x},${current.y}`)
-      if ( (reachedGoal = this.world.reachedGoal(current, goal)) ) {
-        if ( !this._cameFrom.has(goal.key) ) this._cameFrom.set(goal.key, current); // CWSweep, for example, does not use current.key === goal.key.
+      if ( (reachedGoal = this.world.reachedGoal(current, goalNode, goal)) ) {
+        if ( !this._cameFrom.has(goalNode.key) ) this._cameFrom.set(goalNode.key, current); // CWSweep, for example, does not use current.key === goalNode.key.
         break;
       }
-      await this._processFrontierNeighbors(current, goal);
+      await this._processFrontierNeighbors(current, goalNode);
     }
 
     if ( iter >= MAX_ITER ) {
-      console.warn(`${this.constructor.name}|findPath stuck in loop.`, { start, goal });
+      console.warn(`${this.constructor.name}|findPath stuck in loop.`, { startNode, goalNode });
     }
-    const path = reachedGoal ? this.constructor.reconstructPath(this._cameFrom, goal) : null;
+    if ( !reachedGoal ) return null;
+
+    const path = this.constructor.reconstructPath(this._cameFrom, goalNode);
+    if ( !path.at(0).almostEqual(start) ) path.push(start); // World must handle checks between start and startNode.
+    if ( !path.at(-1).almostEqual(goal) ) path.push(goal);  // World must handle checks between goal and goalNode.
     return path;
   }
 
@@ -591,7 +607,7 @@ let { ClockwiseSweepPathfinder, GriddedCollisionPathfinder, WebGPUPathfinder, wo
 let { solveSegment,
       pathIsValid,
       optimizeGridPath,
-      cleanGridPath,
+      dropIntermediatePoints,
       snapPathToGrid,
       straightenPath,
       removeDuplicatePoints,
@@ -607,16 +623,20 @@ end = GridCoordinates3d.fromObject(zanna.center)
 pf = new WebGPUPathfinder(randal)
 
 let beiro = canvas.tokens.placeables.find(t => t.name === "Beiro")
-let bandit = canvas.tokens.placeables.find(t => t.name === "Bandit")
+let riswynn = canvas.tokens.placeables.find(t => t.name === "Riswynn")
 start = GridCoordinates3d.fromObject(beiro.center)
-end = GridCoordinates3d.fromObject(bandit.center)
+end = GridCoordinates3d.fromObject(riswynn.center)
 pf = new WebGPUPathfinder(beiro)
 
 let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
-let lizard = canvas.tokens.placeables.find(t => t.name === "Giant Lizard")
+let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 start = GridCoordinates3d.fromObject(akra.center)
-end = GridCoordinates3d.fromObject(lizard.center)
+end = GridCoordinates3d.fromObject(perrin.center)
 pf = new WebGPUPathfinder(akra)
+
+midE = (pf.token.topE - pf.token.bottomE) * 0.5;
+start.elevation += midE;
+end.elevation += midE;
 
 
 pf.debug = true
@@ -625,10 +645,49 @@ pf.debugDelay = 1000;
 await pf.startPathfinding(start);
 path = await pf._findPath(start, end) // Skip caching
 pf.constructor.drawPath(path)
+pathIsValid(path, pf.token)
+pf.validatePath(path, start, end)
+
+// Straightened path for collision
+gridPath = dropIntermediatePoints(path)
+gridPath = straightenPath(gridPath, pf.token);
+pathIsValid(gridPath, pf.token)
+pf.validatePath(gridPath, start, end)
+
+// Gridded path for collision
+gridPath = dropIntermediatePoints(path)
+pathIsValid(gridPath, pf.token)
+pf.validatePath(gridPath, start, end)
+
+// Straightened path for clockwise is just clockwise path.
+// Gridded path for clockwise
+gridPath = snapPathToGrid(path, pf.token);
+gridPath = optimizeGridPath(gridPath, pf.token) ;
+pathIsValid(gridPath, pf.token)
+pf.validatePath(gridPath, start, end)
+
+// Straightened path for webgpu
+gridPath = dropIntermediatePoints(path)
+gridPath = straightenPath(gridPath, pf.token);
+pathIsValid(gridPath, pf.token)
+pf.validatePath(gridPath, start, end)
+
+// Gridded path for webgpu
+gridPath = dropIntermediatePoints(path)
+pathIsValid(gridPath, pf.token)
+pf.validatePath(gridPath, start, end)
+
+// Gridded path for webgpu, change resolution
+await WebGPUPathfinder.initialize(2 / canvas.dimensions.size);
+
+
+gridPath = dropIntermediatePoints(path)
+pathIsValid(gridPath, pf.token)
+pf.validatePath(gridPath, start, end)
 
 gridPath = snapPathToGrid(path, pf.token)
 pf.constructor.drawPath(gridPath, { color: Draw.COLORS.lightgreen, alpha: 0.5 })
-pf.constructor.drawPath(optimizeGridPath(gridPath, { token: pf.token }), { color: Draw.COLORS.green })
+pf.constructor.drawPath(gridPath, { color: Draw.COLORS.green })
 
 gridPath.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
 

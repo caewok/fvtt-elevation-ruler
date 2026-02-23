@@ -60,6 +60,7 @@ export class ClockwiseSweepPathfinder extends GraphingPathfinder {
    * @param {Node[]} path
    * @returns {Point[]}
    */
+  /*
   snapPathToGrid(path) {
     // TODO: Could use specialized version that limits collision tests between a and b
     //       to edges encountered in a's sweep.
@@ -67,9 +68,10 @@ export class ClockwiseSweepPathfinder extends GraphingPathfinder {
     // TODO: Could run collision pathfinding within a's sweep to find best grid path to b.
 
     // path = snapPathToGrid(path, this.token);
-    // return cleanGridPathPoints(path);
+    // return dropIntermediatePoints(path);
     return super.snapPathToGrid(path);
   }
+  */
 }
 
 /**
@@ -273,7 +275,7 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
    * @param {Node} curr
    * @param {Node} goal
    */
-  reachedGoal(curr, goal) { return curr.sweep.contains(goal.x, goal.y); }
+  reachedGoal(curr, goalNode, _goal) { return curr.sweep.contains(goalNode.x, goalNode.y); }
 
   _sweepOpts = {
     type: "move",     /** @type {CONST.WALL_RESTRICTION_TYPES} */

@@ -17,9 +17,9 @@ import { PATCHES as PATCHES_ClientSettings } from "./ModuleSettingsAbstract.js";
 
 const mergeObject = foundry.utils.mergeObject;
 const PATCHES = {
-  ClientSettings: PATCHES_ClientSettings,
+  "foundry.helpers.ClientSettings": PATCHES_ClientSettings,
   DrawingConfig: PATCHES_DrawingConfig,
-//  "CONFIG.Canvas.rulerClass": PATCHES_Ruler,
+  //  "CONFIG.Canvas.rulerClass": PATCHES_Ruler,
   "foundry.canvas.placeables.Token": PATCHES_Token,
   "foundry.canvas.placeables.Wall": PATCHES_Wall_WebGPU,
   "foundry.canvas.placeables.Region": PATCHES_Region_WebGPU,

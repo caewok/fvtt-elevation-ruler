@@ -9,7 +9,7 @@ PIXI,
 import { Draw } from "../geometry/Draw.js";
 import { Settings } from "../settings.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
-import { snapPathToGrid, optimizeGridPath, cleanGridPath, straightenPath } from "./path_cleaning.js";
+import { snapPathToGrid, optimizeGridPath, dropIntermediatePoints, straightenPath, pathIsValid } from "./path_cleaning.js";
 import { log } from "../util.js";
 
 /* Pathfinding class.
@@ -33,11 +33,12 @@ export class AbstractPathfinder {
 
   constructor(token) { this.token = token; }
 
+  /** @type {Map<key, ElevatedPoint[]>} */
   cachedPaths = new Map();
 
   /**
    * Start pathfinding. From this point, assume the scene and starting point will not change.
-   * @param {GridCoordinates3d} start
+   * @param {Point3d} start
    */
   startPathfinding(_start) {
     this.cachedPaths.clear();
@@ -82,12 +83,14 @@ export class AbstractPathfinder {
 
   /**
    * Find the path between startPoint and endPoint using the chosen algorithm.
-   * @param {Point} start      Start point for the graph
-   * @param {Point} goal        End point for the graph
+   * @param {Point3d} start         Start point for the graph
+   * @param {Point3d} goal          End point for the graph
+   * @param {AbortSignal} signal    Signal to end pathfinding early
+   * @returns {Point3d[]}
    */
   async findPath(start, goal, signal = {}) {
-    start = GridCoordinates3d.fromObject(start).roundDecimals();
-    goal = GridCoordinates3d.fromObject(goal).roundDecimals();
+    start = start.clone().roundDecimals();
+    goal = end.clone().roundDecimals();
 
     if ( this.cachedPaths.has(goal.key) ) return this.cachedPaths.get(goal.key);
     if ( !(start || goal) || start.almostEqual(goal) ) return null;
@@ -138,6 +141,11 @@ export class AbstractPathfinder {
         return false;
       }
     }
+    if ( !pathIsValid(path, this.token) ) {
+      console.warn(`${prefix}|${start} --> ${goal} path is not valid.`);
+      return false;
+    }
+
     return true;
   }
 
@@ -150,12 +158,12 @@ export class AbstractPathfinder {
   async _findPath(_start, _goal, _signal) { console.error("Child class must define _findPath."); }
 
   /**
-   * Clean the path, which may include straightening it, snapping it to a grid, or removing unnecessary points.
+   * Remove unnecessary path points and straighten the path.
    * @param {Node[]} path
    * @returns {Point[]}
    */
   cleanPath(path) {
-    path = cleanGridPath(path);
+    path = dropIntermediatePoints(path);
     return straightenPath(path, this.token);
   }
 
@@ -166,7 +174,7 @@ export class AbstractPathfinder {
    */
   snapPathToGrid(path) {
     path = snapPathToGrid(path, this.token);
-    return optimizeGridPath(path, { token: this.token }) ;
+    return optimizeGridPath(path, this.token) ;
   }
 
   destroy() {

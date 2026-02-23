@@ -18,7 +18,7 @@ import { HorizontalQuadVertices, Polygon3dVertices } from "../geometry/placeable
 import { VertexObject } from "../geometry/placeable_geometry/GeometryDesc.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix } from "../geometry/mixwith.js";
-import { cleanGridPath } from "./path_cleaning.js";
+import { dropIntermediatePoints } from "./path_cleaning.js";
 
 // TODO: import { FastBitSet } from "../FastBitSet/FastBitSet.js";
 
@@ -94,12 +94,12 @@ const GPUTerrainMixin = superclass => class extends superclass {
   /**
    * Convert token edges to flat segment array.
    * Used to treat a token as having walls.
-   * @param {Token} token
+   * @param {Token[]} tokens
    * @returns {Float32Array}
    */
-  static convertTokenEdgesToFlatArray(token) {
-    const border = token.constrainedTokenBorder;
-    return this.convertEdgesToFlatArray([...border.iterateEdges({ close: true })]);
+  static convertTokenEdgesToFlatArray(tokens) {
+    const edges = tokens.flatMap(t => [...t.constrainedTokenBorder.iterateEdges( { close: true })])
+    return this.convertEdgesToFlatArray(edges);
   }
 
   /**
@@ -670,7 +670,7 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
     const bufferType = "transient";
     const blockingTokens = this.blockingTokens();
     if ( blockingTokens.length ) {
-      const blockingSegments = this.constructor.convertWallsToFlatArray(blockingTokens);
+      const blockingSegments = this.constructor.convertTokenEdgesToFlatArray(blockingTokens);
       await this.constructor.worker.updateBufferBlockingSegments(blockingSegments, { bufferType, clear });
       clear = false;
     }
@@ -716,7 +716,7 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
    */
   snapPathToGrid(path) {
     // Already done.
-    return cleanGridPath(path);
+    return dropIntermediatePoints(path);
   }
 
 

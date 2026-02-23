@@ -12,6 +12,7 @@ PIXI,
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 import { OTHER_MODULES, MODULE_ID } from "./const.js";
+import { GEOMETRY_LIB_ID, GEOMETRY_ID } from "./geometry/const.js";
 import { Settings } from "./settings.js";
 import { segmentBounds } from "./util.js";
 import { almostLessThan } from "./geometry/util.js";
@@ -159,13 +160,14 @@ class HalfEdge {
    * @returns {boolean}
    */
   placeableBlocks(origin, moveToken, elevationZ) {
-    elevationZ ??= origin.z || moveToken.bottomZ; // For consistency.
+    elevationZ ??= origin.z ?? moveToken.bottomZ ?? 0; // For consistency.
     for ( let placeable of this.objects ) {
       if ( placeable instanceof foundry.canvas.geometry.edges.Edge ) placeable = placeable.object;
       if ( placeable instanceof foundry.canvas.placeables.Wall
         && this.constructor.wallBlocks(placeable, origin, moveToken, elevationZ) ) return true;
       else if ( placeable instanceof foundry.canvas.placeables.Token
-        && this.constructor.tokenBlocks(placeable, moveToken, elevationZ) ) return true;
+        && this.constructor.tokenBlocks(placeable, moveToken)
+        && elevationZ.between(moveToken.topZ, moveToken.bottomZ) ) return true;
     }
     return false;
   }
@@ -209,10 +211,9 @@ class HalfEdge {
    * Could edges of this token block the moving token?
    * @param {Token} token             Token whose edges will be tested
    * @param {Token} moveToken         Token doing the move
-   * @param {number} [elevationZ]     Elevation of the point or origin to test; will be inferred from moveToken.
    * @returns {boolean}
    */
-  static tokenEdgeBlocks(token, moveToken, elevationZ) {
+  static tokenBlocks(token, moveToken) {
     // Confirm token block setting.
     const PF = Settings.KEYS.PATHFINDING;
     const tokensBlock = Settings.get(PF.TOKENS_BLOCK);
@@ -223,10 +224,6 @@ class HalfEdge {
 
     // Don't block oneself.
     if ( !moveToken || moveToken === token ) return false;
-
-    // Must be within the elevation bounds.
-    elevationZ ??= moveToken.bottomZ || 0;
-    if ( !elevationZ.between(token.topZ, token.bottomZ) ) return false;
 
     // Don't block dead tokens (HP <= 0).
     const { tokenHPAttribute, pathfindingIgnoreStatuses } = CONFIG[MODULE_ID];
@@ -813,14 +810,49 @@ export class EdgeGraph {
    * @param {PIXI.Point} a          Origin point for the move
    * @param {PIXI.Point} b          Destination point for the move
    * @param {Token} token           Token that is moving
-   * @param {CONST.TOKEN_DISPOSITIONS} tokenBlockType
    * @returns {boolean}
    */
-  hasCollision(a, b, token) {
+  hasCollision(a, b, moveToken) {
     const lineSegmentIntersects = foundry.utils.lineSegmentIntersects;
     const edges = this.quadtree.getObjects(segmentBounds(a, b));
     return edges.some(edge => lineSegmentIntersects(a, b, edge.origin, edge.twin.origin)
-      && edge.placeableBlocks(a, token));
+      && edge.placeableBlocks(a, moveToken));
+  }
+
+  /**
+   * Combine edge test with separate token blocking test in 3d.
+   * Used if the edge graph does not contain token edges but token collisions should still be tested.
+   * @param {PIXI.Point} a          Origin point for the move
+   * @param {PIXI.Point} b          Destination point for the move
+   * @param {Token} moveToken       Token that is moving
+   * @returns {boolean}
+   */
+  pathBlocked(a, b, moveToken) {
+    return this.hasCollision(a, b, moveToken) || this.constructor.tokenBlocksSegment(a, b, moveToken);
+  }
+
+  /**
+   * Is this segment blocked by a token?
+   * Helper to use even if tokens are not in the edge graph.
+   * Likely faster than tracking tokens in the edge graph unless there is a reason
+   * to track how tokens and walls connect. Also handles 3d.
+   * @param {GridCoordinates3d} a       Start of the path segment
+   * @param {GridCoordinates3d} b       End of the path segment
+   * @param {Token} moveToken           Token doing the movement
+   * @returns {boolean} True if blocked
+   */
+  static tokenBlocksSegment(a, b, moveToken) {
+    // NOTE: rayIntersectionConstrained will return false if a.z is at the edge of the token.
+    // For example, if a.z === 0, tokens at elevation 0 will not block.
+    using dir = b.subtract(a);
+    for ( const token of canvas.tokens.placeables ) {
+      const geom = token[GEOMETRY_LIB_ID][GEOMETRY_ID];
+      if ( !geom ) continue;
+      if ( !HalfEdge.tokenBlocks(token, moveToken) ) continue;
+      const ix = geom.rayIntersectionConstrained(a, dir);
+      if ( ix ) return true;
+    }
+    return false;
   }
 
   // ----- NOTE: Drawing ----- //

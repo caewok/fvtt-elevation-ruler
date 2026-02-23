@@ -223,7 +223,7 @@ export class Patcher {
       try {
         const cl = eval?.(`"use strict";(${className})`);
         if ( typeof cl === "function" ) return returnPathString ? className : cl;
-      } catch(error) { /* empty */ } /* eslint-disable-line no-unused-vars */
+      } catch(error) { /* Empty */ } /* eslint-disable-line no-unused-vars */
     }
     console.error(`lookupByClassName|${className} not found`);
     return null;
@@ -486,16 +486,14 @@ export class LibWrapperPatch extends AbstractPatch {
  * @returns {string} The directory path
  */
 function lookup(className) {
-   const res = lookupRecursive(className);
-   if ( res ) return `foundry.${res}`;
- }
+  const res = lookupRecursive(className);
+  if ( res ) return `foundry.${res}`;
+}
 
- function lookupRecursive(className, dir = foundry) {
+function lookupRecursive(className, dir = foundry) {
   for ( const [key, obj] of Object.entries(dir) ) {
     // Skip CONFIG and CONST directories
     if ( key === "CONFIG" || key === "CONST" ) continue;
-    // console.log(`${key}: ${typeof obj}`, obj);
-
     switch ( typeof obj ) {
       case "function": {
         if ( obj.name === className ) return key;

@@ -243,13 +243,14 @@ export class Settings extends ModuleSettingsAbstract {
 
   // TODO: Update.
   static setTokenBlocksPathfinding(blockSetting) {
-//     blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
-//     BorderEdge.tokenBlockType = this._tokenBlockType(blockSetting);
-//
-//     registerSceneGraph(MODULE_ID, { tokensOnly: this.useTokensInPathfinding });
-//     if ( this.useTokensInPathfinding ) PATCHER.registerGroup("PATHFINDING_TOKENS");
-//     else PATCHER.deregisterGroup("PATHFINDING_TOKENS");
-//     Pathfinder.dirty = true;
+  // Still needed?
+  //     blockSetting ??= Settings.get(Settings.KEYS.PATHFINDING.TOKENS_BLOCK);
+  //     BorderEdge.tokenBlockType = this._tokenBlockType(blockSetting);
+  //
+  //     registerSceneGraph(MODULE_ID, { tokensOnly: this.useTokensInPathfinding });
+  //     if ( this.useTokensInPathfinding ) PATCHER.registerGroup("PATHFINDING_TOKENS");
+  //     else PATCHER.deregisterGroup("PATHFINDING_TOKENS");
+  //     Pathfinder.dirty = true;
   }
 
   static get useTokensInPathfinding() {

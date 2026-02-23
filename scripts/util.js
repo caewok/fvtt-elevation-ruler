@@ -301,8 +301,8 @@ export function tokenTopLeftFromCenter(token, center) {
     const shape = token.getShape();
     if ( shape.type === PIXI.SHAPES.POLY ) {
       const center = shape.center;
-      out.x -= (center.x * grid.sizeX);
-      out.y -= (center.y * grid.sizeY);
+      out.x -= (center.x * canvas.grid.sizeX);
+      out.y -= (center.y * canvas.grid.sizeY);
       return out;
     }
   }
