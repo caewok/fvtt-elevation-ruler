@@ -354,7 +354,9 @@ class AbstractGraph {
     if ( iter >= MAX_ITER ) {
       console.warn(`${this.constructor.name}|findPath stuck in loop.`, { startNode, goalNode });
     }
-    const path = reachedGoal ? this.constructor.reconstructPath(this._cameFrom, goalNode) : null;
+    if ( !reachedGoal ) return null;
+
+    const path = this.constructor.reconstructPath(this._cameFrom, goalNode);
     if ( !path.at(0).almostEqual(start) ) path.push(start); // World must handle checks between start and startNode.
     if ( !path.at(-1).almostEqual(goal) ) path.push(goal);  // World must handle checks between goal and goalNode.
     return path;
@@ -618,19 +620,19 @@ let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
-pf = new GriddedCollisionPathfinder(randal)
+pf = new WebGPUPathfinder(randal)
 
 let beiro = canvas.tokens.placeables.find(t => t.name === "Beiro")
 let riswynn = canvas.tokens.placeables.find(t => t.name === "Riswynn")
 start = GridCoordinates3d.fromObject(beiro.center)
 end = GridCoordinates3d.fromObject(riswynn.center)
-pf = new GriddedCollisionPathfinder(beiro)
+pf = new WebGPUPathfinder(beiro)
 
 let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
 let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 start = GridCoordinates3d.fromObject(akra.center)
 end = GridCoordinates3d.fromObject(perrin.center)
-pf = new GriddedCollisionPathfinder(akra)
+pf = new WebGPUPathfinder(akra)
 
 midE = (pf.token.topE - pf.token.bottomE) * 0.5;
 start.elevation += midE;
