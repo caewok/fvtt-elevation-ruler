@@ -8,7 +8,6 @@ PIXI,
 
 import { Draw } from "../geometry/Draw.js";
 import { Settings } from "../settings.js";
-import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { snapPathToGrid, optimizeGridPath, dropIntermediatePoints, straightenPath, pathIsValid } from "./path_cleaning.js";
 import { log } from "../util.js";
 
@@ -90,7 +89,7 @@ export class AbstractPathfinder {
    */
   async findPath(start, goal, signal = {}) {
     start = start.clone().roundDecimals();
-    goal = end.clone().roundDecimals();
+    goal = goal.clone().roundDecimals();
 
     if ( this.cachedPaths.has(goal.key) ) return this.cachedPaths.get(goal.key);
     if ( !(start || goal) || start.almostEqual(goal) ) return null;
@@ -174,7 +173,7 @@ export class AbstractPathfinder {
    */
   snapPathToGrid(path) {
     path = snapPathToGrid(path, this.token);
-    return optimizeGridPath(path, this.token) ;
+    return optimizeGridPath(path, this.token);
   }
 
   destroy() {
