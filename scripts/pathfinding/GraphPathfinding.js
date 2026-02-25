@@ -200,7 +200,7 @@ export class GraphPathfindingWorld {
    * @param {Node} goal
    * @returns {number}
    */
-  maxIterations(start, _goal) {
+  static maxIterations(start, _goal) {
     // Number of steps from start to the edge of the scene.
     // For a grid, 1 step is one grid square.
     const { sceneRect, size } = canvas.scene.dimensions;
@@ -331,7 +331,7 @@ class AbstractGraph {
     this._initializePathfindingRun(startNode);
 
     let iter = 0;
-    let MAX_ITER = 1e03; // this.world.maxIterations(start, goal) || 1e03;
+    let MAX_ITER = this.world.constructor.maxIterations(start, goal) || 1e03;
     let reachedGoal = false;
     if ( this.debug ) {
       this.world.drawNode(startNode, { color: Draw.COLORS.yellow });
@@ -642,7 +642,7 @@ end.elevation += midE;
 
 
 pf.debug = true
-pf.debugDelay = 1000;
+pf.debugDelay = 50;
 
 await pf.startPathfinding(start);
 path = await pf._findPath(start, end) // Skip caching
