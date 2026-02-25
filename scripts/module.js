@@ -30,6 +30,7 @@ import {
 import { GriddedCollisionPathfinder, worldBuilderGriddedCollision } from "./pathfinding/GriddedCollisionPathfinding.js";
 
 // ClockwiseSweep pathfinding
+import { ObstacleSweep, ClockwisePathfindingSweep } from "./pathfinding/ClockwiseSweep.js";
 import { ClockwiseSweepPathfinder, worldBuilderClockwise } from "./pathfinding/ClockwiseSweepPathfinding.js";
 
 // WebGPU pathfinding
@@ -145,7 +146,10 @@ Hooks.once("init", function() {
       worldBuilderGriddedCollision,
 
       ClockwiseSweepPathfinder,
-      worldBuilderClockwise
+      worldBuilderClockwise,
+
+      ObstacleSweep,
+      ClockwisePathfindingSweep,
     },
 
     pathCleaning: {
