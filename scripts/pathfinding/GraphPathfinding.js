@@ -361,7 +361,7 @@ class AbstractGraph {
         if ( !this._cameFrom.has(goalNode.key) ) this._cameFrom.set(goalNode.key, current); // CWSweep, for example, does not use current.key === goalNode.key.
         break;
       }
-      await this._processFrontierNeighbors(current, goalNode);
+      for ( const n of this.world.getNeighbors(current) ) this.processFrontierNeighbor(current, n, goal);
     }
 
     if ( iter >= MAX_ITER ) {
@@ -376,24 +376,13 @@ class AbstractGraph {
   }
 
   /**
-   * Asynchronously process all the neighbors for the current node of the frontier.
-   * Async so it can be stopped.
-   * @param {Point} current
-   */
-  async _processFrontierNeighbors(current, goal) {
-    const neighbors = this.world.getNeighbors(current);
-    const numNeighbors = neighbors.length;
-    const promises = Array(numNeighbors);
-    for ( let i = 0; i < numNeighbors; i += 1 ) {
-      promises.push(this._processFrontierNeighbor(current, neighbors[i], goal));
-    }
-    return Promise.allSettled(promises);
-  }
-
-  /**
    * Apply a given algorithm to process neighbors along the frontier.
+   * The child class should set the frontier and cameFrom map accoridngly.
+   * @param {Node} current          The current position
+   * @param {Node} next             The neighbor to consider
+   * @
    */
-  async _processFrontierNeighbor(_current, _next) { console.error("_processFrontierNeighbor must be defined by child class."); }
+  processFrontierNeighbor(_current, _next) { console.error("_processFrontierNeighbor must be defined by child class."); }
 
   /**
    * For a given goal, reconstruct the path to the beginning.
@@ -455,7 +444,7 @@ export class BFSGraph extends AbstractGraph {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  async _processFrontierNeighbor(current, next) {
+  processFrontierNeighbor(current, next) {
     if ( !this._cameFrom.has(next.key) ) {
       this._frontier.enqueue(next);
       this._cameFrom.set(next.key, current);
@@ -492,9 +481,11 @@ export class UniformCostGraph extends BFSGraph {
   }
 
   /**
-   * Apply a given algorithm to process neighbors along the frontier.
+   * Prioritize the neighbor based on cost and add to the
+   * @param {Node} current          The current position
+   * @param {Node} next             The neighbor to consider
    */
-  async _processFrontierNeighbor(current, next) {
+  processFrontierNeighbor(current, next) {
     const costSoFar = this._costSoFar;
     const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
@@ -535,7 +526,7 @@ export class GreedyBestFirstGraph extends BFSGraph {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  async _processFrontierNeighbor(current, next, goal) {
+  processFrontierNeighbor(current, next, goal) {
     if ( !this._cameFrom.has(next.key) ) {
       const priority = this.world.heuristic(next, goal);
       this._frontier.enqueue(next, priority);
@@ -575,16 +566,16 @@ export class AStarGraph extends UniformCostGraph {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  async _processFrontierNeighbor(current, next, goal) {
+  processFrontierNeighbor(current, next, goal) {
     const costSoFar = this._costSoFar;
     const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
       costSoFar.set(next.key, newCost);
+      this._cameFrom.set(next.key, current);
 
       // Priority = g(n) + h(n).
       const priority = newCost + this.world.heuristic(next, goal);
       this._frontier.enqueue(next, priority);
-      this._cameFrom.set(next.key, current);
     }
   }
 
@@ -655,6 +646,10 @@ end.elevation += midE;
 pf.debug = true
 pf.debugDelay = 50;
 
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion"
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "sceneGraph"
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "clockwiseSweep"
+
 await pf.startPathfinding(start);
 path = await pf._findPath(start, end) // Skip caching
 pf.constructor.drawPath(path)
@@ -703,6 +698,18 @@ pf.constructor.drawPath(gridPath, { color: Draw.COLORS.lightgreen, alpha: 0.5 })
 pf.constructor.drawPath(gridPath, { color: Draw.COLORS.green })
 
 gridPath.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
+
+ObstacleSweep = api.pathfinding.ObstacleSweep
+geom = ogre.GeometryLib.geometry
+dir = end.subtract(start)
+ix = start.projectToward(end, geom.rayIntersectionConstrained(start, dir))
+ixNode = pf.world.buildNode(ix)
+Draw.star(ixNode)
+neighbors = pf.world.getNeighbors(ixNode)
+
+sweep = new ObstacleSweep();
+addedEdges = ObstacleSweep.identifyBlockingTokenEdges(pf.token);
+addedEdges.forEach(edge => Draw.segment(edge))
 
 
 token = randal
