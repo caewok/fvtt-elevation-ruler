@@ -314,6 +314,9 @@ class AbstractGraph {
     this._cameFrom.set(start.key, null);
   }
 
+  // Use a Set to track "Closed" nodes (already fully processed)
+  closedSet = new Set();
+
   /**
    * Find the path between startPoint and endPoint using the chosen algorithm.
    * @param {Point} start       Start point for the graph
@@ -337,10 +340,18 @@ class AbstractGraph {
       this.world.drawNode(startNode, { color: Draw.COLORS.yellow });
       this.world.drawNode(goalNode, { color: Draw.COLORS.green });
     }
+
+    const closedSet = this.closedSet;
+    closedSet.clear();
     while ( this._frontier.length > 0 && iter < MAX_ITER ) {
       // if ( signal.aborted ) return null;
       iter += 1;
       const current = this._frontier.dequeue();
+
+      // If already processed, skip.
+      if ( closedSet.has(current.key) ) continue;
+      closedSet.add(current.key);
+
       if ( this.debug ) {
         if ( this.debugDelay ) await sleep(this.debugDelay);
         this.world.drawNode(current, { color: Draw.COLORS.blue, alpha: 0.2, radius: 3 });
