@@ -517,6 +517,7 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       case GD.ALTERNATING_1: return -1;
       case GD.ALTERNATING_2: return -2;
       case GD.ILLEGAL: return Number.POSITIVE_INFINITY;
+      default: return Math.SQRT2;
     }
   }
 }
