@@ -12,7 +12,7 @@ import { Point3d } from "../geometry/3d/Point3d.js";
 import { ObstacleOcclusionTest } from "../geometry/ObstacleOcclusionTest.js";
 import { GridCoordinates } from "../geometry/GridCoordinates.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
-import { mix, Mixin } from "../geometry/mixwith.js";
+import { mix } from "../geometry/mixwith.js";
 import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
 import { ObstacleSweep } from "./ClockwiseSweep.js";
 import { dropIntermediatePoints } from "./path_cleaning.js";
@@ -281,12 +281,19 @@ export const Neighbors3d = superclass => class extends superclass {
  * algorithm to use.
  * @returns {AbstractGridPathfindingWorld}
  */
+
+// Simple cache of the collision world classes, to facilitate instanceof for the world class.
+const worldClassCache = new Map();
+
 export function worldBuilderGriddedCollision({ cost, use3d, heuristic, neighborFilter } = {}) {
   const pathCfg = CONFIG[MODULE_ID].graphPathfinding;
   use3d ??= pathCfg.use3d ?? false;
   cost ||= pathCfg.cost || "euclidean";
   heuristic ||= pathCfg.heuristic || "euclidean";
   neighborFilter ||= pathCfg.neighborFilter || "occlusion";
+
+  const key = [cost, use3d, heuristic, neighborFilter].join(".");
+  if ( worldClassCache.has(key) ) return worldClassCache.get(key);
 
   let costCl;
   let heuristicCl;
@@ -315,6 +322,7 @@ export function worldBuilderGriddedCollision({ cost, use3d, heuristic, neighborF
   }
 
   const classes = [nodeCl, costCl, heuristicCl, neighborsCl, neighborFilterCl];
-  // return mix(AbstractGridPathfindingWorld).with(...classes, Mixin); // Mixin caches the classes.
-  return mix(GraphPathfindingWorld).with(...classes);
+  const out = mix(GraphPathfindingWorld).with(...classes);
+  worldClassCache.set(key, out);
+  return out;
 }

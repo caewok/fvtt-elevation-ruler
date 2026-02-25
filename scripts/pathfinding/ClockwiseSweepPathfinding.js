@@ -11,7 +11,7 @@ import { ElevatedPoint } from "../geometry/3d/ElevatedPoint.js";
 import { Draw } from "../geometry/Draw.js";
 import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
 import { ClockwisePathfindingSweep } from "./ClockwiseSweep.js";
-import { mix, Mixin } from "../geometry/mixwith.js";
+import { mix } from "../geometry/mixwith.js";
 import {
   Manhattan2dCost,
   Manhattan3dCost,
@@ -366,11 +366,17 @@ function randomColor() {
  * algorithm to use.
  * @returns {AbstractGridPathfindingWorld}
  */
+// Simple cache of the collision world classes, to facilitate instanceof for the world class.
+const worldClassCache = new Map();
+
 export function worldBuilderClockwise({ cost, use3d, heuristic } = {}) {
   const pathCfg = CONFIG[MODULE_ID].graphPathfinding;
   use3d ??= pathCfg.use3d;
   cost ??= pathCfg.cost;
   heuristic ??= pathCfg.heuristic;
+
+  const key = [cost, use3d, heuristic, neighborFilter].join(".");
+  if ( worldClassCache.has(key) ) return worldClassCache.get(key);
 
   let costCl;
   let heuristicCl;
@@ -388,8 +394,9 @@ export function worldBuilderClockwise({ cost, use3d, heuristic } = {}) {
   }
 
   const classes = [costCl, heuristicCl];
-  // return mix(AbstractGridPathfindingWorld).with(...classes, Mixin); // Mixin caches the classes.
-  return mix(ClockwiseSweepPathfindingWorld).with(...classes);
+  const out = mix(ClockwiseSweepPathfindingWorld).with(...classes);
+  worldClassCache.set(key, out);
+  return out;
 }
 
 /** Testing

@@ -75,6 +75,8 @@ export class GraphingPathfinder extends AbstractPathfinder {
    * @param {Point3d} start
    */
   startPathfinding(start) {
+    // Reset the world if necessary.
+    if ( !(this.world instanceof this.constructor.worldClass) ) this.#world = null;
     super.startPathfinding(start);
 
     // Set up world
