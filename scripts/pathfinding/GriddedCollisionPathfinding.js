@@ -12,7 +12,7 @@ import { Point3d } from "../geometry/3d/Point3d.js";
 import { ObstacleOcclusionTest } from "../geometry/ObstacleOcclusionTest.js";
 import { GridCoordinates } from "../geometry/GridCoordinates.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
-import { mix, Mixin } from "../geometry/mixwith.js";
+import { mix } from "../geometry/mixwith.js";
 import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
 import { ObstacleSweep } from "./ClockwiseSweep.js";
 import { dropIntermediatePoints } from "./path_cleaning.js";
@@ -80,7 +80,6 @@ export class GriddedCollisionPathfinder extends GraphingPathfinder {
 
 
 // ----- NOTE: Node construction ----- //
-
 export const Node = superclass => class extends superclass {
   buildNode(pt) {
     const gridPt = GridCoordinates3d.fromObject(pt);
@@ -101,6 +100,63 @@ export const Node = superclass => class extends superclass {
    */
   // The buildNode method provides an appropriate goalNode that can connect to goal.
   reachedGoal(current, goalNode) { return current.offsetsEqual(goalNode); }
+};
+
+export const NodeGridless = superclass => class extends superclass {
+  resolution = canvas.grid.size >= 128 ? 8 : (canvas.grid.size >= 64 ? 4 : 2);
+
+  neighborOffset = canvas.grid.size / this.resolution;
+
+  // See SquareGrid##snapToCenter
+  snapTo2dCenter(pt) {
+    const s = canvas.grid.size / this.resolution;
+    const t = canvas.grid.size / 2;
+    pt.x = (Math.round((pt.x - t) / s) * s) + t;
+    pt.y = (Math.round((pt.y - t) / s) * s) + t;
+    return pt;
+  }
+
+  buildNode(pt) {
+    const gridPt = GridCoordinates3d.fromObject(pt);
+    this.snapTo2dCenter(gridPt);
+    if ( gridPt.almostEqualXY(pt) ) return gridPt;
+
+    // Don't walk through blocking obstacles.
+    const validNeighbors = this.filterNeighbors([gridPt], pt);
+    if ( !validNeighbors.length ) return pt;
+    return gridPt;
+  }
+
+  // Do not need reachedGoal b/c just matching key.s
+};
+
+export const NodeGridless3d = superclass => class extends superclass {
+  resolution = canvas.grid.size >= 128 ? 8 : (canvas.grid.size >= 64 ? 4 : 2);
+
+  neighborOffset = canvas.grid.size / this.resolution;
+
+  // See SquareGrid##snapToCenter
+  snapTo3dCenter(pt) {
+    const s = canvas.grid.size / this.resolution;
+    const t = canvas.grid.size / 2;
+    pt.x = (Math.round((pt.x - t) / s) * s) + t;
+    pt.y = (Math.round((pt.y - t) / s) * s) + t;
+    pt.z = (Math.round((pt.z - t) / s) * s) + t;
+    return pt;
+  }
+
+  buildNode(pt) {
+    const gridPt = GridCoordinates3d.fromObject(pt);
+    this.snapTo3dCenter(gridPt);
+    if ( gridPt.almostEqual(pt) ) return gridPt;
+
+    // Don't walk through blocking obstacles.
+    const validNeighbors = this.filterNeighbors([gridPt], pt);
+    if ( !validNeighbors.length ) return pt;
+    return gridPt;
+  }
+
+  // Note: reachedGoal is just matching keys.
 };
 
 // ----- NOTE: Filter Neighbors ----- //
@@ -249,6 +305,62 @@ export const Neighbors2d = superclass => class extends superclass {
   }
 };
 
+/**
+ * Gridless neighbor selection.
+ * canvas.grid.getAdjacentOffsets returns [] on gridless maps.
+ */
+export const Neighbors2dGridless = superclass => class extends superclass {
+
+  /* https://foundryvtt.com/article/walls/
+  50px grids have 1/4 precision (5 snap points per grid unit).
+  100px grids have 1/8 precision (9 snap points per grid unit)
+  200px grids have 1/16 precision (17 snap points per grid unit)
+
+  See canvas.walls.getSnappedPoint
+  size = canvas.dimensions.size
+  size >= 128 ? 8 : (size >= 64 ? 4 : 2)
+
+  If canvas size is 100, resolution of 2 / 100 divides a grid square into two portions.
+  Approximately:
+  |ww••••ww|ww••••ww| <-- Forces path to be in middle of grid or get blocked.
+
+  As wall positions increase, resolution must be incremented by 2. E.g., 4 /100:
+  |w••ww••w|w••ww••w|
+
+  See WebGPUPathfinding.
+  < 64: 2
+  >= 64: 4
+  >= 128: 8
+  */
+
+  static neighborsDelta = [
+    { dx: 0, dy: 1 },
+    { dx: 0, dy: -1 },
+    { dx: 1, dy: 0 },
+    { dx: -1, dy: 0 },
+
+    { dx: 1, dy: 1 },
+    { dx: 1, dy: -1 },
+    { dx: -1, dy: 1 },
+    { dx: -1, dy: -1 },
+  ];
+
+  adjacentOffsets(node) {
+    const out = Array(8);
+    let i = 0;
+    for ( const { dx, dy } of this.constructor.neighborsDelta ) {
+      const offsetPt = node.constructor.tmp.set(
+        node.x + (dx * this.neighborOffset),
+        node.y + (dy * this.neighborOffset),
+        node.z
+      );
+      this.snapTo2dCenter(offsetPt);
+      out[i++] = offsetPt;
+    }
+    return out;
+  }
+};
+
 export const Neighbors3d = superclass => class extends superclass {
 
   config = {
@@ -271,6 +383,70 @@ export const Neighbors3d = superclass => class extends superclass {
   }
 };
 
+export const Neighbors3dGridless = superclass => class extends superclass {
+
+  config = {
+    ...super.config,
+    maxZ: 0,
+    minZ: 0,
+  };
+
+  static neighborsDelta = [
+    { dx: 0, dy: 1, dz: 0 },
+    { dx: 0, dy: -1, dz: 0 },
+    { dx: 1, dy: 0, dz: 0 },
+    { dx: -1, dy: 0, dz: 0 },
+
+    { dx: 1, dy: 1, dz: 0 },
+    { dx: 1, dy: -1, dz: 0 },
+    { dx: -1, dy: 1, dz: 0 },
+    { dx: -1, dy: -1, dz: 0 },
+
+    { dx: 0, dy: 1, dz: 1 },
+    { dx: 0, dy: -1, dz: 1 },
+    { dx: 1, dy: 0, dz: 1 },
+    { dx: -1, dy: 0, dz: 1 },
+
+    { dx: 1, dy: 1, dz: 1 },
+    { dx: 1, dy: -1, dz: 1 },
+    { dx: -1, dy: 1, dz: 1 },
+    { dx: -1, dy: -1, dz: 1 },
+
+    { dx: 0, dy: 1, dz: -1 },
+    { dx: 0, dy: -1, dz: -1 },
+    { dx: 1, dy: 0, dz: -1 },
+    { dx: -1, dy: 0, dz: -1 },
+
+    { dx: 1, dy: 1, dz: -1 },
+    { dx: 1, dy: -1, dz: -1 },
+    { dx: -1, dy: 1, dz: -1 },
+    { dx: -1, dy: -1, dz: -1 },
+  ];
+
+  initialize(token) {
+    const res = this.constructor.zMaxMin();
+    this.config.maxZ = res.max;
+    this.config.minZ = res.min;
+    super.initialize(token);
+  }
+
+  adjacentOffsets(node) {
+    const out = Array(8);
+    let i = 0;
+    for ( const { dx, dy, dz } of this.constructor.neighborsDelta ) {
+      const offsetPt = node.constructor.tmp.set(
+        node.x + (dx * this.neighborOffset),
+        node.y + (dy * this.neighborOffset),
+        node.z + (dz * this.neighborOffset),
+      );
+      offsetPt.z = Math.max(Math.min(offsetPt.z, this.config.maxZ), this.config.minZ);
+      this.snapTo3dCenter(offsetPt);
+      out[i++] = offsetPt;
+    }
+    return out;
+  }
+};
+
 // ---- NOTE: World builder ----- //
 
 // TODO: Eventually tie this to Settings or CONFIG and rebuild the class only when settings/CONFIG change.
@@ -281,6 +457,10 @@ export const Neighbors3d = superclass => class extends superclass {
  * algorithm to use.
  * @returns {AbstractGridPathfindingWorld}
  */
+
+// Simple cache of the collision world classes, to facilitate instanceof for the world class.
+const worldClassCache = new Map();
+
 export function worldBuilderGriddedCollision({ cost, use3d, heuristic, neighborFilter } = {}) {
   const pathCfg = CONFIG[MODULE_ID].graphPathfinding;
   use3d ??= pathCfg.use3d ?? false;
@@ -288,14 +468,23 @@ export function worldBuilderGriddedCollision({ cost, use3d, heuristic, neighborF
   heuristic ||= pathCfg.heuristic || "euclidean";
   neighborFilter ||= pathCfg.neighborFilter || "occlusion";
 
+  const key = [cost, use3d, heuristic, neighborFilter].join(".");
+  if ( worldClassCache.has(key) ) return worldClassCache.get(key);
+
   let costCl;
   let heuristicCl;
   let nodeCl;
   let neighborFilterCl;
   let neighborsCl;
 
-  nodeCl = Node;
-  neighborsCl = use3d ? Neighbors3d : Neighbors2d;
+  if ( canvas.grid.isGridless ) {
+    nodeCl = use3d ? NodeGridless3d : NodeGridless;
+    neighborsCl = use3d ? Neighbors3dGridless : Neighbors2dGridless;
+  } else {
+    nodeCl = Node;
+    neighborsCl = use3d ? Neighbors3d : Neighbors2d;
+  }
+
   switch ( cost ) {
     case "manhattan": costCl = use3d ? Manhattan3dCost : Manhattan2dCost; break;
     case "euclidean": costCl = use3d ? Euclidean3dCost : Euclidean2dCost; break;
@@ -315,6 +504,7 @@ export function worldBuilderGriddedCollision({ cost, use3d, heuristic, neighborF
   }
 
   const classes = [nodeCl, costCl, heuristicCl, neighborsCl, neighborFilterCl];
-  // return mix(AbstractGridPathfindingWorld).with(...classes, Mixin); // Mixin caches the classes.
-  return mix(GraphPathfindingWorld).with(...classes);
+  const out = mix(GraphPathfindingWorld).with(...classes);
+  worldClassCache.set(key, out);
+  return out;
 }

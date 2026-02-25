@@ -75,6 +75,8 @@ export class GraphingPathfinder extends AbstractPathfinder {
    * @param {Point3d} start
    */
   startPathfinding(start) {
+    // Reset the world if necessary.
+    if ( !(this.world instanceof this.constructor.worldClass) ) this.#world = null;
     super.startPathfinding(start);
 
     // Set up world
@@ -357,7 +359,7 @@ class AbstractGraph {
     if ( !reachedGoal ) return null;
 
     const path = this.constructor.reconstructPath(this._cameFrom, goalNode);
-    if ( !path.at(0).almostEqual(start) ) path.push(start); // World must handle checks between start and startNode.
+    if ( !path.at(0).almostEqual(start) ) path.unshift(start); // World must handle checks between start and startNode.
     if ( !path.at(-1).almostEqual(goal) ) path.push(goal);  // World must handle checks between goal and goalNode.
     return path;
   }
@@ -620,19 +622,19 @@ let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
-pf = new WebGPUPathfinder(randal)
+pf = new GriddedCollisionPathfinder(randal)
 
 let beiro = canvas.tokens.placeables.find(t => t.name === "Beiro")
 let riswynn = canvas.tokens.placeables.find(t => t.name === "Riswynn")
 start = GridCoordinates3d.fromObject(beiro.center)
 end = GridCoordinates3d.fromObject(riswynn.center)
-pf = new WebGPUPathfinder(beiro)
+pf = new GriddedCollisionPathfinder(beiro)
 
 let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
 let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 start = GridCoordinates3d.fromObject(akra.center)
 end = GridCoordinates3d.fromObject(perrin.center)
-pf = new WebGPUPathfinder(akra)
+pf = new GriddedCollisionPathfinder(akra)
 
 midE = (pf.token.topE - pf.token.bottomE) * 0.5;
 start.elevation += midE;
