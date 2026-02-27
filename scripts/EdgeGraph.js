@@ -1,6 +1,5 @@
 /* globals
 canvas,
-CanvasQuadtree,
 CONFIG,
 CONST,
 foundry,
@@ -17,6 +16,7 @@ import { Settings } from "./settings.js";
 import { segmentBounds } from "./util.js";
 import { almostLessThan } from "./geometry/util.js";
 import { Draw } from "./geometry/Draw.js";
+import { ObstacleOcclusionTest } from "./geometry/ObstacleOcclusionTest.js";
 
 /** @type {number} */
 const EPSILON = 1e-06; // Precision tolerance.
@@ -211,6 +211,7 @@ class HalfEdge {
    * Could edges of this token block the moving token?
    * @param {Token} token             Token whose edges will be tested
    * @param {Token} moveToken         Token doing the move
+   * @param {TokenBlockingConfig}
    * @returns {boolean}
    */
   static tokenBlocks(token, moveToken) {
@@ -219,46 +220,18 @@ class HalfEdge {
     const tokensBlock = Settings.get(PF.TOKENS_BLOCK);
     if ( tokensBlock === PF.TOKENS_BLOCK_CHOICES.NO ) return false;
 
-    // Don't block hidden tokens.
-    if ( token.document.hidden ) return false;
-
-    // Don't block oneself.
-    if ( !moveToken || moveToken === token ) return false;
-
-    // Don't block dead tokens (HP <= 0).
-    const { tokenHPAttribute, pathfindingIgnoreStatuses } = CONFIG[MODULE_ID];
-    let tokenHP = Number(foundry.utils.getProperty(token, tokenHPAttribute));
-
-    // DemonLord using damage system
-    if ( game.system.id === "demonlord") {
-      let health = Number(foundry.utils.getProperty(token, "actor.system.characteristics.health.max"));
-      let damage = Number(foundry.utils.getProperty(token, "actor.system.characteristics.health.value"));
-      tokenHP = health - damage;
-    }
-
-    if ( Number.isFinite(tokenHP) && tokenHP <= 0 ) return false;
-
-    // Don't block tokens with certain status.
-    if ( token.actor?.statuses && token.actor.statuses.intersects(pathfindingIgnoreStatuses) ) return false;
-
-    // Don't block tokens that share specific disposition with the moving token.
-    if ( tokensBlock === PF.TOKENS_BLOCK_CHOICES.HOSTILE ) {
-      // Hostile: Block if dispositions are secret or hostile/friendly. Neutrals do nothing.
-      const D = CONST.TOKEN_DISPOSITIONS;
-      const moveTokenD = moveToken.document.disposition;
-      const edgeTokenD = token.document.disposition;
-
-      // Looking for reasons not to block.
-      if ( moveTokenD === edgeTokenD ) return false;
-      if ( moveTokenD === D.NEUTRAL || edgeTokenD === D.NEUTRAL ) return false;
-
-      // At this point, either:
-      // 1. Either token is secret; or
-      // 2. One token is hostile and the other is friendly.
-    }
-
-    // At this point, the tokens block setting is ALL.
-    return true;
+    // Set up the blocking configuration.
+    const excludedStatuses = CONFIG[MODULE_ID].pathfindingIgnoreStatuses;
+    const { dead, live, prone } = CONFIG[MODULE_ID].tokensBlock;
+    const blockingCfg = {
+      dead,
+      live,
+      prone,
+      enemies: true, // Per above, TOKENS_BLOCK_CHOICES must be HOSTILE or ALL
+      allies: tokensBlock === PF.TOKENS_BLOCK_CHOICES.ALL,
+      excludedStatuses,
+    };
+    return ObstacleOcclusionTest.tokenBlocks(token, moveToken, blockingCfg);
   }
 }
 
@@ -358,7 +331,7 @@ export class EdgeGraph {
   faces = [];
 
   /** @type {CanvasQuadtree} */
-  quadtree = new CanvasQuadtree();
+  quadtree = new foundry.canvas.geometry.CanvasQuadtree();
 
   // ----- NOTE: Static factory methods ----- //
 

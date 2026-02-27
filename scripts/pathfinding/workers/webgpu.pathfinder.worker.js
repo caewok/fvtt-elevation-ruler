@@ -1151,14 +1151,22 @@ class GPUTerrainMap {
   }
 
   /** Helper to create index buffers */
+
+  /**
+   * @param {Uint16Array|Uint32Array} data
+   * @returns {ArrayBuffer}
+   */
   _createIndexBuffer(data) {
+    // Calculate the aligned size (round up to nearest multiple of 4)
+    // Indices must be Uint32 or Uint16
+    const alignedSize = (data.byteLength + 3) & ~3;
+
     const buffer = this.device.createBuffer({
-      size: data.byteLength,
+      size: alignedSize,
       usage: GPUBufferUsage.INDEX,
       mappedAtCreation: true,
     });
-    // Indices must be Uint32 or Uint16
-    new Uint16Array(buffer.getMappedRange()).set(data);
+    new data.constructor(buffer.getMappedRange()).set(data);
     buffer.unmap();
     return buffer;
   }

@@ -396,7 +396,7 @@ export function worldBuilderClockwise({ cost, use3d, heuristic } = {}) {
   cost ??= pathCfg.cost;
   heuristic ??= pathCfg.heuristic;
 
-  const key = [cost, use3d, heuristic, neighborFilter].join(".");
+  const key = [cost, use3d, heuristic].join(".");
   if ( worldClassCache.has(key) ) return worldClassCache.get(key);
 
   let costCl;

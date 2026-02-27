@@ -15,7 +15,7 @@ import { MODULE_ID, TEMPLATES } from "./const.js";
 import { log, gridShape } from "./util.js";
 
 // Pathfinding
-import { benchPathfinding } from "./pathfinding/benchmark.js";
+import { benchTokenPath } from "./pathfinding/benchmark.js";
 
 import { AbstractPathfinder } from "./pathfinding/AbstractPathfinder.js";
 import {
@@ -62,13 +62,6 @@ Hooks.once("init", function() {
   CONFIG[MODULE_ID] = {
 
     /**
-     * Account for terrains/tokens in pathfinding.
-     * Can be a serious performance hit.
-     * @type {boolean}
-     */
-    pathfindingCheckTerrains: false,
-
-    /**
      * ID of Token statuses to ignore when pathfinding.
      * @type {Set<string>}
      */
@@ -92,12 +85,16 @@ Hooks.once("init", function() {
      */
     tokenPathfindingBuffer: -1,
 
-
     /**
-     * Use pathfinding in 3d, which can be slow.
-     * @type {boolean}
+     * More refined options of what type of tokens block if the tokens block setting
+     * is chosen for pathfinding.
+     * @type {TokenBlockingConfig}
      */
-    use3dPathfinding: false,
+    tokensBlock: {
+      dead: true,
+      live: true,
+      prone: true,
+    },
 
     /**
      * @type {
@@ -131,7 +128,7 @@ Hooks.once("init", function() {
     PATCHER,
 
     pathfinding: {
-      benchPathfinding,
+      benchTokenPath,
 
       AbstractPathfinder,
       BFSGraph,

@@ -1,43 +1,89 @@
 /* globals
-
+CONFIG,
+game,
+Token,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
-import { QBenchmarkLoopFn } from "./benchmark_functions.js";
+import { MODULE_ID } from "../const.js";
+import { QBenchmarkLoopFn } from "../geometry/benchmark.js";
 import { randomPoint } from "./random.js";
+import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 
-// Methods to benchmark pathfinding.
+/**
+ * Bench all pathfinding for a token and an endpoint.
+ * @param {Point3d|token} start     If token, used as starting point
+ * @param {Point3d|token} end       If token, will take the center
+ * @param [opts]
+ * @param {number} N                Number of benchmarks per algorithm
+ * @param {Token} moveToken             Token, if not passed as the start
+ */
+export async function benchTokenPath(startOrToken, endOrToken, { N = 10, moveToken } = {}) {
+  const { start, end, token } = getPathCoordinates(startOrToken, endOrToken, moveToken);
+  const api = game.modules.get(MODULE_ID).api;
+  const { ClockwiseSweepPathfinder, GriddedCollisionPathfinder, WebGPUPathfinder } = api.pathfinding;
+  console.log(`Testing pathfinding for ${token.name} from ${start} --> ${end}.`);
+  const pathfind = async (pf, type) => {
+    const description = type ? `${pf.constructor.name}|${type}` : pf.constructor.name;
+    await pf.startPathfinding(start);
+    await QBenchmarkLoopFn(N, pf._findPath.bind(pf), description, start, end);
+  };
 
-/* Use
-api = game.modules.get("elevationruler").api;
+  // GriddedCollisionPathfinder
+  let pf = new GriddedCollisionPathfinder(token);
+  const neighborFilter = CONFIG.elevationruler.graphPathfinding.neighborFilter;
 
-N = 1000
-await api.pathfinding.benchPathfinding(N)
+  // GriddedCollisionPathfinder|occlusion
+  let type = "occlusion";
+  CONFIG.elevationruler.graphPathfinding.neighborFilter = type;
+  await pathfind(pf, type);
 
+  // GriddedCollisionPathfinder|occlusion
+  type = "sceneGraph";
+  CONFIG.elevationruler.graphPathfinding.neighborFilter = type;
+  await pathfind(pf, type);
 
-*/
-// TODO: Fix.
-export async function benchPathfinding(nPaths = 100, type = "all", nIterations = 10) {
-  Pathfinder.initialize(); // TODO: Only needed until wall updating is fixed.
-  const token = canvas.tokens.controlled[0];
-  // const pf = new Pathfinder(token);
+  // GriddedCollisionPathfinder|occlusion
+  type = "clockwiseSweep";
+  CONFIG.elevationruler.graphPathfinding.neighborFilter = type;
+  await pathfind(pf, type);
 
-  let message = `Testing pathfinding for ${nPaths} random start/end locations.`;
-  if ( token ) message += ` Using size of ${token.name} token.`;
-  console.log(message);
+  // Reset settings for graphPathfinding.
+  CONFIG.elevationruler.graphPathfinding.neighborFilter = neighborFilter;
 
-  const startPoints = Array.fromRange(nPaths).map(elem => randomPoint());
-  const endPoints = Array.fromRange(nPaths).map(elem => randomPoint());
+  // ClockwisePathfinder
+  pf = new ClockwiseSweepPathfinder(token);
+  await pathfind(pf);
 
-  // const types = type === "all" ? Object.keys(Pathfinder.ALGORITHMS) : type;
-  for ( const type of types ) await QBenchmarkLoopFn(nIterations, benchPointSet, type, pf, type, startPoints, endPoints);
+  // WebGPUPathfinder
+  await WebGPUPathfinder.initialize();
+  pf = new WebGPUPathfinder(token);
+  await pathfind(pf);
 }
 
-// function benchPointSet(pf, type, startPoints, endPoints) {
-//   const nPoints = startPoints.length;
-//   for ( let i = 0; i < nPoints; i += 1 ) {
-//     pf.runPath(startPoints[i], endPoints[i], "breadth");
-//   }
-// }
+function getPathCoordinates(startOrToken, endOrToken, token) {
+  if ( startOrToken instanceof foundry.canvas.placeables.Token ) token ??= startOrToken;
+  if ( !token ) throw Error("benchTokenPath requires a valid token.");
+  const midZ = (token.topZ - token.bottomZ) * 0.5;
 
+  let start;
+  let end;
+  if ( startOrToken instanceof foundry.canvas.placeables.Token ) start = GridCoordinates3d.fromTokenCenter(token);
+  else {
+    start = GridCoordinates3d.fromObject(startOrToken);
+    if ( !(Object.hasOwn(startOrToken, "z")
+        || Object.hasOwn(startOrToken, "elevation")) ) start.z = midZ;
+  }
+  if ( endOrToken instanceof foundry.canvas.placeables.Token ) end = GridCoordinates3d.fromTokenCenter(endOrToken);
+  else {
+    end = GridCoordinates3d.fromObject(endOrToken);
+    if ( !(Object.hasOwn(endOrToken, "z")
+        || Object.hasOwn(endOrToken, "elevation")) ) end.z = midZ;
+  }
 
+  if ( start.elevation !== end.elevation || !start.elevation ) {
+    console.warn(`Starting elevation is ${start.elevation} and ending elevation is ${end.elevation}.`);
+  }
+
+  return { start, end, token };
+}

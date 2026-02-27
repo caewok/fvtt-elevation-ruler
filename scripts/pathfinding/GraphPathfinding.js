@@ -364,12 +364,15 @@ class AbstractGraph {
       for ( const n of this.world.getNeighbors(current) ) this.processFrontierNeighbor(current, n, goal);
     }
 
-    if ( iter >= MAX_ITER ) {
-      console.warn(`${this.constructor.name}|findPath stuck in loop.`, { startNode, goalNode });
+    if ( !reachedGoal ) {
+      if ( iter >= MAX_ITER ) console.warn(`${this.constructor.name}|findPath stuck in loop.`, { startNode, goalNode });
+      if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: No path after examining ${closedSet.size} nodes over ${iter} iterations.`);
+      return null;
     }
-    if ( !reachedGoal ) return null;
 
     const path = this.constructor.reconstructPath(this._cameFrom, goalNode);
+    if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: Found ${path?.length} path by examining ${closedSet.size} nodes over ${iter} iterations.`);
+
     if ( !path.at(0).almostEqual(start) ) path.unshift(start); // World must handle checks between start and startNode.
     if ( !path.at(-1).almostEqual(goal) ) path.push(goal);  // World must handle checks between goal and goalNode.
     return path;
@@ -617,8 +620,10 @@ let { solveSegment,
       removeDuplicatePoints,
       fogIsExplored,
 } = api.pathCleaning
+benchTokenPath = api.pathfinding.benchTokenPath
 
 await WebGPUPathfinder.initialize();
+
 
 let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
@@ -643,6 +648,31 @@ start.elevation += midE;
 end.elevation += midE;
 
 
+await benchTokenPath(randal, zanna.center, { N: 3 });
+await benchTokenPath(beiro, riswynn.center, { N: 3 });
+await benchTokenPath(akra, perrin.center, { N: 3 });
+
+// Benchmark collision testing
+QBenchmarkLoopFn = CONFIG.GeometryLib.lib.bench.QBenchmarkLoopFn
+N = 1000
+
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion"
+await pf.startPathfinding(start);
+pf.world.testCollision(start, end, pf.token);
+await QBenchmarkLoopFn(N, pf.world.testCollision.bind(pf.world), "occlusion", start, end, pf.token)
+
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "sceneGraph"
+await pf.startPathfinding(start);
+pf.world.testCollision(start, end, pf.token);
+await QBenchmarkLoopFn(N, pf.world.testCollision.bind(pf.world), "sceneGraph", start, end, pf.token)
+
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "clockwiseSweep"
+await pf.startPathfinding(start);
+pf.world.testCollision(start, end, pf.token);
+pf.world.testCollision2(start, end, pf.token);
+await QBenchmarkLoopFn(N, pf.world.testCollision.bind(pf.world), "clockwiseSweep", start, end, pf.token)
+await QBenchmarkLoopFn(N, pf.world.testCollision2.bind(pf.world), "foundry sweep", start, end, pf.token)
+
 pf.debug = true
 pf.debugDelay = 50;
 
@@ -650,8 +680,10 @@ CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion"
 CONFIG.elevationruler.graphPathfinding.neighborFilter = "sceneGraph"
 CONFIG.elevationruler.graphPathfinding.neighborFilter = "clockwiseSweep"
 
-await pf.startPathfinding(start);
+
+console.time("Pathfinding")
 path = await pf._findPath(start, end) // Skip caching
+console.timeEnd("Pathfinding")
 pf.constructor.drawPath(path)
 pathIsValid(path, pf.token)
 pf.validatePath(path, start, end)

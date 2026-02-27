@@ -23,10 +23,11 @@ export class ObstacleSweep extends foundry.canvas.geometry.ClockwiseSweepPolygon
   _identifyEdges() {
     super._identifyEdges();
     if ( !this.config.addedEdges ) return;
-    const aabb = AABB2d.fromRectangle(this.config.boundingBox);
+
+    // Include only edges that intersect the bounding box.
+    const bbox = this.config.boundingBox;
     for ( const edge of this.config.addedEdges ) {
-      if ( !aabb.overlapsEdge(edge) ) continue;
-      this.edges.add(edge);
+      if ( bbox.lineSegmentIntersects(edge.a, edge.b, { inside: true }) ) this.edges.add(edge);
     }
   }
 
