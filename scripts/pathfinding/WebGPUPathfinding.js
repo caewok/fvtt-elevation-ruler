@@ -14,7 +14,13 @@ import { AbstractPathfinder } from "./AbstractPathfinder.js";
 import { GEOMETRY_LIB_ID, GEOMETRY_ID } from "../geometry/const.js";
 import { Settings } from "../settings.js";
 import { combineTypedArrays } from "../geometry/util.js";
-import { HorizontalQuadVertices, Polygon3dVertices } from "../geometry/placeable_geometry/BasicVertices.js";
+import {
+  HorizontalQuadVertices,
+  Polygon3dVertices,
+  Ellipse3dVertices,
+  Circle3dVertices,
+  Hex3dVertices,
+} from "../geometry/placeable_geometry/BasicVertices.js";
 import { VertexObject } from "../geometry/placeable_geometry/GeometryDesc.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix } from "../geometry/mixwith.js";
@@ -98,7 +104,7 @@ const GPUTerrainMixin = superclass => class extends superclass {
    * @returns {Float32Array}
    */
   static convertTokenEdgesToFlatArray(tokens) {
-    const edges = tokens.flatMap(t => [...t.constrainedTokenBorder.iterateEdges( { close: true })])
+    const edges = tokens.flatMap(t => [...t.constrainedTokenBorder.iterateEdges( { close: true })]);
     return this.convertEdgesToFlatArray(edges);
   }
 
@@ -130,7 +136,38 @@ const GPUTerrainMixin = superclass => class extends superclass {
       return vo;
     }
 
-    vo.vertices = HorizontalQuadVertices.top;
+    if ( CONFIG[GEOMETRY_LIB_ID].CONFIG.useTokenSphere ) {
+      // Assume for now that we would run into the largest part of the sphere radius.
+      // This might be reasonable for two colliding tokens, plus simpler for pathfinding.
+      // Same treatment as ellipse.
+      const { width, height } = token.document;
+      const zHeight = (token.topZ - token.bottomZ) / canvas.dimensions.size;
+      const density = Circle3dVertices.defaultDensityForDimensions(width, height, zHeight);
+      vo.vertices = Circle3dVertices.polygonTopFace(undefined, { density });
+
+    } else {
+      const SHAPES = CONST.TOKEN_SHAPES;
+      switch ( token.document.shape ) {
+        case SHAPES.ELLIPSE_1:
+        case SHAPES.ELLIPSE_2: {
+          const { width, height } = token.document;
+          const zHeight = (token.topZ - token.bottomZ) / canvas.dimensions.size;
+          const density = Ellipse3dVertices.defaultDensityForDimensions(width, height, zHeight);
+          vo.vertices = Ellipse3dVertices.polygonTopFace(undefined, { density });
+          break;
+        }
+
+        case SHAPES.RECTANGLE_1:
+        case SHAPES.RECTANGLE_2: vo.vertices = HorizontalQuadVertices.top; break;
+
+        case SHAPES.TRAPEZOID_1:
+        case SHAPES.TRAPEZOID_2: {
+          const shape = Hex3dVertices.hexagonalShapeForToken(token);
+          vo.vertices = Polygon3dVertices._polygonTopFaceFan(shape, { topZ: 0.5 });
+        }
+      }
+    }
+
     vo.hasNormals = true;
     vo.hasUVs = true;
     vo.dropNormalsAndUVs({ out: vo });

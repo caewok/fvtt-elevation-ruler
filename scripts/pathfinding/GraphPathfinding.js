@@ -629,13 +629,13 @@ let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
-pf = new GriddedCollisionPathfinder(randal)
+pf = new WebGPUPathfinder(randal)
 
 let beiro = canvas.tokens.placeables.find(t => t.name === "Beiro")
 let riswynn = canvas.tokens.placeables.find(t => t.name === "Riswynn")
 start = GridCoordinates3d.fromObject(beiro.center)
 end = GridCoordinates3d.fromObject(riswynn.center)
-pf = new GriddedCollisionPathfinder(beiro)
+pf = new ClockwiseSweepPathfinder(beiro)
 
 let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
 let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
@@ -680,7 +680,9 @@ CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion"
 CONFIG.elevationruler.graphPathfinding.neighborFilter = "sceneGraph"
 CONFIG.elevationruler.graphPathfinding.neighborFilter = "clockwiseSweep"
 
-
+console.time("Pathfinding setup")
+await pf.startPathfinding(start);
+console.timeEnd("Pathfinding setup")
 console.time("Pathfinding")
 path = await pf._findPath(start, end) // Skip caching
 console.timeEnd("Pathfinding")
