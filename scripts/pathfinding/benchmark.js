@@ -1,21 +1,21 @@
 /* globals
 CONFIG,
+foundry,
 game,
-Token,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 
 import { MODULE_ID } from "../const.js";
 import { QBenchmarkLoopFn } from "../geometry/benchmark.js";
-import { randomPoint } from "./random.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
+import { dropIntermediatePoints, straightenPath, snapPathToGrid, optimizeGridPath } from "./path_cleaning.js";
 
 /**
  * Bench all pathfinding for a token and an endpoint.
- * @param {Point3d|token} start     If token, used as starting point
- * @param {Point3d|token} end       If token, will take the center
+ * @param {Point3d|Token} startOrToken     If token, used as starting point
+ * @param {Point3d|Token} endOrToken       If token, will take the center
  * @param [opts]
- * @param {number} N                Number of benchmarks per algorithm
+ * @param {number} N                    Number of benchmarks per algorithm
  * @param {Token} moveToken             Token, if not passed as the start
  */
 export async function benchTokenPath(startOrToken, endOrToken, { N = 10, moveToken } = {}) {
@@ -82,8 +82,85 @@ function getPathCoordinates(startOrToken, endOrToken, token) {
   }
 
   if ( start.elevation !== end.elevation || !start.elevation ) {
-    console.warn(`Starting elevation is ${start.elevation} and ending elevation is ${end.elevation}.`);
+    console.warn(`Starting elevation is ${start.elevation} and ending elevation is ${end.elevation} Using start elevation.`);
+    end.elevation = start.elevation;
   }
 
   return { start, end, token };
+}
+
+/**
+ * Test and draw a path with a given pathfinding algorithm and settings.
+ * @param {Point3d|Token} startOrToken      If token, used as starting point
+ * @param {Point3d|Token} endOrToken        If token, will take the center
+ * @param [opts]
+ * @param {number} [opts.N]                 Number of benchmarks per algorithm
+ * @param {Token} [opts.moveToken]          Token, if not passed as the start
+ * @param {"webGPU"|"collision"|"clockwiseSweep"} [opts.algorithm]         Pathfinding algorithm
+ * @param {}
+ */
+export async function testPathfinding(startOrToken, endOrToken, { moveToken, algorithm = "webGPU", graphPathfinding = {} }) {
+  const api = game.modules.get(MODULE_ID).api;
+  const { ClockwiseSweepPathfinder, GriddedCollisionPathfinder, WebGPUPathfinder } = api.pathfinding;
+
+  const oldConfig = foundry.utils.duplicate(CONFIG[MODULE_ID].graphPathfinding);
+  foundry.utils.mergeObject(CONFIG[MODULE_ID].graphPathfinding, graphPathfinding,
+    { insertKeys: false, inplace: true });
+
+  const { start, end, token } = getPathCoordinates(startOrToken, endOrToken, moveToken);
+  let pf;
+  switch ( algorithm ) {
+    case "collision": pf = new GriddedCollisionPathfinder(token); break;
+    case "clockwiseSweep": pf = new ClockwiseSweepPathfinder(token); break;
+    case "webGPU": await WebGPUPathfinder.initialize(); pf = new WebGPUPathfinder(token); break;
+  }
+
+  console.time("Pathfinding setup");
+  await pf.startPathfinding(start);
+  console.timeEnd("Pathfinding setup");
+
+  CONFIG[MODULE_ID].graphPathfinding = oldConfig;
+
+  console.time("Pathfinding");
+  const path = await pf._findPath(start, end); // Skip caching
+  console.timeEnd("Pathfinding");
+
+  if ( !path ) {
+    console.warn("No path found!", { start, end });
+    return;
+  }
+
+  pf.constructor.drawPath(path);
+  pf.validatePath(path, start, end);
+
+  let gridPath;
+  let straightPath;
+  switch ( algorithm ) {
+    case "collision":
+      straightPath = dropIntermediatePoints(path);
+      straightPath = straightenPath(straightPath, pf.token);
+
+      gridPath = dropIntermediatePoints(path);
+      break;
+
+    case "clockwiseSweep":
+      straightPath = path;
+
+      gridPath = snapPathToGrid(path, pf.token);
+      gridPath = optimizeGridPath(gridPath, pf.token);
+      break;
+
+    case "webGPU":
+      straightPath = dropIntermediatePoints(path);
+      straightPath = straightenPath(straightPath, pf.token);
+
+      gridPath = dropIntermediatePoints(path);
+      break;
+  }
+
+  pf.constructor.drawPath(straightPath, { color: Draw.COLORS.lightblue });
+  pf.constructor.drawPath(gridPath, { color: Draw.COLORS.lightgreen });
+
+  console.log(`Straight path (light blue): ${pf.validatePath(straightPath, start, end)}`);
+  console.log(`Gridded path (light green): ${pf.validatePath(gridPath, start, end)}`);
 }
