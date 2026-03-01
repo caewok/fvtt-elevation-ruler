@@ -761,16 +761,16 @@ export class EdgeGraph {
   pointIsInFace(pt) {
     for ( const face of this.faces ) {
       if ( face.type === Face.ENCLOSURE_TYPES.OUTSIDE ) continue;
-      if ( face.polygon.contains(pt.x, pt.y) ) return true;
+      if ( face.polygon.contains(pt.x, pt.y) ) return face;
     }
     return false;
   }
 
   enclosedFacesForPoint(pt) {
-    const faces = [];
+    const faces = new Set();
     for ( const face of this.faces ) {
       if ( face.type === Face.ENCLOSURE_TYPES.OUTSIDE ) continue;
-      if ( face.polygon.contains(pt.x, pt.y) ) faces.push(face);
+      if ( face.polygon.contains(pt.x, pt.y) ) faces.add(face);
     }
     return faces;
   }

@@ -15,7 +15,7 @@ import { MODULE_ID, TEMPLATES } from "./const.js";
 import { log, gridShape } from "./util.js";
 
 // Pathfinding
-import { benchTokenPath } from "./pathfinding/benchmark.js";
+import { benchTokenPath, testPathfinding } from "./pathfinding/benchmark.js";
 
 import { AbstractPathfinder } from "./pathfinding/AbstractPathfinder.js";
 import {
@@ -129,6 +129,7 @@ Hooks.once("init", function() {
 
     pathfinding: {
       benchTokenPath,
+      testPathfinding,
 
       AbstractPathfinder,
       BFSGraph,

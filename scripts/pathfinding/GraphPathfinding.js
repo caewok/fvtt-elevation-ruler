@@ -178,10 +178,19 @@ export class GraphPathfindingWorld {
    * @param {Node} start
    * @returns {boolean}
    */
-  nodeIsUnreachable(node, _start) {
+  nodeIsUnreachable(node, start) {
     if ( !canvas.scene.dimensions.sceneRect.contains(node.x, node.y) ) return true;
-    if ( CONFIG[MODULE_ID].sceneGraph.pointIsInFace(node) ) return true;
-    return false;
+
+    // Is the node in a different enclosed room than start?
+    const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+    const nodeFace = sceneGraph.pointIsInFace(node);
+    const startFace = sceneGraph.pointIsInFace(start);
+    if ( !(nodeFace || startFace) || nodeFace === startFace ) return false;
+
+    // Possible that we just got unlucky and there are multiple faces for this point.
+    const nodeFaces = sceneGraph.enclosedFacesForPoint(node);
+    const startFaces = sceneGraph.enclosedFacesForPoint(start);
+    return !nodeFaces.intersects(startFaces);
   }
 
   startPathfinding(_start, _goal) { }
@@ -621,24 +630,33 @@ let { solveSegment,
       fogIsExplored,
 } = api.pathCleaning
 benchTokenPath = api.pathfinding.benchTokenPath
+testPathfinding = api.pathfinding.testPathfinding
 
 await WebGPUPathfinder.initialize();
 
 
 let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
-start = GridCoordinates3d.fromObject(randal.center)
-end = GridCoordinates3d.fromObject(zanna.center)
-pf = new WebGPUPathfinder(randal)
-
 let beiro = canvas.tokens.placeables.find(t => t.name === "Beiro")
 let riswynn = canvas.tokens.placeables.find(t => t.name === "Riswynn")
-start = GridCoordinates3d.fromObject(beiro.center)
-end = GridCoordinates3d.fromObject(riswynn.center)
-pf = new ClockwiseSweepPathfinder(beiro)
-
 let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
 let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
+
+// collision, webGPU, clockwiseSweep
+algorithm = "collision"
+await testPathfinding(randal, zanna, { algorithm })
+await testPathfinding(beiro, riswynn, { algorithm })
+await testPathfinding(akra, perrin, { algorithm })
+
+start = GridCoordinates3d.fromObject(randal.center)
+end = GridCoordinates3d.fromObject(zanna.center)
+pf = new GriddedCollisionPathfinder(randal)
+
+
+start = GridCoordinates3d.fromObject(beiro.center)
+end = GridCoordinates3d.fromObject(riswynn.center)
+pf = new GriddedCollisionPathfinder(beiro)
+
 start = GridCoordinates3d.fromObject(akra.center)
 end = GridCoordinates3d.fromObject(perrin.center)
 pf = new GriddedCollisionPathfinder(akra)
@@ -646,6 +664,7 @@ pf = new GriddedCollisionPathfinder(akra)
 midE = (pf.token.topE - pf.token.bottomE) * 0.5;
 start.elevation += midE;
 end.elevation += midE;
+
 
 
 await benchTokenPath(randal, zanna.center, { N: 3 });
@@ -687,14 +706,13 @@ console.time("Pathfinding")
 path = await pf._findPath(start, end) // Skip caching
 console.timeEnd("Pathfinding")
 pf.constructor.drawPath(path)
-pathIsValid(path, pf.token)
 pf.validatePath(path, start, end)
 
 // Straightened path for collision
 gridPath = dropIntermediatePoints(path)
 gridPath = straightenPath(gridPath, pf.token);
-pathIsValid(gridPath, pf.token)
 pf.validatePath(gridPath, start, end)
+pf.constructor.drawPath(gridPath)
 
 // Gridded path for collision
 gridPath = dropIntermediatePoints(path)

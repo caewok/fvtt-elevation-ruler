@@ -249,8 +249,8 @@ export const ClockwiseSweepFilter = superclass => class extends superclass {
     return CONFIG.Canvas.polygonBackends[type].testCollision(start, end, { type, mode: "any", source: this.source });
   }
 
-  nodeIsUnreachable(node) {
-    if ( super.nodeIsUnreachable(node) ) return true;
+  nodeIsUnreachable(node, start) {
+    if ( super.nodeIsUnreachable(node, start) ) return true;
 
     const blockingCfg = {
       dead: false,
@@ -322,7 +322,7 @@ export const OcclusionFilter = superclass => class extends superclass {
   }
 
   nodeIsUnreachable(node, start) {
-    if ( super.nodeIsUnreachable(node) ) return true;
+    if ( super.nodeIsUnreachable(node, start) ) return true;
 
     // Is node within a blocking token?
     for ( const token of canvas.tokens.placeables ) {
