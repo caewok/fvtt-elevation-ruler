@@ -173,7 +173,6 @@ const GPUTerrainMixin = superclass => class extends superclass {
     vo.dropNormalsAndUVs({ out: vo });
 
     const geom = token[GEOMETRY_LIB_ID][GEOMETRY_ID];
-    geom.update();
     vo.transformToModel(geom.modelMatrix, vo);
     return vo;
   }
@@ -199,7 +198,6 @@ const GPUTerrainMixin = superclass => class extends superclass {
    */
   static _convertRegionTopToVertexObject(region) {
     const geom = region[GEOMETRY_LIB_ID][GEOMETRY_ID];
-    geom.update();
 
     // Need to earcut faces but also handle holes.
     const vertices = [];
