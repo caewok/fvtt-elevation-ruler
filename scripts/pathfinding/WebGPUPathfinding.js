@@ -351,7 +351,7 @@ const GPUTerrainMixin = superclass => class extends superclass {
     const subjectToken = this.token;
     return tokens.filter(token => {
       const value = this.constructor.tokenValue(token, subjectToken);
-      return !(value === this.constructor.FEATURES.NORMAL && value === this.constructor.FEATURES.BLOCKING);
+      return !(value === this.constructor.FEATURES.NORMAL || value === this.constructor.FEATURES.BLOCKING);
     });
   }
 

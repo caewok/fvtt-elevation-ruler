@@ -667,7 +667,7 @@ pf = new GriddedCollisionPathfinder(beiro)
 
 start = GridCoordinates3d.fromObject(akra.center)
 end = GridCoordinates3d.fromObject(perrin.center)
-pf = new GriddedCollisionPathfinder(akra)
+pf = new WebGPUPathfinder(akra)
 
 midE = (pf.token.topE - pf.token.bottomE) * 0.5;
 start.elevation += midE;

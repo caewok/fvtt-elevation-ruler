@@ -22,7 +22,7 @@ neighborFilter: sceneGraph
 - [√] Handles directional wall update
 - [√] Handles wall position change
 
-[] *No tokens block*
+[√] *No tokens block*
 - [√] neighborFilter: clockwiseSweep
 - [√] neighborFilter: occlusion
 - [√] neighborFilter: sceneGraph
@@ -78,7 +78,7 @@ neighborFilter: sceneGraph
 [] Heuristic: terrain
 
 ## WebGPU
-[] *No tokens block*
+[√] *No tokens block*
 [] *Enemy Tokens block*
 [] *All Tokens block*
 [] *Tokens x2 difficulty*
