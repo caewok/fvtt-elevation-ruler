@@ -165,13 +165,6 @@ export const NodeGridless3d = superclass => class extends superclass {
 
 export const SceneGraphFilter = superclass => class extends superclass {
 
-  token;
-
-  initialize(token) {
-    super.initialize(token);
-    this.token = token;
-  }
-
   /**
    * Filter the neighbors
    * @param {GridCoordinates} node
@@ -284,7 +277,7 @@ export const OcclusionFilter = superclass => class extends superclass {
     const { dead, live, prone } = CONFIG[MODULE_ID].tokensBlock;
     const PF = Settings.KEYS.PATHFINDING;
     const tokensBlock = Settings.get(PF.TOKENS_BLOCK);
-    const someTokensBlock = tokensBlock !== PF.TOKENS_BLOCK_CHOICES.NONE;
+    const someTokensBlock = tokensBlock !== PF.TOKENS_BLOCK_CHOICES.NO;
     const allTokensBlock = tokensBlock === PF.TOKENS_BLOCK_CHOICES.ALL;
     const blockingCfg = {
       senseType: "move",
@@ -331,7 +324,7 @@ export const OcclusionFilter = superclass => class extends superclass {
     }
 
     // Is node within a blocking region and not currently in that region?
-    if ( this.#occlusionTester._config.blocking.region ) {
+    if ( this.#occlusionTester._config.region ) {
       for ( const region of canvas.regions.placeables ) {
         region.GeometryLib.geometry.update();
         for ( const shape of region.document.shapes ) {

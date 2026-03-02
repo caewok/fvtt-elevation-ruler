@@ -20,8 +20,8 @@ import {
   Ellipse3dVertices,
   Circle3dVertices,
   Hex3dVertices,
-} from "../geometry/placeable_geometry/BasicVertices.js";
-import { VertexObject } from "../geometry/placeable_geometry/GeometryDesc.js";
+} from "../geometry/placeable_vertices/BasicVertices.js";
+import { VertexObject } from "../geometry/placeable_vertices/PlaceableVertices.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix } from "../geometry/mixwith.js";
 import { dropIntermediatePoints } from "./path_cleaning.js";

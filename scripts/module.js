@@ -177,7 +177,7 @@ Hooks.once("setup", function() {
   initializePatching();
 });
 
-Hooks.once("canvasReady", function() {
+Hooks.on("canvasReady", function() {
   // Placeable Geometry for collision testing.
   const geometryTracking = CONFIG.GeometryLib.lib.placeableGeometryTracking;
   const geometryTypes = [
@@ -188,8 +188,9 @@ Hooks.once("canvasReady", function() {
   ];
   for ( const type of geometryTypes ) {
     const cl = geometryTracking[`${type}GeometryTracker`];
-    cl.registerPlaceableHooks();
-    cl.registerExistingPlaceables();
+    const watcher = cl.create();
+    watcher.activate();
+    watcher.registerExistingPlaceables();
   }
 
   Settings.pathfinderReady = true;
@@ -199,6 +200,27 @@ Hooks.once("canvasReady", function() {
     useWalls: true,
     useTokens: false,
   });
+});
+
+Hooks.on("canvasTearDown", function() {
+  CONFIG[MODULE_ID].sceneGraph = null;
+
+  Settings.pathfinderReady = false;
+
+  // Placeable Geometry for collision testing.
+  const geometryTracking = CONFIG.GeometryLib.lib.placeableGeometryTracking;
+  const geometryTypes = [
+    "Tile",
+    "Wall",
+    "Token",
+    "Region",
+  ];
+  for ( const type of geometryTypes ) {
+    const cl = geometryTracking[`${type}GeometryTracker`];
+    const watcher = cl.create();
+    watcher.deactivate();
+    watcher.deRegisterExistingPlaceables();
+  }
 });
 
 // For https://github.com/League-of-Foundry-Developers/foundryvtt-devMode

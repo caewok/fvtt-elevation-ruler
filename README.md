@@ -8,25 +8,11 @@
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/H2H3Y7IJW)
 
-# Elevation Ruler
+# ~~Elevation~~ Pathfinding Ruler
 
-This module displays the ruler when dragging tokens, does pathfinding for the ruler, tracks movement speed and movement history in combat, and can display elevation changes.
-
-## Elevation
-[Screen Recording 2024-06-04 at 4.41.56 PM.webm](https://github.com/caewok/fvtt-elevation-ruler/assets/1267134/eb71786a-7852-43e3-99e2-b4def15a9f83)
-
-Elevation can be changed while using the ruler (default: '[' to increment and ']' to decrement). The distance calculation updates based on the distance measured, assuming a straight line in three dimensions between origin and destination, taking into account elevation change. If you add a waypoint, elevation will be tracked at each waypoint. If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint.
-
-## Dragging tokens (Token Ruler)
-[Screen Recording 2024-06-04 at 4.26.55 PM.webm](https://github.com/caewok/fvtt-elevation-ruler/assets/1267134/c372407f-c26d-4d73-9ef3-25d9bb0aed2b)
-
-When dragging a token, the ruler will automatically appear if you have enabled "Token Ruler" in the module settings. To set waypoints when dragging a token, hit the specified hotkey (default '=' to add and '-' to remove). To adjust the colors that appear for designated speeds see [Setting speed colors](#setting-speed-colors). If you would like specific system support, please feel free to submit a git issue.
-
-## Movement speed / history
-Elevation Ruler supports coloring the ruler highlighting to represent token speeds based on various systems. The user can also control whether the speed for walking, burrowing, or flying should be used by changing the setting on the token hud. Settings determine, on a per-user basis, whether the speed highlighting should always be used, only during combat, or never. The GM can also from users the speeds of hostile tokens. Movement history during combat can also be tracked.
+As of Foundry v13, token dragging displays a ruler and the ruler is capable of measuring elevation. More elevation-specific features may appear in future versions, but the current version of this module focuses on pathfinding when dragging tokens.
 
 ## Pathfinding
-[Screen Recording 2024-06-04 at 4.26.31 PM.webm](https://github.com/caewok/fvtt-elevation-ruler/assets/1267134/1efca6e2-41b1-4cdb-87a3-2fb5e48be5cd)
 
 As of version 0.8.0, a button in the Token controls enables pathfinding for the ruler (or Token Ruler, when enabled). Pathfinding works on gridded (both hex and square) and gridless maps. If using the ruler, start a measurement at a token in order to start pathfinding.
 
@@ -37,73 +23,153 @@ To enable/disable pathfinding, toggle the pathfinding icon in the token controls
 ## Module history
 As of v0.7, Elevation Ruler adds a setting to display the Foundry ruler when dragging tokens.
 As of v0.8, Elevation Ruler adds a toggle to enable pathfinding when using the ruler or dragging tokens with the Token Ruler enabled.
+The v0.9 series is the last set to work in v12.
+
+(Versioning jumps to v13, intended to parallel Foundry versioning.)
+v13 removes parts of Elevation Ruler now native to Foundry v13, and refocuses efforts on pathfinding.
 
 # Installation
 Add this [Manifest URL](https://github.com/caewok/fvtt-elevation-ruler/releases/latest/download/module.json) in Foundry to install.
 
 ## Dependencies
 - [libWrapper](https://github.com/ruipin/fvtt-lib-wrapper)
-- [libRuler](https://github.com/caewok/fvtt-lib-ruler) (deprecated as of Foundry v10; no longer required)
 
 (Elevation Ruler 0.4+ requires Foundry v9 because it replaces the DF Hotkeys dependency with the Foundry keybindings introduced in v9.)
 (Elevation Ruler 0.5+ requires Foundry v10 due to improvements in the Foundry Ruler API.)
 (Elevation Ruler 0.7+ requires Foundry v11.)
-(Elevation Ruler 0.9+ requires Foundry v12.)
+(Elevation Ruler 0.10+ requires Foundry v13.)
 
 ## Modules that add functionality
 - [Wall Height](https://github.com/erithtotl/FVTT-Wall-Height). For defining limited-height walls.
-- [Terrain Mapper](https://github.com/caewok/fvtt-terrain-mapper). In v12, use Terrain Mapper to define elevation for regions.
-- [TDE5/DSA5 Elevation Ruler](https://github.com/Rapunzel77/dsa5-elevation-ruler-integration). Defines token speeds and colors for Das Schwarze Auge (TDE/DSA)
-- [Lancer Ruler Integration](https://foundryvtt.com/packages/lancer-speed-provider). Defines token speeds and colors and handles speed changes based on conditions for LANCER
 
-## Known conflicts
-- [Terrain Ruler](https://github.com/manuelVo/foundryvtt-terrain-ruler)
-- [Enhanced Terrain Layer](https://github.com/ironmonk88/enhanced-terrain-layer)
-- [Drag Ruler](https://github.com/manuelVo/foundryvtt-drag-ruler). Elevation ruler v0.6 series worked with Drag Ruler, but v0.7+ no longer supports Drag Ruler.
-- [Dynamic Active Effects](https://gitlab.com/tposney/dae). DAE interferes with the  active effects used by Terrain Mapper from being calculated for movement penalties in Elevation Ruler. The effect appears to be applied but the movement penalty when moving over the region will not be calculated correctly. Elevation Ruler should otherwise work with DAE.
-- Pathfinder 2e system. The movement penalty calculation for Terrain Mapper regions may not be correctly calculated because PF2e does not use the Foundry active effects system (and current workarounds are limited). Other speed calculations for tokens should work, and Elevation Ruler should otherwise work with PF2e.
-
-In general, modules that overwrite or extend the Ruler Class may cause the elevation ruler module to fail to display or calculate correctly.
 
 ## What systems does it work on?
 
-It has been tested on dnd5e. Because it adds to the functionality of the underlying Foundry measurement ruler, it may work on other systems as well, unless the system overrides key Foundry measurement functions in the Ruler Class. Please submit an issue in this GitHub if you experience issues when running on your preferred system!
+It has been tested on dnd5e but is intended to work in all systems. Features related to testing for live/dead/prone tokens or token allies/enemies may require changes to the Elevation Ruler [CONFIG](#Configuration).Please submit an issue in this GitHub if you experience issues when running on your preferred system!
 
 # How to Use
 
-To use, start measuring with the Foundry measurement ruler as normal. While doing so, hit '[' to increase the elevation at the destination by one step. A step is equal to the grid size (typically 5 feet). Hit ']' to decrease the elevation at the destination by one step.
 
-If you enable the Token Ruler in settings, dragging tokens will also display the ruler.
 
-If you enable Token Speed Highlighting in settings, token speed will be estimated using different colors. Use the Token HUD (right-click on a token on the canvas) if you want to switch from automatic guess of whether the token is walking/flying/burrowing to manual. If the token does not have movement speed for the given movement type (or if Elevation Ruler does not know how to find that movement attribute for the system) the speed highlighter will not change colors.
+# Pathfinding Algorithms
 
-You can modify the system attributes used for walk/fly/burrow as well as the colors used in `CONFIG.elevationruler.SPEED`.
+## Gridded Collision
 
-# Details
+Breaks the scene into a grid and measures cost and obstacle collisions when moving between the grid points. Measurement can be handled using native Foundry tools, which helps with compatibility across systems. Uses A^*^ to find best path between grid points.
 
-## Elevation
-Elevation can be changed while using the ruler :
-1. Manually. Hit the specified hot key (default: '[' to increment and ']' to decrement).
-2. Token. When hovering over a token with the ruler, the origin or destination elevation (as applicable) will update.
-3. Elevated Vision. If the Elevated Vision module is present, it will use that elevation information. (Elevation Ruler v0.5+)
-4. Levels. If the Levels module is present, the ruler will look for Levels-enabled tiles  and default to the bottom elevation of that tile. In Elevation Ruler v0.5+, it will also originate elevation at the bottom of the active layer if the Levels layers UI is active.
-5. If you hold the specified hot key (default 'G'), it will force the ruler to measure elevation from the ground.
+Currently, gridded collision runs on the main thread, not a worker. That will likely change in the future, but it is non-trivial to interact with Foundry canvas objects in a web worker. Performance can be an issue for large scenes or gridless scenes (which require a smaller grid overlay for this algorithm to work).
 
-The distance calculation updates based on the distance measured, assuming a straight line in three dimensions between origin and destination, taking into account elevation change. If you add a waypoint, elevation will be tracked at each waypoint. If you choose to move the origin token (by hitting spacebar) after measuring, the token elevation will be updated along each waypoint.
+Performance is dependent on the number of grid squares for a given canvas. For gridless, it is tied directly to canvas size. Performance also depends on the number of walls and path length.
 
-## Token measurement
+While post-processing can turn gridded movement into straight-line paths, you may want to try Clockwise Sweep for that use case.
 
-When measuring, the ruler will stay at the origin elevation (or originating token elevation) unless manually changed. But if you drag the ruler over a token that has been elevated or lowered, the ruler will reflect the elevation of that token (plus or minus manually incremented values). (This does not happen if you are dragging tokens; you must use the ruler tool.)
+*Best for:*
+- Gridded scenes.
+- Optimal pathfinding with difficult terrain
 
-This is particularly useful where you have an elevated character at the origin, and want to fire or move downwards. Or vice-versa where you are aiming at an elevated token and need total distance to the elevated target.
+*Not great for:*
+- Gridless scenes
+- Large scenes or open areas
 
-## Elevation changes when moving the token with spacebar
+**Implemented features**:
+- [] Square grids
+- [x] Hex grids
+- [ ] Gridless
+- [ ] Snap-to-grid
+- [ ] All tokens block
+- [ ] Enemies-only tokens block
+- [ ] Tokens as difficult terrain
+- [ ] Difficult terrain regions
+- [ ] Token shapes:
+  - [ ] Rectangular
+  - [ ] Hexagonal
+  - [ ] Elliptical cylinder
+  - [ ] Sphere
+  - [ ] Ellipsoid
 
-As with the normal Foundry ruler, if you begin a measurement at your token, you can hit spacebar to move the token. Elevation is modified at the beginning of each waypoint segment move. (As of v0.9.5. Previously, it would be modified at the end of the waypoint segment move.) This may allow you, for example, to jump over a wall if that wall has a maximum height under your current elevation as can be set up using the Wall Height module (or Levels + Wall Height). Or avoid a region with a defined height.
+
+
+## Clockwise Sweep
+
+Clockwise sweep is the algorithm FoundryVTT uses to measure line-of-sight for tokens and lights. Here, the algorithm is re-purposed for pathfinding. Essentially, corners at the edge of the line-of-sight are considered neighbors. Uses A^*^ to find best path between these neighbors, building the line-of-sight at each neighbor.
+
+Beginning at the path start, line-of-sight is measured and the LOS polygon is created. If the end point is in this LOS polygon, we are done. During the LOS sweep, points are marked when a wall blocks the sight and thus creates an open gap area. These are potential "corners" leading to unseen areas. Both a point close to the corner and one halfway along the gap edge are treated as potential neighbors. This effectively allows the line-of-sight to progressively "peek" around corners into unexplored areas.
+
+The end result is an algorithm that works very quickly in large open areas, and is not grid-dependent. Path endpoints tucked away in hard-to-reach corners can sometimes pose a challenge. The algorithm also does not explore all the spaces, so while it will account for terrain cost, it will not always find the optimal path.
+
+Performance decreases as the number of walls increase, but performance is not dependent on canvas size. Performance is not dependent on path length, but is dependent on the number of turns required.
+
+While post-processing can change the straight paths of this algorithm into gridded paths, that is suboptimal. Recommend using another algorithm if gridded movement is essential.
+
+*Best for:*
+- Gridless scenes
+- Performance without using WebGPU
+- Large open areas
+
+*Not great for:*
+- Optimal pathfinding
+- Gridded movement or snap-to-grid
+
+**Implemented features**:
+- [] Square grids
+- [ ] Hex grids
+- [] Gridless
+- [] Snap-to-grid
+- [ ] All tokens block
+- [ ] Enemies-only tokens block
+- [ ] Tokens as difficult terrain
+- [ ] Difficult terrain regions
+- [ ] Token shapes:
+  - [ ] Rectangular
+  - [ ] Hexagonal
+  - [ ] Elliptical cylinder
+  - [ ] Sphere
+  - [ ] Ellipsoid
+
+
+
+## WebGPU (Flood-fill or Wavefront propagation)
+
+This algorithm works in two stages. When a token drag starts, a model of the scene, with blocking edges and difficult terrain, is sent to the GPU. The GPU measures, for every pixel, the least cost to get back to the starting point. (Resolution here may be less than 1-to-1 compared to the scene canvas to improve performance.) This is the "distance map." Creating the map is somewhat slow; performance depends almost entirely on scene size.
+
+Once the distance map is created, a path is found by simply "rolling downhill" from the end point back to the start.
+
+Creation of the distance map is handled in a web worker to avoid locking the initial token drag. Creation of the path is also handled by the web worker. This is currently the only algorithm that uses a web worker.
+
+Performance of the initial distance map creation depends almost entirely on scene size, although a large number of tokens in the scene will increase the time needed to transfer data to the web worker. Once the distance map is created, performance is very fast and is only lightly influenced by the path length.
+
+*Best for:*
+- Gridless scenes
+- Gridded scenes
+- Complex scenes
+- Performance
+
+*Not great for:*
+- System compatibility
+- Large open areas (See Clockwise Sweep)
+- Snap-to-grid
+- Straight-line movement instead of gridded movement (See Clockwise Sweep)
+
+**Implemented features**:
+- [] Square grids
+- [ ] Hex grids
+- [ ] Gridless
+- [ ] Snap-to-grid
+- [ ] All tokens block
+- [ ] Enemies-only tokens block
+- [ ] Tokens as difficult terrain
+- [ ] Difficult terrain regions
+- [ ] Token shapes:
+  - [ ] Rectangular
+  - [ ] Hexagonal
+  - [ ] Elliptical cylinder
+  - [ ] Sphere
+  - [ ] Ellipsoid
+
 
 # Token controls
 
-Elevation Ruler adds two token controls. The "Use Pathfinding" control toggles pathfinding on/off. The "Prefer Token Elevation" control, when enabled, will not adjust the destination elevation when hovering over other tokens. Typically, without this enabled, the ruler will change the destination elevation to match the elevation of a token at the destination point.
+Elevation Ruler adds a "Use Pathfinding" control to toggle pathfinding on/off.
 
 # Key bindings
 
@@ -132,6 +198,8 @@ Elevation Ruler defines certain keybindings:
   - Percent Area: if the terrain area excees some threshold coverage of the grid square/hex center point, that grid square/hex will have penalized movement.
   - Euclidean: A line moving through the terrain will be proportionally penalized based on the percentage of that line within the terrain.
 - Percent Area Threshold: Defines the threshold in Terrain Grid Measurement: Percent Area.
+
+# Configuration
 
 # API
 

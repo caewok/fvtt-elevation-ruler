@@ -145,7 +145,9 @@ export class GraphPathfindingWorld {
    * Initialize this world for a given path construction.
    * @param {Token} token     Token doing the movement
    */
-  initialize(_token) { }
+  token;
+
+  initialize(token) { this.token = token; }
 
   /**
    * Filter the neighbors for this node, keeping only valid neighbors.
@@ -613,6 +615,7 @@ export class AStarGraph extends UniformCostGraph {
   }
 }
 
+
 /* Testing
 MODULE_ID = "elevationruler"
 Draw = CONFIG.GeometryLib.lib.Draw;
@@ -644,9 +647,14 @@ let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 
 // collision, webGPU, clockwiseSweep
 algorithm = "collision"
-await testPathfinding(randal, zanna, { algorithm })
-await testPathfinding(beiro, riswynn, { algorithm })
-await testPathfinding(akra, perrin, { algorithm })
+graphPathfinding = {
+  cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
+  heuristic: "terrain", //"manhattan"|"euclidean"|"foundry"|"terrain"
+  neighborFilter: "sceneGraph" // "clockwiseSweep"|"occlusion"|"sceneGraph"
+}
+await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
+await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
+await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
 
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)

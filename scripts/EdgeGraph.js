@@ -584,7 +584,7 @@ export class EdgeGraph {
       }
     }
 
-    outerFace.type = Face.ENCLOSURE_TYPES.OUTSIDE;
+    if ( outerFace ) outerFace.type = Face.ENCLOSURE_TYPES.OUTSIDE;
     return {
       enclosed: this.faces.filter(f => f.type === Face.ENCLOSURE_TYPES.ENCLOSED),
       outside: outerFace,
