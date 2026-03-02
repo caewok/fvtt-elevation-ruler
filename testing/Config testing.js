@@ -12,15 +12,15 @@
 
 neighborFilter: clockwiseSweep
 - [√] Handles directional wall update
-- [] Handles wall position change
+- [√] Handles wall position change
 
 neighborFilter: occlusion
-- [x] Handles directional wall update
-- [] Handles wall position change
+- [√] Handles directional wall update
+- [√] Handles wall position change
 
 neighborFilter: sceneGraph
 - [√] Handles directional wall update
-- [] Handles wall position change
+- [√] Handles wall position change
 
 [] *No tokens block*
 - [√] neighborFilter: clockwiseSweep

@@ -115,15 +115,15 @@ export async function testPathfinding(startOrToken, endOrToken, { moveToken, alg
     case "webGPU": await WebGPUPathfinder.initialize(); pf = new WebGPUPathfinder(token); break;
   }
 
-  console.time("Pathfinding setup");
+  console.time(`Pathfinding setup for ${algorithm}`);
   await pf.startPathfinding(start);
-  console.timeEnd("Pathfinding setup");
+  console.timeEnd(`Pathfinding setup for ${algorithm}`);
 
   CONFIG[MODULE_ID].graphPathfinding = oldConfig;
 
-  console.time("Pathfinding");
+  console.time(`Pathfinding using ${algorithm}`);
   const path = await pf._findPath(start, end); // Skip caching
-  console.timeEnd("Pathfinding");
+  console.timeEnd(`Pathfinding using ${algorithm}`);
 
   if ( !path ) {
     console.warn("No path found!", { start, end });

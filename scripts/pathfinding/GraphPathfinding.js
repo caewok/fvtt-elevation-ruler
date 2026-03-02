@@ -646,11 +646,11 @@ let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
 let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 
 // collision, webGPU, clockwiseSweep
-algorithm = "collision"
+algorithm = "webGPU"
 graphPathfinding = {
   cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
   heuristic: "terrain", //"manhattan"|"euclidean"|"foundry"|"terrain"
-  neighborFilter: "sceneGraph" // "clockwiseSweep"|"occlusion"|"sceneGraph"
+  neighborFilter: "occlusion" // "clockwiseSweep"|"occlusion"|"sceneGraph"
 }
 await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
 await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
