@@ -90,13 +90,14 @@ function pixelBufferDimensions() { /* eslint-disable-line no-unused-vars */
  * Extract buffer data (for debugging)
  * @param {object} options
  * @param {"transient"|"static"|"subject"|"distance"} options.bufferName
- * @param {Float32Array} buffer
  * @returns {[result: object, transfer: object[]}
  */
-async function extractBufferData({ bufferType = "transient", buffer } = {}) { /* eslint-disable-line no-unused-vars */
-  if ( bufferType === "distance" ) buffer.set(pf.distanceMap);
-  else await pf.terrainMapper.extractBufferData(bufferType, buffer);
-  return [{ buffer, width: pf.width }, [buffer.buffer]];
+async function extractBufferData({ bufferType = "transient" } = {}) { /* eslint-disable-line no-unused-vars */
+  const dims = pf.terrainMapper.gridDims;
+  let buffer;
+  if ( bufferType === "distance" ) buffer = new Uint32Array(pf.distanceMap);
+  else buffer = await pf.terrainMapper.extractBufferData(bufferType);
+  return [{ buffer, width: dims[0] }, [buffer.buffer]];
 }
 
 /**
