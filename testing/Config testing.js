@@ -284,3 +284,13 @@ neighborFilter: sceneGraph
 [] *Overlapping Region x2 difficulty*
 
 [] *Snap-to-grid*
+
+
+# Delicious Palace (Hard square-grid maze)
+[] Collision
+  [] neighborFilter: clockwiseSweep
+  [] neighborFilter: occlusion
+  [] neighborFilter: sceneGraph
+[] ClockwiseSweep
+[] WebGPU
+

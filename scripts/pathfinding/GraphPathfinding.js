@@ -382,7 +382,7 @@ class AbstractGraph {
     }
 
     const path = this.constructor.reconstructPath(this._cameFrom, goalNode);
-    if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: Found ${path?.length} path by examining ${closedSet.size} nodes over ${iter} iterations.`);
+    if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: Found length ${path?.length} path by examining ${closedSet.size} nodes over ${iter} iterations.`);
 
     if ( !path.at(0).almostEqual(start) ) path.unshift(start); // World must handle checks between start and startNode.
     if ( !path.at(-1).almostEqual(goal) ) path.push(goal);  // World must handle checks between goal and goalNode.
@@ -658,16 +658,16 @@ await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
 
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
-pf = new GriddedCollisionPathfinder(randal)
+pf = new WebGPUPathfinder(randal)
 
 
 start = GridCoordinates3d.fromObject(beiro.center)
 end = GridCoordinates3d.fromObject(riswynn.center)
-pf = new GriddedCollisionPathfinder(beiro)
+pf = new WebGPUPathfinder(beiro)
 
 start = GridCoordinates3d.fromObject(akra.center)
 end = GridCoordinates3d.fromObject(perrin.center)
-pf = new WebGPUPathfinder(akra)
+pf = new ClockwiseSweepPathfinder(akra)
 
 midE = (pf.token.topE - pf.token.bottomE) * 0.5;
 start.elevation += midE;
@@ -747,6 +747,47 @@ pf.validatePath(gridPath, start, end)
 
 // Gridded path for webgpu, change resolution
 await WebGPUPathfinder.initialize(2 / canvas.dimensions.size);
+
+// Confirm WebGPU distance map
+PixelCache = CONFIG.GeometryLib.lib.PixelCache
+await pf.startPathfinding(start);
+path = await pf._findPath(start, end)
+worker = pf.constructor.worker
+
+bufferData = await worker.extractBufferData({ bufferType: "static" })
+bufferData = await worker.extractBufferData({ bufferType: "subject" })
+bufferData = await worker.extractBufferData({ bufferType: "transient" })
+bufferData = await worker.extractBufferData({ bufferType: "combined" })
+bufferData = await worker.extractBufferData({ bufferType: "distance" })
+
+uniqueValues = CONFIG.GeometryLib.lib.utils.sortedUnique(bufferData.buffer).reverse()
+
+
+heatMap = PixelCache.createHeatMap(2, 254);
+colorFn = value => {
+  switch ( value ) {
+    case 1: return Draw.COLORS.white;
+    case 255: return Draw.COLORS.red;
+    default: return heatMap(value);
+  }
+}
+alphaFn = value => value === 255 ? 1 : 1 ? 0.1 : 0.5
+
+maxBufferValue = uniqueValues[1]; // Second-largest.
+wallValue = uniqueValues[0]
+heatMap = PixelCache.createHeatMap(2, maxBufferValue);
+colorFn = value => {
+  switch ( value ) {
+    case 1: return Draw.COLORS.white;
+    case wallValue: return Draw.COLORS.red;
+    default: return heatMap(value);
+  }
+}
+alphaFn = value => value === 255 ? 1 : 1 ? 1 : 1
+
+cache = PixelCache.fromPixelArray(bufferData.buffer, bufferData.width, { resolution: worker.resolution })
+cache.translation = worker.sceneTranslation
+cache.draw({ maximumPixelValue: 255, local: false, skip: 0, radius: 5, colorFn, alphaFn })
 
 
 gridPath = dropIntermediatePoints(path)
