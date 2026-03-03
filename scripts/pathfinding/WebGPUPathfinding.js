@@ -484,12 +484,11 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
    * @param {Float32Array} buffer
    * @returns {[result: object, transfer: object[]}
    */
-  async extractBufferData({ bufferType = "transient", buffer } = {}) {
-    buffer ??= new Uint32Array(this.area);
-    const params = { buffer, bufferType };
+  async extractBufferData({ bufferType = "transient" } = {}) {
+    const params = { bufferType };
     params.debug = CONFIG[MODULE_ID].debug;
-    const res = await this.executeFunction("extractBufferData", [params], [buffer.buffer]);
-    return res.buffer;
+    const res = await this.executeFunction("extractBufferData", [params]);
+    return res;
   }
 
   /**
@@ -961,6 +960,11 @@ colorFn = value => {
     default: return heatMap(value);
   }
 }
+
+alphaFn = value => value === 255 ? 1 : 1 ? 0.1 : 0.5
+PixelCache = CONFIG.GeometryLib.lib.PixelCache
+cache = PixelCache.fromPixelArray(bufferData.buffer, bufferData.width, { resolution: worker.resolution, translate: worker.sceneTranslation })
+
 
 alphaFn = value => value === 255 ? 1 : 1 ? 0.1 : 0.5
 pf.terrain.staticTerrain.draw({ maximumPixelValue: 255, local: true, skip: 5, colorFn, alphaFn })
