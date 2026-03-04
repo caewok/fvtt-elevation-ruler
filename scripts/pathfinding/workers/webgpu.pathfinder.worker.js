@@ -220,7 +220,7 @@ class GPUPathfinder {
     if ( debug ) console.timeEnd("GPU Combine buffers");
 
     if ( debug ) console.time("GPU Pathfinding Setup");
-    await this._wavefrontPropagation(start);
+    this._wavefrontPropagation(start);
     if ( debug ) console.timeEnd("GPU Pathfinding Setup");
 
     if ( debug ) console.time("GPU Pathfinding Read Result");
@@ -229,7 +229,7 @@ class GPUPathfinder {
     this.#distanceMapStatus = this.constructor.STATUS.READY;
   }
 
-  async _wavefrontPropagation(start) {
+  _wavefrontPropagation(start) {
     // 1. Upload start index to the GPU
     const startIndex = this.terrainMapper.indexAtCanvas(start.x, start.y);
     const [width, height] = this.terrainMapper.gridDims;
@@ -238,75 +238,45 @@ class GPUPathfinder {
     const workgroupY = Math.ceil(height / 8);
     this.constructor.device.queue.writeBuffer(this.buffers.initUniform, 0, new Uint32Array([startIndex]));
 
+    const commandEncoder = this.constructor.device.createCommandEncoder();
+
     // Initial Pass: Set buffers to Infinity and Start to 0.
     // TODO: Use distinct bind group here instead of A.
-    const commandInit = this.constructor.device.createCommandEncoder();
-    const initPass = commandInit.beginComputePass();
+    const initPass = commandEncoder.beginComputePass();
     initPass.setPipeline(this.pipelines.init);
     initPass.setBindGroup(0, this.bindGroups.init);
     initPass.dispatchWorkgroups(workgroupX, workgroupY);
     initPass.end();
-    this.constructor.device.queue.submit([commandInit.finish()]);
 
     // 3. Propagation Passes (Ping-Pong)
     // Iterate enough times to cover the map (Manhattan distance approx)
     // For a generic grid, Width + Height is a safe upper bound.
     // With diagonals, increase 150%.
 
-    // const iterations = (width + height); // Fails on basic mazes.
-    // const iterations = (width + height) * 2; // Basic, will fail on complex mazes.
-    // const iterations = (width * height) * 0.5; // Nearly all mazes; rather slow.
-    // const iterations = (width x height); // Guaranteed; slow.
+    const iterations = Math.max(width, height) * 1.5;
+    const propagationPass = commandEncoder.beginComputePass();
+    propagationPass.setPipeline(this.pipelines.propagation);
 
-    // Use convergence flag to determine if anything changed after X iterations.
-    let totalIterations = 0;
-    let converged = false;
-    const batchSize = Math.min(width, height); // TODO: Round down to multiples of 2^x. (e.g., 64)
-    const safety = (width * height) + 1;
-    while ( !converged && totalIterations < safety ) {
-      const commandEncoder = this.constructor.device.createCommandEncoder();
-
-      // Reset flag to 0 at start of batch.
-      commandEncoder.clearBuffer(this.buffers.convergence.write);
-
-      // NOTE: This assumes the propagation passes can act out-of-order.
-      // If not, the compute pass must be called repeatedly within the loop.
-      const propagationPass = commandEncoder.beginComputePass();
-      propagationPass.setPipeline(this.pipelines.propagation);
-      for ( let i = 0; i < batchSize; i += 1 ) {
-        const isLast = i === (batchSize - 1);
-        const isEven = (totalIterations % 2 === 0);
-
-        // Swap bind groups every iteration
-        const bgTypeLabel = isLast ? "final" : "normal";
-        const bgGroupLabel = isEven ? "A" : "B";
-        const bindGroup = this.bindGroups[bgTypeLabel][bgGroupLabel];
-
-        propagationPass.setBindGroup(0, bindGroup);
-        propagationPass.dispatchWorkgroups(workgroupX, workgroupY);
-        totalIterations++;
-      }
-      propagationPass.end();
-
-      // Copy flag to readback buffer.
-      commandEncoder.copyBufferToBuffer(this.buffers.convergence.write, 0, this.buffers.convergence.read, 0, 4);
-      this.constructor.device.queue.submit([commandEncoder.finish()]);
-
-      // Read back the convergence result from the GPU.
-      await this.buffers.convergence.read.mapAsync(GPUMapMode.READ);
-      const result = new Uint32Array(this.buffers.convergence.read.getMappedRange());
-      if ( result[0] === 0 ) converged = true; // No changes in batchSize iterations!
-      this.buffers.convergence.read.unmap();
+    // NOTE: This assumes the propagation passes can act out-of-order.
+    // If not, the compute pass must be called repeatedly within the loop.
+    for ( let i = 0; i < iterations; i += 1 ) {
+      // Swap bind groups every iteration
+      const bindGroup = i % 2 === 0 ? this.bindGroups.A : this.bindGroups.B;
+      propagationPass.setBindGroup(0, bindGroup);
+      propagationPass.dispatchWorkgroups(workgroupX, workgroupY);
     }
+    propagationPass.end();
 
     console.debug(`Wavefront Propagation took ${totalIterations} iterations for ${width} x ${height} grid.`);
 
     // Read Results
     // The final result is in Buffer A if iterations is even, Buffer B if odd.
-    const finalBuffer = (totalIterations % 2 === 0) ? this.buffers.A : this.buffers.B;
-    const copyEncoder = this.constructor.device.createCommandEncoder();
-    copyEncoder.copyBufferToBuffer(finalBuffer, 0, this.buffers.read, 0, this.terrainMapper.area * 4);
-    this.constructor.device.queue.submit([copyEncoder.finish()]);
+    const finalBuffer = (iterations % 2 === 0) ? this.buffers.A : this.buffers.B;
+
+    // Copy to read-back buffer
+    commandEncoder.copyBufferToBuffer(finalBuffer, 0, this.buffers.read, 0, this.terrainMapper.area * 4);
+
+    this.constructor.device.queue.submit([commandEncoder.finish()]);
   }
 
   /** @type {Uint32Array} */
@@ -328,7 +298,13 @@ class GPUPathfinder {
     }
 
     // Destroy internal pathfinding buffers.
-    nestedDestroy(this.buffers);
+    for ( const key in this.buffers ) {
+      if ( this.buffers[key] ) {
+        try { this.buffesr[key].unmap(); } catch(e) { /* Ignore if not mapped. */ } /* eslint-disable-line no-unused-vars */
+        this.buffers[key].destroy();
+        this.buffers[key] = null;
+      }
+    }
 
     // Clear the large distanceMap array from JS memory.
     this.distanceMap = null;
@@ -548,28 +524,14 @@ class GPUPathfinder {
     A: null,
     B: null,
 
-    // To test for convergence
-    convergence: {
-      write: null,
-      read: null,
-      off: null,
-      on: null,
-    },
-
     // Results.
     read: null,
   };
 
   bindGroups = {
     // For ping-pong.
-    normal: {
-      A: null,
-      B: null,
-    },
-    final: {
-      A: null,
-      B: null,
-    },
+    A: null,
+    B: null,
 
     // For initializing the distance map buffers.
     init: null,
@@ -602,21 +564,6 @@ class GPUPathfinder {
     const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
     this.buffers.A = this.constructor.device.createBuffer({ size, usage });
     this.buffers.B = this.constructor.device.createBuffer({ size, usage });
-
-    // Convergence Flag (GPU)
-    this.buffers.convergence.write = this.constructor.device.createBuffer({
-      size: 4,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-    });
-
-    // Convergence Readback (CPU)
-    this.buffers.convergence.read = this.constructor.device.createBuffer({
-      size: 4,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-    });
-
-    this.buffers.convergence.off = this.createMappedBuffer(new Uint32Array([0]), GPUBufferUsage.UNIFORM);
-    this.buffers.convergence.on = this.createMappedBuffer(new Uint32Array([1]), GPUBufferUsage.UNIFORM);
   }
 
   _createReadBackBuffer() {
@@ -630,31 +577,17 @@ class GPUPathfinder {
     const buffers = this.buffers;
 
     // Group A: Reads A, Writes B
-    this.bindGroups.normal.A = this.createPropagationBindGroup(
+    this.bindGroups.A = this.createPropagationBindGroup(
       buffers.A,
       buffers.B,
-      buffers.convergence.off,  // Reporting convergence off.
-      "propagationAB normal",
-    );
-    this.bindGroups.final.A = this.createPropagationBindGroup(
-      buffers.A,
-      buffers.B,
-      buffers.convergence.on,  // Reporting convergence on.
-      "propagationAB final",
+      "propagationAB",
     );
 
     // Group B: Reads B, Writes A
-    this.bindGroups.normal.B = this.createPropagationBindGroup(
+    this.bindGroups.B = this.createPropagationBindGroup(
       buffers.B,
       buffers.A,
-      buffers.convergence.off,  // Reporting convergence off.
-      "propagationBA normal",
-    );
-    this.bindGroups.final.B = this.createPropagationBindGroup(
-      buffers.B,
-      buffers.A,
-      buffers.convergence.on, // Reporting convergence on.
-      "propagationBA final",
+      "propagationBA",
     );
 
     this.bindGroups.init = this.constructor.device.createBindGroup({
@@ -667,9 +600,10 @@ class GPUPathfinder {
         { binding: 4, resource: { buffer: this.buffers.initUniform } },
       ]
     });
+
   }
 
-  createPropagationBindGroup(input, output, controlBuffer, label = "propagation") {
+  createPropagationBindGroup(input, output, label = "propagation") {
     return this.constructor.device.createBindGroup({
       label,
       layout: this.pipelines.propagation.getBindGroupLayout(0),
@@ -678,8 +612,6 @@ class GPUPathfinder {
         { binding: 1, resource: { buffer: this.buffers.terrain } },
         { binding: 2, resource: { buffer: input } },
         { binding: 3, resource: { buffer: output } },
-        { binding: 5, resource: { buffer: controlBuffer } },
-        { binding: 6, resource: { buffer: this.buffers.convergence.write } },
       ]
     });
   }
@@ -687,8 +619,6 @@ class GPUPathfinder {
   static shaderCode = `
 struct GridInfo { width: u32, height: u32 };
 struct InitParams { startIndex: u32 };
-struct ControlParams { checkConvergence: u32 };
-struct Convergence { value: u32 };
 
 const WALL = 255u;
 
@@ -702,10 +632,6 @@ const WALL = 255u;
 
 // Params specifically for initialization
 @group(0) @binding(4) var<uniform> initParams: InitParams;
-
-// Track whether further iterations would be useful.
-@group(0) @binding(5) var<uniform> control: ControlParams;
-@group(0) @binding(6) var<storage, read_write> convergence: Convergence;
 
 /**
  * Get index for given local x, y location.
@@ -785,11 +711,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 
     // Update
-    if ( best < current ) {
-      outputDist[idx] = best;
-
-      // If we are at the final iteration of this batch, check for convergence.
-      if ( control.checkConvergence == 1u ) { convergence.value = 1u; }
+    if ( best != MAX_VAL ) {
+      outputDist[idx] = min(current, best);
     } else {
       outputDist[idx] = current;
     }
@@ -1401,8 +1324,12 @@ class GPUTerrainMap {
 
   destroy() {
     // Destroy all GPU buffers.
-    // Handle nested file structure.
-    nestedDestroy(this.buffers);
+    for ( const key in this.buffers ) {
+      if ( this.buffers[key] ) {
+        this.buffers[key].destroy();
+        this.buffers[key] = null;
+      }
+    }
 
     // Destroy the dummy texture.
     if ( this.dummyTexture ) {
@@ -1560,16 +1487,3 @@ fn cs_combine(@builtin(global_invocation_id) id: vec3<u32>) {
  */
 const POW10_8 = Math.pow(10, 8);
 function fastFixed(x) { return Math.round(x * POW10_8) / POW10_8; }
-
-function nestedDestroy(buffers) {
-  for ( const [key, buffer] of Object.entries(buffers) ) {
-    if ( buffer == null ) continue;
-    if ( buffer.destroy ) {
-      try { buffer.unmap(); } catch(e) { /* Ignore if not mapped. */ } /* eslint-disable-line no-unused-vars */
-      buffer.destroy();
-      buffers[key] = null;
-      continue;
-    }
-    nestedDestroy(buffer);
-  }
-}
