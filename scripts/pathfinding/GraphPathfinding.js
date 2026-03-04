@@ -656,6 +656,64 @@ await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
 await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
 await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
 
+
+
+ **
+ * Uses bresenham to draw pixels under each wall in the scene.
+ * @param {Wall[]} [walls]      Walls to approximate
+ * @returns {Set<key>} Unique pixels, coded by point key.
+ *
+function uniquePixelsForCanvasWalls(walls) {
+  const blIterator = CONFIG.GeometryLib.lib.utils.bresenhamLineIterator;
+  const coveredPixels = new Set();
+  walls ??= canvas.walls.placeables;
+  walls.forEach(wall => {
+    const edge = wall.edge;
+    for ( const pt of blIterator(edge.a, edge.b) ) {
+      coveredPixels.add(pt.key);
+      pt.release();
+    }
+  });
+  return coveredPixels;
+}
+
+percentArea = uniquePixelsForCanvasWalls().size / canvas.scene.dimensions.sceneRect.area
+
+// Need to account for resolution. Because the walls are stuck at 1 pixel,
+// they shrink by res, not res^2.
+// Original coverage: length * 1 pixel / (W * H)
+// New coverage: length * res * 1 / (W * res) * (H * res) = length / (W * H * res)
+// Cnew ~= C orig / res
+
+start = GridCoordinates3d.fromObject(randal.center)
+end = GridCoordinates3d.fromObject(zanna.center)
+pf = new WebGPUPathfinder(randal)
+
+res = pf.constructor.worker.resolution
+uniquePixelsForCanvasWalls().size * res
+
+percentArea / res
+
+console.log(`
+\tScene width: \t${canvas.scene.dimensions.sceneWidth} \theight: \t${canvas.scene.dimensions.sceneHeight}
+\tGrid width: \t${pf.constructor.worker.gridDims.x} \theight: \t${pf.constructor.worker.gridDims.y}
+\tResolution: \t${pf.constructor.worker.resolution}
+\tWall pixels: \t${uniquePixelsForCanvasWalls().size}
+\tStart Coords:
+\t\tRandal: \t${randal.center.x - canvas.scene.dimensions.sceneX},${randal.center.y - canvas.scene.dimensions.sceneX}
+\t\Beiro: \t${beiro.center.x - canvas.scene.dimensions.sceneX},${beiro.center.y - canvas.scene.dimensions.sceneX}
+\t\Akra: \t${akra.center.x - canvas.scene.dimensions.sceneX},${akra.center.y - canvas.scene.dimensions.sceneX}
+`)
+
+
+
+
+
+
+
+
+
+
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
 pf = new WebGPUPathfinder(randal)
