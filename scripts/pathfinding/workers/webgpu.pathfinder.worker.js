@@ -299,6 +299,8 @@ class GPUPathfinder {
       this.buffers.convergence.read.unmap();
     }
 
+    console.debug(`Wavefront Propagation took ${totalIterations} iterations for ${width} x ${height} grid.`);
+
     // Read Results
     // The final result is in Buffer A if iterations is even, Buffer B if odd.
     const finalBuffer = (totalIterations % 2 === 0) ? this.buffers.A : this.buffers.B;
@@ -686,6 +688,7 @@ class GPUPathfinder {
 struct GridInfo { width: u32, height: u32 };
 struct InitParams { startIndex: u32 };
 struct ControlParams { checkConvergence: u32 };
+struct Convergence { value: u32 };
 
 const WALL = 255u;
 
@@ -702,7 +705,7 @@ const WALL = 255u;
 
 // Track whether further iterations would be useful.
 @group(0) @binding(5) var<uniform> control: ControlParams;
-@group(0) @binding(6) var<storage, read_write> convergence: atomic<u32>;
+@group(0) @binding(6) var<storage, read_write> convergence: Convergence;
 
 /**
  * Get index for given local x, y location.
@@ -786,7 +789,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
       outputDist[idx] = best;
 
       // If we are at the final iteration of this batch, check for convergence.
-      if ( control.checkConvergence == 1u ) { atomicStore(&convergence, 1u); }
+      if ( control.checkConvergence == 1u ) { convergence.value = 1u; }
     } else {
       outputDist[idx] = current;
     }
