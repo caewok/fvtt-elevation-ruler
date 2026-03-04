@@ -368,7 +368,10 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
     const invSize = 1 / size;
     const maxGridSteps = sceneHeight * sceneWidth * (invSize ** 2);
     const nWalls = canvas.walls.placeables.length;
-    return Math.min(maxGridSteps, (nWalls * 4) + 2);
+    const gapPointsEstimate = Math.min(maxGridSteps, (nWalls * 4) + 2);
+
+    // But multiple iterations may be required to revisit certain points.
+    return gapPointsEstimate * 10;
   }
 
 }

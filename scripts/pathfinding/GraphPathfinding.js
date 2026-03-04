@@ -750,9 +750,10 @@ await WebGPUPathfinder.initialize(2 / canvas.dimensions.size);
 
 // Confirm WebGPU distance map
 PixelCache = CONFIG.GeometryLib.lib.PixelCache
+worker = pf.constructor.worker
 await pf.startPathfinding(start);
 path = await pf._findPath(start, end)
-worker = pf.constructor.worker
+
 
 bufferData = await worker.extractBufferData({ bufferType: "static" })
 bufferData = await worker.extractBufferData({ bufferType: "subject" })
