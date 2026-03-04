@@ -239,11 +239,10 @@ class GPUPathfinder {
     const workgroupY = Math.ceil(height / 8);
     this.constructor.device.queue.writeBuffer(this.buffers.initUniform, 0, new Uint32Array([startIndex]));
 
-    const commandEncoder = this.constructor.device.createCommandEncoder();
-
     // Initial Pass: Set buffers to Infinity and Start to 0.
     // TODO: Use distinct bind group here instead of A.
-    const initPass = commandEncoder.beginComputePass();
+    const commandEncoder = this.constructor.device.createCommandEncoder({ label: "Wavefront encoder" });
+    const initPass = commandEncoder.beginComputePass({ label: "Wavefront init" });
     initPass.setPipeline(this.pipelines.init);
     initPass.setBindGroup(0, this.bindGroups.init);
     initPass.dispatchWorkgroups(workgroupX, workgroupY);
@@ -255,7 +254,7 @@ class GPUPathfinder {
     // With diagonals, increase 150%.
 
     const iterations = Math.max(width, height) * 1.5;
-    const propagationPass = commandEncoder.beginComputePass();
+    const propagationPass = commandEncoder.beginComputePass({ label: "Wavefront Propagation"});
     propagationPass.setPipeline(this.pipelines.propagation);
 
     console.debug(`Running ${iterations} iterations for the distance map.`);
@@ -277,7 +276,6 @@ class GPUPathfinder {
 
     // Copy to read-back buffer
     commandEncoder.copyBufferToBuffer(finalBuffer, 0, this.buffers.read, 0, this.terrainMapper.area * 4);
-
     this.constructor.device.queue.submit([commandEncoder.finish()]);
   }
 
@@ -1186,7 +1184,7 @@ class GPUTerrainMap {
    */
   processBlockingSegments(segmentArr, { bufferType = "transient", openDoors = false, clear = true } = {}) {
     const device = this.device;
-    const commandEncoder = device.createCommandEncoder();
+    const commandEncoder = device.createCommandEncoder({ label: `Process ${bufferType} segments` });
     const buffer = this.buffers[`${bufferType}Terrain`];
 
     // Clear map before drawing.
@@ -1246,7 +1244,7 @@ class GPUTerrainMap {
   async extractBufferData(bufferType = "transient", out) { /* eslint-disable-line default-param-last */
     const device = this.device;
     const buffer = this.buffers[`${bufferType}Terrain`];
-    const commandEncoder = device.createCommandEncoder();
+    const commandEncoder = device.createCommandEncoder({ label: `Extract ${bufferType} data` });
 
     // Copy result from Storage -> Staging
     commandEncoder.copyBufferToBuffer(
@@ -1274,7 +1272,7 @@ class GPUTerrainMap {
    */
   processTerrainTriangles(vertices, indices, { bufferType = "transient", clear = true } = {}) {
     const device = this.device;
-    const commandEncoder = device.createCommandEncoder();
+    const commandEncoder = device.createCommandEncoder({ label: `Process ${bufferType} triangles` });
     const bindGroup = this.bindGroups[`${bufferType}Terrain`];
     const buffer = this.buffers[`${bufferType}Terrain`];
 
