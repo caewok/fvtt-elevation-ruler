@@ -39,39 +39,45 @@ function pointKey(x, y) { return (x << 16) ^ y; }
  * @returns {number[]}
  */
 function bresenhamLine(x1, y1, x2, y2) {
-  x1 = Math.round(x1);
-  y1 = Math.round(y1);
-  x2 = Math.round(x2);
-  y2 = Math.round(y2);
+  // Round for integer conversion.
+  let x = Math.round(x1);
+  let y = Math.round(y1);
+  const targetX = Math.round(x2);
+  const targetY = Math.round(y2);
 
-  // Calculate differences
-  const dx = x2 - x1;
-  const dy = y2 - y1;
+  // Calculate deltas.
+  const dx = Math.abs(targetX - x);
+  const dy = -Math.abs(targetY - y);
+  const sx = x < targetX ? 1 : -1;
+  const sy = y < targetY ? 1 : -1;
 
-  // Determine the maximum absolute difference
-  const n = Math.max(Math.abs(dx), Math.abs(dy));
+  // Initialize the error at dx - dy, which balances out as we step in either direction.
+  let err = dx + dy;
 
-  // Calculate increments.
-  const incX = dx / n;
-  const incY = dy / n;
+  // Driving axis determines the number of points
+  const numPoints = Math.max(dx, -dy) + 1;
+  const n = numPoints * 2;
+  const points = new Int32Array(n);
 
-  // Initialize the result array with the starting point
-  const points = Array((n * 2) + 2);
-  points[0] = x1;
-  points[1] = y1;
+  // Step toward the target.
+  let i = 0;
+  while ( i < n ) {
+    points[i++] = x;
+    points[i++] = y;
 
-  // Iterate through the line
-  for ( let i = 2, ln = points.length; i < ln; i += 2 ) {
-    // Calculate the next point
-    x1 += incX;
-    y1 += incY;
-
-    // Add the adjusted point to the result array
-    points[i] = Math.round(x1);
-    points[i + 1] = Math.round(y1);
+    const e2 = 2 * err;
+    if ( e2 >= dy ) {
+      err += dy;
+      x += sx;
+    }
+    if ( e2 <= dx ) {
+      err += dx;
+      y += sy;
+    }
   }
   return points;
 }
+
 
 /**
  * Use Bresenham to draw pixels under each wall in the scene, and count the pixels.

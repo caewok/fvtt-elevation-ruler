@@ -676,6 +676,30 @@ function uniquePixelsForCanvasWalls(walls) {
   });
   return coveredPixels;
 }
+coveredPixels = uniquePixelsForCanvasWalls()
+coveredPixels.forEach(key => Draw.point(PIXI.Point.invertKey(key), { radius: 1 }))
+
+canvas.walls.placeables.forEach(wall => {
+  const edge = wall.edge;
+  const points = CONFIG.GeometryLib.lib.utils.bresenhamLine(edge.a.x, edge.a.y, edge.b.x, edge.b.y);
+  const pt = PIXI.Point.tmp.set()
+  for ( let i = 0; i < points.length; i += 2 ) {
+    pt.set(points[i], points[i+1]);
+    Draw.point(pt, { radius: 1 })
+  }
+  pt.release();
+});
+
+canvas.walls.placeables.forEach(wall => {
+  const edge = wall.edge;
+  const iter = CONFIG.GeometryLib.lib.utils.bresenhamLineIterator(edge.a, edge.b);
+  for ( const pt of iter ) {
+    Draw.point(pt, { radius: 1 });
+    pt.release();
+  }
+});
+
+
 
 percentArea = uniquePixelsForCanvasWalls().size / canvas.scene.dimensions.sceneRect.area
 
