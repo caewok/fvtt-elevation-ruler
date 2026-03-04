@@ -257,6 +257,8 @@ class GPUPathfinder {
     const propagationPass = commandEncoder.beginComputePass();
     propagationPass.setPipeline(this.pipelines.propagation);
 
+    console.debug(`Running ${iterations} iterations for the distance map.`);
+
     // NOTE: This assumes the propagation passes can act out-of-order.
     // If not, the compute pass must be called repeatedly within the loop.
     for ( let i = 0; i < iterations; i += 1 ) {
@@ -267,7 +269,6 @@ class GPUPathfinder {
     }
     propagationPass.end();
 
-    console.debug(`Wavefront Propagation took ${totalIterations} iterations for ${width} x ${height} grid.`);
 
     // Read Results
     // The final result is in Buffer A if iterations is even, Buffer B if odd.
