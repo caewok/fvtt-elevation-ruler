@@ -7,6 +7,8 @@ self,
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
+// Cannot currently use import. import { bresenhamLine } from "../geometry/util.js";
+
 // Currently throws error re Cannot use import statement outside a module.
 // Worked when creating worker manually from console though...
 // import { GPUTerrainMap } from "../WebGPUPathfinding.js";
@@ -15,6 +17,104 @@ self,
 
 /** @type {GPUPathfinder} */
 let pf;
+
+const SCENE_EDGES = {
+  static: 0,
+  subject: 0,
+  transient: 0,
+};
+
+/**
+ * Simple integer point key.
+ */
+function pointKey(x, y) { return (x << 16) ^ y; }
+
+/**
+ * Bresenham's line algorithm
+ * Returns an array of coordinates.
+ * @param {number} x1   First coordinate x value
+ * @param {number} y1   First coordinate y value
+ * @param {number} x2   Second coordinate x value
+ * @param {number} y2   Second coordinate y value
+ * @returns {number[]}
+ */
+function bresenhamLine(x1, y1, x2, y2) {
+  x1 = Math.round(x1);
+  y1 = Math.round(y1);
+  x2 = Math.round(x2);
+  y2 = Math.round(y2);
+
+  // Calculate differences
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+
+  // Determine the maximum absolute difference
+  const n = Math.max(Math.abs(dx), Math.abs(dy));
+
+  // Calculate increments.
+  const incX = dx / n;
+  const incY = dy / n;
+
+  // Initialize the result array with the starting point
+  const points = Array((n * 2) + 2);
+  points[0] = x1;
+  points[1] = y1;
+
+  // Iterate through the line
+  for ( let i = 2, ln = points.length; i < ln; i += 2 ) {
+    // Calculate the next point
+    x1 += incX;
+    y1 += incY;
+
+    // Add the adjusted point to the result array
+    points[i] = Math.round(x1);
+    points[i + 1] = Math.round(y1);
+  }
+  return points;
+}
+
+/**
+ * Use Bresenham to draw pixels under each wall in the scene, and count the pixels.
+ * @param {Float32Array[]} [segments]      Segments to approximate
+ * @returns {number} Unique pixels count.
+ */
+function countUniquePixelsForSegments(segments) {
+  const coveredPixels = new Set();
+  for ( let i = 0, iMax = segments.length; i < iMax; i += 4 ) {
+    const points = bresenhamLine(segments[i], segments[i+1], segments[i+2], segments[i+3]);
+    for ( let j = 0, jMax = points.length; j < jMax; j += 2 ) {
+      const key = pointKey(points[j], points[j+1]);
+      coveredPixels.add(key);
+    }
+  }
+  return coveredPixels.size;
+}
+
+/**
+ * Estimate the number of iterations required.
+ * Depends primarily on the edge count.
+ * @param {number} startX
+ * @param {number} startY
+ * @returns {number} Iterations required
+ */
+const ERROR_MARGIN = 0.1;
+
+function estimateIterations(startX, startY) {
+  const tm = pf.terrainMapper;
+
+  // Determine how far into the scene the starting position is.
+  const [width, height] = tm.sceneDims;
+  const percentX = startX / width;
+  const percentY = startY / height;
+
+  // Determine the wall coverage at the given resolution.
+  const wallPixels = (SCENE_EDGES.static + SCENE_EDGES.subject + SCENE_EDGES.transient);
+  const wallPixelsForResolution = wallPixels * tm.resolution;
+
+  // Linear regression, with an error adjustment.
+  const estimate = (0.19 * wallPixelsForResolution) - (113.42 * percentX) - (254.71 * percentY) + 564.33;
+  return Math.ceil(estimate * (1 + ERROR_MARGIN));
+}
 
 
 /**
@@ -44,8 +144,13 @@ async function initialize({ debug, ...opts } = {}) { /* eslint-disable-line no-u
  * @param {boolean} [options.debug=false]
  * @returns {boolean}
  */
-function updateBufferBlockingSegments({ segments, bufferType = "transient", clear = true, debug = false } = {}) { /* eslint-disable-line no-unused-vars */
-  pf.terrainMapper.processBlockingSegments(segments, { bufferType, clear });
+function updateBufferBlockingSegments({ segments, bufferType = "transient", openDoors = false, clear = true, debug = false } = {}) { /* eslint-disable-line no-unused-vars */
+  const size = countUniquePixelsForSegments(segments);
+  const doorMult = openDoors ? -1 : 1;
+  SCENE_EDGES[bufferType] = clear ? size * doorMult
+    : SCENE_EDGES[bufferType] += size * doorMult;
+
+  pf.terrainMapper.processBlockingSegments(segments, { bufferType, openDoors, clear });
   if ( debug ) console.debug(`WebGPUPathfinderWorker|Updated blocking segments for ${bufferType} buffer.`);
   return [true];
 }
@@ -252,15 +357,14 @@ class GPUPathfinder {
     // Iterate enough times to cover the map (Manhattan distance approx)
     // For a generic grid, Width + Height is a safe upper bound.
     // With diagonals, increase 150%.
-
-    const iterations = Math.max(width, height) * 1.5;
-    const propagationPass = commandEncoder.beginComputePass({ label: "Wavefront Propagation"});
-    propagationPass.setPipeline(this.pipelines.propagation);
-
+    // const iterations = (width + height) * 5; // Reasonably safe option.
+    const iterations = estimateIterations(start.x, start.y);
     console.debug(`Running ${iterations} iterations for the distance map.`);
 
     // NOTE: This assumes the propagation passes can act out-of-order.
     // If not, the compute pass must be called repeatedly within the loop.
+    const propagationPass = commandEncoder.beginComputePass({ label: "Wavefront Propagation"});
+    propagationPass.setPipeline(this.pipelines.propagation);
     for ( let i = 0; i < iterations; i += 1 ) {
       // Swap bind groups every iteration
       const bindGroup = i % 2 === 0 ? this.bindGroups.A : this.bindGroups.B;
@@ -268,7 +372,6 @@ class GPUPathfinder {
       propagationPass.dispatchWorkgroups(workgroupX, workgroupY);
     }
     propagationPass.end();
-
 
     // Read Results
     // The final result is in Buffer A if iterations is even, Buffer B if odd.
