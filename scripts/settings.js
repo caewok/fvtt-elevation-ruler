@@ -212,7 +212,7 @@ export class Settings extends ModuleSettingsAbstract {
 
   static async initializePathfinding(algorithm) {
     // Destroy prior pathfinding.
-    await WebGPUPathfinder.terminate();
+    await WebGPUPathfinder.destroy();
 
     // Initialize pathfinding.
     const ALG = Settings.KEYS.PATHFINDING.ALGORITHM_CHOICES;
