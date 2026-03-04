@@ -155,6 +155,7 @@ async function terminate() { /* eslint-disable-line no-unused-vars */
   await destroy();
   GPUPathfinder.destroy();
   self.close();
+  return [true];
 }
 
 
@@ -1264,6 +1265,11 @@ class GPUTerrainMap {
     const commandEncoder = device.createCommandEncoder();
     const buffer = this.buffers[`${bufferType}Terrain`];
 
+    // Clear map before drawing.
+    if ( clear ) commandEncoder.clearBuffer(buffer);
+    if ( !segmentArr.length ) return; // Nothing to draw.
+
+    // Either draw normal segments or erase segments for open doors.
     let pipeline = { segments: null, points: null };
     let bindGroup = { segments: null, points: null };
     if ( openDoors ) {
@@ -1277,9 +1283,6 @@ class GPUTerrainMap {
       bindGroup.segments = this.bindGroups[`${bufferType}Walls`];
       bindGroup.points = this.bindGroups[`${bufferType}WallsPoints`];
     }
-
-    // Clear map before drawing.
-    if ( clear ) commandEncoder.clearBuffer(buffer);
 
     // Send the segment vertices to the GPU.
     const vertexBuffer = this._createMappedBuffer(segmentArr, GPUBufferUsage.VERTEX);
@@ -1353,6 +1356,7 @@ class GPUTerrainMap {
 
     // Clear map before drawing.
     if ( clear ) commandEncoder.clearBuffer(buffer);
+    if ( !indices.length ) return; // Nothing to draw.
 
     // Send the triangle vertices and indices to the GPU.
     const vBuf = this._createMappedBuffer(vertices, GPUBufferUsage.VERTEX);
