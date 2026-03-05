@@ -370,7 +370,7 @@ class GPUPathfinder {
     const workgroupY = Math.ceil(height / 16);
     const iterations = estimateIterations(start.x, start.y);
     const steps = Math.ceil(iterations / this.constructor.INTERNAL_ITERATIONS);
-    console.debug(`Running ${iterations} iterations for the distance map.`);
+    // console.debug(`Running ${iterations} iterations for the distance map.`);
 
     // NOTE: This assumes the propagation passes can act out-of-order.
     // If not, the compute pass must be called repeatedly within the loop.
