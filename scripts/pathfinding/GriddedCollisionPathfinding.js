@@ -2,11 +2,13 @@
 canvas,
 CONFIG,
 foundry,
+PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
 import { MODULE_ID } from "../const.js";
+import { Settings } from "../settings.js";
 import { AABB2d } from "../geometry/AABB.js";
 import { Point3d } from "../geometry/3d/Point3d.js";
 import { ObstacleOcclusionTest } from "../geometry/ObstacleOcclusionTest.js";
@@ -103,7 +105,7 @@ export const Node = superclass => class extends superclass {
 };
 
 export const NodeGridless = superclass => class extends superclass {
-  resolution = canvas.grid.size >= 128 ? 8 : (canvas.grid.size >= 64 ? 4 : 2);
+  resolution = canvas.grid.size >= 128 ? 4 : (canvas.grid.size >= 64 ? 2 : 1); // Originally 8|4|2 but too slow.
 
   neighborOffset = canvas.grid.size / this.resolution;
 
@@ -131,7 +133,7 @@ export const NodeGridless = superclass => class extends superclass {
 };
 
 export const NodeGridless3d = superclass => class extends superclass {
-  resolution = canvas.grid.size >= 128 ? 8 : (canvas.grid.size >= 64 ? 4 : 2);
+  resolution = canvas.grid.size >= 128 ? 4 : (canvas.grid.size >= 64 ? 2 : 1); // Originally 8|4|2 but too slow.
 
   neighborOffset = canvas.grid.size / this.resolution;
 
@@ -163,13 +165,6 @@ export const NodeGridless3d = superclass => class extends superclass {
 
 export const SceneGraphFilter = superclass => class extends superclass {
 
-  token;
-
-  initialize(token) {
-    super.initialize(token);
-    this.token = token;
-  }
-
   /**
    * Filter the neighbors
    * @param {GridCoordinates} node
@@ -178,6 +173,10 @@ export const SceneGraphFilter = superclass => class extends superclass {
   filterNeighbors(neighbors, node) {
     const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
     return neighbors.filter(n => !sceneGraph.pathBlocked(node, n, this.token));
+  }
+
+  testCollision(start, end, moveToken) {
+    return CONFIG[MODULE_ID].sceneGraph.pathBlocked(start, end, moveToken);
   }
 };
 
@@ -225,8 +224,26 @@ export const ClockwiseSweepFilter = superclass => class extends superclass {
     });
   }
 
-  nodeIsUnreachable(node) {
-    if ( super.nodeIsUnreachable(node) ) return true;
+  // Must initialize and start pathfinding first.
+  testCollision(start, end, _moveToken) {
+    const aabb = AABB2d.fromPoints([start, end]);
+    this.#sweep.initialize(start, {
+      type: "move",
+      source: this.source,
+      addedEdges: this.#addedEdges,
+      boundaryShapes: [aabb.toRectangle()]
+    });
+    const ray = new foundry.canvas.geometry.Ray(start, end);
+    return this.#sweep._testCollision(ray, "any");
+  }
+
+  testCollision2(start, end, _moveToken) {
+    const type = "move";
+    return CONFIG.Canvas.polygonBackends[type].testCollision(start, end, { type, mode: "any", source: this.source });
+  }
+
+  nodeIsUnreachable(node, start) {
+    if ( super.nodeIsUnreachable(node, start) ) return true;
 
     const blockingCfg = {
       dead: false,
@@ -248,27 +265,57 @@ export const OcclusionFilter = superclass => class extends superclass {
   #occlusionTester = new ObstacleOcclusionTest();
 
   initialize(token) {
-    this.#occlusionTester._config.blocking.tokens.live = true;
+    // Occlusion tester frustum defaults to the scene rect.
+    // We need the entire scene rect b/c cannot know for certain where the path will go.
+    this.#occlusionTester.initialize({ subjectToken: token });
     super.initialize(token);
   }
 
+  startPathfinding(_start) {
+    // Set up blocking.
+    const excludedStatuses = CONFIG[MODULE_ID].pathfindingIgnoreStatuses;
+    const { dead, live, prone } = CONFIG[MODULE_ID].tokensBlock;
+    const PF = Settings.KEYS.PATHFINDING;
+    const tokensBlock = Settings.get(PF.TOKENS_BLOCK);
+    const someTokensBlock = tokensBlock !== PF.TOKENS_BLOCK_CHOICES.NO;
+    const allTokensBlock = tokensBlock === PF.TOKENS_BLOCK_CHOICES.ALL;
+    const blockingCfg = {
+      senseType: "move",
+      walls: true,
+      tiles: false,
+      regions: false,
+      tokens: {
+        dead: dead && someTokensBlock,
+        live: live && someTokensBlock,
+        prone: prone && someTokensBlock,
+        enemies: someTokensBlock,
+        allies: allTokensBlock,
+        excludedStatuses,
+      },
+    };
+    this.#occlusionTester.config = blockingCfg;
+  }
+
   filterNeighbors(neighbors, node) {
-    using rayOrigin = node.clone();
     const ot = this.#occlusionTester;
-    ot.frustum = AABB2d.fromPoints(neighbors);
-    ot._initialize({ rayOrigin });
 
     // Test whether each neighbor is occluded w/r/t this node.
-    using tmpPt = Point3d.tmp;
+    using dir = Point3d.tmp;
     return neighbors.filter(n => {
-      tmpPt.set(n.x, n.y, n.z || node.z);
-      tmpPt.subtract(rayOrigin, tmpPt);
-      return !ot._rayIsOccluded(tmpPt);
+      dir.set(n.x, n.y, n.z || node.z);
+      dir.subtract(node, dir);
+      return !ot.rayIsOccluded(node, dir);
     });
   }
 
+  // Must initialize and start pathfinding first.
+  testCollision(start, end, _moveToken) {
+    using dir = end.subtract(start);
+    return this.#occlusionTester.rayIsOccluded(start, dir);
+  }
+
   nodeIsUnreachable(node, start) {
-    if ( super.nodeIsUnreachable(node) ) return true;
+    if ( super.nodeIsUnreachable(node, start) ) return true;
 
     // Is node within a blocking token?
     for ( const token of canvas.tokens.placeables ) {
@@ -277,7 +324,7 @@ export const OcclusionFilter = superclass => class extends superclass {
     }
 
     // Is node within a blocking region and not currently in that region?
-    if ( this.#occlusionTester._config.blocking.region ) {
+    if ( this.#occlusionTester._config.region ) {
       for ( const region of canvas.regions.placeables ) {
         region.GeometryLib.geometry.update();
         for ( const shape of region.document.shapes ) {
@@ -302,6 +349,23 @@ export const Neighbors2d = superclass => class extends superclass {
     using node2d = GridCoordinates.tmp.set(node.x, node.y);
     return canvas.grid.getAdjacentOffsets(node2d) // Offsets are at the center of the grid square.
       .map(offset => node.constructor.fromOffset(offset, node.elevation));
+  }
+
+  /**
+   * Maximum number of iterations given a start and end coordinate.
+   * Used to stop if no path.
+   * @param {Node} start
+   * @param {Node} goal
+   * @returns {number}
+   */
+  static maxIterations(start, goal) {
+    // Set to either maximum grid steps or an area double that of the minimum grid steps.
+    // Represents searching a rectangle equal to 2x the distance from start to goal.
+    const { sceneHeight, sceneWidth, size } = canvas.scene.dimensions;
+    const invSize = 1 / size;
+    const maxGridSteps = sceneHeight * sceneWidth * (invSize ** 2);
+    const minGridSteps = Math.ceil(PIXI.Point.distanceBetween(start, goal) * invSize);
+    return Math.min((minGridSteps * 2) ** 2, maxGridSteps);
   }
 };
 
@@ -359,6 +423,25 @@ export const Neighbors2dGridless = superclass => class extends superclass {
     }
     return out;
   }
+
+  /**
+   * Maximum number of iterations given a start and end coordinate.
+   * Used to stop if no path.
+   * @param {Node} start
+   * @param {Node} goal
+   * @returns {number}
+   */
+  static maxIterations(start, goal) {
+    // Set to either maximum grid steps or an area double that of the minimum grid steps.
+    // Represents searching a rectangle equal to 2x the distance from start to goal.
+    const { sceneHeight, sceneWidth, size } = canvas.scene.dimensions;
+    const resolution = size >= 128 ? 4 : (size >= 64 ? 4 : 2); // Originally 8|4|2 but too slow.
+    const neighborOffset = size / resolution;
+    const invSize = 1 / neighborOffset;
+    const maxGridSteps = sceneHeight * sceneWidth * (invSize ** 2);
+    const minGridSteps = Math.ceil(PIXI.Point.distanceBetween(start, goal) * invSize);
+    return Math.min((minGridSteps * 2) ** 2, maxGridSteps);
+  }
 };
 
 export const Neighbors3d = superclass => class extends superclass {
@@ -380,6 +463,24 @@ export const Neighbors3d = superclass => class extends superclass {
     return canvas.grid.getAdjacentOffsets(node)
       .map(offset => node.constructor.fromOffset(offset))
       .filter(offset => offset.z.between(this.config.minZ ?? node.z, this.config.maxZ ?? node.z));
+  }
+
+  /**
+   * Maximum number of iterations given a start and end coordinate.
+   * Used to stop if no path.
+   * @param {Node} start
+   * @param {Node} goal
+   * @returns {number}
+   */
+  static maxIterations(start, goal) {
+    // Set to either maximum grid steps or an area double that of the minimum grid steps.
+    // Represents searching a rectangle equal to 2x the distance from start to goal.
+    const { sceneHeight, sceneWidth, size } = canvas.scene.dimensions;
+    const zHeight = this.config.maxZ - this.config.minZ;
+    const invSize = 1 / size;
+    const maxGridSteps = sceneHeight * sceneWidth * zHeight * (invSize ** 3);
+    const minGridSteps = Math.ceil(Point3d.distanceBetween(start, goal) * invSize);
+    return Math.min((minGridSteps * 2) ** 3, maxGridSteps);
   }
 };
 
@@ -444,6 +545,26 @@ export const Neighbors3dGridless = superclass => class extends superclass {
       out[i++] = offsetPt;
     }
     return out;
+  }
+
+  /**
+   * Maximum number of iterations given a start and end coordinate.
+   * Used to stop if no path.
+   * @param {Node} start
+   * @param {Node} goal
+   * @returns {number}
+   */
+  static maxIterations(start, goal) {
+    // Set to either maximum grid steps or an area double that of the minimum grid steps.
+    // Represents searching a rectangle equal to 2x the distance from start to goal.
+    const { sceneHeight, sceneWidth, size } = canvas.scene.dimensions;
+    const resolution = size >= 128 ? 4 : (size >= 64 ? 2 : 1); // Originally 8|4|2 but too slow.
+    const neighborOffset = size / resolution;
+    const zHeight = this.config.maxZ - this.config.minZ;
+    const invSize = 1 / neighborOffset;
+    const maxGridSteps = sceneHeight * sceneWidth * zHeight * (invSize ** 3);
+    const minGridSteps = Math.ceil(Point3d.distanceBetween(start, goal) * invSize);
+    return Math.min((minGridSteps * 2) ** 3, maxGridSteps);
   }
 };
 

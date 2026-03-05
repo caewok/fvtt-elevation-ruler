@@ -350,6 +350,30 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
     // node.drawGapPoints({ color });
   }
 
+  /**
+   * Maximum number of iterations given a start and end coordinate.
+   * Used to stop if no path.
+   * @param {Node} start
+   * @param {Node} goal
+   * @returns {number}
+   */
+  static maxIterations(start, goal) {
+    // Challenging to estimate. Maximum would be the total number of pixels.
+    // The reality is much less, but highly dependent on number of walls.
+    // 0 walls: one iteration.
+    // 1 wall: one + 2 endpoints + 2 midpoints
+    // 2 walls: As few as the 1 wall scenario, or as many as one + 4 endpoints + 4 midpoints + ???
+    // Estimate 4 points per wall, no more than 1 point per grid space.
+    const { sceneHeight, sceneWidth, size } = canvas.scene.dimensions;
+    const invSize = 1 / size;
+    const maxGridSteps = sceneHeight * sceneWidth * (invSize ** 2);
+    const nWalls = canvas.walls.placeables.length;
+    const gapPointsEstimate = Math.min(maxGridSteps, (nWalls * 4) + 2);
+
+    // But multiple iterations may be required to revisit certain points.
+    return gapPointsEstimate * 10;
+  }
+
 }
 
 function randomColor() {
@@ -375,7 +399,7 @@ export function worldBuilderClockwise({ cost, use3d, heuristic } = {}) {
   cost ??= pathCfg.cost;
   heuristic ??= pathCfg.heuristic;
 
-  const key = [cost, use3d, heuristic, neighborFilter].join(".");
+  const key = [cost, use3d, heuristic].join(".");
   if ( worldClassCache.has(key) ) return worldClassCache.get(key);
 
   let costCl;

@@ -36,9 +36,9 @@ const COST_FUNCTIONS = {
 
   foundry: function(a, b) { return canvas.grid.measurePath([a, b]).cost; },
 
-  terrain: function(a, b, token) {
-    const terrainWaypoints = token.createTerrainMovementPath([a, b]);
-    return token.measureMovementPath(terrainWaypoints).cost;
+  terrain: function(a, b) {
+    const terrainWaypoints = this.token.createTerrainMovementPath([a, b]);
+    return this.token.measureMovementPath(terrainWaypoints).cost;
   },
 };
 

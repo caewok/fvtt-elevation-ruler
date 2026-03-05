@@ -14,8 +14,14 @@ import { AbstractPathfinder } from "./AbstractPathfinder.js";
 import { GEOMETRY_LIB_ID, GEOMETRY_ID } from "../geometry/const.js";
 import { Settings } from "../settings.js";
 import { combineTypedArrays } from "../geometry/util.js";
-import { HorizontalQuadVertices, Polygon3dVertices } from "../geometry/placeable_geometry/BasicVertices.js";
-import { VertexObject } from "../geometry/placeable_geometry/GeometryDesc.js";
+import {
+  HorizontalQuadVertices,
+  Polygon3dVertices,
+  Ellipse3dVertices,
+  Circle3dVertices,
+  Hex3dVertices,
+} from "../geometry/placeable_vertices/BasicVertices.js";
+import { VertexObject } from "../geometry/placeable_vertices/PlaceableVertices.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix } from "../geometry/mixwith.js";
 import { dropIntermediatePoints } from "./path_cleaning.js";
@@ -98,7 +104,7 @@ const GPUTerrainMixin = superclass => class extends superclass {
    * @returns {Float32Array}
    */
   static convertTokenEdgesToFlatArray(tokens) {
-    const edges = tokens.flatMap(t => [...t.constrainedTokenBorder.iterateEdges( { close: true })])
+    const edges = tokens.flatMap(t => [...t.constrainedTokenBorder.iterateEdges( { close: true })]);
     return this.convertEdgesToFlatArray(edges);
   }
 
@@ -130,13 +136,43 @@ const GPUTerrainMixin = superclass => class extends superclass {
       return vo;
     }
 
-    vo.vertices = HorizontalQuadVertices.top;
+    if ( CONFIG[GEOMETRY_LIB_ID].CONFIG.useTokenSphere ) {
+      // Assume for now that we would run into the largest part of the sphere radius.
+      // This might be reasonable for two colliding tokens, plus simpler for pathfinding.
+      // Same treatment as ellipse.
+      const { width, height } = token.document;
+      const zHeight = (token.topZ - token.bottomZ) / canvas.dimensions.size;
+      const density = Circle3dVertices.defaultDensityForDimensions(width, height, zHeight);
+      vo.vertices = Circle3dVertices.polygonTopFace(undefined, { density });
+
+    } else {
+      const SHAPES = CONST.TOKEN_SHAPES;
+      switch ( token.document.shape ) {
+        case SHAPES.ELLIPSE_1:
+        case SHAPES.ELLIPSE_2: {
+          const { width, height } = token.document;
+          const zHeight = (token.topZ - token.bottomZ) / canvas.dimensions.size;
+          const density = Ellipse3dVertices.defaultDensityForDimensions(width, height, zHeight);
+          vo.vertices = Ellipse3dVertices.polygonTopFace(undefined, { density });
+          break;
+        }
+
+        case SHAPES.RECTANGLE_1:
+        case SHAPES.RECTANGLE_2: vo.vertices = HorizontalQuadVertices.top; break;
+
+        case SHAPES.TRAPEZOID_1:
+        case SHAPES.TRAPEZOID_2: {
+          const shape = Hex3dVertices.hexagonalShapeForToken(token);
+          vo.vertices = Polygon3dVertices._polygonTopFaceFan(shape, { topZ: 0.5 });
+        }
+      }
+    }
+
     vo.hasNormals = true;
     vo.hasUVs = true;
     vo.dropNormalsAndUVs({ out: vo });
 
     const geom = token[GEOMETRY_LIB_ID][GEOMETRY_ID];
-    geom.update();
     vo.transformToModel(geom.modelMatrix, vo);
     return vo;
   }
@@ -162,7 +198,6 @@ const GPUTerrainMixin = superclass => class extends superclass {
    */
   static _convertRegionTopToVertexObject(region) {
     const geom = region[GEOMETRY_LIB_ID][GEOMETRY_ID];
-    geom.update();
 
     // Need to earcut faces but also handle holes.
     const vertices = [];
@@ -316,7 +351,7 @@ const GPUTerrainMixin = superclass => class extends superclass {
     const subjectToken = this.token;
     return tokens.filter(token => {
       const value = this.constructor.tokenValue(token, subjectToken);
-      return !(value === this.constructor.FEATURES.NORMAL && value === this.constructor.FEATURES.BLOCKING);
+      return !(value === this.constructor.FEATURES.NORMAL || value === this.constructor.FEATURES.BLOCKING);
     });
   }
 
@@ -449,12 +484,11 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
    * @param {Float32Array} buffer
    * @returns {[result: object, transfer: object[]}
    */
-  async extractBufferData({ bufferType = "transient", buffer } = {}) {
-    buffer ??= new Uint32Array(this.area);
-    const params = { buffer, bufferType };
+  async extractBufferData({ bufferType = "transient" } = {}) {
+    const params = { bufferType };
     params.debug = CONFIG[MODULE_ID].debug;
-    const res = await this.executeFunction("extractBufferData", [params], [buffer.buffer]);
-    return res.buffer;
+    const res = await this.executeFunction("extractBufferData", [params]);
+    return res;
   }
 
   /**
@@ -926,6 +960,11 @@ colorFn = value => {
     default: return heatMap(value);
   }
 }
+
+alphaFn = value => value === 255 ? 1 : 1 ? 0.1 : 0.5
+PixelCache = CONFIG.GeometryLib.lib.PixelCache
+cache = PixelCache.fromPixelArray(bufferData.buffer, bufferData.width, { resolution: worker.resolution, translate: worker.sceneTranslation })
+
 
 alphaFn = value => value === 255 ? 1 : 1 ? 0.1 : 0.5
 pf.terrain.staticTerrain.draw({ maximumPixelValue: 255, local: true, skip: 5, colorFn, alphaFn })

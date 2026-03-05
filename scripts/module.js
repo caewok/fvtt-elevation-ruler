@@ -15,7 +15,7 @@ import { MODULE_ID, TEMPLATES } from "./const.js";
 import { log, gridShape } from "./util.js";
 
 // Pathfinding
-import { benchPathfinding } from "./pathfinding/benchmark.js";
+import { benchTokenPath, testPathfinding } from "./pathfinding/benchmark.js";
 
 import { AbstractPathfinder } from "./pathfinding/AbstractPathfinder.js";
 import {
@@ -30,6 +30,7 @@ import {
 import { GriddedCollisionPathfinder, worldBuilderGriddedCollision } from "./pathfinding/GriddedCollisionPathfinding.js";
 
 // ClockwiseSweep pathfinding
+import { ObstacleSweep, ClockwisePathfindingSweep } from "./pathfinding/ClockwiseSweep.js";
 import { ClockwiseSweepPathfinder, worldBuilderClockwise } from "./pathfinding/ClockwiseSweepPathfinding.js";
 
 // WebGPU pathfinding
@@ -61,13 +62,6 @@ Hooks.once("init", function() {
   CONFIG[MODULE_ID] = {
 
     /**
-     * Account for terrains/tokens in pathfinding.
-     * Can be a serious performance hit.
-     * @type {boolean}
-     */
-    pathfindingCheckTerrains: false,
-
-    /**
      * ID of Token statuses to ignore when pathfinding.
      * @type {Set<string>}
      */
@@ -91,12 +85,16 @@ Hooks.once("init", function() {
      */
     tokenPathfindingBuffer: -1,
 
-
     /**
-     * Use pathfinding in 3d, which can be slow.
-     * @type {boolean}
+     * More refined options of what type of tokens block if the tokens block setting
+     * is chosen for pathfinding.
+     * @type {TokenBlockingConfig}
      */
-    use3dPathfinding: false,
+    tokensBlock: {
+      dead: true,
+      live: true,
+      prone: true,
+    },
 
     /**
      * @type {
@@ -130,7 +128,8 @@ Hooks.once("init", function() {
     PATCHER,
 
     pathfinding: {
-      benchPathfinding,
+      benchTokenPath,
+      testPathfinding,
 
       AbstractPathfinder,
       BFSGraph,
@@ -145,7 +144,10 @@ Hooks.once("init", function() {
       worldBuilderGriddedCollision,
 
       ClockwiseSweepPathfinder,
-      worldBuilderClockwise
+      worldBuilderClockwise,
+
+      ObstacleSweep,
+      ClockwisePathfindingSweep,
     },
 
     pathCleaning: {
@@ -175,7 +177,7 @@ Hooks.once("setup", function() {
   initializePatching();
 });
 
-Hooks.once("canvasReady", function() {
+Hooks.on("canvasReady", function() {
   // Placeable Geometry for collision testing.
   const geometryTracking = CONFIG.GeometryLib.lib.placeableGeometryTracking;
   const geometryTypes = [
@@ -186,8 +188,9 @@ Hooks.once("canvasReady", function() {
   ];
   for ( const type of geometryTypes ) {
     const cl = geometryTracking[`${type}GeometryTracker`];
-    cl.registerPlaceableHooks();
-    cl.registerExistingPlaceables();
+    const watcher = cl.create();
+    watcher.activate();
+    watcher.registerExistingPlaceables();
   }
 
   Settings.pathfinderReady = true;
@@ -197,6 +200,27 @@ Hooks.once("canvasReady", function() {
     useWalls: true,
     useTokens: false,
   });
+});
+
+Hooks.on("canvasTearDown", function() {
+  CONFIG[MODULE_ID].sceneGraph = null;
+
+  Settings.pathfinderReady = false;
+
+  // Placeable Geometry for collision testing.
+  const geometryTracking = CONFIG.GeometryLib.lib.placeableGeometryTracking;
+  const geometryTypes = [
+    "Tile",
+    "Wall",
+    "Token",
+    "Region",
+  ];
+  for ( const type of geometryTypes ) {
+    const cl = geometryTracking[`${type}GeometryTracker`];
+    const watcher = cl.create();
+    watcher.deactivate();
+    watcher.deRegisterExistingPlaceables();
+  }
 });
 
 // For https://github.com/League-of-Foundry-Developers/foundryvtt-devMode

@@ -145,7 +145,9 @@ export class GraphPathfindingWorld {
    * Initialize this world for a given path construction.
    * @param {Token} token     Token doing the movement
    */
-  initialize(_token) { }
+  token;
+
+  initialize(token) { this.token = token; }
 
   /**
    * Filter the neighbors for this node, keeping only valid neighbors.
@@ -178,10 +180,19 @@ export class GraphPathfindingWorld {
    * @param {Node} start
    * @returns {boolean}
    */
-  nodeIsUnreachable(node, _start) {
+  nodeIsUnreachable(node, start) {
     if ( !canvas.scene.dimensions.sceneRect.contains(node.x, node.y) ) return true;
-    if ( CONFIG[MODULE_ID].sceneGraph.pointIsInFace(node) ) return true;
-    return false;
+
+    // Is the node in a different enclosed room than start?
+    const sceneGraph = CONFIG[MODULE_ID].sceneGraph;
+    const nodeFace = sceneGraph.pointIsInFace(node);
+    const startFace = sceneGraph.pointIsInFace(start);
+    if ( !(nodeFace || startFace) || nodeFace === startFace ) return false;
+
+    // Possible that we just got unlucky and there are multiple faces for this point.
+    const nodeFaces = sceneGraph.enclosedFacesForPoint(node);
+    const startFaces = sceneGraph.enclosedFacesForPoint(start);
+    return !nodeFaces.intersects(startFaces);
   }
 
   startPathfinding(_start, _goal) { }
@@ -200,7 +211,7 @@ export class GraphPathfindingWorld {
    * @param {Node} goal
    * @returns {number}
    */
-  maxIterations(start, _goal) {
+  static maxIterations(start, _goal) {
     // Number of steps from start to the edge of the scene.
     // For a grid, 1 step is one grid square.
     const { sceneRect, size } = canvas.scene.dimensions;
@@ -314,6 +325,9 @@ class AbstractGraph {
     this._cameFrom.set(start.key, null);
   }
 
+  // Use a Set to track "Closed" nodes (already fully processed)
+  closedSet = new Set();
+
   /**
    * Find the path between startPoint and endPoint using the chosen algorithm.
    * @param {Point} start       Start point for the graph
@@ -331,16 +345,24 @@ class AbstractGraph {
     this._initializePathfindingRun(startNode);
 
     let iter = 0;
-    let MAX_ITER = 1e03; // this.world.maxIterations(start, goal) || 1e03;
+    let MAX_ITER = this.world.constructor.maxIterations(start, goal) || 1e03;
     let reachedGoal = false;
     if ( this.debug ) {
       this.world.drawNode(startNode, { color: Draw.COLORS.yellow });
       this.world.drawNode(goalNode, { color: Draw.COLORS.green });
     }
+
+    const closedSet = this.closedSet;
+    closedSet.clear();
     while ( this._frontier.length > 0 && iter < MAX_ITER ) {
       // if ( signal.aborted ) return null;
       iter += 1;
       const current = this._frontier.dequeue();
+
+      // If already processed, skip.
+      if ( closedSet.has(current.key) ) continue;
+      closedSet.add(current.key);
+
       if ( this.debug ) {
         if ( this.debugDelay ) await sleep(this.debugDelay);
         this.world.drawNode(current, { color: Draw.COLORS.blue, alpha: 0.2, radius: 3 });
@@ -350,39 +372,31 @@ class AbstractGraph {
         if ( !this._cameFrom.has(goalNode.key) ) this._cameFrom.set(goalNode.key, current); // CWSweep, for example, does not use current.key === goalNode.key.
         break;
       }
-      await this._processFrontierNeighbors(current, goalNode);
+      for ( const n of this.world.getNeighbors(current) ) this.processFrontierNeighbor(current, n, goal);
     }
 
-    if ( iter >= MAX_ITER ) {
-      console.warn(`${this.constructor.name}|findPath stuck in loop.`, { startNode, goalNode });
+    if ( !reachedGoal ) {
+      if ( iter >= MAX_ITER ) console.warn(`${this.constructor.name}|findPath stuck in loop.`, { startNode, goalNode });
+      if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: No path after examining ${closedSet.size} nodes over ${iter} iterations.`);
+      return null;
     }
-    if ( !reachedGoal ) return null;
 
     const path = this.constructor.reconstructPath(this._cameFrom, goalNode);
+    if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: Found length ${path?.length} path by examining ${closedSet.size} nodes over ${iter} iterations.`);
+
     if ( !path.at(0).almostEqual(start) ) path.unshift(start); // World must handle checks between start and startNode.
     if ( !path.at(-1).almostEqual(goal) ) path.push(goal);  // World must handle checks between goal and goalNode.
     return path;
   }
 
   /**
-   * Asynchronously process all the neighbors for the current node of the frontier.
-   * Async so it can be stopped.
-   * @param {Point} current
-   */
-  async _processFrontierNeighbors(current, goal) {
-    const neighbors = this.world.getNeighbors(current);
-    const numNeighbors = neighbors.length;
-    const promises = Array(numNeighbors);
-    for ( let i = 0; i < numNeighbors; i += 1 ) {
-      promises.push(this._processFrontierNeighbor(current, neighbors[i], goal));
-    }
-    return Promise.allSettled(promises);
-  }
-
-  /**
    * Apply a given algorithm to process neighbors along the frontier.
+   * The child class should set the frontier and cameFrom map accoridngly.
+   * @param {Node} current          The current position
+   * @param {Node} next             The neighbor to consider
+   * @
    */
-  async _processFrontierNeighbor(_current, _next) { console.error("_processFrontierNeighbor must be defined by child class."); }
+  processFrontierNeighbor(_current, _next) { console.error("_processFrontierNeighbor must be defined by child class."); }
 
   /**
    * For a given goal, reconstruct the path to the beginning.
@@ -444,7 +458,7 @@ export class BFSGraph extends AbstractGraph {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  async _processFrontierNeighbor(current, next) {
+  processFrontierNeighbor(current, next) {
     if ( !this._cameFrom.has(next.key) ) {
       this._frontier.enqueue(next);
       this._cameFrom.set(next.key, current);
@@ -481,9 +495,11 @@ export class UniformCostGraph extends BFSGraph {
   }
 
   /**
-   * Apply a given algorithm to process neighbors along the frontier.
+   * Prioritize the neighbor based on cost and add to the
+   * @param {Node} current          The current position
+   * @param {Node} next             The neighbor to consider
    */
-  async _processFrontierNeighbor(current, next) {
+  processFrontierNeighbor(current, next) {
     const costSoFar = this._costSoFar;
     const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
@@ -524,7 +540,7 @@ export class GreedyBestFirstGraph extends BFSGraph {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  async _processFrontierNeighbor(current, next, goal) {
+  processFrontierNeighbor(current, next, goal) {
     if ( !this._cameFrom.has(next.key) ) {
       const priority = this.world.heuristic(next, goal);
       this._frontier.enqueue(next, priority);
@@ -564,16 +580,16 @@ export class AStarGraph extends UniformCostGraph {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
    */
-  async _processFrontierNeighbor(current, next, goal) {
+  processFrontierNeighbor(current, next, goal) {
     const costSoFar = this._costSoFar;
     const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
       costSoFar.set(next.key, newCost);
+      this._cameFrom.set(next.key, current);
 
       // Priority = g(n) + h(n).
       const priority = newCost + this.world.heuristic(next, goal);
       this._frontier.enqueue(next, priority);
-      this._cameFrom.set(next.key, current);
     }
   }
 
@@ -599,6 +615,7 @@ export class AStarGraph extends UniformCostGraph {
   }
 }
 
+
 /* Testing
 MODULE_ID = "elevationruler"
 Draw = CONFIG.GeometryLib.lib.Draw;
@@ -615,46 +632,177 @@ let { solveSegment,
       removeDuplicatePoints,
       fogIsExplored,
 } = api.pathCleaning
+benchTokenPath = api.pathfinding.benchTokenPath
+testPathfinding = api.pathfinding.testPathfinding
 
 await WebGPUPathfinder.initialize();
 
+
 let randal = canvas.tokens.placeables.find(t => t.name === "Randal")
 let zanna = canvas.tokens.placeables.find(t => t.name === "Zanna")
-start = GridCoordinates3d.fromObject(randal.center)
-end = GridCoordinates3d.fromObject(zanna.center)
-pf = new GriddedCollisionPathfinder(randal)
-
 let beiro = canvas.tokens.placeables.find(t => t.name === "Beiro")
 let riswynn = canvas.tokens.placeables.find(t => t.name === "Riswynn")
-start = GridCoordinates3d.fromObject(beiro.center)
-end = GridCoordinates3d.fromObject(riswynn.center)
-pf = new GriddedCollisionPathfinder(beiro)
-
 let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
 let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
+
+// collision, webGPU, clockwiseSweep
+algorithm = "webGPU"
+graphPathfinding = {
+  cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
+  heuristic: "terrain", //"manhattan"|"euclidean"|"foundry"|"terrain"
+  neighborFilter: "occlusion" // "clockwiseSweep"|"occlusion"|"sceneGraph"
+}
+await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
+await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
+await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
+
+
+
+ **
+ * Uses bresenham to draw pixels under each wall in the scene.
+ * @param {Wall[]} [walls]      Walls to approximate
+ * @returns {Set<key>} Unique pixels, coded by point key.
+ *
+function uniquePixelsForCanvasWalls(walls) {
+  const blIterator = CONFIG.GeometryLib.lib.utils.bresenhamLineIterator;
+  const coveredPixels = new Set();
+  walls ??= canvas.walls.placeables;
+  walls.forEach(wall => {
+    const edge = wall.edge;
+    for ( const pt of blIterator(edge.a, edge.b) ) {
+      coveredPixels.add(pt.key);
+      pt.release();
+    }
+  });
+  return coveredPixels;
+}
+coveredPixels = uniquePixelsForCanvasWalls()
+coveredPixels.forEach(key => Draw.point(PIXI.Point.invertKey(key), { radius: 1 }))
+
+canvas.walls.placeables.forEach(wall => {
+  const edge = wall.edge;
+  const points = CONFIG.GeometryLib.lib.utils.bresenhamLine(edge.a.x, edge.a.y, edge.b.x, edge.b.y);
+  const pt = PIXI.Point.tmp.set()
+  for ( let i = 0; i < points.length; i += 2 ) {
+    pt.set(points[i], points[i+1]);
+    Draw.point(pt, { radius: 1 })
+  }
+  pt.release();
+});
+
+canvas.walls.placeables.forEach(wall => {
+  const edge = wall.edge;
+  const iter = CONFIG.GeometryLib.lib.utils.bresenhamLineIterator(edge.a, edge.b);
+  for ( const pt of iter ) {
+    Draw.point(pt, { radius: 1 });
+    pt.release();
+  }
+});
+
+
+
+percentArea = uniquePixelsForCanvasWalls().size / canvas.scene.dimensions.sceneRect.area
+
+// Need to account for resolution. Because the walls are stuck at 1 pixel,
+// they shrink by res, not res^2.
+// Original coverage: length * 1 pixel / (W * H)
+// New coverage: length * res * 1 / (W * res) * (H * res) = length / (W * H * res)
+// Cnew ~= C orig / res
+
+start = GridCoordinates3d.fromObject(randal.center)
+end = GridCoordinates3d.fromObject(zanna.center)
+pf = new WebGPUPathfinder(randal)
+
+res = pf.constructor.worker.resolution
+uniquePixelsForCanvasWalls().size * res
+
+percentArea / res
+
+console.log(`
+\tScene width: \t${canvas.scene.dimensions.sceneWidth} \theight: \t${canvas.scene.dimensions.sceneHeight}
+\tGrid width: \t${pf.constructor.worker.gridDims.x} \theight: \t${pf.constructor.worker.gridDims.y}
+\tResolution: \t${pf.constructor.worker.resolution}
+\tWall pixels: \t${uniquePixelsForCanvasWalls().size}
+\tStart Coords:
+\t\tRandal: \t${randal.center.x - canvas.scene.dimensions.sceneX},${randal.center.y - canvas.scene.dimensions.sceneX}
+\t\Beiro: \t${beiro.center.x - canvas.scene.dimensions.sceneX},${beiro.center.y - canvas.scene.dimensions.sceneX}
+\t\Akra: \t${akra.center.x - canvas.scene.dimensions.sceneX},${akra.center.y - canvas.scene.dimensions.sceneX}
+`)
+
+
+
+
+
+
+
+
+
+
+start = GridCoordinates3d.fromObject(randal.center)
+end = GridCoordinates3d.fromObject(zanna.center)
+pf = new WebGPUPathfinder(randal)
+
+
+start = GridCoordinates3d.fromObject(beiro.center)
+end = GridCoordinates3d.fromObject(riswynn.center)
+pf = new WebGPUPathfinder(beiro)
+
 start = GridCoordinates3d.fromObject(akra.center)
 end = GridCoordinates3d.fromObject(perrin.center)
-pf = new GriddedCollisionPathfinder(akra)
+pf = new ClockwiseSweepPathfinder(akra)
 
 midE = (pf.token.topE - pf.token.bottomE) * 0.5;
 start.elevation += midE;
 end.elevation += midE;
 
 
-pf.debug = true
-pf.debugDelay = 1000;
 
+await benchTokenPath(randal, zanna.center, { N: 3 });
+await benchTokenPath(beiro, riswynn.center, { N: 3 });
+await benchTokenPath(akra, perrin.center, { N: 3 });
+
+// Benchmark collision testing
+QBenchmarkLoopFn = CONFIG.GeometryLib.lib.bench.QBenchmarkLoopFn
+N = 1000
+
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion"
 await pf.startPathfinding(start);
+pf.world.testCollision(start, end, pf.token);
+await QBenchmarkLoopFn(N, pf.world.testCollision.bind(pf.world), "occlusion", start, end, pf.token)
+
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "sceneGraph"
+await pf.startPathfinding(start);
+pf.world.testCollision(start, end, pf.token);
+await QBenchmarkLoopFn(N, pf.world.testCollision.bind(pf.world), "sceneGraph", start, end, pf.token)
+
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "clockwiseSweep"
+await pf.startPathfinding(start);
+pf.world.testCollision(start, end, pf.token);
+pf.world.testCollision2(start, end, pf.token);
+await QBenchmarkLoopFn(N, pf.world.testCollision.bind(pf.world), "clockwiseSweep", start, end, pf.token)
+await QBenchmarkLoopFn(N, pf.world.testCollision2.bind(pf.world), "foundry sweep", start, end, pf.token)
+
+pf.debug = true
+pf.debugDelay = 50;
+
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion"
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "sceneGraph"
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "clockwiseSweep"
+
+console.time("Pathfinding setup")
+await pf.startPathfinding(start);
+console.timeEnd("Pathfinding setup")
+console.time("Pathfinding")
 path = await pf._findPath(start, end) // Skip caching
+console.timeEnd("Pathfinding")
 pf.constructor.drawPath(path)
-pathIsValid(path, pf.token)
 pf.validatePath(path, start, end)
 
 // Straightened path for collision
 gridPath = dropIntermediatePoints(path)
 gridPath = straightenPath(gridPath, pf.token);
-pathIsValid(gridPath, pf.token)
 pf.validatePath(gridPath, start, end)
+pf.constructor.drawPath(gridPath)
 
 // Gridded path for collision
 gridPath = dropIntermediatePoints(path)
@@ -682,6 +830,47 @@ pf.validatePath(gridPath, start, end)
 // Gridded path for webgpu, change resolution
 await WebGPUPathfinder.initialize(2 / canvas.dimensions.size);
 
+// Confirm WebGPU distance map
+PixelCache = CONFIG.GeometryLib.lib.PixelCache
+await pf.startPathfinding(start);
+path = await pf._findPath(start, end)
+worker = pf.constructor.worker
+
+bufferData = await worker.extractBufferData({ bufferType: "static" })
+bufferData = await worker.extractBufferData({ bufferType: "subject" })
+bufferData = await worker.extractBufferData({ bufferType: "transient" })
+bufferData = await worker.extractBufferData({ bufferType: "combined" })
+bufferData = await worker.extractBufferData({ bufferType: "distance" })
+
+uniqueValues = CONFIG.GeometryLib.lib.utils.sortedUnique(bufferData.buffer).reverse()
+
+
+heatMap = PixelCache.createHeatMap(2, 254);
+colorFn = value => {
+  switch ( value ) {
+    case 1: return Draw.COLORS.white;
+    case 255: return Draw.COLORS.red;
+    default: return heatMap(value);
+  }
+}
+alphaFn = value => value === 255 ? 1 : 1 ? 0.1 : 0.5
+
+maxBufferValue = uniqueValues[1]; // Second-largest.
+wallValue = uniqueValues[0]
+heatMap = PixelCache.createHeatMap(2, maxBufferValue);
+colorFn = value => {
+  switch ( value ) {
+    case 1: return Draw.COLORS.white;
+    case wallValue: return Draw.COLORS.red;
+    default: return heatMap(value);
+  }
+}
+alphaFn = value => value === 255 ? 1 : 1 ? 1 : 1
+
+cache = PixelCache.fromPixelArray(bufferData.buffer, bufferData.width, { resolution: worker.resolution })
+cache.translation = worker.sceneTranslation
+cache.draw({ maximumPixelValue: 255, local: false, skip: 0, radius: 5, colorFn, alphaFn })
+
 
 gridPath = dropIntermediatePoints(path)
 pathIsValid(gridPath, pf.token)
@@ -692,6 +881,18 @@ pf.constructor.drawPath(gridPath, { color: Draw.COLORS.lightgreen, alpha: 0.5 })
 pf.constructor.drawPath(gridPath, { color: Draw.COLORS.green })
 
 gridPath.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
+
+ObstacleSweep = api.pathfinding.ObstacleSweep
+geom = ogre.GeometryLib.geometry
+dir = end.subtract(start)
+ix = start.projectToward(end, geom.rayIntersectionConstrained(start, dir))
+ixNode = pf.world.buildNode(ix)
+Draw.star(ixNode)
+neighbors = pf.world.getNeighbors(ixNode)
+
+sweep = new ObstacleSweep();
+addedEdges = ObstacleSweep.identifyBlockingTokenEdges(pf.token);
+addedEdges.forEach(edge => Draw.segment(edge))
 
 
 token = randal
