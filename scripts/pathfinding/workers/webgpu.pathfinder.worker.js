@@ -237,8 +237,8 @@ class GPUPathfinder {
     const startIndex = this.terrainMapper.indexAtCanvas(start.x, start.y);
     const [width, height] = this.terrainMapper.gridDims;
 
-    const workgroupX = Math.ceil(width / 8);
-    const workgroupY = Math.ceil(height / 8);
+    const initWorkgroupX = Math.ceil(width / 8);
+    const initWorkgroupY = Math.ceil(height / 8);
     this.constructor.device.queue.writeBuffer(this.buffers.initUniform, 0, new Uint32Array([startIndex]));
 
     // Initial Pass: Set buffers to Infinity and Start to 0.
@@ -247,7 +247,7 @@ class GPUPathfinder {
     const initPass = commandInit.beginComputePass();
     initPass.setPipeline(this.pipelines.init);
     initPass.setBindGroup(0, this.bindGroups.init);
-    initPass.dispatchWorkgroups(workgroupX, workgroupY);
+    initPass.dispatchWorkgroups(initWorkgroupX, initWorkgroupY);
     initPass.end();
     this.constructor.device.queue.submit([commandInit.finish()]);
 
@@ -264,8 +264,10 @@ class GPUPathfinder {
     // Use convergence flag to determine if anything changed after X iterations.
     let totalIterations = 0;
     let converged = false;
-    const batchSize = Math.min(width, height); // TODO: Round down to multiples of 2^x? (e.g., 64)
+    const batchSize = 64; // Math.min(width, height); // TODO: Round down to multiples of 2^x? (e.g., 64)
     const safety = Math.ceil(((width * height) + 1) / this.constructor.INTERNAL_ITERATIONS);
+    const workgroupX = Math.ceil(width / 16);
+    const workgroupY = Math.ceil(height / 16);
     while ( !converged && totalIterations < safety ) {
       const commandEncoder = this.constructor.device.createCommandEncoder();
 
@@ -302,7 +304,7 @@ class GPUPathfinder {
       this.buffers.convergence.read.unmap();
     }
 
-    console.debug(`Wavefront Propagation took ${totalIterations} iterations for ${width} x ${height} grid.`);
+    // console.debug(`Wavefront Propagation took ${totalIterations} iterations for ${width} x ${height} grid.`);
 
     // Read Results
     // The final result is in Buffer A if iterations is even, Buffer B if odd.
@@ -691,10 +693,11 @@ class GPUPathfinder {
 struct GridInfo { width: u32, height: u32 };
 struct InitParams { startIndex: u32 };
 struct ControlParams { checkConvergence: u32 };
-struct Convergence { value: u32 };
 
 const WALL = 255u;
 const MAX_VAL = 0xFFFFFFFFu;
+const UNIT_UVEC2 = vec2<u32>(1u, 1u);
+const UNIT_IVEC2 = vec2<i32>(1, 1);
 
 @group(0) @binding(0) var<uniform> grid: GridInfo;
 
@@ -709,7 +712,7 @@ const MAX_VAL = 0xFFFFFFFFu;
 
 // Track whether further iterations would be useful.
 @group(0) @binding(5) var<uniform> control: ControlParams;
-@group(0) @binding(6) var<storage, read_write> convergence: Convergence;
+@group(0) @binding(6) var<storage, read_write> convergence: atomic<u32>;
 
 // Shared memory for the 16x16 tile + 1px halo (18x18 total)
 var<workgroup> tile: array<u32, 324>;
@@ -717,33 +720,19 @@ var<workgroup> tile: array<u32, 324>;
 /**
  * Get index for given local x, y location.
  */
-fn get_idx(x: u32, y: u32) -> u32 { return y * grid.width + x; }
+fn get_idx(loc: vec2<u32>) -> u32 { return loc.y * grid.width + loc.x; }
 
 /**
  * Check if cell is a wall.
  * @returns True if wall, false if traversable.
  */
-fn is_wall(x: u32, y: u32) -> bool { return terrainMap[get_idx(x, y)] >= WALL; }
-
-/**
- * Helper for handling when threads load from global to a shared local tile for the local loop.
- */
-fn load_to_tile(lx: u32, ly: u32, gx: i32, gy: i32) {
-  if ( gx >= 0 && gy >= 0 && u32(gx) < grid.width && u32(gy) < grid.height ) {
-    tile[(ly * 18u) + lx] = inputDist[get_idx(u32(gx), u32(gy))];
-  } else {
-    tile[(ly * 18u) + lx] = 0xFFFFFFFFu;
-  }
-}
+fn is_wall(loc: vec2<u32>) -> bool { return terrainMap[get_idx(loc)] >= WALL; }
 
 @compute @workgroup_size(8, 8)
 fn init_dist(@builtin(global_invocation_id) id: vec3<u32>) {
-  let x = id.x;
-  let y = id.y;
-
   // Boundary check for the 2d grid.
-  if ( x >= grid.width || y >= grid.height ) { return; }
-  let idx = get_idx(x, y);
+  if ( id.x >= grid.width || id.y >= grid.height ) { return; }
+  let idx = get_idx(id.xy);
 
   // Set each pixel of the distance map buffers to infinity except for the starting index.
   var val = 0xFFFFFFFFu;
@@ -752,54 +741,64 @@ fn init_dist(@builtin(global_invocation_id) id: vec3<u32>) {
   outputDist[idx] = val;
 }
 
+// Helper to load and map 256 threads to 324 tile slots (18x18)
+fn load_global_to_tile(localIdx: u32, gBase: vec2<i32>) {
+  let tileCoords = vec2<i32>(i32(localIdx % 18u), i32(localIdx / 18u));
+  let g = gBase + tileCoords - UNIT_IVEC2;
+  let ug = vec2<u32>(u32(g.x), u32(g.y));
+  if ( g.x >= 0 && g.y >= 0 && ug.x < grid.width && ug.y < grid.height ) {
+    tile[localIdx] = inputDist[get_idx(ug)];
+  } else {
+    tile[localIdx] = MAX_VAL;
+  }
+}
+
 @compute @workgroup_size(16, 16)
 fn main(
   @builtin(global_invocation_id) global_id: vec3<u32>,
   @builtin(local_invocation_id) local_id: vec3<u32>,
-  @builtin(workgroup_id) group_id: vec3<u32>,
+  @builtin(local_invocation_index) local_idx: u32,
 ) {
-  let lx = local_id.x + 1u; // Local X in 18x18 tile.
-  let ly = local_id.y + 1u; // Local Y in 18x18 tile.
+  let globalBase = vec2<i32>(
+    i32(global_id.x - local_id.x),
+    i32(global_id.y - local_id.y)
+  );
 
-  // Cooperative load: Every thread loads its primary pixel and helps with the halo.
-  let gx = i32(global_id.x);
-  let gy = i32(global_id.y);
-  load_to_tile(lx, ly, gx, gy);
+  // Each of the 256 threads load their respective pixel (16x16).
+  load_global_to_tile(local_idx, globalBase);
 
-  // Halo loads for some threads.
-  if ( local_id.x == 0u ) { load_to_tile(0u, ly, gx - 1, gy); }
-  if ( local_id.x == 15u ) { load_to_tile(17u, ly, gx + 1, gy); }
-  if ( local_id.y == 0u ) { load_to_tile(lx, 0u, gx, gy - 1); }
-  if ( local_id.y == 15u ) { load_to_tile(lx, 17u, gx, gy + 1); }
+  // First 68 threads load the remaining (halo) pixels to fill 324 slots (18x18).
+  if ( local_idx < 68u ) { load_global_to_tile(local_idx + 256u, globalBase); }
 
   // Stop until tile is fully loaded.
   workgroupBarrier();
 
-  // Local propagation loop.
-  // Run 8 iterations locally, which is the sweet spot for 16x16 tiles.
-  var currentBest = tile[ly * 18u + lx];
-  let current = currentBest;
-  let isOnGrid = u32(gx) < grid.width && u32(gy) < grid.height;
+  // Local propagation logic.
+  let local = local_id.xy + UNIT_UVEC2;
+  let tileIdx = (local.y * 18u) + local.x;
+
+  var currentBest = tile[tileIdx];
+  let initialValue = currentBest;
 
   // Base Movement Costs (Scaled up to keep integer precision)
   // Example: Road(1) -> Straight=10. Swamp(5) -> Straight=50
-  let idx = get_idx(u32(gx), u32(gy));
+  let idx = get_idx(global_id.xy);
   let tileCost = terrainMap[idx];
   let costStraight = 10u * tileCost;
+  let isOnGrid = global_id.x < grid.width && global_id.y < grid.height;
 
-  // Safety check: Are we on a wall?
-  var canWalk = false;
-  if ( isOnGrid ) { canWalk = tileCost < WALL; }
-
+  // Local propagation loop.
+  // Run 8 iterations locally, which is the sweet spot for 16x16 tiles.
   // Note: Cannot break in this loop b/c of workgroupBarrier.
   for ( var i = 0u; i < 8u; i ++ ) {
-    // Only update if we are walkable and not already at the source (0u).
-    if ( canWalk && currentBest > 0u ) {
+    // Note: If test must be within the loop because 'workgroupBarrier'
+    // must only be called from uniform control flow.
+    if ( isOnGrid && tileCost < WALL ) {
       // ----- Check cardinal neighbors ----- //
-      let left  = tile[ly * 18u + (lx - 1u)];
-      let right = tile[ly * 18u + (lx + 1u)];
-      let up    = tile[(ly - 1u) * 18u + lx];
-      let down  = tile[(ly + 1u) * 18u + lx];
+      let left  = tile[local.y * 18u + (local.x - 1u)];
+      let right = tile[local.y * 18u + (local.x + 1u)];
+      let up    = tile[(local.y - 1u) * 18u + local.x];
+      let down  = tile[(local.y + 1u) * 18u + local.x];
 
       // Find the minimum among the neighbors.
       let neighborMin = min(min(left, right), min(up, down));
@@ -808,20 +807,21 @@ fn main(
       }
     }
 
-    // Update the local tile with the new best value.
-    // Everyone writes so neighbors can see the update.
-    // Not strictly needed if not walking, but keeps things the same for all.
-    tile[ly * 18u + lx] = currentBest;
+    // Update the local tile.
+    tile[tileIdx] = currentBest;
 
     // Sync within the workgroup.
     workgroupBarrier();
   }
 
   // Write final result back to the global VRAM.
-  if ( isOnGrid ) { outputDist[idx] = currentBest; }
+  if ( isOnGrid ) {
+    outputDist[idx] = currentBest;
 
-  // If we are at the final iteration of this batch, check for convergence.
-  if ( control.checkConvergence == 1u && currentBest < current )  { convergence.value = 1u; }
+    // Convergence: Only write 1 if the value *actually* dropped.
+    if ( control.checkConvergence == 1u
+      && currentBest < initialValue ) { atomicStore(&convergence, 1u); }
+  }
 }
 `;
 }
@@ -1472,7 +1472,7 @@ struct VertexOutput {
 @group(0) @binding(4) var<storage, read_write> transientMap: array<u32>;
 @group(0) @binding(5) var<storage, read_write> combinedMap: array<u32>;
 
-fn get_idx(x: u32, y: u32) -> u32 { return y * u32(config.gridRes.x) + x; }
+fn get_idx(loc: vec2<u32>) -> u32 { return loc.y * u32(config.gridRes.x) + loc.x; }
 
 @vertex
 fn vs_main(@location(0) pos: vec2<f32>) -> VertexOutput {
@@ -1500,9 +1500,8 @@ const OPEN_DOOR: u32 = 0u;
 fn fs_wall(@builtin(position) fragPos: vec4<f32>) {
   // fragPos is in the coordinate space of the attachment (the dummy texture).
   // Since the dummy texture is sized to gridRes, these are already grid coords.
-  let x = u32(fragPos.x);
-  let y = u32(fragPos.y);
-  let idx = get_idx(x, y);
+  let loc = vec2<u32>(u32(fragPos.x), u32(fragPos.y));
+  let idx = get_idx(loc);
 
   // Safety check to prevent out-of-bounds if floating point error occurs
   // TODO: Is atomic necessary here? We are not incrementing for walls.
@@ -1513,9 +1512,8 @@ fn fs_wall(@builtin(position) fragPos: vec4<f32>) {
 fn fs_open_door(@builtin(position) fragPos: vec4<f32>) {
   // fragPos is in the coordinate space of the attachment (the dummy texture).
   // Since the dummy texture is sized to gridRes, these are already grid coords.
-  let x = u32(fragPos.x);
-  let y = u32(fragPos.y);
-  let idx = get_idx(x, y);
+  let loc = vec2<u32>(u32(fragPos.x), u32(fragPos.y));
+  let idx = get_idx(loc);
 
   // Safety check to prevent out-of-bounds if floating point error occurs
   // TODO: Is atomic necessary here? We are not incrementing for walls.
@@ -1549,9 +1547,8 @@ fn updateTerrainValue(idx: u32) {
 fn fs_difficult_terrain(@builtin(position) fragPos: vec4<f32>) {
   // fragPos is in the coordinate space of the attachment (the dummy texture).
   // Since the dummy texture is sized to gridRes, these are already grid coords.
-  let x = u32(fragPos.x);
-  let y = u32(fragPos.y);
-  let idx = get_idx(x, y);
+  let loc = vec2<u32>(u32(fragPos.x), u32(fragPos.y));
+  let idx = get_idx(loc);
 
   // Safety check to prevent out-of-bounds if floating point error occurs
   if ( idx < arrayLength(&terrainMap) ) {
