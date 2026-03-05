@@ -341,6 +341,8 @@ class GPUPathfinder {
     this.#distanceMapStatus = this.constructor.STATUS.READY;
   }
 
+  static INTERNAL_ITERATIONS = 8; // Number of internal local iterations in the loop.
+
   _wavefrontPropagation(start) {
     // 1. Upload start index to the GPU
     const startIndex = this.terrainMapper.indexAtCanvas(start.x, start.y);
@@ -365,13 +367,14 @@ class GPUPathfinder {
     // With diagonals, increase 150%.
     // const iterations = (width + height) * 5; // Reasonably safe option.
     const iterations = estimateIterations(start.x, start.y);
+    const steps = Math.ceil(iterations / this.constructor.INTERNAL_ITERATIONS);
     console.debug(`Running ${iterations} iterations for the distance map.`);
 
     // NOTE: This assumes the propagation passes can act out-of-order.
     // If not, the compute pass must be called repeatedly within the loop.
     const propagationPass = commandEncoder.beginComputePass({ label: "Wavefront Propagation"});
     propagationPass.setPipeline(this.pipelines.propagation);
-    for ( let i = 0; i < iterations; i += 1 ) {
+    for ( let i = 0; i < steps; i += 1 ) {
       // Swap bind groups every iteration
       const bindGroup = i % 2 === 0 ? this.bindGroups.A : this.bindGroups.B;
       propagationPass.setBindGroup(0, bindGroup);
@@ -730,6 +733,7 @@ struct GridInfo { width: u32, height: u32 };
 struct InitParams { startIndex: u32 };
 
 const WALL = 255u;
+const MAX_VAL = 0xFFFFFFFFu;
 
 @group(0) @binding(0) var<uniform> grid: GridInfo;
 
@@ -742,6 +746,9 @@ const WALL = 255u;
 // Params specifically for initialization
 @group(0) @binding(4) var<uniform> initParams: InitParams;
 
+// Shared memory for the 16x16 tile + 1px halo (18x18 total)
+var<workgroup> tile: array<u32, 324>;
+
 /**
  * Get index for given local x, y location.
  */
@@ -752,6 +759,17 @@ fn get_idx(x: u32, y: u32) -> u32 { return y * grid.width + x; }
  * @returns True if wall, false if traversable.
  */
 fn is_wall(x: u32, y: u32) -> bool { return terrainMap[get_idx(x, y)] >= WALL; }
+
+/**
+ * Helper for handling when threads load from global to a shared local tile for the local loop.
+ */
+fn load_to_tile(lx: u32, ly: u32, gx: i32, gy: i32) {
+  if ( gx >= 0 && gy >= 0 && u32(gx) < grid.width && u32(gy) < grid.height ) {
+    tile[(ly * 18u) + lx] = inputDist[get_idx(u32(gx), u32(gy))];
+  } else {
+    tile[(ly * 18u) + lx] = 0xFFFFFFFFu;
+  }
+}
 
 @compute @workgroup_size(8, 8)
 fn init_dist(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -769,62 +787,72 @@ fn init_dist(@builtin(global_invocation_id) id: vec3<u32>) {
   outputDist[idx] = val;
 }
 
-@compute @workgroup_size(8, 8)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-    let x = id.x;
-    let y = id.y;
+@compute @workgroup_size(16, 16)
+fn main(
+  @builtin(global_invocation_id) global_id: vec3<u32>,
+  @builtin(local_invocation_id) local_id: vec3<u32>,
+  @builtin(workgroup_id) group_id: vec3<u32>,
+) {
+  let lx = local_id.x + 1u; // Local X in 18x18 tile.
+  let ly = local_id.y + 1u; // Local Y in 18x18 tile.
 
-    // Boundary check for the 2d grid.
-    if ( x >= grid.width || y >= grid.height ) { return; }
-    let idx = get_idx(x, y);
+  // Cooperative load: Every thread loads its primary pixel and helps with the halo.
+  let gx = i32(global_id.x);
+  let gy = i32(global_id.y);
+  load_to_tile(lx, ly, gx, gy);
 
-    // Wall check.
-    // Note 0xFFFFFFFFu represents infinity internally.
-    let tileCost = terrainMap[idx];
-    if ( tileCost >= WALL ) {
-      outputDist[idx] = 0xFFFFFFFFu;
-      return;
+  // Halo loads for some threads.
+  if ( local_id.x == 0u ) { load_to_tile(0u, ly, gx - 1, gy); }
+  if ( local_id.x == 15u ) { load_to_tile(17u, ly, gx + 1, gy); }
+  if ( local_id.y == 0u ) { load_to_tile(lx, 0u, gx, gy - 1); }
+  if ( local_id.y == 15u ) { load_to_tile(lx, 17u, gx, gy + 1); }
+
+  // Stop until tile is fully loaded.
+  workgroupBarrier();
+
+  // Local propagation loop.
+  // Run 8 iterations locally, which is the sweet spot for 16x16 tiles.
+  var currentBest = tile[ly * 18u + lx];
+  let isOnGrid = u32(gx) < grid.width && u32(gy) < grid.height;
+
+  // Base Movement Costs (Scaled up to keep integer precision)
+  // Example: Road(1) -> Straight=10. Swamp(5) -> Straight=50
+  let idx = get_idx(u32(gx), u32(gy));
+  let tileCost = terrainMap[idx];
+  let costStraight = 10u * tileCost;
+
+  // Safety check: Are we on a wall?
+  var canWalk = false;
+  if ( isOnGrid ) { canWalk = tileCost < WALL; }
+
+  // Note: Cannot break in this loop b/c of workgroupBarrier.
+  for ( var i = 0u; i < 8u; i ++ ) {
+    // Only update if we are walkable and not already at the source (0u).
+    if ( canWalk && currentBest > 0u ) {
+      // ----- Check cardinal neighbors ----- //
+      let left  = tile[ly * 18u + (lx - 1u)];
+      let right = tile[ly * 18u + (lx + 1u)];
+      let up    = tile[(ly - 1u) * 18u + lx];
+      let down  = tile[(ly + 1u) * 18u + lx];
+
+      // Find the minimum among the neighbors.
+      let neighborMin = min(min(left, right), min(up, down));
+      if ( neighborMin != MAX_VAL ) {
+        currentBest = min(currentBest, neighborMin + costStraight);
+      }
     }
 
-    let current = inputDist[idx];
-    var best = 0xFFFFFFFFu;
+    // Update the local tile with the new best value.
+    // Everyone writes so neighbors can see the update.
+    // Not strictly needed if not walking, but keeps things the same for all.
+    tile[ly * 18u + lx] = currentBest;
 
-    // Base Movement Costs (Scaled up to keep integer precision)
-    // Example: Road(1) -> Straight=10. Swamp(5) -> Straight=50.
-    let COST_STRAIGHT = 10u * tileCost;
-    let MAX_VAL = 0xFFFFFFFFu;
+    // Sync within the workgroup.
+    workgroupBarrier();
+  }
 
-    // ----- Check straight neighbors (cost 10) ----- //
-    // Left
-    if ( x > 0u ) {
-      let v = inputDist[get_idx(x - 1u, y)];
-      if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
-    }
-
-    // Right
-    if ( x < grid.width - 1u ) {
-      let v = inputDist[get_idx(x + 1u, y)];
-      if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
-    }
-
-    // Up
-    if ( y > 0u ) {
-      let v = inputDist[get_idx(x, y - 1u)];
-      if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
-    }
-
-    // Down
-    if ( y < grid.height - 1u ) {
-      let v = inputDist[get_idx(x, y + 1u)];
-      if (v != MAX_VAL) { best = min(best, v + COST_STRAIGHT); }
-    }
-
-    // Update
-    if ( best != MAX_VAL ) {
-      outputDist[idx] = min(current, best);
-    } else {
-      outputDist[idx] = current;
-    }
+  // Write final result back to the global VRAM.
+  if ( isOnGrid ) { outputDist[idx] = currentBest; }
 }
 `;
 }
