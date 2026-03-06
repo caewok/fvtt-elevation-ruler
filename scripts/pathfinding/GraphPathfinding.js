@@ -622,7 +622,7 @@ Draw = CONFIG.GeometryLib.lib.Draw;
 GridCoordinates3d = CONFIG.GeometryLib.lib.threeD.GridCoordinates3d
 GridCoordinates = CONFIG.GeometryLib.lib.GridCoordinates
 api = game.modules.get("elevationruler").api
-let { ClockwiseSweepPathfinder, GriddedCollisionPathfinder, WebGPUPathfinder, worldBuilderGriddedCollision } = api.pathfinding;
+let { ClockwiseSweepPathfinder, GriddedCollisionPathfinder, WebGPUPathfinder, worldBuilderGriddedCollision, ClockwiseSweepPathfindingNode } = api.pathfinding;
 let { solveSegment,
       pathIsValid,
       optimizeGridPath,
@@ -711,7 +711,7 @@ percentArea = uniquePixelsForCanvasWalls().size / canvas.scene.dimensions.sceneR
 
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
-pf = new WebGPUPathfinder(randal)
+pf = new ClockwiseSweepPathfinder(randal)
 
 res = pf.constructor.worker.resolution
 uniquePixelsForCanvasWalls().size * res
@@ -740,12 +740,12 @@ console.log(`
 
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
-pf = new WebGPUPathfinder(randal)
+pf = new ClockwiseSweepPathfinder(randal)
 
 
 start = GridCoordinates3d.fromObject(beiro.center)
 end = GridCoordinates3d.fromObject(riswynn.center)
-pf = new WebGPUPathfinder(beiro)
+pf = new ClockwiseSweepPathfinder(beiro)
 
 start = GridCoordinates3d.fromObject(akra.center)
 end = GridCoordinates3d.fromObject(perrin.center)
@@ -755,6 +755,14 @@ midE = (pf.token.topE - pf.token.bottomE) * 0.5;
 start.elevation += midE;
 end.elevation += midE;
 
+
+
+// Clockwise sweep
+
+node = ClockwiseSweepPathfindingNode.create(start)
+node.sweep.offsetCorners.forEach(key => Draw.point(PIXI.Point.invertKey(key)))
+
+pf.
 
 
 await benchTokenPath(randal, zanna.center, { N: 3 });
