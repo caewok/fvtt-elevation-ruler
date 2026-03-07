@@ -646,7 +646,8 @@ let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
 let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 
 // collision, webGPU, clockwiseSweep
-algorithm = "webGPU"
+CONFIG.elevationruler.clockwiseSweepCornerGapType = "gap"  // "gap"|"v"|"edge"
+algorithm = "clockwiseSweep"
 graphPathfinding = {
   cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
   heuristic: "terrain", //"manhattan"|"euclidean"|"foundry"|"terrain"
@@ -755,15 +756,23 @@ midE = (pf.token.topE - pf.token.bottomE) * 0.5;
 start.elevation += midE;
 end.elevation += midE;
 
+await pf.startPathfinding(start);
+path = await pf._findPath(start, end)
+pf.constructor.drawPath(path)
+pf.validatePath(path, start, end)
 
 
 // Clockwise sweep
 
+CONFIG.elevationruler.clockwiseSweepCornerGapType = "gap" // gap|v|edge
 node = ClockwiseSweepPathfindingNode.create(start)
-node.sweep.offsetCorners.forEach(key => Draw.point(PIXI.Point.invertKey(key)))
+ClockwiseSweepPathfindingNode.CORNER_OFFSET = 20
+node.sweep.cornerGapsEncountered.forEach(pt => Draw.point(pt))
+node.calculateGapPoints();
+node.gapPointKeys.forEach(key => Draw.point(PIXI.Point.invertKey(key)))
 
-pf.
-
+corners = offsetGapCorners(node.sweep, 20)
+corners.forEach(key => Draw.point(PIXI.Point.invertKey(key)))
 
 await benchTokenPath(randal, zanna.center, { N: 3 });
 await benchTokenPath(beiro, riswynn.center, { N: 3 });

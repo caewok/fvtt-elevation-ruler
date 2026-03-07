@@ -30,7 +30,7 @@ import {
 import { GriddedCollisionPathfinder, worldBuilderGriddedCollision } from "./pathfinding/GriddedCollisionPathfinding.js";
 
 // ClockwiseSweep pathfinding
-import { ObstacleSweep, ClockwiseCornerSweep, ClockwiseCornerVSweep, ClockwiseCornerVisibleEdgeSweep } from "./pathfinding/ClockwiseSweep.js";
+import { ObstacleSweep, ClockwiseCornerSweep, ClockwiseCornerGapSweep } from "./pathfinding/ClockwiseSweep.js";
 import { ClockwiseSweepPathfinder, worldBuilderClockwise, ClockwiseSweepPathfindingNode } from "./pathfinding/ClockwiseSweepPathfinding.js";
 
 // WebGPU pathfinding
@@ -96,17 +96,7 @@ Hooks.once("init", function() {
       prone: true,
     },
 
-    /**
-     * @type {
-     * manhattan
-     * manhattan3d
-     * euclidean
-     * euclidean3d
-     * foundry
-     * foundryTokenCost
-     * occlusion
-     * }
-     */
+    /** @type {object} */
     graphPathfinding: {
       algorithm: "astar",   // @type {"astar"|"greedy"|"breadth"|"uniform"}
       use3d: false,         // @type {true|false}. TODO: Currently non-functional.
@@ -120,9 +110,9 @@ Hooks.once("init", function() {
      * gap: Near, medium, and far points in the gap from corner to far edge.
      * v: Offset using the V created by corners
      * edge: Offset by moving away from the corner in the direction of the edge creating the shadow.
-     * @type {string}
+     * @type {"gap"|"v"|"edge"}
      */
-    clockwiseSweepCornerGapType = "gap";
+    clockwiseSweepCornerGapType: "gap",
 
     /**
      * Enable certain debug console logging and tests.
@@ -157,6 +147,7 @@ Hooks.once("init", function() {
 
       ObstacleSweep,
       ClockwiseCornerSweep,
+      ClockwiseCornerGapSweep,
       ClockwiseSweepPathfindingNode,
     },
 
