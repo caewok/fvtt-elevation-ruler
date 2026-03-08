@@ -194,7 +194,8 @@ export const ClockwiseSweepFilter = superclass => class extends superclass {
   initialize(token) {
     super.initialize(token);
     this.source = new foundry.canvas.sources.PointMovementSource({ object: token });
-    this.#addedEdges = ObstacleSweep.identifyBlockingTokenEdges(token);
+    const blockingTokens = ObstacleSweep.blockingTokens(token, blockingTokens)
+    this.#addedEdges = ObstacleSweep.tokenEdges(blockingTokens);
     if ( this.#addedEdges.length ) foundry.canvas.geometry.edges.Edge.identifyEdgeIntersections(
       [...this.#addedEdges, ...canvas.edges.getEdges(canvas.scene.dimensions.rect)]);
   }

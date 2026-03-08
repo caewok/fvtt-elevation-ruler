@@ -31,22 +31,11 @@ export class ObstacleSweep extends foundry.canvas.geometry.ClockwiseSweepPolygon
     }
   }
 
-  static identifyBlockingTokenEdges(subjectToken) {
-    // Add token edges. Must be temporary wall edges.
-    const PATHFINDING = Settings.KEYS.PATHFINDING;
-    const blocking = Settings.get(PATHFINDING.TOKENS_BLOCK);
-    const blockingCfg = {
-      dead: false,
-      live: blocking !== PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
-      prone: false,
-      enemies: blocking !== PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
-      allies: blocking === PATHFINDING.TOKENS_BLOCK_CHOICES.ALL,
-    };
-    const occlusionCfg = { blockingCfg, subjectToken };
+  static tokenEdges(tokens) {
+    tokens ??= canvas.tokens.placeables;
     const Edge = foundry.canvas.geometry.edges.Edge;
     const edges = [];
-    for ( const token of canvas.tokens.placeables ) {
-      if ( !ObstacleOcclusionTest.includeToken(token, occlusionCfg) ) continue;
+    for ( const token of tokens ) {
       for ( const edge of token.constrainedTokenBorder.iterateEdges({ closed: false }) ) {
         edges.push(new Edge(edge.a, edge.b, {
           object: { flags: {
@@ -63,20 +52,27 @@ export class ObstacleSweep extends foundry.canvas.geometry.ClockwiseSweepPolygon
     }
     return edges;
   }
+
+  static blockingTokens(subjectToken, tokens) {
+    tokens ??= canvas.tokens.placeables;
+    const PATHFINDING = Settings.KEYS.PATHFINDING;
+    const blocking = Settings.get(PATHFINDING.TOKENS_BLOCK);
+    const blockingCfg = {
+      dead: false,
+      live: blocking !== PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
+      prone: false,
+      enemies: blocking !== PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
+      allies: blocking === PATHFINDING.TOKENS_BLOCK_CHOICES.ALL,
+    };
+    const occlusionCfg = { blockingCfg, subjectToken };
+    return tokens.filter(token => ObstacleOcclusionTest.includeToken(token, occlusionCfg));
+  }
 }
 
 /**
- * Extend Clockwise Sweep to track when the sweep hits wall corners.
+ * Extend Clockwise Sweep to track when the sweep hits wall corners; get the edges.
  */
-export class ClockwiseCornerSweep extends ObstacleSweep {
-  /**
-   * Corners are when the sweep hits a non-limited wall
-   * and must extend the sweep beyond that point.
-   * In addition, corners where the walls simply continue are ignored
-   * @type {Point[]}
-   */
-  cornersEncountered = new Set();
-
+export class ClockwiseCornerEdgeSweep extends ObstacleSweep {
   /**
    * "Edges" or walls encountered. Added if the wall forms part of the polygon.
    * @type {Set<Wall>}
@@ -88,13 +84,8 @@ export class ClockwiseCornerSweep extends ObstacleSweep {
 
   /** @inheritdoc */
   _compute() {
-    this.cornersEncountered.clear();
+    this.edgesEncountered.clear();
     super._compute();
-  }
-
-  _switchEdge(result, activeEdges) {
-    this.cornersEncountered.add(result.target.key);
-    super._switchEdge(result, activeEdges);
   }
 
   addPoint(point) {
@@ -111,27 +102,230 @@ export class ClockwiseCornerSweep extends ObstacleSweep {
 /**
  * Extend Clockwise Sweep to track when the sweep hits wall corners.
  */
-export class ClockwiseCornerGapSweep extends ObstacleSweep {
+export class ClockwiseCornerSweep extends ObstacleSweep {
 
   /**
-   * Vertex encountered at the gap
-   * @type {PolygonVertex[]}
+   * Corners are when the sweep hits a non-limited wall
+   * and must extend the sweep beyond that point.
+   * In addition, corners where the walls simply continue are ignored
+   * @type {Point[]}
    */
-  cornerGapsEncountered = [];
+  cornersEncountered = new Set();
 
   /** @type {object} */
   sweepOpts = {};
 
   /** @inheritdoc */
   _compute() {
-    this.cornerGapsEncountered.length = 0;
+    this.cornersEncountered.clear();
     super._compute();
   }
 
   _switchEdge(result, activeEdges) {
-    this.cornerGapsEncountered.push(result.target);
+    this.cornersEncountered.add(result.target.key);
     super._switchEdge(result, activeEdges);
   }
+}
+
+/**
+ * @typedef CornerMapEntry
+ * @prop {Set<Edge>} edges              Every edge that shares this corner vertex as an endpoint
+ * @prop {PIXI.Point.key[]} offsetCornerKeys    The offset points. offsetVCorners generates 1; offsetCornerEdges generates 2.
+ */
+
+/**
+ * For a set of edges, get the point at the "V" of each acute corner.
+ * The point extends out from the V by a set number of pixels.
+ * If a single wall, the point extends in line with the wall:  ––– •
+ * If walls inside the V that connect at the same point, only the outside edges control:
+ *  \ | /
+ *   \|/
+ *
+ *    •
+ * Note how the point aligns with the bisector of the outer-most edges for the corner.
+ *
+ * @param {Edge[]} edges                        Edges to test
+ * @param {number}[offset=2]                    How far away from the corner to set the offset.
+ * @returns {Map<number, CornerMapEntry>}       Corner keys mapped to offset corner points and edges.
+ */
+export function offsetVCornersForEdges(edges, offset = 2, cornerMap = new Map()) {
+  edges ??= canvas.walls.placeables.map(w => w.edge);
+
+  // Create a map of all edge endpoints to their edges.
+  for ( const edge of edges ) {
+    _processEndpoint(edge.a, edge, cornerMap);
+    _processEndpoint(edge.b, edge, cornerMap);
+  }
+
+  // Identify corners
+  // Single edge: extend from endpoints.
+  // Two edges: use the bisector
+  // 3+ edges: use the bisector from the outermost edges.
+  for ( const [cornerKey, value] of cornerMap.entries() ) {
+    if ( !value.edges.size ) console.error("Every corner should have at least one edge.");
+    let offsetCorner;
+    const vertex = PIXI.Point.invertKey(cornerKey);
+    if ( value.edges.size === 1 ) {
+      const edge = value.edges.first();
+      const a = edge.b.key === cornerKey ? edge.a : edge.b;
+      offsetCorner = _vOffsetSingleEdge(a, vertex, offset);
+    } else {
+      const res = formsV(value.edges, vertex);
+      if ( !res ) continue;
+      offsetCorner = _vOffsetTwoEdges(res.ccw, res.cw, vertex, offset);
+    }
+    value.offsetCornerKeys[0] = offsetCorner.key;
+  }
+  return cornerMap;
+}
+
+/* Debug
+console.time("offsetVCorners")
+cornerMap = offsetVCornersForEdges(undefined, 20)
+console.timeEnd("offsetVCorners")
+cornerMap.keys().forEach(key => Draw.point(PIXI.Point.invertKey(key)))
+cornerMap.values().forEach(v => Draw.point(PIXI.Point.invertKey(v.offsetCornerKeys), { color: Draw.COLORS.blue }))
+
+*/
+
+/**
+ * For a set of edges, for each corner, get the point that extends the line at each corner.
+ *  \ | /
+ *   \|/
+ *
+ *   • •
+ * Note how the points align with the outer edges.
+ *
+ * @param {Edge[]} edges                        Edges to test
+ * @param {number}[offset=2]                    How far away from the corner to set the offset.
+ * @returns {Set<number>} The offset corner points, stored as keys in the set.
+ */
+export function offsetEdgeCornersForEdges(edges, offset = 2, cornerMap = new Map()) {
+  edges ??= canvas.walls.placeables.map(w => w.edge);
+
+  // Create a map of all edge endpoints to their edges.
+  for ( const edge of edges ) {
+    _processEndpoint(edge.a, edge, cornerMap);
+    _processEndpoint(edge.b, edge, cornerMap);
+  }
+
+  // Identify corners
+  // Single edge: extend from endpoints.
+  // Two edges: use the bisector
+  // 3+ edges: use the bisector from the outermost edges.
+  const offset2 = offset ** 2;
+  for ( const [cornerKey, value] of cornerMap.entries() ) {
+    if ( !value.edges.size ) console.error("Every corner should have at least one edge.");
+    let offsetCorner;
+    const vertex = PIXI.Point.invertKey(cornerKey);
+    value.offsetCornerKeys.length = 0;
+    if ( value.edges.size === 1 ) {
+      value.offsetCornerKeys.length = 1;
+      const edge = value.edges.first();
+      const a = edge.b.key === cornerKey ? edge.a : edge.b;
+      value.offsetCornerKeys[0] = _vOffsetSingleEdge(a, vertex, offset).key;
+    } else {
+      const res = formsV(value.edges, vertex);
+      if ( !res ) continue;
+
+      // From each outer edge point, set a point cw|ccw --> v -...offset-•
+      value.offsetCornerKeys.length = 2;
+      value.offsetCornerKeys[0] = vertex.towardsPointSquared(res.cw, -offset2).key;
+      value.offsetCornerKeys[1] = vertex.towardsPointSquared(res.ccw, -offset2).key;
+    }
+  }
+  return cornerMap;
+}
+
+/* Debug
+console.time("offsetVCorners")
+cornerMap = offsetVCornersForEdges(undefined, 20)
+console.timeEnd("offsetVCorners")
+cornerMap.keys().forEach(key => Draw.point(PIXI.Point.invertKey(key)))
+cornerMap.values().forEach(v => Draw.point(PIXI.Point.invertKey(v.offsetCornerKeys), { color: Draw.COLORS.blue }))
+
+*/
+
+/**
+ * Helper to define the corner map entry for a single edge endpoint.
+ * If the entry already exists, this adds the new edge.
+ * @param {PIXI.Point} a      Edge endpoint
+ * @param {Edge} edge         Edge to store
+ * @param {Map<number,CornerMapEntry>} cornerMap      Map of corner keys and information for each, to be updated
+ */
+function _processEndpoint(a, edge, cornerMap) {
+  const key = a.key;
+  const value = cornerMap.get(key) ?? { edges: new Set(), offsetCornerKeys: [] };
+  if ( !cornerMap.has(key) ) cornerMap.set(key, value);
+  value.edges.add(edge);
+}
+
+
+/**
+ * From a Clockwise sweep, for each corner, get the point at the "V" of each corner.
+ * The point extends out from the V by a set number of pixels.
+ * If a single wall, the point extends in line with the wall:  ––– •
+ * If walls inside the V that connect at the same point, only the outside edges control:
+ *  \ | /
+ *   \|/
+ *
+ *    •
+ * Note how the point aligns with the bisector of the outer-most edges for the corner.
+ *
+ * @param {PolygonVertex[]} cornerResults       Corner vertex data from the sweep
+ * @param {number}[offset=2]                    How far away from the corner to set the offset.
+ * @returns {Set<number>} The offset corner points, stored as keys in the set.
+ */
+export function offsetVCorners(sweep, offset = 2) {
+  const cornerResults = sweep.cornerGapsEncountered;
+  using vertex = PIXI.Point.tmp;
+  const nCorners = cornerResults.length;
+  const offsetCorners = new Set(); // Possible but unlikely that multiple corners would be present.
+  for ( let i = 0; i < nCorners; i += 1 ) {
+    const corner = cornerResults[i];
+    vertex.set(corner.x, corner.y);
+    const offsetCorner = _vOffsetForCornerEdges(vertex, corner.edges, offset);
+    offsetCorners.add(offsetCorner.key);
+  }
+  return offsetCorners;
+}
+
+
+/**
+ * From a Clockwise sweep, for each corner, get the point that extends the line at each corner.
+ * Unlike the above version, this one does not rely on knowledge beyond that of viewable
+ * walls, but ends up creating multiple points.
+ *  \ | /
+ *   \|/
+ *
+ *   • •
+ * Note how the points align with the outer edges.
+ * @param {PolygonVertex[]} cornerResults       Corner vertex data from the sweep
+ * @param {PIXI.Point} origin                   Sweep origin
+ * @param {number}[offset=2]                    How far away from the corner to set the offset.
+ * @returns {Set<number>} The offset corner points, stored as keys in the set.
+ */
+export function offsetEdgeCorners(sweep, offset = 2) {
+  const cornerResults = sweep.cornerGapsEncountered;
+  const origin = sweep.origin;
+  const offset2 = offset ** 2;
+  using vertex = PIXI.Point.tmp;
+  const nCorners = cornerResults.length;
+  const offsetCorners = new Set(); // Possible but unlikely that multiple corners would be present.
+  for ( let i = 0; i < nCorners; i += 1 ) {
+    const corner = cornerResults[i];
+    vertex.set(corner.x, corner.y);
+
+    // Find the closest clockwise edge.
+    if ( corner.cwEdges.size && corner.ccwEdges.size ) console.warn("offsetEdgeCorners|corner should have either cwEdges or ccwEdge but not both.");
+    const edges = corner.cwEdges.size ? corner.cwEdges : corner.ccwEdges;
+    const closest = facingEdgePoint(origin, corner, edges);
+
+    // Move along the closest edge away from the vertex and the other endpoint, into the gap.
+    const offsetCorner = vertex.towardsPointSquared(closest, -offset2);
+    offsetCorners.add(offsetCorner.key);
+  }
+  return offsetCorners;
 }
 
 /**
@@ -155,19 +349,6 @@ function bisectingVector(a, v, c) {
   if ( out.x.almostEqual(0) && out.y.almostEqual(0) ) return deltaAV;
   out.normalize(out);
   return out;
-}
-
-/**
- * Given array or set of segments, find the shared vertex between the first two.
- * Assumes without testing that there is one; otherwise returns the second endpoint of the first segment.
- * @param {Set<Segment>|Segment[]} segments
- * @returns {PIXI.Point}
- */
-export function _sharedVertex(segments) {
-  const iter = segments.values();
-  const edge0 = iter.next().value;
-  const edge1 = iter.next().value;
-  return edge0.a.key === edge1.a.key || edge0.a.key === edge1.b.key ? edge0.a : edge0.b;
 }
 
 /**
@@ -245,103 +426,6 @@ function facingEdgePoint(origin, vertex, segments) {
 }
 
 /**
- * For a set of edges, get the point at the "V" of each acute corner.
- * The point extends out from the V by a set number of pixels.
- * If a single wall, the point extends in line with the wall:  ––– •
- * If walls inside the V that connect at the same point, only the outside edges control:
- *  \ | /
- *   \|/
- *
- *    •
- * Note how the point aligns with the bisector of the outer-most edges for the corner.
- *
- * @param {Edge[]} edges                        Edges to test
- * @param {number}[offset=2]                    How far away from the corner to set the offset.
- * @returns {Set<number>} The offset corner points, stored as keys in the set.
- */
-function offsetVCornersForEdges(edges, offset = 2 ) {
-  edges ??= canvas.walls.placeables.map(w => w.edge);
-  const offset2 = offset ** 2;
-
-  // Create a map of all edge endpoints to their edges.
-  const cornerMap = new Map();
-  for ( const edge of edges ) {
-    _processEndpoint(edge.a, edge, cornerMap);
-    _processEndpoint(edge.b, edge, cornerMap);
-  }
-
-  // Identify corners
-  // Single edge: extend from endpoints.
-  // Two edges: use the bisector
-  // 3+ edges: use the bisector from the outermost edges.
-  for ( const [cornerKey, value] of cornerMap.entries() ) {
-    if ( !value.edges.size ) console.error("Every corner should have at least one edge.");
-    let offsetCorner;
-    const vertex = PIXI.Point.invertKey(cornerKey);
-    if ( value.edges.size === 1 ) {
-      const edge = value.edges.first();
-      const a = edge.b.key === cornerKey ? edge.a : edge.b;
-      offsetCorner = _vOffsetSingleEdge(a, vertex, offset);
-    } else {
-      const res = formsV(value.edges, vertex);
-      if ( !res ) continue;
-      offsetCorner = _vOffsetTwoEdges(res.ccw, res.cw, vertex, offset)
-    }
-    value.offsetCornerKey = offsetCorner.key
-  }
-  return cornerMap;
-}
-
-/*
-console.time("offsetVCorners")
-cornerMap = offsetVCornersForEdges(undefined, 20)
-console.timeEnd("offsetVCorners")
-cornerMap.keys().forEach(key => Draw.point(PIXI.Point.invertKey(key)))
-cornerMap.values().forEach(v => Draw.point(PIXI.Point.invertKey(v.offsetCornerKey), { color: Draw.COLORS.blue }))
-
-*/
-
-function _processEndpoint(a, edge, cornerMap) {
-  const key = a.key;
-  const value = cornerMap.get(key) ?? { edges: new Set(), offsetCornerKey: -1 };
-  if ( !cornerMap.has(key) ) cornerMap.set(key, value);
-  value.edges.add(edge);
-}
-
-
-/**
- * From a Clockwise sweep, for each corner, get the point at the "V" of each corner.
- * The point extends out from the V by a set number of pixels.
- * If a single wall, the point extends in line with the wall:  ––– •
- * If walls inside the V that connect at the same point, only the outside edges control:
- *  \ | /
- *   \|/
- *
- *    •
- * Note how the point aligns with the bisector of the outer-most edges for the corner.
- *
- * @param {PolygonVertex[]} cornerResults       Corner vertex data from the sweep
- * @param {number}[offset=2]                    How far away from the corner to set the offset.
- * @returns {Set<number>} The offset corner points, stored as keys in the set.
- */
-export function offsetVCorners(sweep, offset = 2) {
-  const cornerResults = sweep.cornerGapsEncountered;
-  const offset2 = offset ** 2;
-  using vertex = PIXI.Point.tmp;
-  const nCorners = cornerResults.length;
-  const offsetCorners = new Set(); // Possible but unlikely that multiple corners would be present.
-  for ( let i = 0; i < nCorners; i += 1 ) {
-    const corner = cornerResults[i];
-    vertex.set(corner.x, corner.y);
-    const offsetCorner = _vOffsetForCornerEdges(vertex, corner.edges, offset);
-    offsetCorners.add(offsetCorner.key);
-  }
-  return offsetCorners;
-}
-
-
-
-/**
  * Helper for offsetVCorners.
  * For given set of edges that form a "V", returns the offset from the "V".
  * @param {PIXI.Point} vertex
@@ -364,12 +448,12 @@ function _vOffsetForCornerEdges(vertex, cornerEdges, offset = 2) {
       const [edge0, edge1] = [...cornerEdges];
       const a = edge0.a.key === vertexKey ? edge0.b : edge0.a;
       const c = edge1.a.key === vertexKey ? edge1.b : edge1.a;
-      return _vOffsetTwoEdges(a, c, vertex, offset)
+      return _vOffsetTwoEdges(a, c, vertex, offset);
     }
     default: {
       // Multiple edges; locate the outer edges then treat like case 2.
       const res = findOutermostVEdges(cornerEdges, vertex); // Faster to use result.target b/c it stores its key.
-      return _vOffsetTwoEdges(res.ccw, res.cw, vertex, offset)
+      return _vOffsetTwoEdges(res.ccw, res.cw, vertex, offset);
     }
   }
 }
@@ -379,130 +463,20 @@ function _vOffsetSingleEdge(a, vertex, offset = 2) {
 }
 
 function _vOffsetTwoEdges(a, c, vertex, offset = 2) {
-  const biV = bisectingVector(a, vertex, c);
+  using biV = bisectingVector(a, vertex, c);
   biV.multiplyScalar(-offset, biV);
   return vertex.add(biV);
 }
 
 /**
- * From a Clockwise sweep, for each corner, get the point that extends the line at each corner.
- * Unlike the above version, this one does not rely on knowledge beyond that of viewable
- * walls, but ends up creating multiple points.
- *  \ | /
- *   \|/
- *
- *   • •
- * Note how the points align with the outer edges.
- * @param {PolygonVertex[]} cornerResults       Corner vertex data from the sweep
- * @param {PIXI.Point} origin                   Sweep origin
- * @param {number}[offset=2]                    How far away from the corner to set the offset.
- * @returns {Set<number>} The offset corner points, stored as keys in the set.
+ * Given array or set of segments, find the shared vertex between the first two.
+ * Assumes without testing that there is one; otherwise returns the second endpoint of the first segment.
+ * @param {Set<Segment>|Segment[]} segments
+ * @returns {PIXI.Point}
  */
-export function offsetEdgeCorners(sweep, offset = 2) {
-  const cornerResults = sweep.cornerGapsEncountered;
-  const origin = sweep.origin;
-  const offset2 = offset ** 2;
-  using vertex = PIXI.Point.tmp;
-  const nCorners = cornerResults.length;
-  const offsetCorners = new Set(); // Possible but unlikely that multiple corners would be present.
-  for ( let i = 0; i < nCorners; i += 1 ) {
-    const corner = cornerResults[i];
-    vertex.set(corner.x, corner.y);
-
-    // Find the closest clockwise edge.
-    if ( corner.cwEdges.size && corner.ccwEdges.size ) console.warn("offsetEdgeCorners|corner should have either cwEdges or ccwEdge but not both.");
-    const edges = corner.cwEdges.size ? corner.cwEdges : corner.ccwEdges;
-    const closest = facingEdgePoint(origin, corner, edges);
-
-    // Move along the closest edge away from the vertex and the other endpoint, into the gap.
-    const offsetCorner = vertex.towardsPointSquared(closest, -offset2);
-    offsetCorners.add(offsetCorner.key);
-  }
-  return offsetCorners;
-}
-
-/**
- * From a clockwise sweep, locate points along the gap as it jumps from a corner to
- * next edge.
- *
- * ----- • •  •|
- *
- * To be valid, the points must be rounded such that they are within the sweep.
- * @param {PolygonVertex[]} cornerResults       Corner vertex data from the sweep
- * @param {PIXI.Point} origin                   Sweep origin
- * @param {number}[offset=2]                    How far away from the corner to set the offset.
- * @returns {Set<number>} The offset corner points, stored as keys in the set.
- */
-export function offsetGapCorners(sweep, offset = 2) {
-  const cornersEncountered = new Set(sweep.cornerGapsEncountered.map(v => v.key));
-  const offset2 = offset ** 2;
-  const iter = sweep.iteratePoints({ close: true });
-  let prev = iter.next().value;
-  let curr = iter.next().value;
-  using nearPoint = PIXI.Point.tmp;
-  using midPoint = PIXI.Point.tmp;
-  using farPoint = PIXI.Point.tmp;
-  using dir = PIXI.Point.tmp;
-  const gapPoints = new Set();
-  // Debug: const gapEdges = [];
-  for ( const next of iter ) {
-    if ( typeof curr.key === "undefined" ) console.error("Gap curr key undefined", { curr });
-    if ( cornersEncountered.has(curr.key) ) {
-      // Identify the far gap edge point and the correct normal.
-
-      // Origin --> curr -> prev; or
-      // Origin --> curr -> next
-      const b = foundry.utils.orient2dFast(sweep.origin, curr, prev).almostEqual(0) ? prev : next;
-
-      // Near point: step slightly along view line from current.
-      // Far point: step slightly along view line from prev/next.
-      // Mid point: midway between curr, prev/next.
-      curr.towardsPointSquared(b, offset2, nearPoint);
-      b.towardsPointSquared(curr, offset2, farPoint);
-      PIXI.Point.midPoint(curr, b, midPoint);
-
-      // Round the points so they remain within the sweep.
-      b.subtract(curr, dir);
-      if ( b === prev ) dir.set(dir.y, -dir.x);
-      else dir.set(-dir.y, dir.x);
-      const quadrant = (dir.x > 0) + ((dir.y > 0) * 2);
-      let xFn;
-      let yFn;
-      switch ( quadrant ) {
-        case 0:   // Dir: -x, -y
-          xFn = "floor";
-          yFn = "floor";
-          break;
-        case 1: // Dir: x, -y
-          xFn = "ceil";
-          yFn = "floor";
-          break;
-        case 2: // Dir: -x, y
-          xFn = "floor";
-          yFn = "ceil";
-          break;
-        case 3: // Dir: x, y
-          xFn = "ceil";
-          yFn = "ceil";
-      }
-      nearPoint.x = Math[xFn](nearPoint.x);
-      nearPoint.y = Math[yFn](nearPoint.y);
-      midPoint.x = Math[xFn](midPoint.x);
-      midPoint.y = Math[yFn](midPoint.y);
-      farPoint.x = Math[xFn](farPoint.x);
-      farPoint.y = Math[yFn](farPoint.y);
-
-      gapPoints.add(nearPoint.key);
-      gapPoints.add(midPoint.key);
-      gapPoints.add(farPoint.key);
-      // Debug: gapEdges.push({ a: curr, b });
-
-    }
-    prev.release();
-    prev = curr;
-    curr = next;
-  }
-  prev.release();
-  curr.release();
-  return gapPoints;
+function _sharedVertex(segments) { /* eslint-disable-line no-unused-vars */
+  const iter = segments.values();
+  const edge0 = iter.next().value;
+  const edge1 = iter.next().value;
+  return edge0.a.key === edge1.a.key || edge0.a.key === edge1.b.key ? edge0.a : edge0.b;
 }

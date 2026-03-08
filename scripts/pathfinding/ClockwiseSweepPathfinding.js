@@ -8,10 +8,14 @@ PIXI,
 "use strict";
 
 import { MODULE_ID } from "../const.js";
+import { NULL_SET } from "../geometry/util.js";
+import { AABB2d } from "../geometry/AABB.js";
 import { ElevatedPoint } from "../geometry/3d/ElevatedPoint.js";
 import { Draw } from "../geometry/Draw.js";
 import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
-import { ClockwiseCornerGapSweep, offsetGapCorners, offsetVCorners, offsetEdgeCorners } from "./ClockwiseSweep.js";
+import { ClockwiseCornerSweep, offsetVCornersForEdges, offsetEdgeCornersForEdges } from "./ClockwiseSweep.js";
+import { WebGPUPathfinder } from "./WebGPUPathfinding.js"; // For the token and region terrain methods.
+import { UniformPointGrid } from "./UniformPointGrid.js";
 import { mix } from "../geometry/mixwith.js";
 import {
   Manhattan2dCost,
@@ -90,10 +94,10 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
   }
 
   /** @type {PointSourcePolygon} */
-  #sweep = new ClockwiseCornerGapSweep();
+  #sweep;
 
   /** @type {ClockwiseSweepPathfindingNode[]} */
-  #gapPointKeys = new Set();
+  #neighborKeys = new Set();
 
   #computedSweep = false;
 
@@ -104,16 +108,13 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
     return this.#sweep;
   }
 
-  get gapPointKeys() {
-    if ( !this.#computedNeighbors ) this.calculateGapPoints();
-    return this.#gapPointKeys;
-  }
-
   computeSweep() {
+    this.#sweep = new ClockwiseCornerSweep();
     this.#sweep.initialize(this, this.sweepOpts);
     this.#sweep.compute();
     this.#computedSweep = true;
 
+    // Debugging.
     // const color = randomColor();
     // this.drawShape({ fill: color, });
   }
@@ -121,35 +122,66 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
   /** @type {number<pixels>} */
   static CORNER_OFFSET = 2;
 
-  calculateGapPoints() {
-    let gapFn;
-    switch ( CONFIG[MODULE_ID].clockwiseSweepCornerGapType ) {
-      case "gap": gapFn = offsetGapCorners; break;
-      case "v": gapFn = offsetVCorners; break;
-      case "edge": gapFn = offsetEdgeCorners; break;
-      default: gapFn = offsetVCorners;
+  /**
+   * Calculate the neighbors for this node.
+   * Neighbors are offset corner points or terrain points
+   * contained within the sweep.
+   * @returns {ClockwiseSweepPathfindingNode[]}
+   */
+  getNeighbors(cornerMap, terrainPointGrid) {
+    if ( !this.#computedNeighbors ) {
+      this.#neighborKeys.clear();
+      for ( const cornerNeighbor of this._calculateCornerNeighbors(cornerMap) ) {
+        this.#neighborKeys.add(cornerNeighbor);
+      }
+      if ( terrainPointGrid ) {
+        for ( const terrainNeighbor of this._calculateTerrainNeighbors(terrainPointGrid) ) {
+          this.#neighborKeys.add(terrainNeighbor);
+        }
+      }
     }
-    this.#gapPointKeys = gapFn(this.sweep, this.constructor.CORNER_OFFSET);
-    if ( this.#gapPointKeys.some(key => this.#gapPointInvalid(key)) ) {
-      console.warn("Gap point is invalid", this.#gapPointKeys);
-    }
-
-    this.#computedNeighbors = true;
-
-    /*
-    const color = randomColor();
-    this.drawGapPoints({ color });
-    */
+    this.#sweep = null; // Allow sweep to be GC'd now that neighbors are defined.
+    return this.#neighborKeys;
   }
 
-  #gapPointInvalid(key) {
+  _calculateCornerNeighbors(cornerMap) {
+    if ( !cornerMap.size ) return NULL_SET;
+    const neighbors = new Set();
+    const sweep = this.sweep;
+
+    // Corner offsets can be found by getting the offsets for the
+    // corners in the sweep.
+    // TODO: Can these offset corners ever be outside the sweep? If yes, contains test is required.
+    for ( const cornerKey of sweep.cornersEncountered ) {
+      if ( !cornerMap.has(cornerKey) ) continue;
+      cornerMap.get(cornerKey).offsetCornerKeys.forEach(key => neighbors.add(key));
+    }
+    return neighbors;
+  }
+
+  _calculateTerrainNeighbors(terrainPointGrid) {
+    if ( !terrainPointGrid.grid.size ) return NULL_SET;
+
+    // Terrain offsets are neighbors if they are within the sweep, requiring a contains test.
+    const neighbors = new Set();
+    const sweep = this.sweep;
+    const aabb = AABB2d.fromPolygon(sweep);
+    const potentialPoints = terrainPointGrid.query(aabb);
+    for ( const pt of potentialPoints ) {
+      if ( sweep.contains(pt.x, pt.y) ) neighbors.add(pt.key);
+    }
+    return neighbors;
+  }
+
+  #neighborInvalid(key) {
     using gapPoint = PIXI.Point.invertKey(key);
     if ( !this.sweep.contains(gapPoint.x, gapPoint.y) ) {
       console.warn(`Sweep does not contain gap point${gapPoint}`);
       return true;
     }
 
-    // Gap point cannot lie on a sweep edge. (Could check all edges but would require access to main clockwise pathfinding data.)
+    // Gap point cannot lie on a sweep edge.
+    // (Could check all edges but would require access to main clockwise pathfinding data.)
     const onEdge = this.sweep.edges.some(edge => {
       if ( !foundry.utils.orient2dFast(edge.a, edge.b, gapPoint).almostEqual(0) ) return false;
 
@@ -182,13 +214,20 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
     Draw.shape(this.sweep, opts);
   }
 
-  drawGapPoints(opts = {}) {
+  drawNeighbors(opts = {}) {
+    if ( !this.#computedNeighbors ) return;
     opts.alpha ??= 0.5;
-    this.gapPointKeys.forEach(key => Draw.point(PIXI.Point.invert(key), opts));
+    this.getNeighbors().forEach(key => Draw.point(PIXI.Point.invert(key), opts));
   }
 }
 
 export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
+
+  /** @type {number<pixels>} */
+  static CORNER_OFFSET = 2;
+
+  /** @type {number[]} */
+  static TERRAIN_T_VALUES = [1/8, 0.5, 7/8];
 
   /**
    * Cost to move from a -> b.
@@ -219,7 +258,8 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
 
   nodeIsUnreachable(node, fromPoint) {
     if ( !node.sweep.points.length ) return true;
-    return !(node.gapPointKeys.size || node.sweep.contains(fromPoint.x, fromPoint.y));
+    return !(node.sweep.contains(fromPoint.x, fromPoint.y)
+      || node.getNeighbors(this._cornerMap, this._terrainPointGrid).size);
   }
 
   /**
@@ -242,7 +282,8 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
    */
   initialize(token) {
     super.initialize(token);
-    this._sweepOpts.addedEdges = ClockwiseCornerGapSweep.identifyBlockingTokenEdges(token);
+    const blockingTokens = ClockwiseCornerSweep.blockingTokens(token);
+    this._sweepOpts.addedEdges = ClockwiseCornerSweep.tokenEdges(blockingTokens);
     this._sweepOpts.source = new foundry.canvas.sources.PointMovementSource({ object: token }); // See Token##getMovementSource
     this.existingNodes.clear();
   }
@@ -250,8 +291,92 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
   startPathfinding(start) {
     this._sweepOpts.source.initialize(start); // See Token##getMovementSource
     super.startPathfinding(start);
+
+    // For performance, precalculate the potential neighbors.
+    this._cornerMap.clear();
+    this._terrainPointKeys.clear();
+    this.calculateCornerMap(); // Token and edge corners.
+    this.calculateTokenTerrainPoints();
+    this.calculateRegionTerrainPoints();
+
+    // Confirm that no terrain points are also blocking points.
+    const cornerOffsetKeys = new Set(this._cornerMap.values().flatMap(obj => obj.offsetCornerKeys));
+    for ( const key of this._terrainPointKeys ) {
+      if ( cornerOffsetKeys.has(key) ) this._terrainPointKeys.delete(key);
+    }
+
+    // Store the terrain points in a grid for fast lookup.
+    this._terrainPointGrid.clear();
+    this._terrainPointKeys.forEach(key => this._terrainPointGrid.insertPoint(PIXI.Point.invertKey(key)));
+
+    // Setup the starting node.
     start = this.buildNode(start);
     this.existingNodes.set(start.key, start); // 3d key.
+  }
+
+  _cornerMap = new Map();
+
+  _terrainPointKeys = new Set(); // TODO: Do we need to store this? Can terrainPointGrid suffice?
+
+  _terrainPointGrid = new UniformPointGrid();
+
+  /**
+   * Create a corner map for all edges on the canvas.
+   * Used to identify neighboring positions for the sweep more quickly.
+   * Maps corners identified by CWSweep to the offset corner points.
+   * @returns {Map<PIXI.Point.key, CornerMapEntry>}       Corner keys mapped to offset corner points and edges.
+   */
+  calculateCornerMap() {
+    let cornerFn;
+    switch ( CONFIG[MODULE_ID].clockwiseSweepCornerGapType ) {
+      case "v": cornerFn = offsetVCornersForEdges; break;
+      case "edge": cornerFn = offsetEdgeCornersForEdges; break;
+      default: cornerFn = offsetVCornersForEdges;
+    }
+    const edges = [...canvas.walls.placeables.map(w => w.edge), ...this._sweepOpts.addedEdges];
+    return cornerFn(edges, this.constructor.CORNER_OFFSET, this._cornerMap);
+  }
+
+  /**
+   * For each non-blocking token, determine its terrain points.
+   * @returns {Set<PIXI.Point.key>}
+   */
+  calculateTokenTerrainPoints() {
+    const terrainPointKeys = this._terrainPointKeys;
+    const blockingTokens = new Set(ClockwiseCornerSweep.blockingTokens(this.token));
+    for ( const token of canvas.tokens.placeables ) {
+      if ( token === this.token ) continue;
+      if ( blockingTokens.has(token) ) continue;
+      const value = WebGPUPathfinder.tokenValue(token, this.token);
+      if ( value <= WebGPUPathfinder.FEATURES.NORMAL ) continue;
+
+      // Use the constrained token border, expanded so the points are not on the token.
+      using pt = PIXI.Point.tmp;
+      const border = token.constrainedTokenBorder.pad(this.constructor.CORNER_OFFSET);
+      for ( const edge of border.iterateEdges({ close: true }) ) {
+        for ( const t of this.constructor.TERRAIN_T_VALUES ) {
+          edge.a.projectToward(edge.b, t, pt);
+          terrainPointKeys.add(pt.key);
+        }
+      }
+    }
+    return terrainPointKeys;
+  }
+
+  /**
+   * For each terrain region, determine its terrain points.
+   * @returns {Set<PIXI.Point.key>}
+   */
+  calculateRegionTerrainPoints() {
+    const terrainPointKeys = this._terrainPointKeys;
+    for ( const region of canvas.regions.placeables ) {
+      if ( !region.document.shapes.length ) continue;
+      const value = WebGPUPathfinder.regionValue(region, this.token);
+      if ( value <= WebGPUPathfinder.FEATURES.NORMAL ) continue;
+
+      // Get the region border, padded so the points are not in the region.
+      // TODO: Fix.
+    }
   }
 
   /**
@@ -272,28 +397,19 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
     const nodeKey = node.key;
     if ( typeof nodeKey === "undefined" ) console.error("Node key must be defined.");
     if ( !(node instanceof ClockwiseSweepPathfindingNode) ) console.error("Node must be ClockwiseSweepPathfindingNode.");
-    if ( !node.sweep.points.length ) return [];
 
-    // All gap points to this node are neighbors.
-    // Convert to 3d key.
+    // Retrieve all 2d neighbor keys for this node.
+    const neighborKeys = node.getNeighbors(this._cornerMap, this._terrainPointGrid);
+
+    // Convert each to a node.
     using pt = ElevatedPoint.tmp;
     pt.z = node.z;
-    const neighbors = new Set(node.gapPointKeys.map(key => {
-      PIXI.Point.invertKey(key, pt);
-      return pt.key;
-    }));
-    for ( const [existingKey, existingNode] of this.existingNodes.entries() ) {
-      if ( existingKey === nodeKey ) continue;
-
-      // Any nodes within this node sweep are neighbors.
-      if ( node.sweep.contains(existingNode.x, existingNode.y) ) neighbors.add(existingKey);
-    }
-    // gapPointSet.forEach(pt => Draw.point(pt, { color: Draw.COLORS.yellow, alpha: 0.2 }));
-
-    // Convert to Node.
-    return [...neighbors].map(key => {
-      if ( this.existingNodes.has(key) ) return this.existingNodes.get(key);
-      ElevatedPoint.invertKey(key, pt);
+    return [...neighborKeys].map(key2d => {
+      const pt2d = PIXI.Point.invertKey(key2d);
+      pt.x = pt2d.x;
+      pt.y = pt2d.y;
+      const key3d = pt.key;
+      if ( this.existingNodes.has(key3d) ) return this.existingNodes.get(key3d);
       return ClockwiseSweepPathfindingNode.create(pt, this._sweepOpts);
     });
   }
@@ -390,6 +506,7 @@ export function worldBuilderClockwise({ cost, use3d, heuristic } = {}) {
   worldClassCache.set(key, out);
   return out;
 }
+
 
 /** Testing
   Draw.point(sweep.origin, { color: Draw.COLORS.blue })

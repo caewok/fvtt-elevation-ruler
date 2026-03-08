@@ -30,7 +30,7 @@ import {
 import { GriddedCollisionPathfinder, worldBuilderGriddedCollision } from "./pathfinding/GriddedCollisionPathfinding.js";
 
 // ClockwiseSweep pathfinding
-import { ObstacleSweep, ClockwiseCornerSweep, ClockwiseCornerGapSweep } from "./pathfinding/ClockwiseSweep.js";
+import { ObstacleSweep, ClockwiseCornerSweep, ClockwiseCornerEdgeSweep, offsetVCornersForEdges } from "./pathfinding/ClockwiseSweep.js";
 import { ClockwiseSweepPathfinder, worldBuilderClockwise, ClockwiseSweepPathfindingNode } from "./pathfinding/ClockwiseSweepPathfinding.js";
 
 // WebGPU pathfinding
@@ -107,12 +107,11 @@ Hooks.once("init", function() {
 
     /**
      * How to offset the corners for the clockwise sweep pathfinding.
-     * gap: Near, medium, and far points in the gap from corner to far edge.
      * v: Offset using the V created by corners
      * edge: Offset by moving away from the corner in the direction of the edge creating the shadow.
-     * @type {"gap"|"v"|"edge"}
+     * @type {"v"|"edge"}
      */
-    clockwiseSweepCornerGapType: "gap",
+    clockwiseSweepCornerGapType: "v",
 
     /**
      * Enable certain debug console logging and tests.
@@ -147,8 +146,9 @@ Hooks.once("init", function() {
 
       ObstacleSweep,
       ClockwiseCornerSweep,
-      ClockwiseCornerGapSweep,
+      ClockwiseCornerEdgeSweep,
       ClockwiseSweepPathfindingNode,
+      offsetVCornersForEdges,
     },
 
     pathCleaning: {

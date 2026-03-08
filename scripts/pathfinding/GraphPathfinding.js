@@ -646,7 +646,7 @@ let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
 let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 
 // collision, webGPU, clockwiseSweep
-CONFIG.elevationruler.clockwiseSweepCornerGapType = "gap"  // "gap"|"v"|"edge"
+CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"  // |"v"|"edge"
 algorithm = "clockwiseSweep"
 graphPathfinding = {
   cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
@@ -763,13 +763,20 @@ pf.validatePath(path, start, end)
 
 
 // Clockwise sweep
+await pf.startPathfinding(start);
+pf.world._cornerMap.keys().forEach(key => Draw.point(PIXI.Point.invertKey(key)))
+pf.world._cornerMap.values().forEach(v => {
+  v.offsetCornerKeys.forEach(key => Draw.point(PIXI.Point.invertKey(key), { color: Draw.COLORS.blue }))
+})
+pf.world._terrainPointKeys.forEach(key => Draw.point(PIXI.Point.invertKey(key), { color: Draw.COLORS.green }));
 
-CONFIG.elevationruler.clockwiseSweepCornerGapType = "gap" // gap|v|edge
+
+
+
+CONFIG.elevationruler.clockwiseSweepCornerGapType = "v" // gap|v|edge
 node = ClockwiseSweepPathfindingNode.create(start)
 ClockwiseSweepPathfindingNode.CORNER_OFFSET = 20
-node.sweep.cornerGapsEncountered.forEach(pt => Draw.point(pt))
-node.calculateGapPoints();
-node.gapPointKeys.forEach(key => Draw.point(PIXI.Point.invertKey(key)))
+
 
 corners = offsetGapCorners(node.sweep, 20)
 corners.forEach(key => Draw.point(PIXI.Point.invertKey(key)))

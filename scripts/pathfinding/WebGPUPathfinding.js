@@ -355,6 +355,8 @@ const GPUTerrainMixin = superclass => class extends superclass {
     });
   }
 
+
+
 };
 
 export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
