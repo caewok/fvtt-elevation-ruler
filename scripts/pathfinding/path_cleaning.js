@@ -52,8 +52,8 @@ export function snapPathToGrid(path, token, maxDepth = 4) {
  * @param {number} [maxDepth=4]       Maximum depth passed to solveSegment
  * @returns {GridPathResult}
  */
-function _approximateGridPath(path, token, maxDepth = 4) {
-  if ( path.length < 2 ) return new GridPathResult(path);
+function _approximateGridPath(path, token, maxDepth = 4, _depth = 0) {
+  if ( path.length < 2 || _depth > maxDepth  ) return new GridPathResult(path);
 
   let finalPath = [path[0]];
   const firstSegment = new GridPathResult(solveSegment(path[0], path[1], token, maxDepth));
@@ -72,7 +72,7 @@ function _approximateGridPath(path, token, maxDepth = 4) {
 
     // Find a grid approximation for the new path.
     const candidatePath = [candidateConnectionPath.at(-1) || firstSegment.path.at(-1), ...path.slice(2,)];
-    otherSegments = _approximateGridPath(candidatePath, token, maxDepth);
+    otherSegments = _approximateGridPath(candidatePath, token, maxDepth, _depth + 1);
     if ( candidateConnectionPath.length > 1 ) {
       // Add back in any extra candidateConnectionPath points.
       otherSegments.path = [
@@ -306,7 +306,7 @@ function _solveSegment(a, b, token, maxDepth = 4, _depth = 0) {
   }
 
   // Base case. Revert to direct line if reaching max depth or points are too close.
-  if ( _depth >= maxDepth
+  if ( _depth > maxDepth
     || PIXI.Point.distanceSquaredBetween(a, b) < (canvas.dimensions.size ** 2) ) return [a, b];
 
 

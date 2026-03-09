@@ -129,8 +129,9 @@ export class ClockwiseCornerSweep extends ObstacleSweep {
 
 /**
  * @typedef CornerMapEntry
- * @prop {Set<Edge>} edges              Every edge that shares this corner vertex as an endpoint
- * @prop {PIXI.Point.key[]} offsetCornerKeys    The offset points. offsetVCorners generates 1; offsetCornerEdges generates 2.
+ * @prop {Set<Edge>} edges                      Every edge that shares this corner vertex as an endpoint
+ * @prop {PIXI.Point.key[]} offsetCornerKeys    The offset points.
+ *   offsetVCorners generates 1; offsetCornerEdges generates 2.
  */
 
 /**
@@ -148,7 +149,7 @@ export class ClockwiseCornerSweep extends ObstacleSweep {
  * @param {number}[offset=2]                    How far away from the corner to set the offset.
  * @returns {Map<number, CornerMapEntry>}       Corner keys mapped to offset corner points and edges.
  */
-export function offsetVCornersForEdges(edges, offset = 2, cornerMap = new Map()) {
+export function offsetVCornersForEdges(edges, elevationZ = 0, offset = 2, cornerMap = new Map()) {
   edges ??= canvas.walls.placeables.map(w => w.edge);
 
   // Create a map of all edge endpoints to their edges.
@@ -174,6 +175,8 @@ export function offsetVCornersForEdges(edges, offset = 2, cornerMap = new Map())
       if ( !res ) continue;
       offsetCorner = _vOffsetTwoEdges(res.ccw, res.cw, vertex, offset);
     }
+    if ( !offsetCorner ) console.error("offsetVCornersForEdges failed", { edge: [...edges], elevationZ, offset })
+
     value.offsetCornerKeys[0] = offsetCorner.key;
   }
   return cornerMap;
@@ -200,11 +203,14 @@ cornerMap.values().forEach(v => Draw.point(PIXI.Point.invertKey(v.offsetCornerKe
  * @param {number}[offset=2]                    How far away from the corner to set the offset.
  * @returns {Set<number>} The offset corner points, stored as keys in the set.
  */
-export function offsetEdgeCornersForEdges(edges, offset = 2, cornerMap = new Map()) {
+export function offsetEdgeCornersForEdges(edges, elevationZ = 0, offset = 2, cornerMap = new Map()) {
   edges ??= canvas.walls.placeables.map(w => w.edge);
 
   // Create a map of all edge endpoints to their edges.
   for ( const edge of edges ) {
+    if ( !edge.move ) continue;
+    if ( edge.object instanceof foundry.canvas.placeables.Wall
+      && !elevationZ.between(edge.object.bottomZ, edge.object.topZ) ) continue;
     _processEndpoint(edge.a, edge, cornerMap);
     _processEndpoint(edge.b, edge, cornerMap);
   }
@@ -216,7 +222,6 @@ export function offsetEdgeCornersForEdges(edges, offset = 2, cornerMap = new Map
   const offset2 = offset ** 2;
   for ( const [cornerKey, value] of cornerMap.entries() ) {
     if ( !value.edges.size ) console.error("Every corner should have at least one edge.");
-    let offsetCorner;
     const vertex = PIXI.Point.invertKey(cornerKey);
     value.offsetCornerKeys.length = 0;
     if ( value.edges.size === 1 ) {
@@ -257,7 +262,34 @@ function _processEndpoint(a, edge, cornerMap) {
   const key = a.key;
   const value = cornerMap.get(key) ?? { edges: new Set(), offsetCornerKeys: [] };
   if ( !cornerMap.has(key) ) cornerMap.set(key, value);
+
+  // If this overlaps another edge, skip.
+  // If another edge overlaps this, skip.
+  // Recall the edges here share vertex a. Need to just make sure b is between edge.a and edge.b.
+  const e1 = edge.a.key === key ? edge.b : edge.a;
+  for ( const other of value.edges ) {
+    const e2 = other.a.key === key ? other.b : other.a;
+    if ( segmentsOverlap(a, e1, e2) ) return;
+  }
   value.edges.add(edge);
+}
+
+/**
+ * Helper to determine if two segments that share a vertex overlap.
+ * Overlap means they are collinear and point the same direction.
+ * @param {PIXI.Point} v      Shared vertex
+ * @param {PIXI.Point} e1     Endpoint of the first segment
+ * @param {PIXI.Point} e2     End point of the second segment
+ * @returns {boolean} True if they overlap.
+ */
+function segmentsOverlap(v, e1, e2) {
+  // Collinearity check.
+  if ( !foundry.utils.orient2dFast(v, e1, e1).almostEqual(0) ) return false;
+
+  // Directionality check. Dot product of the vectors v|a1 and v|a2.
+  using delta1 = e1.subtract(v);
+  using delta2 = e2.subtract(v);
+  return delta1.dot(delta2) > 0;
 }
 
 
@@ -276,7 +308,8 @@ function _processEndpoint(a, edge, cornerMap) {
  * @param {number}[offset=2]                    How far away from the corner to set the offset.
  * @returns {Set<number>} The offset corner points, stored as keys in the set.
  */
-export function offsetVCorners(sweep, offset = 2) {
+/*
+function offsetVCorners(sweep, offset = 2) {
   const cornerResults = sweep.cornerGapsEncountered;
   using vertex = PIXI.Point.tmp;
   const nCorners = cornerResults.length;
@@ -289,6 +322,7 @@ export function offsetVCorners(sweep, offset = 2) {
   }
   return offsetCorners;
 }
+*/
 
 
 /**
@@ -305,7 +339,8 @@ export function offsetVCorners(sweep, offset = 2) {
  * @param {number}[offset=2]                    How far away from the corner to set the offset.
  * @returns {Set<number>} The offset corner points, stored as keys in the set.
  */
-export function offsetEdgeCorners(sweep, offset = 2) {
+/*
+function offsetEdgeCorners(sweep, offset = 2) {
   const cornerResults = sweep.cornerGapsEncountered;
   const origin = sweep.origin;
   const offset2 = offset ** 2;
@@ -317,7 +352,9 @@ export function offsetEdgeCorners(sweep, offset = 2) {
     vertex.set(corner.x, corner.y);
 
     // Find the closest clockwise edge.
-    if ( corner.cwEdges.size && corner.ccwEdges.size ) console.warn("offsetEdgeCorners|corner should have either cwEdges or ccwEdge but not both.");
+    if ( corner.cwEdges.size && corner.ccwEdges.size ) {
+      console.warn("offsetEdgeCorners|corner should have either cwEdges or ccwEdge but not both.");
+    }
     const edges = corner.cwEdges.size ? corner.cwEdges : corner.ccwEdges;
     const closest = facingEdgePoint(origin, corner, edges);
 
@@ -327,6 +364,7 @@ export function offsetEdgeCorners(sweep, offset = 2) {
   }
   return offsetCorners;
 }
+*/
 
 /**
  * For angle formed by a|v|c, calculate the vector that bisects the two segments at v.
@@ -415,6 +453,7 @@ function formsV(segments, vertex) {
  * @param {Set<Segment>|Segment[]} segments
  * @returns {PIXI.Point}
  */
+/*
 function facingEdgePoint(origin, vertex, segments) {
   // Similar logic to findOutermostVEdges except looking for the edge next to vertex --> origin.
   const { ccw, cw } = findOutermostVEdges(segments, vertex);
@@ -424,6 +463,7 @@ function facingEdgePoint(origin, vertex, segments) {
   // If ccw is more counter-clockwise than the origin, then cw is the "facing" point.
   return foundry.utils.orient2dFast(vertex, origin, ccw) > 0 ? cw : ccw;
 }
+*/
 
 /**
  * Helper for offsetVCorners.
@@ -433,6 +473,7 @@ function facingEdgePoint(origin, vertex, segments) {
  * @param {number} [offset=20]
  * @returns {PIXI.Point}
  */
+/*
 function _vOffsetForCornerEdges(vertex, cornerEdges, offset = 2) {
   const vertexKey = vertex.key;
   switch ( cornerEdges.size ) {
@@ -457,6 +498,7 @@ function _vOffsetForCornerEdges(vertex, cornerEdges, offset = 2) {
     }
   }
 }
+*/
 
 function _vOffsetSingleEdge(a, vertex, offset = 2) {
   return vertex.towardsPointSquared(a, -(offset ** 2));

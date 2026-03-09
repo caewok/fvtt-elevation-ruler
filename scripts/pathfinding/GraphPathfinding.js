@@ -756,6 +756,9 @@ midE = (pf.token.topE - pf.token.bottomE) * 0.5;
 start.elevation += midE;
 end.elevation += midE;
 
+pf.debug = true
+pf.debugDelay = 50;
+
 await pf.startPathfinding(start);
 path = await pf._findPath(start, end)
 pf.constructor.drawPath(path)
@@ -763,13 +766,15 @@ pf.validatePath(path, start, end)
 
 
 // Clockwise sweep
+CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"
 await pf.startPathfinding(start);
 pf.world._cornerMap.keys().forEach(key => Draw.point(PIXI.Point.invertKey(key)))
 pf.world._cornerMap.values().forEach(v => {
-  v.offsetCornerKeys.forEach(key => Draw.point(PIXI.Point.invertKey(key), { color: Draw.COLORS.blue }))
+  v.offsetCornerKeys.forEach(key => Draw.point(PIXI.Point.invertKey(key), { color: Draw.COLORS.blue, radius: 1 }))
 })
 pf.world._terrainPointKeys.forEach(key => Draw.point(PIXI.Point.invertKey(key), { color: Draw.COLORS.green }));
 
+pf.world.existingNodes.values().forEach(node => Draw.point(node, { color: Draw.COLORS.green, radius: 2 }))
 
 
 
@@ -777,6 +782,20 @@ CONFIG.elevationruler.clockwiseSweepCornerGapType = "v" // gap|v|edge
 node = ClockwiseSweepPathfindingNode.create(start)
 ClockwiseSweepPathfindingNode.CORNER_OFFSET = 20
 
+Draw.star(node)
+Draw.shape(node.sweep, { fill: Draw.COLORS.blue, fillAlpha: 0.3 })
+neighborKeys = node.getNeighbors(pf.world._cornerMap, pf.world._terrainPointGrid)
+
+neighborNodes = pf.world.adjacentOffsets(node)
+for ( let i = 0; i < neighborNodes.length; i += 1 ) {
+   const node = neighborNodes[i]
+   Draw.point(node, { radius: 1 })
+   Draw.shape(node.sweep, { fill: Draw.COLORS.green, fillAlpha: 0.3 })
+
+}
+
+
+})
 
 corners = offsetGapCorners(node.sweep, 20)
 corners.forEach(key => Draw.point(PIXI.Point.invertKey(key)))
@@ -806,8 +825,7 @@ pf.world.testCollision2(start, end, pf.token);
 await QBenchmarkLoopFn(N, pf.world.testCollision.bind(pf.world), "clockwiseSweep", start, end, pf.token)
 await QBenchmarkLoopFn(N, pf.world.testCollision2.bind(pf.world), "foundry sweep", start, end, pf.token)
 
-pf.debug = true
-pf.debugDelay = 50;
+
 
 CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion"
 CONFIG.elevationruler.graphPathfinding.neighborFilter = "sceneGraph"
