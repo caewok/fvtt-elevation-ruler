@@ -30,8 +30,8 @@ import {
 import { GriddedCollisionPathfinder, worldBuilderGriddedCollision } from "./pathfinding/GriddedCollisionPathfinding.js";
 
 // ClockwiseSweep pathfinding
-import { ObstacleSweep, ClockwisePathfindingSweep } from "./pathfinding/ClockwiseSweep.js";
-import { ClockwiseSweepPathfinder, worldBuilderClockwise } from "./pathfinding/ClockwiseSweepPathfinding.js";
+import { ObstacleSweep, ClockwiseCornerSweep, ClockwiseCornerEdgeSweep, offsetVCornersForEdges } from "./pathfinding/ClockwiseSweep.js";
+import { ClockwiseSweepPathfinder, worldBuilderClockwise, ClockwiseSweepPathfindingNode } from "./pathfinding/ClockwiseSweepPathfinding.js";
 
 // WebGPU pathfinding
 import { WebGPUPathfinder } from "./pathfinding/WebGPUPathfinding.js";
@@ -96,17 +96,7 @@ Hooks.once("init", function() {
       prone: true,
     },
 
-    /**
-     * @type {
-     * manhattan
-     * manhattan3d
-     * euclidean
-     * euclidean3d
-     * foundry
-     * foundryTokenCost
-     * occlusion
-     * }
-     */
+    /** @type {object} */
     graphPathfinding: {
       algorithm: "astar",   // @type {"astar"|"greedy"|"breadth"|"uniform"}
       use3d: false,         // @type {true|false}. TODO: Currently non-functional.
@@ -114,6 +104,14 @@ Hooks.once("init", function() {
       heuristic: "foundry", // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
       neighborFilter: "clockwiseSweep",    // @type{"clockwiseSweep"|"occlusion"|"sceneGraph"}
     },
+
+    /**
+     * How to offset the corners for the clockwise sweep pathfinding.
+     * v: Offset using the V created by corners
+     * edge: Offset by moving away from the corner in the direction of the edge creating the shadow.
+     * @type {"v"|"edge"}
+     */
+    clockwiseSweepCornerGapType: "v",
 
     /**
      * Enable certain debug console logging and tests.
@@ -147,7 +145,10 @@ Hooks.once("init", function() {
       worldBuilderClockwise,
 
       ObstacleSweep,
-      ClockwisePathfindingSweep,
+      ClockwiseCornerSweep,
+      ClockwiseCornerEdgeSweep,
+      ClockwiseSweepPathfindingNode,
+      offsetVCornersForEdges,
     },
 
     pathCleaning: {

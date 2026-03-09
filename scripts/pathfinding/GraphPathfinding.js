@@ -622,7 +622,7 @@ Draw = CONFIG.GeometryLib.lib.Draw;
 GridCoordinates3d = CONFIG.GeometryLib.lib.threeD.GridCoordinates3d
 GridCoordinates = CONFIG.GeometryLib.lib.GridCoordinates
 api = game.modules.get("elevationruler").api
-let { ClockwiseSweepPathfinder, GriddedCollisionPathfinder, WebGPUPathfinder, worldBuilderGriddedCollision } = api.pathfinding;
+let { ClockwiseSweepPathfinder, GriddedCollisionPathfinder, WebGPUPathfinder, worldBuilderGriddedCollision, ClockwiseSweepPathfindingNode } = api.pathfinding;
 let { solveSegment,
       pathIsValid,
       optimizeGridPath,
@@ -646,7 +646,8 @@ let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
 let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 
 // collision, webGPU, clockwiseSweep
-algorithm = "webGPU"
+CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"  // |"v"|"edge"
+algorithm = "clockwiseSweep"
 graphPathfinding = {
   cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
   heuristic: "terrain", //"manhattan"|"euclidean"|"foundry"|"terrain"
@@ -711,7 +712,7 @@ percentArea = uniquePixelsForCanvasWalls().size / canvas.scene.dimensions.sceneR
 
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
-pf = new WebGPUPathfinder(randal)
+pf = new ClockwiseSweepPathfinder(randal)
 
 res = pf.constructor.worker.resolution
 uniquePixelsForCanvasWalls().size * res
@@ -740,12 +741,12 @@ console.log(`
 
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
-pf = new WebGPUPathfinder(randal)
+pf = new ClockwiseSweepPathfinder(randal)
 
 
 start = GridCoordinates3d.fromObject(beiro.center)
 end = GridCoordinates3d.fromObject(riswynn.center)
-pf = new WebGPUPathfinder(beiro)
+pf = new ClockwiseSweepPathfinder(beiro)
 
 start = GridCoordinates3d.fromObject(akra.center)
 end = GridCoordinates3d.fromObject(perrin.center)
@@ -755,7 +756,49 @@ midE = (pf.token.topE - pf.token.bottomE) * 0.5;
 start.elevation += midE;
 end.elevation += midE;
 
+pf.debug = true
+pf.debugDelay = 50;
 
+await pf.startPathfinding(start);
+path = await pf._findPath(start, end)
+pf.constructor.drawPath(path)
+pf.validatePath(path, start, end)
+
+
+// Clockwise sweep
+CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"
+await pf.startPathfinding(start);
+pf.world._cornerMap.keys().forEach(key => Draw.point(PIXI.Point.invertKey(key)))
+pf.world._cornerMap.values().forEach(v => {
+  v.offsetCornerKeys.forEach(key => Draw.point(PIXI.Point.invertKey(key), { color: Draw.COLORS.blue, radius: 1 }))
+})
+pf.world._terrainPointKeys.forEach(key => Draw.point(PIXI.Point.invertKey(key), { color: Draw.COLORS.green }));
+
+pf.world.existingNodes.values().forEach(node => Draw.point(node, { color: Draw.COLORS.green, radius: 2 }))
+
+
+
+CONFIG.elevationruler.clockwiseSweepCornerGapType = "v" // gap|v|edge
+node = ClockwiseSweepPathfindingNode.create(start)
+ClockwiseSweepPathfindingNode.CORNER_OFFSET = 20
+
+Draw.star(node)
+Draw.shape(node.sweep, { fill: Draw.COLORS.blue, fillAlpha: 0.3 })
+neighborKeys = node.getNeighbors(pf.world._cornerMap, pf.world._terrainPointGrid)
+
+neighborNodes = pf.world.adjacentOffsets(node)
+for ( let i = 0; i < neighborNodes.length; i += 1 ) {
+   const node = neighborNodes[i]
+   Draw.point(node, { radius: 1 })
+   Draw.shape(node.sweep, { fill: Draw.COLORS.green, fillAlpha: 0.3 })
+
+}
+
+
+})
+
+corners = offsetGapCorners(node.sweep, 20)
+corners.forEach(key => Draw.point(PIXI.Point.invertKey(key)))
 
 await benchTokenPath(randal, zanna.center, { N: 3 });
 await benchTokenPath(beiro, riswynn.center, { N: 3 });
@@ -782,8 +825,7 @@ pf.world.testCollision2(start, end, pf.token);
 await QBenchmarkLoopFn(N, pf.world.testCollision.bind(pf.world), "clockwiseSweep", start, end, pf.token)
 await QBenchmarkLoopFn(N, pf.world.testCollision2.bind(pf.world), "foundry sweep", start, end, pf.token)
 
-pf.debug = true
-pf.debugDelay = 50;
+
 
 CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion"
 CONFIG.elevationruler.graphPathfinding.neighborFilter = "sceneGraph"
