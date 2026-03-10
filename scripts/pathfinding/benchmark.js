@@ -129,9 +129,7 @@ export async function testPathfinding(startOrToken, endOrToken, { moveToken, alg
     console.warn("No path found!", { start, end });
     return;
   }
-
   pf.constructor.drawPath(path);
-  pf.validatePath(path, start, end);
 
   let gridPath;
   let straightPath;
@@ -158,9 +156,15 @@ export async function testPathfinding(startOrToken, endOrToken, { moveToken, alg
       break;
   }
 
+
   pf.constructor.drawPath(straightPath, { color: Draw.COLORS.lightblue });
   pf.constructor.drawPath(gridPath, { color: Draw.COLORS.lightgreen });
 
-  console.log(`Straight path (light blue): ${pf.validatePath(straightPath, start, end)}`);
-  console.log(`Gridded path (light green): ${pf.validatePath(gridPath, start, end)}`);
+  const origTest = pf.validatePath(path, start, end);
+  const straightTest = pf.validatePath(straightPath, start, end);
+  const gridTest = pf.validatePath(gridPath, start, end);
+
+  console.log(`Original path: ${origTest}`);
+  console.log(`Straight path (light blue): ${straightTest}`);
+  console.log(`Gridded path (light green): ${gridTest}`);
 }

@@ -177,6 +177,12 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
         // right: the left wall cuts the sweep, meaning the corner offset from the right might be
         // too far left. Not obvious how to catch this without testing all collisions.
         if ( !sweep._testCollision(ray, "any") ) neighbors.add(key);
+
+        // Instead of collision test, check for whether the sweep contains the offset point:
+        // We know the sweep contains the corner. Need to know if the ray from the corner
+        // to the offset corner hits an edge of the sweep before it hits the offset corner.
+
+
       });
     }
     return neighbors;

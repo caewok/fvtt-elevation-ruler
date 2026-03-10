@@ -658,6 +658,54 @@ await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
 await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
 
 
+// Test all
+
+console.log("\n\n-----Collision: Occlusion -----")
+algorithm = "collision"
+graphPathfinding.neighborFilter = "occlusion"
+await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
+await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
+await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
+
+console.log("\n\n-----Collision: CWSweep -----")
+algorithm = "collision"
+graphPathfinding.neighborFilter = "occlusion"
+await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
+await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
+await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
+
+console.log("\n\n-----Collision: Scene Graph -----")
+algorithm = "collision"
+graphPathfinding.neighborFilter = "occlusion"
+await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
+await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
+await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
+
+console.log("\n\n-----Clockwise Sweep: 'V' -----")
+algorithm = "clockwiseSweep"
+CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"
+await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
+await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
+await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
+
+console.log("\n\n-----Clockwise Sweep: 'Edge' -----")
+algorithm = "clockwiseSweep"
+CONFIG.elevationruler.clockwiseSweepCornerGapType = "edge"
+await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
+await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
+await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
+
+console.log("\n\n-----WebGPU -----")
+algorithm = "webGPU"
+await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
+await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
+await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
+
+
+
+
+
+
 
  **
  * Uses bresenham to draw pixels under each wall in the scene.
@@ -927,7 +975,7 @@ gridPath.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
 ObstacleSweep = api.pathfinding.ObstacleSweep
 geom = ogre.GeometryLib.geometry
 dir = end.subtract(start)
-ix = start.projectToward(end, geom.rayIntersectionConstrained(start, dir))
+ix = start.projectToward(end, geom.rayIntersection(start, dir))
 ixNode = pf.world.buildNode(ix)
 Draw.star(ixNode)
 neighbors = pf.world.getNeighbors(ixNode)
