@@ -122,21 +122,20 @@ export class AbstractPathfinder {
    * @returns {boolean}
    */
   validatePath(path, start, goal, prefix = "Pathfinder") {
-    const pathString = this.pathString(path);
-    log(`${prefix}|${start} --> ${goal}:\n${pathString}`);
+    log(`${prefix}|${start} --> ${goal}:\n${this.pathString(path)}`);
     if ( !path[0].almostEqual(start) ) {
-      console.error(`${prefix}|${start} --> ${goal} start incorrect:\n${pathString}`);
+      console.error(`${prefix}|${start} --> ${goal} start incorrect:\n${this.pathString(path.slice(0, 2))}`);
       return false;
     }
     if ( !path.at(-1).almostEqual(goal) ) {
-      console.error(`${prefix}|${start} --> ${goal} end incorrect:\n${pathString}`);
+      console.error(`${prefix}|${start} --> ${goal} end incorrect:\n${this.pathString([path.at(-2), path.at(-1)])}`);
       return false;
     }
 
     const ClockwiseSweepPolygon = foundry.canvas.geometry.ClockwiseSweepPolygon;
     for ( let i = 0, iMax = path.length - 1; i < iMax; i += 1 ) {
       if ( ClockwiseSweepPolygon.testCollision(path[i], path[i + 1], { mode: "any", type: "move" }) ) {
-        console.warn(`${prefix}|${start} --> ${goal} path has collision at ${i}:\n${pathString}`);
+        console.warn(`${prefix}|${start} --> ${goal} path has collision at ${i}:\n${this.pathString(path.slice(i, i + 2))}`);
         return false;
       }
     }

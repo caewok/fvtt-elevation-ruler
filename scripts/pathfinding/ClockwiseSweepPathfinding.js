@@ -156,14 +156,16 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
     // Corner offsets can be found by getting the offsets for the
     // corners in the sweep.
     // TODO: Can these offset corners ever be outside the sweep? If yes, contains test is required.
-    using pt = PIXI.Point.tmp;
+    using cornerOffset = PIXI.Point.tmp;
+    using corner = PIXI.Point.tmp;
 
     // Ray has cached values that would have to be reset, except that _testCollision only uses ray.B.
-    const ray = { B: pt };
+    const ray = { B: cornerOffset };
     for ( const cornerKey of sweep.cornersEncountered ) {
       if ( !cornerMap.has(cornerKey) ) continue;
+      PIXI.Point.invertKey(cornerKey, corner);
       cornerMap.get(cornerKey).offsetCornerKeys.forEach(key => {
-        PIXI.Point.invertKey(key, pt);
+        PIXI.Point.invertKey(key, cornerOffset);
 
         // sweep._envelopsPoint fails if the orient2d test for lineSegmentIntersects is
         // extremely close. In other words, if the point is near a diagonal (sweep) edge,
@@ -176,12 +178,20 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
         // is not guaranteed to be. Example: One wall from the left and another behind it from the
         // right: the left wall cuts the sweep, meaning the corner offset from the right might be
         // too far left. Not obvious how to catch this without testing all collisions.
-        if ( !sweep._testCollision(ray, "any") ) neighbors.add(key);
+        // if ( !sweep._testCollision(ray, "any") ) neighbors.add(key);
 
         // Instead of collision test, check for whether the sweep contains the offset point:
         // We know the sweep contains the corner. Need to know if the ray from the corner
         // to the offset corner hits an edge of the sweep before it hits the offset corner.
 
+        let hasIx = false;
+        for ( const edge of sweep.iterateEdges({ close: true }) ) {
+          if ( edge.a.key === cornerKey || edge.b.key === cornerKey ) continue;
+          if ( !foundry.utils.lineSegmentIntersects(edge.a, edge.b, corner, cornerOffset) ) continue;
+          hasIx = true;
+          break;
+        }
+        if ( !hasIx ) neighbors.add(key);
 
       });
     }
