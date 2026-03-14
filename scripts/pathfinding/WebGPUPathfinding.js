@@ -14,6 +14,7 @@ import { AbstractPathfinder } from "./AbstractPathfinder.js";
 import { GEOMETRY_LIB_ID, GEOMETRY_ID } from "../geometry/const.js";
 import { Settings } from "../settings.js";
 import { combineTypedArrays } from "../geometry/util.js";
+import { tokenTerrainValue, regionTerrainValue, TERRAIN_FEATURES } from "./terrain_utils.js";
 import {
   HorizontalQuadVertices,
   Polygon3dVertices,
@@ -266,13 +267,6 @@ const GPUTerrainMixin = superclass => class extends superclass {
 
   // ----- NOTE: Methods ----- //
 
-  /** @type {enum} */
-  static FEATURES = {
-    CLEAR: 0,       // Clear value.
-    NORMAL: 1,      // Basic cost to move 1 grid space.
-    BLOCKING: 255,  // Considered infinite cost: 2^8 -1.
-  };
-
   /**
    * Move value for token.
    * If tokens block, mark as wall.
@@ -282,46 +276,11 @@ const GPUTerrainMixin = superclass => class extends superclass {
    * @returns {number}
    */
   static tokenValue(token, subjectToken) {
-    // If the token does not affect the subject, should return NORMAL (not 0, although that could work).
-    if ( token === subjectToken ) return this.FEATURES.NORMAL;
-
-    // TODO: Add setting to change this.
-    if ( token.isProne ) return this.FEATURES.NORMAL;
-    if ( CONFIG[GEOMETRY_LIB_ID].CONFIG.tokenIsDead(token) ) return this.FEATURES.NORMAL;
-
-    const PATHFINDING = Settings.KEYS.PATHFINDING;
-    const blocking = Settings.get(PATHFINDING.TOKENS_BLOCK);
-    if ( blocking === PATHFINDING.TOKENS_BLOCK_CHOICES.ALL ) return this.FEATURES.BLOCKING;
-
-    const isEnemy = CONFIG[GEOMETRY_LIB_ID].CONFIG.tokenIsEnemy(subjectToken, token);
-    if ( isEnemy && blocking === PATHFINDING.TOKENS_BLOCK_CHOICES.HOSTILE ) return this.FEATURES.BLOCKING;
-
-    // No token blocking; check for token difficulties.
-    const hostileDifficulty = Settings.get(PATHFINDING.TOKEN_DIFFICULTY.HOSTILE);
-    if ( isEnemy ) return hostileDifficulty * this.FEATURES.NORMAL;
-
-    const isAlly = CONFIG[GEOMETRY_LIB_ID].CONFIG.tokenIsAlly(subjectToken, token);
-    const allyDifficulty = Settings.get(PATHFINDING.TOKEN_DIFFICULTY.FRIENDLY);
-    if ( isAlly ) return allyDifficulty * this.FEATURES.NORMAL;
-
-    return this.FEATURES.NORMAL;
+    return tokenTerrainValue(token, subjectToken);
   }
 
   static regionValue(region, subjectToken) {
-    let value = this.FEATURES.NORMAL;
-    if ( game.system.id === "dnd5e" ) {
-      // Treat multiple difficult behaviors as multiplicative.
-      const DIFFICULTY_MULTIPLIER = 2;
-      behaviorLoop:
-      for ( const behavior of region.document.behaviors ) {
-        if ( behavior.type !== "dnd5e.difficultTerrain" ) continue behaviorLoop;
-        for ( const ignoredDisposition of behavior.system.ignoredDispositions ) {
-          if ( ignoredDisposition === subjectToken.document.disposition ) continue behaviorLoop;
-        }
-        value *= DIFFICULTY_MULTIPLIER;
-      }
-    }
-    return value;
+    return regionTerrainValue(region, subjectToken);
   }
 
 
@@ -330,7 +289,7 @@ const GPUTerrainMixin = superclass => class extends superclass {
     const subjectToken = this.token;
     return tokens.filter(token => {
       const value = this.constructor.tokenValue(token, subjectToken);
-      return value === this.constructor.FEATURES.BLOCKING;
+      return value === TERRAIN_FEATURES.BLOCKING;
     });
   }
 
@@ -341,7 +300,7 @@ const GPUTerrainMixin = superclass => class extends superclass {
     return regions.filter(region => {
       if ( !region.document.shapes.length ) return false;
       const value = this.constructor.regionValue(region, subjectToken);
-      return value !== this.constructor.FEATURES.NORMAL;
+      return value !== TERRAIN_FEATURES.NORMAL;
     });
   }
 
@@ -351,7 +310,7 @@ const GPUTerrainMixin = superclass => class extends superclass {
     const subjectToken = this.token;
     return tokens.filter(token => {
       const value = this.constructor.tokenValue(token, subjectToken);
-      return !(value === this.constructor.FEATURES.NORMAL || value === this.constructor.FEATURES.BLOCKING);
+      return !(value === TERRAIN_FEATURES.NORMAL || value === TERRAIN_FEATURES.BLOCKING);
     });
   }
 

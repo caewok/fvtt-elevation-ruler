@@ -14,9 +14,9 @@ import { ElevatedPoint } from "../geometry/3d/ElevatedPoint.js";
 import { Draw } from "../geometry/Draw.js";
 import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
 import { ClockwiseCornerSweep, offsetVCornersForEdges, offsetEdgeCornersForEdges } from "./ClockwiseSweep.js";
-import { WebGPUPathfinder } from "./WebGPUPathfinding.js"; // For the token and region terrain methods.
 import { UniformPointGrid } from "./UniformPointGrid.js";
 import { mix } from "../geometry/mixwith.js";
+import { tokenTerrainValue, regionTerrainValue, TERRAIN_FEATURES } from "./terrain_utils.js";
 import {
   Manhattan2dCost,
   Manhattan3dCost,
@@ -66,13 +66,13 @@ export class ClockwiseSweepPathfinder extends GraphingPathfinder {
    * @returns {Point[]}
    */
   /*
-  snapPathToGrid(path) {
+  async snapPathToGrid(path) {
     // TODO: Could use specialized version that limits collision tests between a and b
     //       to edges encountered in a's sweep.
 
     // TODO: Could run collision pathfinding within a's sweep to find best grid path to b.
 
-    // path = snapPathToGrid(path, this.token);
+    // path = await snapPathToGrid(path, this.token);
     // return dropIntermediatePoints(path);
     return super.snapPathToGrid(path);
   }
@@ -382,8 +382,8 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
     for ( const token of canvas.tokens.placeables ) {
       if ( token === this.token ) continue;
       if ( blockingTokens.has(token) ) continue;
-      const value = WebGPUPathfinder.tokenValue(token, this.token);
-      if ( value <= WebGPUPathfinder.FEATURES.NORMAL ) continue;
+      const value = tokenTerrainValue(token, this.token);
+      if ( value <= TERRAIN_FEATURES.NORMAL ) continue;
 
       // Use the constrained token border, expanded so the points are not on the token.
       using pt = PIXI.Point.tmp;
@@ -406,8 +406,8 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
     const terrainPointKeys = this._terrainPointKeys;
     for ( const region of canvas.regions.placeables ) {
       if ( !region.document.shapes.length ) continue;
-      const value = WebGPUPathfinder.regionValue(region, this.token);
-      if ( value <= WebGPUPathfinder.FEATURES.NORMAL ) continue;
+      const value = regionTerrainValue(region, this.token);
+      if ( value <= TERRAIN_FEATURES.NORMAL ) continue;
 
       // Get the region border, padded so the points are not in the region.
       // TODO: Fix.
