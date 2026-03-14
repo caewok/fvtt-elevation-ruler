@@ -12,11 +12,14 @@ import { NULL_SET } from "../geometry/util.js";
 import { AABB2d } from "../geometry/AABB.js";
 import { ElevatedPoint } from "../geometry/3d/ElevatedPoint.js";
 import { Draw } from "../geometry/Draw.js";
-import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
+import { GraphPathfinder } from "./GraphPathfinding.js";
+import { GraphPathfindingWorld } from "./GraphPathfindingWorld.js";
 import { ClockwiseCornerSweep, offsetVCornersForEdges, offsetEdgeCornersForEdges } from "./ClockwiseSweep.js";
-import { WebGPUPathfinder } from "./WebGPUPathfinding.js"; // For the token and region terrain methods.
 import { UniformPointGrid } from "./UniformPointGrid.js";
 import { mix } from "../geometry/mixwith.js";
+import { tokenTerrainValue, regionTerrainValue, TERRAIN_FEATURES } from "./terrain_utils.js";
+import { snapPathToGrid } from "./snap_to_grid.js";
+import { optimizeGridPath } from "./path_cleaning.js";
 import {
   Manhattan2dCost,
   Manhattan3dCost,
@@ -46,37 +49,24 @@ Conduct sweep from those points.
 Stop when the point is within the end sweep.
 */
 
-export class ClockwiseSweepPathfinder extends GraphingPathfinder {
+export class ClockwiseSweepPathfinder extends GraphPathfinder {
 
   static get worldClass() { return worldBuilderClockwise(); }
-
-  /**
-   * Clean the path, which may include straightening it, snapping it to a grid, or removing unnecessary points.
-   * @param {Node[]} path
-   * @returns {Point[]}
-   */
-  cleanPath(path) {
-    // Already straightened and has limited points, so simply return.
-    return path;
-  }
 
   /**
    * Snap the path to the grid.
    * @param {Node[]} path
    * @returns {Point[]}
    */
-  /*
-  snapPathToGrid(path) {
+  async snapPathToGrid(path) {
+    path = await snapPathToGrid(path, this.token);
+    return optimizeGridPath(path, this.token);
     // TODO: Could use specialized version that limits collision tests between a and b
     //       to edges encountered in a's sweep.
 
     // TODO: Could run collision pathfinding within a's sweep to find best grid path to b.
-
-    // path = snapPathToGrid(path, this.token);
-    // return dropIntermediatePoints(path);
-    return super.snapPathToGrid(path);
   }
-  */
+
 }
 
 /**
@@ -156,14 +146,16 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
     // Corner offsets can be found by getting the offsets for the
     // corners in the sweep.
     // TODO: Can these offset corners ever be outside the sweep? If yes, contains test is required.
-    using pt = PIXI.Point.tmp;
+    using cornerOffset = PIXI.Point.tmp;
+    using corner = PIXI.Point.tmp;
 
     // Ray has cached values that would have to be reset, except that _testCollision only uses ray.B.
-    const ray = { B: pt };
+    // const ray = { B: cornerOffset };
     for ( const cornerKey of sweep.cornersEncountered ) {
       if ( !cornerMap.has(cornerKey) ) continue;
+      PIXI.Point.invertKey(cornerKey, corner);
       cornerMap.get(cornerKey).offsetCornerKeys.forEach(key => {
-        PIXI.Point.invertKey(key, pt);
+        PIXI.Point.invertKey(key, cornerOffset);
 
         // sweep._envelopsPoint fails if the orient2d test for lineSegmentIntersects is
         // extremely close. In other words, if the point is near a diagonal (sweep) edge,
@@ -176,7 +168,21 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
         // is not guaranteed to be. Example: One wall from the left and another behind it from the
         // right: the left wall cuts the sweep, meaning the corner offset from the right might be
         // too far left. Not obvious how to catch this without testing all collisions.
-        if ( !sweep._testCollision(ray, "any") ) neighbors.add(key);
+        // if ( !sweep._testCollision(ray, "any") ) neighbors.add(key);
+
+        // Instead of collision test, check for whether the sweep contains the offset point:
+        // We know the sweep contains the corner. Need to know if the ray from the corner
+        // to the offset corner hits an edge of the sweep before it hits the offset corner.
+
+        let hasIx = false;
+        for ( const edge of sweep.iterateEdges({ close: true }) ) {
+          if ( edge.a.key === cornerKey || edge.b.key === cornerKey ) continue;
+          if ( !foundry.utils.lineSegmentIntersects(edge.a, edge.b, corner, cornerOffset) ) continue;
+          hasIx = true;
+          break;
+        }
+        if ( !hasIx ) neighbors.add(key);
+
       });
     }
     return neighbors;
@@ -366,8 +372,8 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
     for ( const token of canvas.tokens.placeables ) {
       if ( token === this.token ) continue;
       if ( blockingTokens.has(token) ) continue;
-      const value = WebGPUPathfinder.tokenValue(token, this.token);
-      if ( value <= WebGPUPathfinder.FEATURES.NORMAL ) continue;
+      const value = tokenTerrainValue(token, this.token);
+      if ( value <= TERRAIN_FEATURES.NORMAL ) continue;
 
       // Use the constrained token border, expanded so the points are not on the token.
       using pt = PIXI.Point.tmp;
@@ -390,8 +396,8 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
     const terrainPointKeys = this._terrainPointKeys;
     for ( const region of canvas.regions.placeables ) {
       if ( !region.document.shapes.length ) continue;
-      const value = WebGPUPathfinder.regionValue(region, this.token);
-      if ( value <= WebGPUPathfinder.FEATURES.NORMAL ) continue;
+      const value = regionTerrainValue(region, this.token);
+      if ( value <= TERRAIN_FEATURES.NORMAL ) continue;
 
       // Get the region border, padded so the points are not in the region.
       // TODO: Fix.

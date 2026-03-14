@@ -8,7 +8,8 @@ game,
 import { MODULE_ID } from "../const.js";
 import { QBenchmarkLoopFn } from "../geometry/benchmark.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
-import { dropIntermediatePoints, straightenPath, snapPathToGrid, optimizeGridPath } from "./path_cleaning.js";
+import { dropIntermediatePoints, straightenPath, optimizeGridPath } from "./path_cleaning.js";
+import { snapPathToGrid } from "./snap_to_grid.js";
 
 /**
  * Bench all pathfinding for a token and an endpoint.
@@ -129,9 +130,7 @@ export async function testPathfinding(startOrToken, endOrToken, { moveToken, alg
     console.warn("No path found!", { start, end });
     return;
   }
-
   pf.constructor.drawPath(path);
-  pf.validatePath(path, start, end);
 
   let gridPath;
   let straightPath;
@@ -146,7 +145,7 @@ export async function testPathfinding(startOrToken, endOrToken, { moveToken, alg
     case "clockwiseSweep":
       straightPath = path;
 
-      gridPath = snapPathToGrid(path, pf.token);
+      gridPath = await snapPathToGrid(path, pf.token);
       gridPath = optimizeGridPath(gridPath, pf.token);
       break;
 
@@ -158,9 +157,15 @@ export async function testPathfinding(startOrToken, endOrToken, { moveToken, alg
       break;
   }
 
+
   pf.constructor.drawPath(straightPath, { color: Draw.COLORS.lightblue });
   pf.constructor.drawPath(gridPath, { color: Draw.COLORS.lightgreen });
 
-  console.log(`Straight path (light blue): ${pf.validatePath(straightPath, start, end)}`);
-  console.log(`Gridded path (light green): ${pf.validatePath(gridPath, start, end)}`);
+  const origTest = pf.validatePath(path, start, end);
+  const straightTest = pf.validatePath(straightPath, start, end);
+  const gridTest = pf.validatePath(gridPath, start, end);
+
+  console.log(`Original path: ${origTest}`);
+  console.log(`Straight path (light blue): ${straightTest}`);
+  console.log(`Gridded path (light green): ${gridTest}`);
 }

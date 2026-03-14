@@ -15,9 +15,10 @@ import { ObstacleOcclusionTest } from "../geometry/ObstacleOcclusionTest.js";
 import { GridCoordinates } from "../geometry/GridCoordinates.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix } from "../geometry/mixwith.js";
-import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
+import { GraphPathfinder } from "./GraphPathfinding.js";
+import { GraphPathfindingWorld } from "./GraphPathfindingWorld.js";
 import { ObstacleSweep } from "./ClockwiseSweep.js";
-import { dropIntermediatePoints } from "./path_cleaning.js";
+import { straightenPath, dropIntermediatePoints } from "./path_cleaning.js";
 import {
   Manhattan2dCost,
   Manhattan3dCost,
@@ -51,23 +52,26 @@ Abstract
 - closestNode
 */
 
-export class GriddedCollisionPathfinder extends GraphingPathfinder {
+export class GriddedCollisionPathfinder extends GraphPathfinder {
 
   static get worldClass() { return worldBuilderGriddedCollision(); }
 
   /**
-   * Path cleaning.
-   *
-   * GriddedCollisionPathfinder will return gridded paths if on gridded scene; linear otherwise.
+   * Remove unnecessary path points and straighten the path.
+   * @param {Node[]} path
+   * @returns {Point[]}
    */
-  // cleanPath(path); // Handled by super.cleanPath.
+  cleanPath(path) {
+    path = dropIntermediatePoints(path);
+    return straightenPath(path, this.token);
+  }
 
   /**
    * Snap the path to the grid.
    * @param {Node[]} path
    * @returns {Point[]}
    */
-  snapPathToGrid(path) {
+  async snapPathToGrid(path) {
     // The Foundry offsets already snap-to-grid. Drop intermediate points.
     return dropIntermediatePoints(path);
   }

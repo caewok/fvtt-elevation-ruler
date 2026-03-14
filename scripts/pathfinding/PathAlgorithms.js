@@ -1,88 +1,376 @@
 /* globals
-CONFIG,
+canvas,
+foundry,
+PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
-import { MODULE_ID } from "../const.js";
-import { AbstractPathfinder } from "./AbstractPathfinder.js";
-import { Settings } from "../settings.js";
-import { BFSGraph, UniformCostGraph, AStarGraph, TestGraph } from "./PathAlgorithms.js";
+import { Draw } from "../geometry/Draw.js";
+import { PriorityQueue } from "./PriorityQueue.js";
 
-// Each pathfinding should create a new GraphPathfinder, so properties are not mixed up
-// between async jobs.
-export class GraphPathfinder extends AbstractPathfinder {
-  /** @type {AbstractGraph} */
-  lastGraph; // For debugging.
+/* Basic pathfinding algorithms.
 
-  #world;
+Abstract
+- getNeighbors
+  - adjacentOffsets
+  - filterNeighbors
+- cost
+- heuristic
+- buildNode
+- initialize
+- closestNode
+*/
 
-  get world() {
-    if ( !this.#world ) this.world = new this.constructor.worldClass();
-    return this.#world;
-  }
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-  set world(value) {
-    this.#world = value;
-    this.#world.initialize(this.token);
-  }
+/**
+ * Basic frontier that simply uses an array.
+ * Mimics PriorityQueue so that can be used as a frontier.
+ */
+class Frontier extends Array {
+  // Priority is ignored in base version.
+  enqueue(value, _priority) { return this.push(value); }
 
-  static get worldClass() { return Settings.pathfindingWorldClass; }
+  dequeue() { return this.shift(); }
 
-  #graphClass;
+  clear() { this.length = 0; }
+}
 
-  get graphClass() {
-    if ( this.#graphClass ) return this.#graphClass;
 
-    // If none set, go with current CONFIG.
-    switch ( CONFIG[MODULE_ID].graphPathfinding.algorithm ) {
-      case "astar": return AStarGraph;
-      case "breadth": return BFSGraph;
-      case "uniform": return UniformCostGraph;
-      case "greedy": return GreedyBestFirstGraph;
-      case "test": return TestGraph;
-      default: return AStarGraph;
-    }
-  }
+class AbstractGraph {
 
-  // Allow override of the graph class.
-  set graphClass(value) { this.#graphClass = value; }
+  /** @type {AbstractPathfindingWorld} */
+  world;
 
+  _cameFrom = new Map();
+
+  _frontier = new Frontier();
+
+  debug = false;
+
+  debugDelay = 0;
+
+  constructor(world) { this.world = world; }
 
   /**
-   * Start pathfinding.
-   * From this point, assume the scene and starting point will not change.
-   * @param {Point3d} start
+   * Initialize the pathfinding run.
    */
-  startPathfinding(start) {
-    // Reset the world if necessary.
-    if ( !(this.world instanceof this.constructor.worldClass) ) this.#world = null;
-    super.startPathfinding(start);
-
-    // Set up world
-    this.world.startPathfinding(start);
+  _initializePathfindingRun(start) {
+    this._initializeFrontier(start);
+    this._initializeCameFrom(start);
   }
+
+  /**
+   * Clear and initialize the frontier for pathfinding run.
+   * Frontier tracks next neighbors to be visited.
+   * @param {Point} start
+   */
+  _initializeFrontier(start) {
+    this._frontier.clear();
+    this._frontier.enqueue(start, 0); // Priority is ignored in base version.
+  }
+
+  /**
+   * Clear and initialize the frontier for pathfinding run.
+   * The cameFrom map tracks visited nodes.
+   * @param {Point} start
+   */
+  _initializeCameFrom(start) {
+    this._cameFrom.clear();
+    this._cameFrom.set(start.key, null);
+  }
+
+  // Use a Set to track "Closed" nodes (already fully processed)
+  closedSet = new Set();
 
   /**
    * Find the path between startPoint and endPoint using the chosen algorithm.
-   * @param {Point3d} start      Start point for the graph
-   * @param {Point3d} goal       End point for the graph
-   * @param {AbortSignal} signal    Signal to end pathfinding early
-   * @returns {Point3d[]}
+   * @param {Point} start       Start point for the graph
+   * @param {Point} goal        End point for the graph
    */
-  async _findPath(start, goal, signal) {
-    const graph = this.lastGraph = new this.graphClass(this.world);
-    graph.debug = this.debug;
-    graph.debugDelay = this.debugDelay;
-    return graph.findPath(start, goal, signal);
+  async findPath(start, goal, _signal = {}) {
+    const startNode = this.world.buildNode(start);
+    const goalNode = this.world.buildNode(goal);
+    if ( this.world.nodeIsUnreachable(goalNode, startNode) ) {
+      console.warn(`${this.constructor.name}|Node unreachable.`, { startNode, goalNode });
+      return null;
+    }
+
+    // Frontier tracks next neighbors to be visited.
+    this._initializePathfindingRun(startNode);
+
+    let iter = 0;
+    let MAX_ITER = this.world.constructor.maxIterations(start, goal) || 1e03;
+    let reachedGoal = false;
+    if ( this.debug ) {
+      this.world.drawNode(startNode, { color: Draw.COLORS.yellow });
+      this.world.drawNode(goalNode, { color: Draw.COLORS.green });
+    }
+
+    const closedSet = this.closedSet;
+    closedSet.clear();
+    while ( this._frontier.length > 0 && iter < MAX_ITER ) {
+      // if ( signal.aborted ) return null;
+      iter += 1;
+      const current = this._frontier.dequeue();
+
+      // If already processed, skip.
+      if ( closedSet.has(current.key) ) continue;
+      closedSet.add(current.key);
+
+      if ( this.debug ) {
+        if ( this.debugDelay ) await sleep(this.debugDelay);
+        this.world.drawNode(current, { color: Draw.COLORS.blue, alpha: 0.2, radius: 3 });
+      }
+      // console.debug(`${this.constructor.name}|Processing frontier ${current.x},${current.y}`)
+      if ( (reachedGoal = this.world.reachedGoal(current, goalNode, goal)) ) {
+        if ( !this._cameFrom.has(goalNode.key) ) this._cameFrom.set(goalNode.key, current); // CWSweep, for example, does not use current.key === goalNode.key.
+        break;
+      }
+      for ( const n of this.world.getNeighbors(current) ) this.processFrontierNeighbor(current, n, goal);
+    }
+
+    if ( !reachedGoal ) {
+      if ( iter >= MAX_ITER ) console.warn(`${this.constructor.name}|findPath stuck in loop.`, { startNode, goalNode });
+      if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: No path after examining ${closedSet.size} nodes over ${iter} iterations.`);
+      return null;
+    }
+
+    const path = this.constructor.reconstructPath(this._cameFrom, goalNode);
+    if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: Found length ${path?.length} path by examining ${closedSet.size} nodes over ${iter} iterations.`);
+
+    if ( !path.at(0).almostEqual(start) ) path.unshift(start); // World must handle checks between start and startNode.
+    if ( !path.at(-1).almostEqual(goal) ) path.push(goal);  // World must handle checks between goal and goalNode.
+    return path;
   }
 
-  destroy() {
-    this.world = null;
-    this.lastGraph = null;
-    super.destroy();
+  /**
+   * Apply a given algorithm to process neighbors along the frontier.
+   * The child class should set the frontier and cameFrom map accoridngly.
+   * @param {Node} current          The current position
+   * @param {Node} next             The neighbor to consider
+   * @
+   */
+  processFrontierNeighbor(_current, _next) { console.error("_processFrontierNeighbor must be defined by child class."); }
+
+  /**
+   * For a given goal, reconstruct the path to the beginning.
+   * @param {Map<number, GridCoordinate|null>} cameFrom
+   * @param {GridCoordinate} goal
+   * @returns {GridCoordinate[]}
+   */
+  static reconstructPath(cameFrom, goal) {
+    let current = goal;
+    const path = [];
+    while ( current !== null ) {
+      path.push(current); // Push + reverse likely faster then unshift.
+      current = cameFrom.get(current.key);
+    }
+    return path.reverse();
+  }
+
+  /**
+   * Specialized debug draw for the algorithm.
+   * @param {object} [opts]
+   */
+  drawDebug(start, goal, opts = {}) {
+    const gridShape = new PIXI.Polygon(canvas.grid.getShape());
+    opts.fill ??= Draw.COLORS.blue;
+    opts.fillAlpha ??= 0.10;
+    opts.alpha ??= 0;
+    for ( const node of this._cameFrom.values() ) {
+      if ( !node ) continue;
+      Draw.shape(gridShape.translate(node.x, node.y), opts);
+    }
   }
 }
+
+export class TestGraph extends AbstractGraph {
+  async findPath(startPoint, endPoint, signal = {}) {
+    const id = foundry.utils.randomID();
+    console.debug(`TestPathfinder ${id}|starting.`);
+    let iter = 0;
+    while ( iter < 100 ) {
+      if ( signal.aborted ) {
+        console.debug(`\tTestPathfinder ${id}|stopped at iteration ${iter}.`);
+        return null;
+      }
+      await sleep(100);
+      iter += 1;
+      console.debug(`\tTestPathfinder ${id}|iteration ${iter}.`);
+    }
+    console.debug(`\tTestPathfinder ${id}|Reached iteration ${iter}.`);
+    return canvas.grid.getDirectPath([startPoint, endPoint]);
+  }
+}
+
+/**
+ * BFS explores neighbors layer by layer.
+ * It is optimal for unweighted graphs (where every step costs exactly 1).
+ */
+export class BFSGraph extends AbstractGraph {
+
+  /**
+   * Apply a given algorithm to process neighbors along the frontier.
+   */
+  processFrontierNeighbor(current, next) {
+    if ( !this._cameFrom.has(next.key) ) {
+      this._frontier.enqueue(next);
+      this._cameFrom.set(next.key, current);
+    }
+  }
+}
+
+/**
+ * UCS is essentially Dijkstra’s Algorithm.
+ * It expands the node with the lowest cumulative cost g(n) from the start.
+ */
+export class UniformCostGraph extends BFSGraph {
+
+  _costSoFar = new Map();
+
+  _frontier = new PriorityQueue("low");
+
+  /**
+   * Initialize the pathfinding run.
+   */
+  _initializePathfindingRun(start) {
+    super._initializePathfindingRun(start);
+    this._initializeCostSoFar(start);
+  }
+
+  /**
+   * Clear and initialize the cost map for pathfinding run.
+   * The costSoFar map tracks costs to reach different nodes.
+   * @param {Point} start
+   */
+  _initializeCostSoFar(start) {
+    this._costSoFar.clear();
+    this._costSoFar.set(start.key, 0);
+  }
+
+  /**
+   * Prioritize the neighbor based on cost and add to the
+   * @param {Node} current          The current position
+   * @param {Node} next             The neighbor to consider
+   */
+  processFrontierNeighbor(current, next) {
+    const costSoFar = this._costSoFar;
+    const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
+    if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
+      costSoFar.set(next.key, newCost);
+      this._frontier.enqueue(next, newCost);
+      this._cameFrom.set(next.key, current);
+    }
+  }
+
+  /**
+   * Specialized debug draw for the algorithm.
+   * @param {object} [opts]
+   */
+  drawDebug(start, goal, opts = {}) {
+    const gridShape = new PIXI.Polygon(canvas.grid.getShape());
+    const costMinMax = Math.minMax(...this._costSoFar.values());
+    opts.fill ??= Draw.COLORS.blue;
+    opts.alpha ??= 0;
+    opts.fillAlpha ??= 1;
+
+    for ( const node of this._cameFrom.values() ) {
+      if ( !node ) continue;
+      const nodeCost = this._costSoFar.get(node.key);
+      opts.fillAlpha = (nodeCost - costMinMax.min) / (costMinMax.max - costMinMax.min);
+      Draw.shape(gridShape.translate(node.x, node.y), opts);
+    }
+  }
+}
+
+/**
+ * This algorithm uses a heuristic $h(n)$ to estimate the distance to the goal.
+ * It is fast but not guaranteed to find the shortest path because it ignores the cost already traveled.
+ */
+export class GreedyBestFirstGraph extends BFSGraph {
+
+  _frontier = new PriorityQueue("low");
+
+  /**
+   * Apply a given algorithm to process neighbors along the frontier.
+   */
+  processFrontierNeighbor(current, next, goal) {
+    if ( !this._cameFrom.has(next.key) ) {
+      const priority = this.world.heuristic(next, goal);
+      this._frontier.enqueue(next, priority);
+      this._cameFrom.set(next.key, current);
+    }
+  }
+
+  /**
+   * Specialized debug draw for the algorithm.
+   * @param {object} [opts]
+   */
+  drawDebug(start, goal, opts = {}) {
+    const gridShape = new PIXI.Polygon(canvas.grid.getShape());
+    opts.fill ??= Draw.COLORS.blue;
+    opts.alpha ??= 0;
+    opts.fillAlpha ??= 1;
+
+    const nodesSeen = new Set();
+    const costMax = this.world.heuristic(start, goal);
+    for ( const node of this._cameFrom.values() ) {
+      if ( !node || nodesSeen.has(node.key) ) continue;
+      nodesSeen.add(node.key);
+      const nodeCost = this.world.heuristic(node, goal);
+      opts.fillAlpha = nodeCost / costMax;
+      Draw.shape(gridShape.translate(node.x, node.y), opts);
+    }
+  }
+
+}
+
+/**
+ * A* combines the strengths of UCS and Greedy search.
+ * It uses f(n) = g(n) + h(n) to stay efficient while guaranteeing the shortest path
+ * (provided the heuristic is admissible).
+ */
+export class AStarGraph extends UniformCostGraph {
+  /**
+   * Apply a given algorithm to process neighbors along the frontier.
+   */
+  processFrontierNeighbor(current, next, goal) {
+    const costSoFar = this._costSoFar;
+    const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
+    if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
+      costSoFar.set(next.key, newCost);
+      this._cameFrom.set(next.key, current);
+
+      // Priority = g(n) + h(n).
+      const priority = newCost + this.world.heuristic(next, goal);
+      this._frontier.enqueue(next, priority);
+    }
+  }
+
+  /**
+   * Specialized debug draw for the algorithm.
+   * @param {object} [opts]
+   */
+  drawDebug(start, goal, opts = {}) {
+    const gridShape = new PIXI.Polygon(canvas.grid.getShape());
+    const costMinMax = Math.minMax(...this._costSoFar.values());
+    opts.fill ??= Draw.COLORS.blue;
+    opts.alpha ??= 0;
+    opts.fillAlpha ??= 1;
+
+    const nodesSeen = new Set();
+    for ( const node of this._cameFrom.values() ) {
+      if ( !node || nodesSeen.has(node) ) continue;
+      nodesSeen.add(node);
+      const nodeCost = this._costSoFar.get(node.key) + this.world.heuristic(node, goal);
+      opts.fillAlpha = (nodeCost - costMinMax.min) / (costMinMax.max - costMinMax.min);
+      Draw.shape(gridShape.translate(node.x, node.y), opts);
+    }
+  }
+}
+
 
 /* Testing
 MODULE_ID = "elevationruler"
