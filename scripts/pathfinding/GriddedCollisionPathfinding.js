@@ -67,7 +67,7 @@ export class GriddedCollisionPathfinder extends GraphingPathfinder {
    * @param {Node[]} path
    * @returns {Point[]}
    */
-  snapPathToGrid(path) {
+  async snapPathToGrid(path) {
     // The Foundry offsets already snap-to-grid. Drop intermediate points.
     return dropIntermediatePoints(path);
   }

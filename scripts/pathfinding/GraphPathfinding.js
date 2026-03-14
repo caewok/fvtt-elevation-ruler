@@ -631,6 +631,7 @@ let { solveSegment,
       straightenPath,
       removeDuplicatePoints,
       fogIsExplored,
+      snapPathToGrid2,
 } = api.pathCleaning
 benchTokenPath = api.pathfinding.benchTokenPath
 testPathfinding = api.pathfinding.testPathfinding
@@ -812,6 +813,13 @@ path = await pf._findPath(start, end)
 pf.constructor.drawPath(path)
 pf.validatePath(path, start, end)
 
+res = await snapPathToGrid(path, pf.token)
+pf.constructor.drawPath(res.gridPath)
+
+path = path.map(pt => GridCoordinates3d.fromObject(pt));
+res.pf.debug = true
+res.pf.debugDelay = 100
+await res.pf.findPath(path[0], path.at(-1))
 
 // Clockwise sweep
 CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"
@@ -901,7 +909,7 @@ pf.validatePath(gridPath, start, end)
 
 // Straightened path for clockwise is just clockwise path.
 // Gridded path for clockwise
-gridPath = snapPathToGrid(path, pf.token);
+gridPath = await snapPathToGrid(path, pf.token);
 gridPath = optimizeGridPath(gridPath, pf.token) ;
 pathIsValid(gridPath, pf.token)
 pf.validatePath(gridPath, start, end)
@@ -966,7 +974,7 @@ gridPath = dropIntermediatePoints(path)
 pathIsValid(gridPath, pf.token)
 pf.validatePath(gridPath, start, end)
 
-gridPath = snapPathToGrid(path, pf.token)
+gridPath = await snapPathToGrid(path, pf.token)
 pf.constructor.drawPath(gridPath, { color: Draw.COLORS.lightgreen, alpha: 0.5 })
 pf.constructor.drawPath(gridPath, { color: Draw.COLORS.green })
 
@@ -991,7 +999,7 @@ b = GridCoordinates3d.fromObject(path[1]);
 
 
 
-gridPath = snapPathToGrid(path, randal)
+gridPath = await snapPathToGrid(path, randal)
 gridPath.forEach(pt => Draw.point(pt, { radius: 1, color: Draw.COLORS.yellow }))
 
 

@@ -8,7 +8,8 @@ PIXI,
 
 import { Draw } from "../geometry/Draw.js";
 import { Settings } from "../settings.js";
-import { snapPathToGrid, optimizeGridPath, dropIntermediatePoints, straightenPath, pathIsValid } from "./path_cleaning.js";
+import { optimizeGridPath, dropIntermediatePoints, straightenPath, pathIsValid } from "./path_cleaning.js";
+import { snapPathToGrid } from "./snap_to_grid.js";
 import { log } from "../util.js";
 
 /* Pathfinding class.
@@ -170,8 +171,8 @@ export class AbstractPathfinder {
    * @param {Node[]} path
    * @returns {Point[]}
    */
-  snapPathToGrid(path) {
-    path = snapPathToGrid(path, this.token);
+  async snapPathToGrid(path) {
+    path = await snapPathToGrid(path, this.token);
     return optimizeGridPath(path, this.token);
   }
 

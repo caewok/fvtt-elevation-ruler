@@ -44,12 +44,11 @@ import {
   optimizeGridPath,
   dropIntermediatePoints,
   pathIsValid,
-  snapPathToGrid,
   removeDuplicatePoints,
   straightenPath,
   fogIsExplored,
-  solveSegment,
 } from "./pathfinding/path_cleaning.js";
+import { snapPathToGrid } from "./pathfinding/snap_to_grid.js";
 
 // Load the geometry library.
 import "./geometry/registration.js";
@@ -152,14 +151,13 @@ Hooks.once("init", function() {
     },
 
     pathCleaning: {
+      snapPathToGrid,
       pathIsValid,
       optimizeGridPath,
       dropIntermediatePoints,
-      snapPathToGrid,
       straightenPath,
       removeDuplicatePoints,
       fogIsExplored,
-      solveSegment,
     },
 
     EdgeGraph,

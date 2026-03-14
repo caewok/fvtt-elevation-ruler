@@ -710,7 +710,7 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
    * @param {Node[]} path
    * @returns {Point[]}
    */
-  snapPathToGrid(path) {
+  async snapPathToGrid(path) {
     // Already done.
     return dropIntermediatePoints(path);
   }
