@@ -250,8 +250,9 @@ console.log(`
 
 
 
-
-
+CONFIG.elevationruler.graphPathfinding.cost = "terrain"             // "manhattan"|"euclidean"|"foundry"|"terrain"
+CONFIG.elevationruler.graphPathfinding.heuristic = "terrain"        // "manhattan"|"euclidean"|"foundry"|"terrain"
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion" // "clockwiseSweep"|"occlusion"|"sceneGraph"
 
 
 
@@ -267,7 +268,7 @@ pf = new ClockwiseSweepPathfinder(beiro)
 
 start = GridCoordinates3d.fromObject(akra.center)
 end = GridCoordinates3d.fromObject(perrin.center)
-pf = new ClockwiseSweepPathfinder(akra)
+pf = new GriddedCollisionPathfinder(akra)
 
 midE = (pf.token.topE - pf.token.bottomE) * 0.5;
 start.elevation += midE;
@@ -288,6 +289,14 @@ path = path.map(pt => GridCoordinates3d.fromObject(pt));
 res.pf.debug = true
 res.pf.debugDelay = 100
 await res.pf.findPath(path[0], path.at(-1))
+
+terrainWaypoints = akra.createTerrainMovementPath([akra.center, perrin.center]);
+akra.measureMovementPath(terrainWaypoints).cost;
+
+pf.world.cost(akra.center, perrin.center)
+
+canvas.grid.measurePath([akra.center, perrin.center])
+canvas.grid.measurePath(terrainWaypoints)
 
 // Clockwise sweep
 CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"
