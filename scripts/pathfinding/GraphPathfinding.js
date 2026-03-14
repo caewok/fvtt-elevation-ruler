@@ -128,6 +128,12 @@ await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
 
 
 // Test all
+graphPathfinding = {
+  cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
+  heuristic: "terrain", //"manhattan"|"euclidean"|"foundry"|"terrain"
+  neighborFilter: "occlusion" // "clockwiseSweep"|"occlusion"|"sceneGraph"
+}
+
 
 console.log("\n\n-----Collision: Occlusion -----")
 algorithm = "collision"

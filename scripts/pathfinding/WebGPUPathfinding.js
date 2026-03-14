@@ -3,7 +3,6 @@ canvas,
 CONFIG,
 CONST,
 foundry,
-game,
 PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
@@ -283,13 +282,12 @@ const GPUTerrainMixin = superclass => class extends superclass {
     return regionTerrainValue(region, subjectToken);
   }
 
-
   blockingTokens(tokens) {
     tokens ||= canvas.tokens.placeables;
     const subjectToken = this.token;
     return tokens.filter(token => {
       const value = this.constructor.tokenValue(token, subjectToken);
-      return value === TERRAIN_FEATURES.BLOCKING;
+      return value === TERRAIN_FEATURES.IMPASSABLE;
     });
   }
 
@@ -310,12 +308,9 @@ const GPUTerrainMixin = superclass => class extends superclass {
     const subjectToken = this.token;
     return tokens.filter(token => {
       const value = this.constructor.tokenValue(token, subjectToken);
-      return !(value === TERRAIN_FEATURES.NORMAL || value === TERRAIN_FEATURES.BLOCKING);
+      return !(value === TERRAIN_FEATURES.NORMAL || value === TERRAIN_FEATURES.IMPASSABLE);
     });
   }
-
-
-
 };
 
 export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
@@ -1074,86 +1069,6 @@ for ( let x = 0; x < 100; x += 1 ) {
 }
 */
 
-
-/**
- * Get unique array values and sort low-to-high.
- * @param {TypedArray} arr
- * @returns {number[]}
- */
-function sortedUnique(arr) {
-  const s = new Set(arr);
-  const out = [...s];
-  out.sort((a, b) => a - b);
-  return out;
-}
-
-/**
- * Histogram using map
- * @param {TypedArray} arr
- * @returns {Map<number, number>} Number and total count for each
- */
-function histogram(arr) {
-  const s = new Set(arr);
-  const m = new Map();
-  for ( const n of s ) m.set(n, 0);
-  for ( const n of arr ) m.set(n, m.get(n) + 1);
-  return m;
-}
-
-/**
- * Creates a function that maps a value to a color between blue and red.
- *
- * @param {number} min - The minimum value of the range (Blue/Cold).
- * @param {number} max - The maximum value of the range (Red/Hot).
- * @returns {function(number): number} - A function that accepts a value and returns a PIXI-compatible Hex integer.
- */
-function createHeatMap(min, max) {
-  return function(value) {
-    // 1. Normalize the value to a 0-1 range
-    // Clamp the value to ensure it stays within the min/max bounds
-    const clampedValue = Math.max(min, Math.min(max, value));
-
-    // Calculate ratio (0 = min, 1 = max)
-    const ratio = (clampedValue - min) / (max - min);
-
-    // 2. Map ratio to Hue
-    // Blue is 240°, Red is 0°.
-    // We want to go from 240 down to 0 based on the ratio.
-    const hue = (1 - ratio) * 240;
-
-    // 3. Convert HSL to RGB
-    // Using standard saturation (100%) and lightness (50%) for vibrant colors
-    const saturation = 100;
-    const lightness = 50;
-
-    return hslToHex(hue, saturation, lightness);
-  };
-}
-
-/**
- * Helper: Converts HSL values to a PIXI-friendly Hex Integer.
- * * @param {number} h - Hue (0-360)
- * @param {number} s - Saturation (0-100)
- * @param {number} l - Lightness (0-100)
- * @returns {number} - Hex integer (e.g., 0xFF0000)
- */
-function hslToHex(h, s, l) {
-  s /= 100;
-  l /= 100;
-
-  const k = n => (n + (h / 30)) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = n =>
-    l - (a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))));
-
-  // Calculate RGB components (0-255)
-  const r = Math.round(255 * f(0));
-  const g = Math.round(255 * f(8));
-  const b = Math.round(255 * f(4));
-
-  // Combine bitwise into a single integer
-  return (r << 16) + (g << 8) + b;
-}
 
 /* Worker testing
 PixelCache = CONFIG.GeometryLib.lib.PixelCache
