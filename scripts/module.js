@@ -23,8 +23,8 @@ import {
   UniformCostGraph,
   GreedyBestFirstGraph,
   AStarGraph,
-  GraphingPathfinder,
-} from "./pathfinding/GraphPathfinding.js";
+} from "./pathfinding/PathAlgorithms.js";
+import { GraphPathfinder } from "./pathfinding/GraphPathfinding.js";
 
 // Gridded collision pathfinding
 import { GriddedCollisionPathfinder, worldBuilderGriddedCollision } from "./pathfinding/GriddedCollisionPathfinding.js";
@@ -133,7 +133,7 @@ Hooks.once("init", function() {
       UniformCostGraph,
       GreedyBestFirstGraph,
       AStarGraph,
-      GraphingPathfinder,
+      GraphPathfinder,
 
       WebGPUPathfinder,
 

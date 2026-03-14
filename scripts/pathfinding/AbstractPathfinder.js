@@ -8,8 +8,7 @@ PIXI,
 
 import { Draw } from "../geometry/Draw.js";
 import { Settings } from "../settings.js";
-import { optimizeGridPath, dropIntermediatePoints, straightenPath, pathIsValid } from "./path_cleaning.js";
-import { snapPathToGrid } from "./snap_to_grid.js";
+import { pathIsValid } from "./path_cleaning.js";
 import { log } from "../util.js";
 
 /* Pathfinding class.
@@ -161,20 +160,14 @@ export class AbstractPathfinder {
    * @param {Node[]} path
    * @returns {Point[]}
    */
-  cleanPath(path) {
-    path = dropIntermediatePoints(path);
-    return straightenPath(path, this.token);
-  }
+  cleanPath(path) { return path; }
 
   /**
    * Snap the path to the grid.
    * @param {Node[]} path
    * @returns {Point[]}
    */
-  async snapPathToGrid(path) {
-    path = await snapPathToGrid(path, this.token);
-    return optimizeGridPath(path, this.token);
-  }
+  async snapPathToGrid(path) { return path; }
 
   destroy() {
     this.activeJobs.values().forEach(job => job.abort());

@@ -819,6 +819,7 @@ export class EdgeGraph {
     // For example, if a.z === 0, tokens at elevation 0 will not block.
     using dir = b.subtract(a);
     for ( const token of canvas.tokens.placeables ) {
+      // console.debug(`tokenBlocksSegment|${moveToken.name} --> ${token.name}`);
       const geom = token[GEOMETRY_LIB_ID][GEOMETRY_ID];
       if ( !geom ) continue;
       if ( !HalfEdge.tokenBlocks(token, moveToken) ) continue;

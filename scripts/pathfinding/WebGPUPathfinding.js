@@ -25,7 +25,7 @@ import {
 import { VertexObject } from "../geometry/placeable_vertices/PlaceableVertices.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix } from "../geometry/mixwith.js";
-import { dropIntermediatePoints } from "./path_cleaning.js";
+import { dropIntermediatePoints, straightenPath } from "./path_cleaning.js";
 
 // TODO: import { FastBitSet } from "../FastBitSet/FastBitSet.js";
 
@@ -703,7 +703,16 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
 
   // ----- NOTE: Path cleaning ----- //
 
-  // Path can be cleaned like normal.
+  /**
+   * Remove unnecessary path points and straighten the path.
+   * @param {Node[]} path
+   * @returns {Point[]}
+   */
+  cleanPath(path) {
+    path = dropIntermediatePoints(path);
+    return straightenPath(path, this.token);
+  }
+
 
   /**
    * Snap the path to the grid.

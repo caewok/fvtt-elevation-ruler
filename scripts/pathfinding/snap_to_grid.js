@@ -10,10 +10,12 @@ PIXI,
 import { MODULE_ID } from "../const.js";
 import { GridCoordinates } from "../geometry/GridCoordinates.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
-import { GraphPathfindingWorld, AStarGraph } from "./GraphPathfinding.js";
+import { GraphPathfindingWorld } from "./GraphPathfindingWorld.js";
 import { Euclidean2dHeuristic } from "./cost_measurement.js";
 import { Node, SceneGraphFilter, Neighbors2d } from "./GriddedCollisionPathfinding.js";
 import { mix } from "../geometry/mixwith.js";
+import { AStarGraph } from "./PathAlgorithms.js";
+
 
 // Assortment of functions used to clean generated paths.
 // Straighten, snap-to-grid, fog test.
@@ -122,7 +124,7 @@ export async function snapPathToGrid(path, token, signal, debug = false) {
     pf.debugDelay = 100;
   }
   const gridPath = await pf.findPath(path[0], path.at(-1), signal);
-  return debug ? { gridPath, pf } : pf;
+  return debug ? { gridPath, pf } : gridPath;
 }
 
 /**

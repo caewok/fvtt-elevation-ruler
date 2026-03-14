@@ -12,11 +12,14 @@ import { NULL_SET } from "../geometry/util.js";
 import { AABB2d } from "../geometry/AABB.js";
 import { ElevatedPoint } from "../geometry/3d/ElevatedPoint.js";
 import { Draw } from "../geometry/Draw.js";
-import { GraphingPathfinder, GraphPathfindingWorld } from "./GraphPathfinding.js";
+import { GraphPathfinder } from "./GraphPathfinding.js";
+import { GraphPathfindingWorld } from "./GraphPathfindingWorld.js";
 import { ClockwiseCornerSweep, offsetVCornersForEdges, offsetEdgeCornersForEdges } from "./ClockwiseSweep.js";
 import { UniformPointGrid } from "./UniformPointGrid.js";
 import { mix } from "../geometry/mixwith.js";
 import { tokenTerrainValue, regionTerrainValue, TERRAIN_FEATURES } from "./terrain_utils.js";
+import { snapPathToGrid } from "./snap_to_grid.js";
+import { optimizeGridPath } from "./path_cleaning.js";
 import {
   Manhattan2dCost,
   Manhattan3dCost,
@@ -46,37 +49,24 @@ Conduct sweep from those points.
 Stop when the point is within the end sweep.
 */
 
-export class ClockwiseSweepPathfinder extends GraphingPathfinder {
+export class ClockwiseSweepPathfinder extends GraphPathfinder {
 
   static get worldClass() { return worldBuilderClockwise(); }
-
-  /**
-   * Clean the path, which may include straightening it, snapping it to a grid, or removing unnecessary points.
-   * @param {Node[]} path
-   * @returns {Point[]}
-   */
-  cleanPath(path) {
-    // Already straightened and has limited points, so simply return.
-    return path;
-  }
 
   /**
    * Snap the path to the grid.
    * @param {Node[]} path
    * @returns {Point[]}
    */
-  /*
   async snapPathToGrid(path) {
+    path = await snapPathToGrid(path, this.token);
+    return optimizeGridPath(path, this.token);
     // TODO: Could use specialized version that limits collision tests between a and b
     //       to edges encountered in a's sweep.
 
     // TODO: Could run collision pathfinding within a's sweep to find best grid path to b.
-
-    // path = await snapPathToGrid(path, this.token);
-    // return dropIntermediatePoints(path);
-    return super.snapPathToGrid(path);
   }
-  */
+
 }
 
 /**
@@ -160,7 +150,7 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
     using corner = PIXI.Point.tmp;
 
     // Ray has cached values that would have to be reset, except that _testCollision only uses ray.B.
-    const ray = { B: cornerOffset };
+    // const ray = { B: cornerOffset };
     for ( const cornerKey of sweep.cornersEncountered ) {
       if ( !cornerMap.has(cornerKey) ) continue;
       PIXI.Point.invertKey(cornerKey, corner);
