@@ -355,23 +355,6 @@ export const Neighbors2d = superclass => class extends superclass {
     return canvas.grid.getAdjacentOffsets(node2d) // Offsets are at the center of the grid square.
       .map(offset => node.constructor.fromOffset(offset, node.elevation));
   }
-
-  /**
-   * Maximum number of iterations given a start and end coordinate.
-   * Used to stop if no path.
-   * @param {Node} start
-   * @param {Node} goal
-   * @returns {number}
-   */
-  static maxIterations(start, goal) {
-    // Set to either maximum grid steps or an area double that of the minimum grid steps.
-    // Represents searching a rectangle equal to 2x the distance from start to goal.
-    const { sceneHeight, sceneWidth, size } = canvas.scene.dimensions;
-    const invSize = 1 / size;
-    const maxGridSteps = sceneHeight * sceneWidth * (invSize ** 2);
-    const minGridSteps = Math.ceil(PIXI.Point.distanceBetween(start, goal) * invSize);
-    return Math.min((minGridSteps * 2) ** 2, maxGridSteps);
-  }
 };
 
 /**
@@ -428,25 +411,6 @@ export const Neighbors2dGridless = superclass => class extends superclass {
     }
     return out;
   }
-
-  /**
-   * Maximum number of iterations given a start and end coordinate.
-   * Used to stop if no path.
-   * @param {Node} start
-   * @param {Node} goal
-   * @returns {number}
-   */
-  static maxIterations(start, goal) {
-    // Set to either maximum grid steps or an area double that of the minimum grid steps.
-    // Represents searching a rectangle equal to 2x the distance from start to goal.
-    const { sceneHeight, sceneWidth, size } = canvas.scene.dimensions;
-    const resolution = size >= 128 ? 4 : (size >= 64 ? 4 : 2); // Originally 8|4|2 but too slow.
-    const neighborOffset = size / resolution;
-    const invSize = 1 / neighborOffset;
-    const maxGridSteps = sceneHeight * sceneWidth * (invSize ** 2);
-    const minGridSteps = Math.ceil(PIXI.Point.distanceBetween(start, goal) * invSize);
-    return Math.min((minGridSteps * 2) ** 2, maxGridSteps);
-  }
 };
 
 export const Neighbors3d = superclass => class extends superclass {
@@ -468,24 +432,6 @@ export const Neighbors3d = superclass => class extends superclass {
     return canvas.grid.getAdjacentOffsets(node)
       .map(offset => node.constructor.fromOffset(offset))
       .filter(offset => offset.z.between(this.config.minZ ?? node.z, this.config.maxZ ?? node.z));
-  }
-
-  /**
-   * Maximum number of iterations given a start and end coordinate.
-   * Used to stop if no path.
-   * @param {Node} start
-   * @param {Node} goal
-   * @returns {number}
-   */
-  static maxIterations(start, goal) {
-    // Set to either maximum grid steps or an area double that of the minimum grid steps.
-    // Represents searching a rectangle equal to 2x the distance from start to goal.
-    const { sceneHeight, sceneWidth, size } = canvas.scene.dimensions;
-    const zHeight = this.config.maxZ - this.config.minZ;
-    const invSize = 1 / size;
-    const maxGridSteps = sceneHeight * sceneWidth * zHeight * (invSize ** 3);
-    const minGridSteps = Math.ceil(Point3d.distanceBetween(start, goal) * invSize);
-    return Math.min((minGridSteps * 2) ** 3, maxGridSteps);
   }
 };
 
@@ -550,26 +496,6 @@ export const Neighbors3dGridless = superclass => class extends superclass {
       out[i++] = offsetPt;
     }
     return out;
-  }
-
-  /**
-   * Maximum number of iterations given a start and end coordinate.
-   * Used to stop if no path.
-   * @param {Node} start
-   * @param {Node} goal
-   * @returns {number}
-   */
-  static maxIterations(start, goal) {
-    // Set to either maximum grid steps or an area double that of the minimum grid steps.
-    // Represents searching a rectangle equal to 2x the distance from start to goal.
-    const { sceneHeight, sceneWidth, size } = canvas.scene.dimensions;
-    const resolution = size >= 128 ? 4 : (size >= 64 ? 2 : 1); // Originally 8|4|2 but too slow.
-    const neighborOffset = size / resolution;
-    const zHeight = this.config.maxZ - this.config.minZ;
-    const invSize = 1 / neighborOffset;
-    const maxGridSteps = sceneHeight * sceneWidth * zHeight * (invSize ** 3);
-    const minGridSteps = Math.ceil(Point3d.distanceBetween(start, goal) * invSize);
-    return Math.min((minGridSteps * 2) ** 3, maxGridSteps);
   }
 };
 

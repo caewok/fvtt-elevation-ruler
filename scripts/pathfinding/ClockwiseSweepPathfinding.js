@@ -296,7 +296,7 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
    * @param {Node} curr
    * @param {Node} goal
    */
-  reachedGoal(curr, goalNode, _goal) {
+  reachedGoal(curr, goalNode) {
     this.goalNode = goalNode;
     return curr.key === goalNode.key;
   }

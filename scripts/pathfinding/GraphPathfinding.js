@@ -303,6 +303,15 @@ path = await pf._findPath(start, end)
 pf.constructor.drawPath(path)
 pf.validatePath(path, start, end)
 
+
+graph = new pf.graphClass(pf.world)
+graph.debug = pf.debug
+graph.debugDelay = pf.debugDelay
+state = graph._startRun(start, end)
+reachedGoal = await graph._processNextFrontier(state)
+
+
+
 res = await snapPathToGrid(path, pf.token)
 pf.constructor.drawPath(res.gridPath)
 
