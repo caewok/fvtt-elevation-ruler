@@ -8,6 +8,7 @@ PIXI,
 "use strict";
 
 import { MODULE_ID } from "../const.js";
+import { GEOMETRY_LIB_ID, GEOMETRY_ID } from "../geometry/const.js";
 import { NULL_SET } from "../geometry/util.js";
 import { AABB2d } from "../geometry/AABB.js";
 import { ElevatedPoint } from "../geometry/3d/ElevatedPoint.js";
@@ -76,10 +77,16 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
   /** @param {ClockwiseSweepPolygon.config} */
   sweepOpts = {};
 
-  static create(pt, sweepOpts = {}) {
+  cornerMap;
+
+  terrainPointGrid;
+
+  static create(pt, cornerMap, terrainPointGrid, sweepOpts = {}) {
     const node = this.fromObject(pt);
     node.roundDecimals();
     node.sweepOpts = sweepOpts; // Here we want to link the same sweep opts object.
+    node.cornerMap = cornerMap;
+    node.terrainPointGrid = terrainPointGrid;
     return node;
   }
 
@@ -118,14 +125,14 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
    * contained within the sweep.
    * @returns {ClockwiseSweepPathfindingNode[]}
    */
-  getNeighbors(cornerMap, terrainPointGrid) {
+  getNeighbors() {
     if ( !this.#computedNeighbors ) {
       this.#neighborKeys.clear();
-      for ( const cornerNeighbor of this._calculateCornerNeighbors(cornerMap) ) {
+      for ( const cornerNeighbor of this._calculateCornerNeighbors() ) {
         this.#neighborKeys.add(cornerNeighbor);
       }
-      if ( terrainPointGrid ) {
-        for ( const terrainNeighbor of this._calculateTerrainNeighbors(terrainPointGrid) ) {
+      if ( this.terrainPointGrid ) {
+        for ( const terrainNeighbor of this._calculateTerrainNeighbors() ) {
           this.#neighborKeys.add(terrainNeighbor);
         }
       }
@@ -138,8 +145,8 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
     return this.#neighborKeys;
   }
 
-  _calculateCornerNeighbors(cornerMap) {
-    if ( !cornerMap.size ) return NULL_SET;
+  _calculateCornerNeighbors() {
+    if ( !this.cornerMap.size ) return NULL_SET;
     const neighbors = new Set();
     const sweep = this.sweep;
 
@@ -152,9 +159,9 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
     // Ray has cached values that would have to be reset, except that _testCollision only uses ray.B.
     // const ray = { B: cornerOffset };
     for ( const cornerKey of sweep.cornersEncountered ) {
-      if ( !cornerMap.has(cornerKey) ) continue;
+      if ( !this.cornerMap.has(cornerKey) ) continue;
       PIXI.Point.invertKey(cornerKey, corner);
-      cornerMap.get(cornerKey).offsetCornerKeys.forEach(key => {
+      this.cornerMap.get(cornerKey).offsetCornerKeys.forEach(key => {
         PIXI.Point.invertKey(key, cornerOffset);
 
         // sweep._envelopsPoint fails if the orient2d test for lineSegmentIntersects is
@@ -188,14 +195,14 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
     return neighbors;
   }
 
-  _calculateTerrainNeighbors(terrainPointGrid) {
-    if ( !terrainPointGrid.grid.size ) return NULL_SET;
+  _calculateTerrainNeighbors() {
+    if ( !this.terrainPointGrid.grid.size ) return NULL_SET;
 
     // Terrain offsets are neighbors if they are within the sweep, requiring a contains test.
     const neighbors = new Set();
     const sweep = this.sweep;
     const aabb = AABB2d.fromPolygon(sweep);
-    const potentialPoints = terrainPointGrid.query(aabb);
+    const potentialPoints = this.terrainPointGrid.query(aabb);
     const ray = { B: null };
     for ( const pt of potentialPoints ) {
       // if ( sweep._envelopsPoint(pt) ) neighbors.add(pt.key);
@@ -270,7 +277,7 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
   buildNode(pt3d) {
     const key = pt3d.key;
     if ( this.existingNodes.has(key) ) return this.existingNodes.get(key);
-    const node = ClockwiseSweepPathfindingNode.create(pt3d, this._sweepOpts);
+    const node = ClockwiseSweepPathfindingNode.create(pt3d, this.cornerMap, this.terrainPointGrid, this._sweepOpts);
     this.existingNodes.set(key, node);
     return node;
   }
@@ -278,8 +285,10 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
   nodeIsUnreachable(node, fromPoint) {
     if ( !node.sweep.points.length ) return true;
     return !(node.sweep.contains(fromPoint.x, fromPoint.y)
-      || node.getNeighbors(this._cornerMap, this._terrainPointGrid).size);
+      || node.getNeighbors(this.cornerMap, this.terrainPointGrid).size);
   }
+
+  goalNode;
 
   /**
    * Did we reach the goal node?
@@ -287,7 +296,10 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
    * @param {Node} curr
    * @param {Node} goal
    */
-  reachedGoal(curr, goalNode, _goal) { return curr.sweep.contains(goalNode.x, goalNode.y); }
+  reachedGoal(curr, goalNode, _goal) {
+    this.goalNode = goalNode;
+    return curr.key === goalNode.key;
+  }
 
   _sweepOpts = {
     type: "move",     /** @type {CONST.WALL_RESTRICTION_TYPES} */
@@ -318,32 +330,32 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
     this.existingNodes.clear();
 
     // For performance, precalculate the potential neighbors.
-    this._cornerMap.clear();
+    this.cornerMap.clear();
     this._terrainPointKeys.clear();
     this.calculateCornerMap(start.z); // Token and edge corners.
-    this.calculateTokenTerrainPoints();
-    this.calculateRegionTerrainPoints();
+    this.calculateTokenTerrainPoints(start.z);
+    this.calculateRegionTerrainPoints(start.z);
 
     // Confirm that no terrain points are also blocking points.
-    const cornerOffsetKeys = new Set(this._cornerMap.values().flatMap(obj => obj.offsetCornerKeys));
+    const cornerOffsetKeys = new Set(this.cornerMap.values().flatMap(obj => obj.offsetCornerKeys));
     for ( const key of this._terrainPointKeys ) {
       if ( cornerOffsetKeys.has(key) ) this._terrainPointKeys.delete(key);
     }
 
     // Store the terrain points in a grid for fast lookup.
-    this._terrainPointGrid.clear();
-    this._terrainPointKeys.forEach(key => this._terrainPointGrid.insertPoint(PIXI.Point.invertKey(key)));
+    this.terrainPointGrid.clear();
+    this._terrainPointKeys.forEach(key => this.terrainPointGrid.insertPoint(PIXI.Point.invertKey(key)));
 
     // Setup the starting node.
     start = this.buildNode(start);
     this.existingNodes.set(start.key, start); // 3d key.
   }
 
-  _cornerMap = new Map();
+  cornerMap = new Map();
 
   _terrainPointKeys = new Set(); // TODO: Do we need to store this? Can terrainPointGrid suffice?
 
-  _terrainPointGrid = new UniformPointGrid();
+  terrainPointGrid = new UniformPointGrid();
 
   /**
    * Create a corner map for all edges on the canvas.
@@ -359,7 +371,7 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
       default: cornerFn = offsetVCornersForEdges;
     }
     const edges = [...canvas.walls.placeables.map(w => w.edge), ...this._sweepOpts.addedEdges];
-    return cornerFn(edges, elevationZ, this.constructor.CORNER_OFFSET, this._cornerMap);
+    return cornerFn(edges, elevationZ, this.constructor.CORNER_OFFSET, this.cornerMap);
   }
 
   /**
@@ -367,40 +379,60 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
    * @returns {Set<PIXI.Point.key>}
    */
   calculateTokenTerrainPoints(elevationZ) {
-    const terrainPointKeys = this._terrainPointKeys;
     const blockingTokens = new Set(ClockwiseCornerSweep.blockingTokens(this.token));
     for ( const token of canvas.tokens.placeables ) {
       if ( token === this.token ) continue;
       if ( blockingTokens.has(token) ) continue;
+
+      // Skip if not within the target elevation.
+      if ( !elevationZ.between(token.bottomZ, token.topZ) ) continue;
+
+      // Determine if the token is difficult terrain.
       const value = tokenTerrainValue(token, this.token);
       if ( value <= TERRAIN_FEATURES.NORMAL ) continue;
 
       // Use the constrained token border, expanded so the points are not on the token.
-      using pt = PIXI.Point.tmp;
-      const border = token.constrainedTokenBorder.pad(this.constructor.CORNER_OFFSET);
-      for ( const edge of border.iterateEdges({ close: true }) ) {
-        for ( const t of this.constructor.TERRAIN_T_VALUES ) {
-          edge.a.projectToward(edge.b, t, pt);
-          terrainPointKeys.add(pt.key);
-        }
-      }
+      this._addTerrainPointsForPolygon(token.constrainedTokenBorder);
     }
-    return terrainPointKeys;
   }
 
   /**
    * For each terrain region, determine its terrain points.
    * @returns {Set<PIXI.Point.key>}
    */
-  calculateRegionTerrainPoints() {
-    const terrainPointKeys = this._terrainPointKeys;
+  calculateRegionTerrainPoints(elevationZ) {
     for ( const region of canvas.regions.placeables ) {
       if ( !region.document.shapes.length ) continue;
+
+      // Skip if not within the target elevation.
+      if ( !elevationZ.between(region.bottomZ, region.topZ) ) continue;
+
+      // Determine if the region is difficult terrain.
       const value = regionTerrainValue(region, this.token);
       if ( value <= TERRAIN_FEATURES.NORMAL ) continue;
 
       // Get the region border, padded so the points are not in the region.
-      // TODO: Fix.
+      const geom = region[GEOMETRY_LIB_ID]?.[GEOMETRY_ID];
+      if ( !geom ) continue;
+      for ( const combinedFace of geom.combinedFaces ) {
+        const top = combinedFace.top;
+        const top2d = top.toPolygon2d();
+        if ( Array.isArray(top2d) ) {
+          for ( const poly of top2d ) this._addTerrainPointsForPolygon(poly, top.isHole);
+        } else this._addTerrainPointsForPolygon(top2d, top.isHole);
+      }
+    }
+  }
+
+  _addTerrainPointsForPolygon(poly, isHole = false) {
+    const terrainPointKeys = this._terrainPointKeys;
+    poly = poly.clone().pad(this.constructor.CORNER_OFFSET * (isHole ? -1 : 1));
+    using pt = PIXI.Point.tmp;
+    for ( const edge of poly.iterateEdges({ close: true }) ) {
+      for ( const t of this.constructor.TERRAIN_T_VALUES ) {
+        edge.a.projectToward(edge.b, t, pt);
+        terrainPointKeys.add(pt.key);
+      }
     }
   }
 
@@ -424,18 +456,25 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
     if ( !(node instanceof ClockwiseSweepPathfindingNode) ) console.error("Node must be ClockwiseSweepPathfindingNode.");
 
     // Retrieve all 2d neighbor keys for this node.
-    const neighborKeys = node.getNeighbors(this._cornerMap, this._terrainPointGrid);
+    const neighborKeys = node.getNeighbors(this.cornerMap, this.terrainPointGrid);
 
     // Convert each to a node.
     using pt2d = PIXI.Point.tmp;
     using pt3d = ElevatedPoint.tmp;
     pt3d.z = node.z;
-    return [...neighborKeys].map(key2d => {
+    const neighbors = [...neighborKeys].map(key2d => {
       PIXI.Point.invertKey(key2d, pt2d);
       pt3d.x = pt2d.x;
       pt3d.y = pt2d.y;
       return this.buildNode(pt3d);
     });
+
+    // If the end point is contained within the sweep, it is a neighbor.
+    // Important so the end is prioritized but not placed ahead of nodes that have a
+    // better score, such as avoiding difficult terrain (where going straight to goal would
+    // just punch through the terrain).
+    if ( node.sweep.contains(this.goalNode.x, this.goalNode.y) ) neighbors.push(this.goalNode);
+    return neighbors;
   }
 
   /**

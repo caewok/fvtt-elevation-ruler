@@ -21,6 +21,7 @@ export class UniformPointGrid {
   /* For cell size that is power of two,
    * replace Math.floor(x / cellSize) with x >> exp
    */
+  cellSizeInv = 1 / Math.pow(2, this.cellExponent);
 
   /** @type {Map<number, PIXI.Point[]>} */
   grid = new Map();
@@ -72,7 +73,7 @@ export class UniformPointGrid {
     const results = [];
     for ( let r = rowStart; r < rowEnd; r += 1 ) {
       for ( let c = colStart; c < colEnd; c += 1 ) {
-        const cell = this.grid.get(c + (r * cols));
+        const cell = this.grid.get(c + (r * cols)) || [];
         for ( const p of cell ) {
           if ( aabb.containsPoint(p) ) results.push(p);
         }
@@ -90,4 +91,23 @@ export class UniformPointGrid {
 function nearestPowerOfTwo(n) {
   if ( n <= 0 ) return 1;
   return Math.round(Math.log2(n));
+}
+
+/**
+ * Faster rounding using bit math with 32-bit integers.
+ */
+function nextPowerOfTwo(n) {
+  n = (n + 0.5) | 0; // Equivalent to Math.round(n);
+  n |= n >> 1;
+  n |= n >> 2;
+  n |= n >> 4;
+  n |= n >> 8;
+  n |= n >> 16;
+  return n + 1;
+}
+
+function fastNearestPowerOfTwo(n) {
+  const next = nextPowerOfTwo(n);
+  const prev = next >> 1;
+  return (next - n) < (n - prev) ? next : (prev || 1);
 }
