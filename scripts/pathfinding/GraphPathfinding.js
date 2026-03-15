@@ -101,6 +101,8 @@ let { solveSegment,
       fogIsExplored,
       snapPathToGrid2,
 } = api.pathCleaning
+
+
 benchTokenPath = api.pathfinding.benchTokenPath
 testPathfinding = api.pathfinding.testPathfinding
 
@@ -116,7 +118,7 @@ let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 
 // collision, webGPU, clockwiseSweep
 CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"  // |"v"|"edge"
-algorithm = "clockwiseSweep"
+algorithm = "collision" // "collision"|"clockwiseSweep"|"webGPU"
 graphPathfinding = {
   cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
   heuristic: "terrain", //"manhattan"|"euclidean"|"foundry"|"terrain"
@@ -125,7 +127,7 @@ graphPathfinding = {
 await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
 await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
 await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
-
+await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
 
 // Test all
 graphPathfinding = {
@@ -135,26 +137,32 @@ graphPathfinding = {
 }
 
 
+
+
 console.log("\n\n-----Collision: Occlusion -----")
 algorithm = "collision"
 graphPathfinding.neighborFilter = "occlusion"
 await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
 await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
 await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
+await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
+
 
 console.log("\n\n-----Collision: CWSweep -----")
 algorithm = "collision"
-graphPathfinding.neighborFilter = "occlusion"
+graphPathfinding.neighborFilter = "clockwiseSweep"
 await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
 await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
 await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
+await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
 
 console.log("\n\n-----Collision: Scene Graph -----")
 algorithm = "collision"
-graphPathfinding.neighborFilter = "occlusion"
+graphPathfinding.neighborFilter = "sceneGraph"
 await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
 await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
 await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
+await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
 
 console.log("\n\n-----Clockwise Sweep: 'V' -----")
 algorithm = "clockwiseSweep"
@@ -162,6 +170,7 @@ CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"
 await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
 await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
 await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
+await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
 
 console.log("\n\n-----Clockwise Sweep: 'Edge' -----")
 algorithm = "clockwiseSweep"
@@ -169,12 +178,14 @@ CONFIG.elevationruler.clockwiseSweepCornerGapType = "edge"
 await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
 await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
 await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
+await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
 
 console.log("\n\n-----WebGPU -----")
 algorithm = "webGPU"
 await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
 await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
 await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
+await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
 
 
 
@@ -265,7 +276,7 @@ CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion" // "clockwis
 
 start = GridCoordinates3d.fromObject(randal.center)
 end = GridCoordinates3d.fromObject(zanna.center)
-pf = new ClockwiseSweepPathfinder(randal)
+pf = new GriddedCollisionPathfinder(randal)
 
 
 start = GridCoordinates3d.fromObject(beiro.center)
@@ -275,6 +286,10 @@ pf = new ClockwiseSweepPathfinder(beiro)
 start = GridCoordinates3d.fromObject(akra.center)
 end = GridCoordinates3d.fromObject(perrin.center)
 pf = new ClockwiseSweepPathfinder(akra)
+
+start = GridCoordinates3d.fromObject(beiro.center)
+end = GridCoordinates3d.fromObject(randal.center)
+pf = new GriddedCollisionPathfinder(beiro)
 
 midE = (pf.token.topE - pf.token.bottomE) * 0.5;
 start.elevation += midE;

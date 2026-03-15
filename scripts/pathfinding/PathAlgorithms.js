@@ -43,42 +43,42 @@ class AbstractGraph {
   /** @type {AbstractPathfindingWorld} */
   world;
 
+  /** @type {Map<Point3d#key, Node>} */
   _cameFrom = new Map();
 
+  /** @type {Frontier|PriorityQueue} */
   _frontier = new Frontier();
 
+  /** @type {boolean} */
   debug = false;
 
+  /** @type {number} */
   debugDelay = 0;
 
   constructor(world) { this.world = world; }
 
-  /**
-   * Initialize the pathfinding run.
-   */
-  _initializePathfindingRun(start) {
-    this._initializeFrontier(start);
-    this._initializeCameFrom(start);
-  }
+  static newFrontier() { return new Frontier(); }
 
   /**
-   * Clear and initialize the frontier for pathfinding run.
-   * Frontier tracks next neighbors to be visited.
-   * @param {Point} start
+   * Generate a fresh state for each pathfinding run.
+   * Child classes may override this to inject PriorityQueues or track costs.
+   * @param {Node} start
+   * @returns {Object}
    */
-  _initializeFrontier(start) {
-    this._frontier.clear();
-    this._frontier.enqueue(start, 0); // Priority is ignored in base version.
-  }
+  createRunState(start, goal) {
+    const frontier = this.constructor.newFrontier();
+    frontier.enqueue(start, 0);
 
-  /**
-   * Clear and initialize the frontier for pathfinding run.
-   * The cameFrom map tracks visited nodes.
-   * @param {Point} start
-   */
-  _initializeCameFrom(start) {
-    this._cameFrom.clear();
-    this._cameFrom.set(start.key, null);
+    const cameFrom = new Map();
+    cameFrom.set(start.key, null);
+
+    return {
+      start,
+      goal,
+      frontier,
+      cameFrom,
+      closedSet: new Set(),
+    };
   }
 
   // Use a Set to track "Closed" nodes (already fully processed)
@@ -89,7 +89,7 @@ class AbstractGraph {
    * @param {Point} start       Start point for the graph
    * @param {Point} goal        End point for the graph
    */
-  async findPath(start, goal, _signal = {}) {
+  async findPath(start, goal, signal = {}) {
     const startNode = this.world.buildNode(start);
     const goalNode = this.world.buildNode(goal);
     if ( this.world.nodeIsUnreachable(goalNode, startNode) ) {
@@ -97,8 +97,9 @@ class AbstractGraph {
       return null;
     }
 
-    // Frontier tracks next neighbors to be visited.
-    this._initializePathfindingRun(startNode);
+    // Initialize the isolated run state.
+    const state = this.createRunState(start, goal);
+    if ( this.debug ) this.lastState = state;
 
     let iter = 0;
     let MAX_ITER = this.world.constructor.maxIterations(start, goal) || 1e03;
@@ -108,37 +109,42 @@ class AbstractGraph {
       this.world.drawNode(goalNode, { color: Draw.COLORS.green });
     }
 
-    const closedSet = this.closedSet;
-    closedSet.clear();
-    while ( this._frontier.length > 0 && iter < MAX_ITER ) {
-      // if ( signal.aborted ) return null;
-      iter += 1;
-      const current = this._frontier.dequeue();
+    // Process each frontier node in turn.
+    while ( state.frontier.length > 0 && iter < MAX_ITER ) {
+      if ( signal.aborted ) {
+        console.debug(`${this.constructor.name}|Pathfinding run aborted.`);
+        return null;
+      }
+
+      const current = state.frontier.dequeue();
 
       // If already processed, skip.
-      if ( closedSet.has(current.key) ) continue;
-      closedSet.add(current.key);
+      if ( state.closedSet.has(current.key) ) continue;
+      state.closedSet.add(current.key);
+
+      iter += 1;
 
       if ( this.debug ) {
         if ( this.debugDelay ) await sleep(this.debugDelay);
         this.world.drawNode(current, { color: Draw.COLORS.blue, alpha: 0.2, radius: 3 });
       }
-      // console.debug(`${this.constructor.name}|Processing frontier ${current.x},${current.y}`)
+
       if ( (reachedGoal = this.world.reachedGoal(current, goalNode, goal)) ) {
-        if ( !this._cameFrom.has(goalNode.key) ) this._cameFrom.set(goalNode.key, current); // CWSweep, for example, does not use current.key === goalNode.key.
+        if ( !state.cameFrom.has(goalNode.key) ) state.cameFrom.set(goalNode.key, current); // CWSweep, for example, does not use current.key === goalNode.key.
         break;
       }
-      for ( const n of this.world.getNeighbors(current) ) this.processFrontierNeighbor(current, n, goal);
+
+      for ( const n of this.world.getNeighbors(current) ) this.processFrontierNeighbor(current, n, state);
     }
 
     if ( !reachedGoal ) {
       if ( iter >= MAX_ITER ) console.warn(`${this.constructor.name}|findPath stuck in loop.`, { startNode, goalNode });
-      if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: No path after examining ${closedSet.size} nodes over ${iter} iterations.`);
+      if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: No path after examining ${state.closedSet.size} nodes over ${iter} iterations.`);
       return null;
     }
 
-    const path = this.constructor.reconstructPath(this._cameFrom, goalNode);
-    if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: Found length ${path?.length} path by examining ${closedSet.size} nodes over ${iter} iterations.`);
+    const path = this.constructor.reconstructPath(state.cameFrom, goalNode);
+    if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: Found length ${path?.length} path by examining ${state.closedSet.size} nodes over ${iter} iterations.`);
 
     if ( !path.at(0).almostEqual(start) ) path.unshift(start); // World must handle checks between start and startNode.
     if ( !path.at(-1).almostEqual(goal) ) path.push(goal);  // World must handle checks between goal and goalNode.
@@ -150,9 +156,9 @@ class AbstractGraph {
    * The child class should set the frontier and cameFrom map accoridngly.
    * @param {Node} current          The current position
    * @param {Node} next             The neighbor to consider
-   * @
+   * @param {Object} state          Running state, from createRunState
    */
-  processFrontierNeighbor(_current, _next) { console.error("_processFrontierNeighbor must be defined by child class."); }
+  processFrontierNeighbor(_current, _next, _state) { throw new Error("_processFrontierNeighbor must be defined by child class."); }
 
   /**
    * For a given goal, reconstruct the path to the beginning.
@@ -174,12 +180,12 @@ class AbstractGraph {
    * Specialized debug draw for the algorithm.
    * @param {object} [opts]
    */
-  drawDebug(start, goal, opts = {}) {
+  drawDebug(state, opts = {}) {
     const gridShape = new PIXI.Polygon(canvas.grid.getShape());
     opts.fill ??= Draw.COLORS.blue;
     opts.fillAlpha ??= 0.10;
     opts.alpha ??= 0;
-    for ( const node of this._cameFrom.values() ) {
+    for ( const node of state.cameFrom.values() ) {
       if ( !node ) continue;
       Draw.shape(gridShape.translate(node.x, node.y), opts);
     }
@@ -213,11 +219,14 @@ export class BFSGraph extends AbstractGraph {
 
   /**
    * Apply a given algorithm to process neighbors along the frontier.
+   * @param {Node} current          The current position
+   * @param {Node} next             The neighbor to consider
+   * @param {Object} state          Running state, from createRunState
    */
-  processFrontierNeighbor(current, next) {
-    if ( !this._cameFrom.has(next.key) ) {
-      this._frontier.enqueue(next);
-      this._cameFrom.set(next.key, current);
+  processFrontierNeighbor(current, next, state) {
+    if ( !state.cameFrom.has(next.key) ) {
+      state.frontier.enqueue(next);
+      state.cameFrom.set(next.key, current);
     }
   }
 }
@@ -228,40 +237,33 @@ export class BFSGraph extends AbstractGraph {
  */
 export class UniformCostGraph extends BFSGraph {
 
-  _costSoFar = new Map();
-
-  _frontier = new PriorityQueue("low");
+  static newFrontier() { return new PriorityQueue("low"); }
 
   /**
-   * Initialize the pathfinding run.
+   * Generate a fresh state for each pathfinding run.
+   * @param {Node} start
+   * @returns {Object}
    */
-  _initializePathfindingRun(start) {
-    super._initializePathfindingRun(start);
-    this._initializeCostSoFar(start);
-  }
-
-  /**
-   * Clear and initialize the cost map for pathfinding run.
-   * The costSoFar map tracks costs to reach different nodes.
-   * @param {Point} start
-   */
-  _initializeCostSoFar(start) {
-    this._costSoFar.clear();
-    this._costSoFar.set(start.key, 0);
+  createRunState(start, goal) {
+    const state = super.createRunState(start, goal);
+    state.costSoFar = new Map();
+    state.costSoFar.set(start.key, 0);
+    return state;
   }
 
   /**
    * Prioritize the neighbor based on cost and add to the
    * @param {Node} current          The current position
    * @param {Node} next             The neighbor to consider
+   * @param {Object} state          Running state, from createRunState
    */
-  processFrontierNeighbor(current, next) {
-    const costSoFar = this._costSoFar;
+  processFrontierNeighbor(current, next, state) {
+    const costSoFar = state.costSoFar;
     const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
       costSoFar.set(next.key, newCost);
-      this._frontier.enqueue(next, newCost);
-      this._cameFrom.set(next.key, current);
+      state.frontier.enqueue(next, newCost);
+      state.cameFrom.set(next.key, current);
     }
   }
 
@@ -269,16 +271,16 @@ export class UniformCostGraph extends BFSGraph {
    * Specialized debug draw for the algorithm.
    * @param {object} [opts]
    */
-  drawDebug(start, goal, opts = {}) {
+  drawDebug(state, opts = {}) {
     const gridShape = new PIXI.Polygon(canvas.grid.getShape());
-    const costMinMax = Math.minMax(...this._costSoFar.values());
+    const costMinMax = Math.minMax(...state.costSoFar.values());
     opts.fill ??= Draw.COLORS.blue;
     opts.alpha ??= 0;
     opts.fillAlpha ??= 1;
 
-    for ( const node of this._cameFrom.values() ) {
+    for ( const node of state.cameFrom.values() ) {
       if ( !node ) continue;
-      const nodeCost = this._costSoFar.get(node.key);
+      const nodeCost = state.costSoFar.get(node.key);
       opts.fillAlpha = (nodeCost - costMinMax.min) / (costMinMax.max - costMinMax.min);
       Draw.shape(gridShape.translate(node.x, node.y), opts);
     }
@@ -291,16 +293,19 @@ export class UniformCostGraph extends BFSGraph {
  */
 export class GreedyBestFirstGraph extends BFSGraph {
 
-  _frontier = new PriorityQueue("low");
+  static newFrontier() { return new PriorityQueue("low"); }
 
   /**
    * Apply a given algorithm to process neighbors along the frontier.
+   * @param {Node} current          The current position
+   * @param {Node} next             The neighbor to consider
+   * @param {Object} state          Running state, from createRunState
    */
-  processFrontierNeighbor(current, next, goal) {
-    if ( !this._cameFrom.has(next.key) ) {
-      const priority = this.world.heuristic(next, goal);
-      this._frontier.enqueue(next, priority);
-      this._cameFrom.set(next.key, current);
+  processFrontierNeighbor(current, next, state) {
+    if ( !state.cameFrom.has(next.key) ) {
+      const priority = this.world.heuristic(next, state.goal);
+      state.frontier.enqueue(next, priority);
+      state.cameFrom.set(next.key, current);
     }
   }
 
@@ -308,15 +313,15 @@ export class GreedyBestFirstGraph extends BFSGraph {
    * Specialized debug draw for the algorithm.
    * @param {object} [opts]
    */
-  drawDebug(start, goal, opts = {}) {
+  drawDebug(state, opts = {}) {
     const gridShape = new PIXI.Polygon(canvas.grid.getShape());
     opts.fill ??= Draw.COLORS.blue;
     opts.alpha ??= 0;
     opts.fillAlpha ??= 1;
 
     const nodesSeen = new Set();
-    const costMax = this.world.heuristic(start, goal);
-    for ( const node of this._cameFrom.values() ) {
+    const costMax = this.world.heuristic(state.start, state.goal);
+    for ( const node of state.cameFrom.values() ) {
       if ( !node || nodesSeen.has(node.key) ) continue;
       nodesSeen.add(node.key);
       const nodeCost = this.world.heuristic(node, goal);
@@ -324,7 +329,6 @@ export class GreedyBestFirstGraph extends BFSGraph {
       Draw.shape(gridShape.translate(node.x, node.y), opts);
     }
   }
-
 }
 
 /**
@@ -335,17 +339,20 @@ export class GreedyBestFirstGraph extends BFSGraph {
 export class AStarGraph extends UniformCostGraph {
   /**
    * Apply a given algorithm to process neighbors along the frontier.
+   * @param {Node} current          The current position
+   * @param {Node} next             The neighbor to consider
+   * @param {Object} state          Running state, from createRunState
    */
-  processFrontierNeighbor(current, next, goal) {
-    const costSoFar = this._costSoFar;
+  processFrontierNeighbor(current, next, state) {
+    const costSoFar = state.costSoFar;
     const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
       costSoFar.set(next.key, newCost);
-      this._cameFrom.set(next.key, current);
+      state.cameFrom.set(next.key, current);
 
       // Priority = g(n) + h(n).
-      const priority = newCost + this.world.heuristic(next, goal);
-      this._frontier.enqueue(next, priority);
+      const priority = newCost + this.world.heuristic(next, state.goal);
+      state.frontier.enqueue(next, priority);
     }
   }
 
@@ -353,18 +360,18 @@ export class AStarGraph extends UniformCostGraph {
    * Specialized debug draw for the algorithm.
    * @param {object} [opts]
    */
-  drawDebug(start, goal, opts = {}) {
+  drawDebug(state, opts = {}) {
     const gridShape = new PIXI.Polygon(canvas.grid.getShape());
-    const costMinMax = Math.minMax(...this._costSoFar.values());
+    const costMinMax = Math.minMax(...state.costSoFar.values());
     opts.fill ??= Draw.COLORS.blue;
     opts.alpha ??= 0;
     opts.fillAlpha ??= 1;
 
     const nodesSeen = new Set();
-    for ( const node of this._cameFrom.values() ) {
+    for ( const node of state.cameFrom.values() ) {
       if ( !node || nodesSeen.has(node) ) continue;
       nodesSeen.add(node);
-      const nodeCost = this._costSoFar.get(node.key) + this.world.heuristic(node, goal);
+      const nodeCost = state.costSoFar.get(node.key) + this.world.heuristic(node, goal);
       opts.fillAlpha = (nodeCost - costMinMax.min) / (costMinMax.max - costMinMax.min);
       Draw.shape(gridShape.translate(node.x, node.y), opts);
     }

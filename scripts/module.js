@@ -136,11 +136,10 @@ Hooks.once("init", function() {
       GraphPathfinder,
 
       WebGPUPathfinder,
-
       GriddedCollisionPathfinder,
-      worldBuilderGriddedCollision,
-
       ClockwiseSweepPathfinder,
+
+      worldBuilderGriddedCollision,
       worldBuilderClockwise,
 
       ObstacleSweep,
@@ -148,7 +147,6 @@ Hooks.once("init", function() {
       ClockwiseCornerEdgeSweep,
       ClockwiseSweepPathfindingNode,
       offsetVCornersForEdges,
-      fogIsExplored,
     },
 
     pathCleaning: {
@@ -158,6 +156,7 @@ Hooks.once("init", function() {
       dropIntermediatePoints,
       straightenPath,
       removeDuplicatePoints,
+      fogIsExplored,
     },
 
     EdgeGraph,
