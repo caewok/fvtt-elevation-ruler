@@ -1,4 +1,5 @@
 /* globals
+canvas,
 CONFIG,
 game,
 */
@@ -7,6 +8,7 @@ game,
 
 import { Settings } from "../settings.js";
 import { GEOMETRY_LIB_ID } from "../geometry/const.js";
+import { PixelCache } from "../geometry/PixelCache.js";
 
 /**
  * Utility functions for terrain evaluation that can be shared between pathfinding classes
@@ -71,4 +73,26 @@ export function regionTerrainValue(region, subjectToken) {
     }
   }
   return value;
+}
+
+/**
+ * Function factory to provide a means to test if a given canvas location is explored or unexplored.
+ * Dependent on the scene having a fog exploration for that user.
+ * Because fog will change over time, this should be called each time a new path is requested.
+ * @returns {function} Function that checks whether a canvas position is explored
+ *   - @param {number} x
+ *   - @param {number} y
+ *   - @returns {boolean}  True if explored, false if unexplored. If no fog, always true.
+ */
+export function fogIsExplored() {
+  const tex = canvas.fog.exploration?.getTexture();
+  if ( !tex || !tex.valid ) return undefined;
+
+  const { width } = canvas.visibility.textureConfiguration;
+  const pixelRes = PixelCache.extractPixelsFromTexture(tex);
+  let pixels = PixelCache.extractPixelChannel(pixelRes.pixels, 0, 4);
+  const cache = PixelCache.fromPixelArray(pixels, width);
+
+  // TODO: Do we need to translate the fog for the scene or does it cover the entire canvas?
+  return (x, y) => cache.pixelAtCanvas(x, y) > 128;
 }

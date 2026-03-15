@@ -10,6 +10,7 @@ import { Draw } from "../geometry/Draw.js";
 import { Settings } from "../settings.js";
 import { pathIsValid } from "./path_cleaning.js";
 import { log } from "../util.js";
+import { fogIsExplored } from "./terrain_utils.js";
 
 /* Pathfinding class.
 
@@ -35,12 +36,18 @@ export class AbstractPathfinder {
   /** @type {Map<key, ElevatedPoint[]>} */
   cachedPaths = new Map();
 
+  fogOfWar = null;
+
   /**
    * Start pathfinding. From this point, assume the scene and starting point will not change.
    * @param {Point3d} start
    */
   startPathfinding(_start) {
     this.cachedPaths.clear();
+
+    // Check if the destination is in the fog of war.
+    if ( Settings.get(Settings.KEYS.PATHFINDING.LIMIT_TOKEN_LOS) ) this.fogOfWar = fogIsExplored();
+    else this.fogOfWar = null;
   }
 
   /**
@@ -49,6 +56,7 @@ export class AbstractPathfinder {
   endPathfinding() {
     this.activeJobs.values().forEach(job => job.abort());
     this.activeJobs.clear();
+    this.fogOfWar = null;
   }
 
   cancelJob(jobId) {
@@ -91,8 +99,12 @@ export class AbstractPathfinder {
     start = start.clone().roundDecimals();
     goal = goal.clone().roundDecimals();
 
+    // Check the cache.
     if ( this.cachedPaths.has(goal.key) ) return this.cachedPaths.get(goal.key);
     if ( !(start || goal) || start.almostEqual(goal) ) return null;
+
+    // Check if the destination is not viewable by the user.
+    if ( this.fogOfWar && this.fogOfWar(goal.x, goal.y) ) return null;
 
     const id = foundry.utils.randomID();
     const prefix = `${this.constructor.name} ${id}`;
