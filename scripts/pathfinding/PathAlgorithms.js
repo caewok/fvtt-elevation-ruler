@@ -78,6 +78,7 @@ class AbstractGraph {
       frontier,
       cameFrom,
       closedSet: new Set(),
+      iter: 0,
     };
   }
 
@@ -90,6 +91,23 @@ class AbstractGraph {
    * @param {Point} goal        End point for the graph
    */
   async findPath(start, goal, signal = {}) {
+    const state = this._startRun(start, goal);
+    if ( !state ) return null;
+    const reachedGoal = await this._doRun(state, signal);
+    if ( !reachedGoal ) {
+      if ( this.debug ) console.debug(`${start} -> ${goal}: No path after examining ${state.closedSet.size} nodes over ${state.iter} iterations.`);
+      return null;
+    }
+    return this._endRun(start, goal, state);
+  }
+
+  /**
+   * Being a pathfinding run.
+   * @param {Point} start       Start point for the graph
+   * @param {Point} goal        End point for the graph
+   * @returns {Object|null} Null if no path; state otherwise.
+   */
+  _startRun(start, goal) {
     const startNode = this.world.buildNode(start);
     const goalNode = this.world.buildNode(goal);
     if ( this.world.nodeIsUnreachable(goalNode, startNode) ) {
@@ -99,56 +117,54 @@ class AbstractGraph {
 
     // Initialize the isolated run state.
     const state = this.createRunState(start, goal);
-    if ( this.debug ) this.lastState = state;
-
-    let iter = 0;
-    let MAX_ITER = this.world.constructor.maxIterations(start, goal) || 1e03;
-    let reachedGoal = false;
     if ( this.debug ) {
-      this.world.drawNode(startNode, { color: Draw.COLORS.yellow });
-      this.world.drawNode(goalNode, { color: Draw.COLORS.green });
+      this.lastState = state;
+      this.world.drawNode(state.start, { color: Draw.COLORS.yellow });
+      this.world.drawNode(state.goal, { color: Draw.COLORS.green });
     }
+    return state;
+  }
 
-    // Process each frontier node in turn.
-    while ( state.frontier.length > 0 && iter < MAX_ITER ) {
+  async _doRun(state, signal = {}) {
+    let MAX_ITER = this.world.constructor.maxIterations(state.start, state.goal) || 1e03;
+    while ( state.iter < MAX_ITER ) {
       if ( signal.aborted ) {
         console.debug(`${this.constructor.name}|Pathfinding run aborted.`);
         return null;
       }
-
-      const current = state.frontier.dequeue();
-
-      // If already processed, skip.
-      if ( state.closedSet.has(current.key) ) continue;
-      state.closedSet.add(current.key);
-
-      iter += 1;
-
-      if ( this.debug ) {
-        if ( this.debugDelay ) await sleep(this.debugDelay);
-        this.world.drawNode(current, { color: Draw.COLORS.blue, alpha: 0.2, radius: 3 });
-      }
-
-      if ( (reachedGoal = this.world.reachedGoal(current, goalNode, goal)) ) {
-        if ( !state.cameFrom.has(goalNode.key) ) state.cameFrom.set(goalNode.key, current); // CWSweep, for example, does not use current.key === goalNode.key.
-        break;
-      }
-
-      for ( const n of this.world.getNeighbors(current) ) this.processFrontierNeighbor(current, n, state);
+      state.iter += 1;
+      if ( !state.frontier.length ) return false;
+      const reachedGoal = await this._processNextFrontier(state);
+      if ( reachedGoal ) return true;
     }
+    console.warn(`${this.constructor.name}|findPath stuck in loop.`, state);
+    return false;
+  }
 
-    if ( !reachedGoal ) {
-      if ( iter >= MAX_ITER ) console.warn(`${this.constructor.name}|findPath stuck in loop.`, { startNode, goalNode });
-      if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: No path after examining ${state.closedSet.size} nodes over ${iter} iterations.`);
-      return null;
-    }
-
-    const path = this.constructor.reconstructPath(state.cameFrom, goalNode);
-    if ( this.debug ) console.debug(`${startNode} -> ${goalNode}: Found length ${path?.length} path by examining ${state.closedSet.size} nodes over ${iter} iterations.`);
+  _endRun(start, goal, state) {
+    const path = this.constructor.reconstructPath(state);
+    if ( this.debug ) console.debug(`${start} -> ${goal}: Found length ${path?.length} path by examining ${state.closedSet.size} nodes over ${state.iter} iterations.`);
 
     if ( !path.at(0).almostEqual(start) ) path.unshift(start); // World must handle checks between start and startNode.
     if ( !path.at(-1).almostEqual(goal) ) path.push(goal);  // World must handle checks between goal and goalNode.
     return path;
+  }
+
+  async _processNextFrontier(state) {
+    const current = state.frontier.dequeue();
+    state.closedSet.add(current.key);
+    if ( this.debug ) {
+      if ( this.debugDelay ) await sleep(this.debugDelay);
+      this.world.drawNode(current, { color: Draw.COLORS.blue, alpha: 0.2, radius: 3 });
+    }
+
+    if ( this.world.reachedGoal(current, state.goal) ) {
+      if ( !state.cameFrom.has(state.goal.key) ) state.cameFrom.set(state.goal.key, current); // CWSweep, for example, does not use current.key === goalNode.key.
+      return true;
+    }
+
+    for ( const n of this.world.getNeighbors(current) ) this.processFrontierNeighbor(current, n, state);
+    return false;
   }
 
   /**
@@ -166,12 +182,12 @@ class AbstractGraph {
    * @param {GridCoordinate} goal
    * @returns {GridCoordinate[]}
    */
-  static reconstructPath(cameFrom, goal) {
-    let current = goal;
+  static reconstructPath(state) {
+    let current = state.goal;
     const path = [];
     while ( current !== null ) {
       path.push(current); // Push + reverse likely faster then unshift.
-      current = cameFrom.get(current.key);
+      current = state.cameFrom.get(current.key);
     }
     return path.reverse();
   }
@@ -224,6 +240,7 @@ export class BFSGraph extends AbstractGraph {
    * @param {Object} state          Running state, from createRunState
    */
   processFrontierNeighbor(current, next, state) {
+    if ( state.closedSet.has(next.key) ) return;
     if ( !state.cameFrom.has(next.key) ) {
       state.frontier.enqueue(next);
       state.cameFrom.set(next.key, current);
@@ -258,6 +275,7 @@ export class UniformCostGraph extends BFSGraph {
    * @param {Object} state          Running state, from createRunState
    */
   processFrontierNeighbor(current, next, state) {
+    if ( state.closedSet.has(next.key) ) return;
     const costSoFar = state.costSoFar;
     const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
@@ -302,6 +320,7 @@ export class GreedyBestFirstGraph extends BFSGraph {
    * @param {Object} state          Running state, from createRunState
    */
   processFrontierNeighbor(current, next, state) {
+    if ( state.closedSet.has(next.key) ) return;
     if ( !state.cameFrom.has(next.key) ) {
       const priority = this.world.heuristic(next, state.goal);
       state.frontier.enqueue(next, priority);
@@ -324,7 +343,7 @@ export class GreedyBestFirstGraph extends BFSGraph {
     for ( const node of state.cameFrom.values() ) {
       if ( !node || nodesSeen.has(node.key) ) continue;
       nodesSeen.add(node.key);
-      const nodeCost = this.world.heuristic(node, goal);
+      const nodeCost = this.world.heuristic(node, state.goal);
       opts.fillAlpha = nodeCost / costMax;
       Draw.shape(gridShape.translate(node.x, node.y), opts);
     }
@@ -344,6 +363,7 @@ export class AStarGraph extends UniformCostGraph {
    * @param {Object} state          Running state, from createRunState
    */
   processFrontierNeighbor(current, next, state) {
+    if ( state.closedSet.has(next.key) ) return;
     const costSoFar = state.costSoFar;
     const newCost = costSoFar.get(current.key) + this.world.cost(current, next, this.token);
     if ( !costSoFar.has(next.key) || newCost < costSoFar.get(next.key) ) {
@@ -371,7 +391,7 @@ export class AStarGraph extends UniformCostGraph {
     for ( const node of state.cameFrom.values() ) {
       if ( !node || nodesSeen.has(node) ) continue;
       nodesSeen.add(node);
-      const nodeCost = state.costSoFar.get(node.key) + this.world.heuristic(node, goal);
+      const nodeCost = state.costSoFar.get(node.key) + this.world.heuristic(node, state.goal);
       opts.fillAlpha = (nodeCost - costMinMax.min) / (costMinMax.max - costMinMax.min);
       Draw.shape(gridShape.translate(node.x, node.y), opts);
     }
@@ -464,12 +484,6 @@ algorithm = "webGPU"
 await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
 await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
 await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
-
-
-
-
-
-
 
  **
  * Uses bresenham to draw pixels under each wall in the scene.
