@@ -128,6 +128,12 @@ await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
 
 
 // Test all
+graphPathfinding = {
+  cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
+  heuristic: "terrain", //"manhattan"|"euclidean"|"foundry"|"terrain"
+  neighborFilter: "occlusion" // "clockwiseSweep"|"occlusion"|"sceneGraph"
+}
+
 
 console.log("\n\n-----Collision: Occlusion -----")
 algorithm = "collision"
@@ -250,8 +256,9 @@ console.log(`
 
 
 
-
-
+CONFIG.elevationruler.graphPathfinding.cost = "terrain"             // "manhattan"|"euclidean"|"foundry"|"terrain"
+CONFIG.elevationruler.graphPathfinding.heuristic = "terrain"        // "manhattan"|"euclidean"|"foundry"|"terrain"
+CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion" // "clockwiseSweep"|"occlusion"|"sceneGraph"
 
 
 
@@ -289,6 +296,14 @@ res.pf.debug = true
 res.pf.debugDelay = 100
 await res.pf.findPath(path[0], path.at(-1))
 
+terrainWaypoints = akra.createTerrainMovementPath([akra.center, perrin.center]);
+akra.measureMovementPath(terrainWaypoints).cost;
+
+pf.world.cost(akra.center, perrin.center)
+
+canvas.grid.measurePath([akra.center, perrin.center])
+canvas.grid.measurePath(terrainWaypoints)
+
 // Clockwise sweep
 CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"
 await pf.startPathfinding(start);
@@ -296,25 +311,29 @@ pf.world._cornerMap.keys().forEach(key => Draw.point(PIXI.Point.invertKey(key)))
 pf.world._cornerMap.values().forEach(v => {
   v.offsetCornerKeys.forEach(key => Draw.point(PIXI.Point.invertKey(key), { color: Draw.COLORS.blue, radius: 1 }))
 })
-pf.world._terrainPointKeys.forEach(key => Draw.point(PIXI.Point.invertKey(key), { color: Draw.COLORS.green }));
+pf.world._terrainPointKeys.forEach(key => Draw.point(PIXI.Point.invertKey(key), { color: Draw.COLORS.green, radius: 1 }));
 
 pf.world.existingNodes.values().forEach(node => Draw.point(node, { color: Draw.COLORS.green, radius: 2 }))
 
 
 
 CONFIG.elevationruler.clockwiseSweepCornerGapType = "v" // gap|v|edge
-node = ClockwiseSweepPathfindingNode.create(start)
+node = pf.world.buildNode(start)
 ClockwiseSweepPathfindingNode.CORNER_OFFSET = 20
 
+
+
+
+node = pf.world.buildNode(start)
 Draw.star(node)
-Draw.shape(node.sweep, { fill: Draw.COLORS.blue, fillAlpha: 0.3 })
-neighborKeys = node.getNeighbors(pf.world._cornerMap, pf.world._terrainPointGrid)
+Draw.shape(node.sweep, { fill: Draw.COLORS.blue, fillAlpha: 0.2 })
+neighborKeys = node.getNeighbors()
 
 neighborNodes = pf.world.adjacentOffsets(node)
 for ( let i = 0; i < neighborNodes.length; i += 1 ) {
    const node = neighborNodes[i]
    Draw.point(node, { radius: 1 })
-   Draw.shape(node.sweep, { fill: Draw.COLORS.green, fillAlpha: 0.3 })
+   // Draw.shape(node.sweep, { fill: Draw.COLORS.green, fillAlpha: 0.3 })
 
 }
 

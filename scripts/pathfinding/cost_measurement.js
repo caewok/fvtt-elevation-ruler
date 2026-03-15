@@ -7,8 +7,11 @@ PIXI,
 
 
 import { Point3d } from "../geometry/3d/Point3d.js";
+import { tokenTopLeftFromCenter } from "../util.js";
 
 // ----- NOTE: Base cost/heuristic methods ----- //
+
+
 
 /**
  * Various helper functions to calculate cost or heuristics in two or three dimensions.
@@ -37,7 +40,9 @@ const COST_FUNCTIONS = {
   foundry: function(a, b) { return canvas.grid.measurePath([a, b]).cost; },
 
   terrain: function(a, b) {
-    const terrainWaypoints = this.token.createTerrainMovementPath([a, b]);
+    using aTL = tokenTopLeftFromCenter(this.token, a);
+    using bTL = tokenTopLeftFromCenter(this.token, b);
+    const terrainWaypoints = this.token.createTerrainMovementPath([aTL, bTL]);
     return this.token.measureMovementPath(terrainWaypoints).cost;
   },
 };
