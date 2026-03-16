@@ -43,12 +43,6 @@ class AbstractGraph {
   /** @type {AbstractPathfindingWorld} */
   world;
 
-  /** @type {Map<Point3d#key, Node>} */
-  _cameFrom = new Map();
-
-  /** @type {Frontier|PriorityQueue} */
-  _frontier = new Frontier();
-
   /** @type {boolean} */
   debug = false;
 
@@ -82,9 +76,6 @@ class AbstractGraph {
     };
   }
 
-  // Use a Set to track "Closed" nodes (already fully processed)
-  closedSet = new Set();
-
   /**
    * Find the path between startPoint and endPoint using the chosen algorithm.
    * @param {Point} start       Start point for the graph
@@ -116,7 +107,7 @@ class AbstractGraph {
     }
 
     // Initialize the isolated run state.
-    const state = this.createRunState(start, goal);
+    const state = this.createRunState(startNode, goalNode);
     if ( this.debug ) {
       this.lastState = state;
       this.world.drawNode(state.start, { color: Draw.COLORS.yellow });
@@ -413,7 +404,6 @@ let { solveSegment,
       snapPathToGrid,
       straightenPath,
       removeDuplicatePoints,
-      fogIsExplored,
       snapPathToGrid2,
 } = api.pathCleaning
 benchTokenPath = api.pathfinding.benchTokenPath
