@@ -72,7 +72,7 @@ class LinearPathfindingWorld extends mix(GraphPathfindingWorld)
     // If on the linear path and gridded, cost should be 0.
 
     // If b is not gridded, make cost very high. 3x the grid distance.
-    if ( !pointIsOn2dGrid(dest) ) return this.STRAIGHT_COST + PIXI.Point.distanceBetween(start, dest);
+    if ( !pointIsOn2dGrid(dest) ) return this.STRAIGHT_COST + PIXI.Point.distanceSquaredBetween(start, dest);
 
     // Otherwise, find the closest distance to the linear path.
     let minDist2 = Number.POSITIVE_INFINITY;
@@ -82,7 +82,7 @@ class LinearPathfindingWorld extends mix(GraphPathfindingWorld)
       minDist2 = Math.min(minDist2, distanceSquaredToSegment(a, b, dest));
       a = b;
     }
-    return minDist2 + PIXI.Point.distanceBetween(start, dest);
+    return minDist2 + PIXI.Point.distanceSquaredBetween(start, dest);
   }
 
   adjacentOffsets(node) {
@@ -105,6 +105,7 @@ class LinearPathfindingWorld extends mix(GraphPathfindingWorld)
         closest[1] = pt;
       }
     }
+    closest = closest.filter(elem => Boolean(elem)); // In case closest[1] never gets defined.
     return [...offsets, ...closest];
   }
 }
