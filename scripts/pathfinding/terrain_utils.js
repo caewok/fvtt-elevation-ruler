@@ -1,4 +1,5 @@
 /* globals
+canvas,
 CONFIG,
 game,
 */
@@ -7,6 +8,7 @@ game,
 
 import { Settings } from "../settings.js";
 import { GEOMETRY_LIB_ID } from "../geometry/const.js";
+import { PixelCache } from "../geometry/PixelCache.js";
 
 /**
  * Utility functions for terrain evaluation that can be shared between pathfinding classes

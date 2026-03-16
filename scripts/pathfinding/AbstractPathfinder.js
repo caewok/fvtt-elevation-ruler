@@ -49,6 +49,7 @@ export class AbstractPathfinder {
   endPathfinding() {
     this.activeJobs.values().forEach(job => job.abort());
     this.activeJobs.clear();
+    this.fogOfWar = null;
   }
 
   cancelJob(jobId) {
@@ -91,8 +92,13 @@ export class AbstractPathfinder {
     start = start.clone().roundDecimals();
     goal = goal.clone().roundDecimals();
 
+    // Check the cache.
     if ( this.cachedPaths.has(goal.key) ) return this.cachedPaths.get(goal.key);
     if ( !(start || goal) || start.almostEqual(goal) ) return null;
+
+    // Check if the destination is not viewable by the user.
+    if ( Settings.get(Settings.KEYS.PATHFINDING.LIMIT_TOKEN_LOS)
+      && !canvas.fog.isPointExplored(goal) ) return null;
 
     const id = foundry.utils.randomID();
     const prefix = `${this.constructor.name} ${id}`;

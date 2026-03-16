@@ -1,6 +1,7 @@
 /* globals
 canvas,
 CONFIG,
+PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
@@ -116,28 +117,17 @@ export class GraphPathfindingWorld {
    * @param {Node} goal
    * @returns {number}
    */
-  static maxIterations(start, _goal) {
-    // Number of steps from start to the edge of the scene.
-    // For a grid, 1 step is one grid square.
-    const { sceneRect, size } = canvas.scene.dimensions;
-    if ( canvas.grid.isGridless ) {
-      const maxDist = Math.max(
-        sceneRect.width - start.x,
-        start.x - sceneRect.x,
-        sceneRect.height - start.y,
-        start.y - sceneRect.y,
-      );
-      return Math.ceil(maxDist / (this.resolution || 1)); // TODO: Resolution for gridless.
-
-    } else {
-      const maxDist = Math.max(
-        sceneRect.width - start.x,
-        start.x - sceneRect.x,
-        sceneRect.height - start.y,
-        start.y - sceneRect.y,
-      );
-      return Math.ceil(maxDist / size);
-    }
+  static maxIterations(start, goal) {
+    // For a grid-based graph, the absolute limit is the total number of cells.
+    // E.g., 50 x 50 = 2500.
+    // Can either cap at reasonable limit. 10K – 20K unless using worker or yielding to main thread
+    // using requestAnimationFrame.
+    // Balanced for A*: 5 * manhattan distance between start and goal. But fails pretty hard at mazes.
+    const MIN_ITERATIONS = 1000;
+    const { size, rect } = canvas.scene.dimensions;
+    const balanced = (manhattan(start, goal) / size) * 10;
+    const minBalanced = Math.max(balanced, MIN_ITERATIONS); // Do a reasonable number of iterations regardless.
+    return Math.ceil(Math.min(minBalanced, 10000, rect.area / size));
   }
 
   /**
@@ -170,4 +160,10 @@ export class GraphPathfindingWorld {
   }
 
   drawNode(node, opts = {}) { Draw.point(node, opts); }
+}
+
+function manhattan(a, b) { // Formula: abs(a.x - b.x) + abs(a.y - b.y)
+  using delta = PIXI.Point.tmp;
+  a.subtract(b, delta).abs(delta);
+  return delta.x + delta.y;
 }

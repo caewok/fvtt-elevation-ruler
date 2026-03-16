@@ -46,7 +46,6 @@ import {
   pathIsValid,
   removeDuplicatePoints,
   straightenPath,
-  fogIsExplored,
 } from "./pathfinding/path_cleaning.js";
 import { snapPathToGrid } from "./pathfinding/snap_to_grid.js";
 
@@ -136,11 +135,10 @@ Hooks.once("init", function() {
       GraphPathfinder,
 
       WebGPUPathfinder,
-
       GriddedCollisionPathfinder,
-      worldBuilderGriddedCollision,
-
       ClockwiseSweepPathfinder,
+
+      worldBuilderGriddedCollision,
       worldBuilderClockwise,
 
       ObstacleSweep,
@@ -157,7 +155,6 @@ Hooks.once("init", function() {
       dropIntermediatePoints,
       straightenPath,
       removeDuplicatePoints,
-      fogIsExplored,
     },
 
     EdgeGraph,
