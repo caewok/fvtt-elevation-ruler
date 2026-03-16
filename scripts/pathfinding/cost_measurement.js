@@ -15,35 +15,36 @@ import { tokenTopLeftFromCenter } from "../util.js";
 
 /**
  * Various helper functions to calculate cost or heuristics in two or three dimensions.
+ * Always uses cost ^ 2 so that distanceSquared can be used (no square root).
  */
 const COST_FUNCTIONS = {
   D2: {
-    euclidean: function(a, b) { return PIXI.Point.distanceBetween(a, b); },
+    euclidean: function(a, b) { return PIXI.Point.distanceSquaredBetween(a, b); },
 
     manhattan: function(a, b) { // Formula: abs(a.x - b.x) + abs(a.y - b.y)
       using delta = PIXI.Point.tmp;
       a.subtract(b, delta).abs(delta);
-      return delta.x + delta.y;
+      return (delta.x + delta.y) ** 2;
     },
   },
 
   D3: {
-    euclidean: function(a, b) { return Point3d.distanceBetween(a, b); },
+    euclidean: function(a, b) { return Point3d.distanceSquaredBetween(a, b); },
 
     manhattan: function(a, b) { // Formula: abs(a.x - b.x) + abs(a.y - b.y) + abs(a.z - b.z)
       using delta = Point3d.tmp;
       a.subtract(b, delta).abs(delta);
-      return delta.x + delta.y + delta.z;
+      return (delta.x + delta.y + delta.z) ** 2;
     },
   },
 
-  foundry: function(a, b) { return canvas.grid.measurePath([a, b]).cost; },
+  foundry: function(a, b) { return canvas.grid.measurePath([a, b]).cost ** 2; },
 
   terrain: function(a, b) {
     using aTL = tokenTopLeftFromCenter(this.token, a);
     using bTL = tokenTopLeftFromCenter(this.token, b);
     const terrainWaypoints = this.token.createTerrainMovementPath([aTL, bTL]);
-    return this.token.measureMovementPath(terrainWaypoints).cost;
+    return this.token.measureMovementPath(terrainWaypoints).cost ** 2;
   },
 };
 
