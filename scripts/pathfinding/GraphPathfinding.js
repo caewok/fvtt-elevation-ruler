@@ -120,7 +120,7 @@ let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 
 // collision, webGPU, clockwiseSweep
 CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"  // |"v"|"edge"
-algorithm = "collision" // "collision"|"clockwiseSweep"|"webGPU"
+algorithm = "clockwiseSweep" // "collision"|"clockwiseSweep"|"webGPU"
 graphPathfinding = {
   cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
   heuristic: "terrain", //"manhattan"|"euclidean"|"foundry"|"terrain"
@@ -134,60 +134,53 @@ await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
 // Test all
 graphPathfinding = {
   cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
-  heuristic: "terrain", //"manhattan"|"euclidean"|"foundry"|"terrain"
+  heuristic: "euclidean", //"manhattan"|"euclidean"|"foundry"|"terrain"
   neighborFilter: "occlusion" // "clockwiseSweep"|"occlusion"|"sceneGraph"
 }
 
 
+startToken = randal
+endToken = zanna
+
+startToken = beiro
+endToken = riswynn
+
+startToken = akra
+endToken = perrin
+
+startToken = beiro
+endToken = randal
 
 
 console.log("\n\n-----Collision: Occlusion -----")
 algorithm = "collision"
 graphPathfinding.neighborFilter = "occlusion"
-await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
-await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
-await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
-await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
-
+await testPathfinding(startToken, endToken, { algorithm, graphPathfinding })
 
 console.log("\n\n-----Collision: CWSweep -----")
 algorithm = "collision"
 graphPathfinding.neighborFilter = "clockwiseSweep"
-await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
-await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
-await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
-await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
+await testPathfinding(startToken, endToken, { algorithm, graphPathfinding })
 
 console.log("\n\n-----Collision: Scene Graph -----")
 algorithm = "collision"
 graphPathfinding.neighborFilter = "sceneGraph"
-await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
-await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
-await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
-await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
+await testPathfinding(startToken, endToken, { algorithm, graphPathfinding })
 
 console.log("\n\n-----Clockwise Sweep: 'V' -----")
 algorithm = "clockwiseSweep"
 CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"
-await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
-await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
-await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
-await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
+await testPathfinding(startToken, endToken, { algorithm, graphPathfinding })
 
 console.log("\n\n-----Clockwise Sweep: 'Edge' -----")
 algorithm = "clockwiseSweep"
 CONFIG.elevationruler.clockwiseSweepCornerGapType = "edge"
-await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
-await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
-await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
-await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
+await testPathfinding(startToken, endToken, { algorithm, graphPathfinding })
 
 console.log("\n\n-----WebGPU -----")
 algorithm = "webGPU"
-await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
-await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
-await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
-await testPathfinding(beiro, randal, { algorithm, graphPathfinding })
+await testPathfinding(startToken, endToken, { algorithm, graphPathfinding })
+
 
 
 

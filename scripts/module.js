@@ -99,7 +99,7 @@ Hooks.once("init", function() {
       algorithm: "astar",   // @type {"astar"|"greedy"|"breadth"|"uniform"}
       use3d: false,         // @type {true|false}. TODO: Currently non-functional.
       cost: "terrain",      // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
-      heuristic: "terrain", // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
+      heuristic: "euclidean", // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
       neighborFilter: "clockwiseSweep",    // @type{"clockwiseSweep"|"occlusion"|"sceneGraph"}
     },
 

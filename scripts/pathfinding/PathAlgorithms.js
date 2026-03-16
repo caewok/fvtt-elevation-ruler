@@ -110,8 +110,8 @@ class AbstractGraph {
     const state = this.createRunState(startNode, goalNode);
     if ( this.debug ) {
       this.lastState = state;
-      this.world.drawNode(state.start, { color: Draw.COLORS.yellow });
-      this.world.drawNode(state.goal, { color: Draw.COLORS.green });
+      Draw.star(start);
+      Draw.point(goal, { color: Draw.COLORS.green });
     }
     return state;
   }
