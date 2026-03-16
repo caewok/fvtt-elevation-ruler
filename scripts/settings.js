@@ -77,6 +77,7 @@ export class Settings extends ModuleSettingsAbstract {
    */
   static registerAll() {
     const { KEYS, register, localize } = this;
+    const PF = KEYS.PATHFINDING;
 
     // ----- NOTE: Pathfinding ----- //
 
@@ -88,72 +89,77 @@ export class Settings extends ModuleSettingsAbstract {
     });
 
     const pathfindingAlgChoices = {};
-    Object.values(KEYS.PATHFINDING.ALGORITHM_CHOICES).forEach(alg => pathfindingAlgChoices[alg] = localize(alg));
-    if ( !WebGPUPathfinder.supportsWebGPU ) delete pathfindingAlgChoices[KEYS.PATHFINDING.ALGORITHM_CHOICES.WEBGPU];
+    Object.values(PF.ALGORITHM_CHOICES).forEach(alg => pathfindingAlgChoices[alg] = localize(alg));
+    if ( !WebGPUPathfinder.supportsWebGPU ) delete pathfindingAlgChoices[PF.ALGORITHM_CHOICES.WEBGPU];
 
-    register(KEYS.PATHFINDING.ALGORITHM, {
-      name: localize(`${KEYS.PATHFINDING.ALGORITHM}.name`),
-      // Currently unused hint: localize(`${KEYS.PATHFINDING.ALGORITHM}.hint`),
+    register(PF.ALGORITHM, {
+      name: localize(`${PF.ALGORITHM}.name`),
+      // Currently unused hint: localize(`${PF.ALGORITHM}.hint`),
       scope: "user",
       config: true,
       type: new foundry.data.fields.StringField({
         required: true,
         blank: false,
-        initial: KEYS.PATHFINDING.ALGORITHM_CHOICES.SIMPLE,
+        initial: PF.ALGORITHM_CHOICES.COLLISION,
         choices: pathfindingAlgChoices,
       }),
       requiresReload: false,
       onChange: value => this.updateTokensPathfinder({ algorithm: value }), // TODO: Initialize the pathfinding algorithm?
     });
 
-    register(KEYS.PATHFINDING.TOKENS_BLOCK, {
-      name: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK}.name`),
-      hint: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK}.hint`),
+    const choices = new Set(Object.keys(pathfindingAlgChoices));
+    if ( !choices.has(this.get(PF.ALGORITHM)) ) {
+      this.set(PF.ALGORITHM, PF.ALGORITHM_CHOICES.COLLISION);
+    }
+
+    register(PF.TOKENS_BLOCK, {
+      name: localize(`${PF.TOKENS_BLOCK}.name`),
+      hint: localize(`${PF.TOKENS_BLOCK}.hint`),
       scope: "world",
       config: true,
       type: new foundry.data.fields.StringField({
         required: true,
         blank: false,
-        initial: KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO,
+        initial: PF.TOKENS_BLOCK_CHOICES.NO,
         choices: {
-          [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.NO}`),
-          [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.HOSTILE]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.HOSTILE}`),
-          [KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL]: localize(`${KEYS.PATHFINDING.TOKENS_BLOCK_CHOICES.ALL}`),
+          [PF.TOKENS_BLOCK_CHOICES.NO]: localize(`${PF.TOKENS_BLOCK_CHOICES.NO}`),
+          [PF.TOKENS_BLOCK_CHOICES.HOSTILE]: localize(`${PF.TOKENS_BLOCK_CHOICES.HOSTILE}`),
+          [PF.TOKENS_BLOCK_CHOICES.ALL]: localize(`${PF.TOKENS_BLOCK_CHOICES.ALL}`),
         }
       }),
       requiresReload: false,
       onChange: value => this.setTokenBlocksPathfinding(value)
     });
 
-    register(KEYS.PATHFINDING.TOKEN_DIFFICULTY.FRIENDLY, {
-      name: localize(`${KEYS.PATHFINDING.TOKEN_DIFFICULTY.FRIENDLY}.name`),
-      hint: localize(`${KEYS.PATHFINDING.TOKEN_DIFFICULTY.FRIENDLY}.hint`),
+    register(PF.TOKEN_DIFFICULTY.FRIENDLY, {
+      name: localize(`${PF.TOKEN_DIFFICULTY.FRIENDLY}.name`),
+      hint: localize(`${PF.TOKEN_DIFFICULTY.FRIENDLY}.hint`),
       scope: "world",
       config: true,
       type: new foundry.data.fields.NumberField({ nullable: false, min: 1, initial: 1 }),
     });
 
-    register(KEYS.PATHFINDING.TOKEN_DIFFICULTY.HOSTILE, {
-      name: localize(`${KEYS.PATHFINDING.TOKEN_DIFFICULTY.HOSTILE}.name`),
-      hint: localize(`${KEYS.PATHFINDING.TOKEN_DIFFICULTY.HOSTILE}.hint`),
+    register(PF.TOKEN_DIFFICULTY.HOSTILE, {
+      name: localize(`${PF.TOKEN_DIFFICULTY.HOSTILE}.name`),
+      hint: localize(`${PF.TOKEN_DIFFICULTY.HOSTILE}.hint`),
       scope: "world",
       config: true,
       type: new foundry.data.fields.NumberField({ nullable: false, min: 1, initial: 1 }),
     });
 
 
-    register(KEYS.PATHFINDING.LIMIT_TOKEN_LOS, {
-      name: localize(`${KEYS.PATHFINDING.LIMIT_TOKEN_LOS}.name`),
-      hint: localize(`${KEYS.PATHFINDING.LIMIT_TOKEN_LOS}.hint`),
+    register(PF.LIMIT_TOKEN_LOS, {
+      name: localize(`${PF.LIMIT_TOKEN_LOS}.name`),
+      hint: localize(`${PF.LIMIT_TOKEN_LOS}.hint`),
       scope: "world",
       config: true,
       type: new foundry.data.fields.BooleanField({ initial: false }),
       requiresReload: false
     });
 
-    register(KEYS.PATHFINDING.SNAP_TO_GRID, {
-      name: localize(`${KEYS.PATHFINDING.SNAP_TO_GRID}.name`),
-      hint: localize(`${KEYS.PATHFINDING.SNAP_TO_GRID}.hint`),
+    register(PF.SNAP_TO_GRID, {
+      name: localize(`${PF.SNAP_TO_GRID}.name`),
+      hint: localize(`${PF.SNAP_TO_GRID}.hint`),
       scope: "world",
       config: true,
       type: new foundry.data.fields.BooleanField({ initial: false }),
@@ -215,9 +221,10 @@ export class Settings extends ModuleSettingsAbstract {
     await WebGPUPathfinder.destroy();
 
     // Initialize pathfinding.
-    const ALG = Settings.KEYS.PATHFINDING.ALGORITHM_CHOICES;
-    algorithm ??= Settings.get(Settings.KEYS.PATHFINDING.ALGORITHM);
-    if ( algorithm === ALG.SIMPLE ) algorithm = CONFIG[MODULE_ID].graphPathfinding.algorithm;
+    const PF = Settings.KEYS.PATHFINDING;
+    algorithm ??= Settings.get(PF.ALGORITHM);
+    const ALG = PF.ALGORITHM_CHOICES;
+    if ( algorithm === ALG.COLLISION ) algorithm = CONFIG[MODULE_ID].graphPathfinding.algorithm;
     switch ( algorithm ) {
       case ALG.WEBGPU:
       case "webgpu": await WebGPUPathfinder.initialize(); break;
