@@ -47,7 +47,6 @@ import {
   removeDuplicatePoints,
   straightenPath,
 } from "./pathfinding/path_cleaning.js";
-import { fogIsExplored } from "./pathfinding/terrain_utils.js";
 import { snapPathToGrid } from "./pathfinding/snap_to_grid.js";
 
 // Load the geometry library.
@@ -156,7 +155,6 @@ Hooks.once("init", function() {
       dropIntermediatePoints,
       straightenPath,
       removeDuplicatePoints,
-      fogIsExplored,
     },
 
     EdgeGraph,
