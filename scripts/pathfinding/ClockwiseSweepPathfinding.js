@@ -77,6 +77,8 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
   /** @param {ClockwiseSweepPolygon.config} */
   sweepOpts = {};
 
+  drawn = false;
+
   cornerMap;
 
   terrainPointGrid;
@@ -427,10 +429,15 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
   _addTerrainPointsForPolygon(poly, isHole = false) {
     const terrainPointKeys = this._terrainPointKeys;
     poly = poly.clone().pad(this.constructor.CORNER_OFFSET * (isHole ? -1 : 1));
+    using polyCenter = PIXI.Point.fromObject(poly.center);
     using pt = PIXI.Point.tmp;
     for ( const edge of poly.iterateEdges({ close: true }) ) {
       for ( const t of this.constructor.TERRAIN_T_VALUES ) {
         edge.a.projectToward(edge.b, t, pt);
+
+        // Don't add if there is a collision between the point and the polygon center.
+        // Usually due to token against wall.
+        if ( CONFIG[MODULE_ID].sceneGraph.hasCollision(pt, polyCenter, this.token) ) continue;
         terrainPointKeys.add(pt.key);
       }
     }
@@ -493,10 +500,15 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
   drawNode(node, opts = {}) {
     super.drawNode(node, opts);
 
-    const color = randomColor();
-    node.drawShape({ fill: color, });
-    node.drawNeighbors({ color });
+    if ( !node.drawn ) {
+      const color = randomColor();
+      node.drawShape({ fill: color, });
+      node.drawNeighbors({ color });
+      node.drawn = true;
+    }
   }
+
+  _clearNodeDrawnState() { this.world.existingNodes.values().forEach(node => node.drawn = false); }
 
   /**
    * Maximum number of iterations given a start and end coordinate.
@@ -508,18 +520,22 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
   static maxIterations(_start, _goal) {
     // Challenging to estimate. Maximum would be the total number of pixels.
     // The reality is much less, but highly dependent on number of walls.
-    // 0 walls: one iteration.
-    // 1 wall: one + 2 endpoints + 2 midpoints
-    // 2 walls: As few as the 1 wall scenario, or as many as one + 4 endpoints + 4 midpoints + ???
-    // Estimate 4 points per wall, no more than 1 point per grid space.
-    const { sceneHeight, sceneWidth, size } = canvas.scene.dimensions;
-    const invSize = 1 / size;
-    const maxGridSteps = sceneHeight * sceneWidth * (invSize ** 2);
-    const nWalls = canvas.walls.placeables.length;
-    const gapPointsEstimate = Math.min(maxGridSteps, (nWalls * 4) + 2);
+    // Each wall has max 1 or 2 per endpoint for clockwiseSweepCornerGapType "v"|"edge".
+    const numPerEndpoint = CONFIG[MODULE_ID].clockwiseSweepCornerGapType === "v" ? 1 : 2;
+    const maxOffsetWalls = canvas.walls.placeables.length * numPerEndpoint * 2;
 
-    // But multiple iterations may be required to revisit certain points.
-    return gapPointsEstimate;
+    // More would be added per token and per region.
+    // Estimate 12 per token.
+    const maxOffsetTokens = canvas.tokens.placeables.length * 12;
+
+    // Regions are harder, but at least as many as tokens.
+    // (Would need to consider circumference/perimeter to estimate better.)
+    const maxOffsetRegions = canvas.regions.placeables.length * 24;
+
+    // Number of iterations dependent on number of backsteps, but each node should only
+    // be visited once at most.
+    const maxOffsetCorners = maxOffsetWalls + maxOffsetTokens + maxOffsetRegions;
+    return Math.min(Math.max(maxOffsetCorners, 100), 10000);
   }
 
 }
