@@ -103,13 +103,13 @@ export class AbstractPathfinder {
     const id = foundry.utils.randomID();
     const prefix = `${this.constructor.name} ${id}`;
     if ( signal.aborted ) return null;
-    console.time(`${prefix}|findPath`);
-    if ( PIXI.Point.distanceBetween(start, goal) > (6 * canvas.grid.size) ) log(`${prefix}|${start} --> ${goal}:`); // For debugging.
+    // console.time(`${prefix}|findPath`);
+    // if ( PIXI.Point.distanceBetween(start, goal) > (6 * canvas.grid.size) ) log(`${prefix}|${start} --> ${goal}:`); // For debugging.
     let path = await this._findPath(start, goal, signal);
-    console.timeEnd(`${prefix}|findPath`);
+    // console.timeEnd(`${prefix}|findPath`);
 
     if ( !path ) {
-      log(` ${prefix}|${start} --> ${goal}: null`);
+      // log(` ${prefix}|${start} --> ${goal}: null`);
       return null;
     }
 
