@@ -101,15 +101,9 @@ function findMovementPath(wrapped, waypoints, options) {
 }
 
 /**
- * Add token blocking handling to constrainMovementPath.
- * Add only when CONFIG is set for now. Unclear if needed outside of collision pathfinding.
+ * TODO: Add token blocking handling to constrainMovementPath?.
+ * Unclear if needed outside of collision pathfinding.
  */
-function constrainMovementPath(wrapped, waypoints, opts = {}) {
-  const result = wrapped(waypoints, opts);
-
-
-
-}
 
 PATCHES.BASIC.WRAPS = { findMovementPath, _initializeDragLeft, _onDragEnd };
 
