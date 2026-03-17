@@ -223,12 +223,7 @@ export class Settings extends ModuleSettingsAbstract {
     // Initialize pathfinding.
     const PF = Settings.KEYS.PATHFINDING;
     algorithm ??= Settings.get(PF.ALGORITHM);
-    const ALG = PF.ALGORITHM_CHOICES;
-    if ( algorithm === ALG.COLLISION ) algorithm = CONFIG[MODULE_ID].graphPathfinding.algorithm;
-    switch ( algorithm ) {
-      case ALG.WEBGPU:
-      case "webgpu": await WebGPUPathfinder.initialize(); break;
-    }
+    if ( Settings.get(PF.ALGORITHM) === PF.ALGORITHM_CHOICES.WEBGPU ) await WebGPUPathfinder.initialize();
 
     // Set up pathfinding for each token on the canvas.
     this.updateTokensPathfinder({ algorithm });

@@ -120,7 +120,7 @@ let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 
 // collision, webGPU, clockwiseSweep
 CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"  // |"v"|"edge"
-algorithm = "clockwiseSweep" // "collision"|"clockwiseSweep"|"webGPU"
+algorithm = "collision" // "collision"|"clockwiseSweep"|"webGPU"
 graphPathfinding = {
   cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
   heuristic: "terrain", //"manhattan"|"euclidean"|"foundry"|"terrain"
