@@ -115,14 +115,16 @@ class AbstractGraph {
     const t0 = performance.now();
     const reachedGoal = await this.doRun(state, signal);
     console.debug(`findPath|${Math.round(performance.now() - t0)} ms`)
-    if ( !reachedGoal ) {
-      if ( this.debug ) console.debug(`${start} -> ${goal}: No path after examining ${state.closedSet.size} nodes over ${state.iter} iterations.`);
-      return null;
-    }
+
     if ( signal.aborted ) {
       console.debug(`${this.constructor.name}|Pathfinding run aborted.`);
       return null;
     }
+    if ( !reachedGoal ) {
+      if ( this.debug ) console.debug(`${start} -> ${goal}: No path after examining ${state.closedSet.size} nodes over ${state.iter} iterations.`);
+      return null;
+    }
+
     return this._endRun(start, goal, state);
   }
 
@@ -174,8 +176,8 @@ class AbstractGraph {
     */
 
     return Boolean(this.world.constructor.idleYield)
-      ? IdleTaskRunner.runIdle(iter, { signal })
-      : IdleTaskRunner.runPriority(iter, { signal });
+      ? IdleTaskRunner.runIdle(iter, signal)
+      : IdleTaskRunner.runPriority(iter, signal);
   }
 
   *_doRun(state) {
