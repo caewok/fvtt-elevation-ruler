@@ -132,20 +132,20 @@ async function pathfind(path, wrapped, waypoints, options, token) {
     const prevW = waypoints.at(-1);
     if ( prevW.x.almostEqual(foundryEnd.x) && prevW.y.almostEqual(foundryEnd.y) ) waypoints.pop();
     waypoints.push(foundryEnd);
-    if ( PIXI.Point.distanceBetween(foundryStart, foundryEnd) > (6 * canvas.grid.size) ) { console.debug("Long path", { foundPath, waypoints }); }
+    // if ( PIXI.Point.distanceBetween(foundryStart, foundryEnd) > (6 * canvas.grid.size) ) { console.debug("Long path", { foundPath, waypoints }); }
 
+    /*
     const pathStr = [];
     foundPath.forEach(pt => pathStr.push(`\t${pt}`));
-    const waypointStr = [];
-    waypoints.forEach(pt => waypointStr.push(`\t${GridCoordinates3d.fromLocationWithElevation(pt, pt.elevation)}`));
     const start = GridCoordinates3d.fromLocationWithElevation(foundryStart, foundryStart.elevation);
     const end = GridCoordinates3d.fromLocationWithElevation(foundryEnd, foundryEnd.elevation);
+    const waypointStr = [];
+    waypoints.forEach(pt => waypointStr.push(`\t${GridCoordinates3d.fromLocationWithElevation(pt, pt.elevation)}`));
     log(`Found path for ${start} --> ${end}\n${pathStr.join("\n")}\nWaypoints:\n${waypointStr.join("\n")}`);
+    */
   }
 
   // Rerun findMovementPath to account for regions, etc.
   const foundrySearch = wrapped(waypoints, options);
   return foundrySearch.result || foundrySearch.promise;
 }
-
-

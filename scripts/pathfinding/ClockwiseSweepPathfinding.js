@@ -249,6 +249,9 @@ export class ClockwiseSweepPathfindingNode extends ElevatedPoint {
 
 export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
 
+  /** @type {number} */
+  static get idleYield() { return CONFIG[MODULE_ID].clockwiseSweepPathfinding.idleYield || 0; }
+
   /** @type {number<pixels>} */
   static CORNER_OFFSET = 5;
 
@@ -367,7 +370,7 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
    */
   calculateCornerMap(elevationZ) {
     let cornerFn;
-    switch ( CONFIG[MODULE_ID].clockwiseSweepCornerGapType ) {
+    switch ( CONFIG[MODULE_ID].clockwiseSweepPathfinding.cornerGapType ) {
       case "v": cornerFn = offsetVCornersForEdges; break;
       case "edge": cornerFn = offsetEdgeCornersForEdges; break;
       default: cornerFn = offsetVCornersForEdges;
@@ -521,7 +524,7 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
     // Challenging to estimate. Maximum would be the total number of pixels.
     // The reality is much less, but highly dependent on number of walls.
     // Each wall has max 1 or 2 per endpoint for clockwiseSweepCornerGapType "v"|"edge".
-    const numPerEndpoint = CONFIG[MODULE_ID].clockwiseSweepCornerGapType === "v" ? 1 : 2;
+    const numPerEndpoint = CONFIG[MODULE_ID].clockwiseSweepPathfinding.cornerGapType === "v" ? 1 : 2;
     const maxOffsetWalls = canvas.walls.placeables.length * numPerEndpoint * 2;
 
     // More would be added per token and per region.
@@ -558,7 +561,7 @@ function randomColor() {
 const worldClassCache = new Map();
 
 export function worldBuilderClockwise({ cost, use3d, heuristic } = {}) {
-  const pathCfg = CONFIG[MODULE_ID].graphPathfinding;
+  const pathCfg = CONFIG[MODULE_ID].clockwiseSweepPathfinding;
   use3d ??= pathCfg.use3d;
   cost ??= pathCfg.cost;
   heuristic ??= pathCfg.heuristic;

@@ -119,7 +119,7 @@ let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
 let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 
 // collision, webGPU, clockwiseSweep
-CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"  // |"v"|"edge"
+CONFIG.elevationruler.clockwiseSweepPathfinding.cornerGapType = "v"  // |"v"|"edge"
 algorithm = "collision" // "collision"|"clockwiseSweep"|"webGPU"
 graphPathfinding = {
   cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
@@ -169,12 +169,12 @@ await testPathfinding(startToken, endToken, { algorithm, graphPathfinding })
 
 console.log("\n\n-----Clockwise Sweep: 'V' -----")
 algorithm = "clockwiseSweep"
-CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"
+CONFIG.elevationruler.clockwiseSweepPathfinding.cornerGapType = "v"
 await testPathfinding(startToken, endToken, { algorithm, graphPathfinding })
 
 console.log("\n\n-----Clockwise Sweep: 'Edge' -----")
 algorithm = "clockwiseSweep"
-CONFIG.elevationruler.clockwiseSweepCornerGapType = "edge"
+CONFIG.elevationruler.clockwiseSweepPathfinding.cornerGapType = "edge"
 await testPathfinding(startToken, endToken, { algorithm, graphPathfinding })
 
 console.log("\n\n-----WebGPU -----")
@@ -263,7 +263,7 @@ console.log(`
 
 
 CONFIG.elevationruler.graphPathfinding.cost = "terrain"             // "manhattan"|"euclidean"|"foundry"|"terrain"
-CONFIG.elevationruler.graphPathfinding.heuristic = "terrain"        // "manhattan"|"euclidean"|"foundry"|"terrain"
+CONFIG.elevationruler.graphPathfinding.heuristic = "euclidean"        // "manhattan"|"euclidean"|"foundry"|"terrain"
 CONFIG.elevationruler.graphPathfinding.neighborFilter = "occlusion" // "clockwiseSweep"|"occlusion"|"sceneGraph"
 
 
@@ -303,7 +303,13 @@ graph = new pf.graphClass(pf.world)
 graph.debug = pf.debug
 graph.debugDelay = pf.debugDelay
 state = graph._startRun(start, end)
-reachedGoal = await graph._processNextFrontier(state)
+await graph.doRun(state)
+
+iter = await graph._doRun(state)
+await iter.next()
+
+
+reachedGoal = graph._processNextFrontier(state)
 
 
 
@@ -324,7 +330,7 @@ canvas.grid.measurePath([akra.center, perrin.center])
 canvas.grid.measurePath(terrainWaypoints)
 
 // Clockwise sweep
-CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"
+CONFIG.elevationruler.clockwiseSweepPathfinding.cornerGapType = "v"
 await pf.startPathfinding(start);
 pf.world.cornerMap.keys().forEach(key => Draw.point(PIXI.Point.invertKey(key), { radius: 1 }))
 pf.world.cornerMap.values().forEach(v => {
@@ -336,7 +342,7 @@ pf.world.existingNodes.values().forEach(node => Draw.point(node, { color: Draw.C
 
 
 
-CONFIG.elevationruler.clockwiseSweepCornerGapType = "v" // gap|v|edge
+CONFIG.elevationruler.clockwiseSweepPathfinding.cornerGapType = "v" // gap|v|edge
 node = pf.world.buildNode(start)
 ClockwiseSweepPathfindingNode.CORNER_OFFSET = 20
 
