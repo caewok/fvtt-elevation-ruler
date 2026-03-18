@@ -101,7 +101,7 @@ Hooks.once("init", function() {
       cost: "terrain",      // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
       heuristic: "euclidean", // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
       neighborFilter: "clockwiseSweep",    // @type{"clockwiseSweep"|"occlusion"|"sceneGraph"}
-      idleYield: 25,          // @type {number} Number of iterations to yield. 0 means do not yield for idle.
+      idleYield: 100,          // @type {number} Number of iterations to yield. 0 means do not yield for idle.
     },
 
     /**
@@ -121,7 +121,7 @@ Hooks.once("init", function() {
        * @type {"v"|"edge"}
        */
       cornerGapType: "v",
-      idleYield: 0,           // @type {number} Number of iterations to yield. 0 means do not yield for idle.
+      idleYield: 50,           // @type {number} Number of iterations to yield. 0 means do not yield for idle.
     },
 
     clockwiseSweepCornerGapType: "v",

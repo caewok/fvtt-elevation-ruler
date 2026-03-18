@@ -108,16 +108,16 @@ class AbstractGraph {
     const state = this._startRun(start, goal);
     if ( !state ) return null;
     if ( signal.aborted ) {
-      console.debug(`${this.constructor.name}|Pathfinding run aborted.`);
+      if ( this.debug )  console.debug(`${this.constructor.name}|Pathfinding run aborted.`);
       return null;
     }
 
-    const t0 = performance.now();
+    // const t0 = performance.now();
     const reachedGoal = await this.doRun(state, signal);
-    console.debug(`findPath|${Math.round(performance.now() - t0)} ms`)
+    // console.debug(`findPath|${Math.round(performance.now() - t0)} ms`)
 
     if ( signal.aborted ) {
-      console.debug(`${this.constructor.name}|Pathfinding run aborted.`);
+      if ( this.debug )  console.debug(`${this.constructor.name}|Pathfinding run aborted.`);
       return null;
     }
     if ( !reachedGoal ) {
