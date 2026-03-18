@@ -1,13 +1,16 @@
 /* globals
 canvas,
+CONFIG,
 foundry,
 PIXI,
 */
 /* eslint no-unused-vars: ["error", { "argsIgnorePattern": "^_" }] */
 "use strict";
 
+import { MODULE_ID } from "../const.js";
 import { Draw } from "../geometry/Draw.js";
 import { PriorityQueue } from "./PriorityQueue.js";
+import { IdleTaskRunner } from "../IdleTaskRunner.js";
 
 /* Basic pathfinding algorithms.
 
@@ -23,6 +26,13 @@ Abstract
 */
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+function sleepSync(ms) {
+    const start = Date.now();
+    while (Date.now() < start + ms) {
+        // Do nothing, just wait
+    }
+}
 
 /**
  * Basic frontier that simply uses an array.
@@ -54,10 +64,21 @@ class AbstractGraph {
   static newFrontier() { return new Frontier(); }
 
   /**
+   * @typedef GraphRunState
+   * @prop {Node} start
+   * @prop {Node} goal
+   * @prop {Frontier} frontier
+   * @prop {Map<Node.key, Node|null>} cameFrom
+   * @prop {Set<Node.key>} closedSet
+   * @prop {number} iter
+   */
+
+  /**
    * Generate a fresh state for each pathfinding run.
    * Child classes may override this to inject PriorityQueues or track costs.
    * @param {Node} start
-   * @returns {Object}
+   * @param {Node} goal
+   * @returns {GraphRunState}
    */
   createRunState(start, goal) {
     const frontier = this.constructor.newFrontier();
@@ -80,23 +101,37 @@ class AbstractGraph {
    * Find the path between startPoint and endPoint using the chosen algorithm.
    * @param {Point} start       Start point for the graph
    * @param {Point} goal        End point for the graph
+   * @param {AbortSignal} [signal]
+   * @returns {GridCoordinates3d[]|null}
    */
   async findPath(start, goal, signal = {}) {
     const state = this._startRun(start, goal);
     if ( !state ) return null;
-    const reachedGoal = await this._doRun(state, signal);
+    if ( signal.aborted ) {
+      console.debug(`${this.constructor.name}|Pathfinding run aborted.`);
+      return null;
+    }
+
+    const t0 = performance.now();
+    const reachedGoal = await this.doRun(state, signal);
+    console.debug(`findPath|${Math.round(performance.now() - t0)} ms`)
     if ( !reachedGoal ) {
       if ( this.debug ) console.debug(`${start} -> ${goal}: No path after examining ${state.closedSet.size} nodes over ${state.iter} iterations.`);
+      return null;
+    }
+    if ( signal.aborted ) {
+      console.debug(`${this.constructor.name}|Pathfinding run aborted.`);
       return null;
     }
     return this._endRun(start, goal, state);
   }
 
+
   /**
    * Being a pathfinding run.
    * @param {Point} start       Start point for the graph
    * @param {Point} goal        End point for the graph
-   * @returns {Object|null} Null if no path; state otherwise.
+   * @returns {GraphState|null} Null if no path; state otherwise.
    */
   _startRun(start, goal) {
     const startNode = this.world.buildNode(start);
@@ -116,17 +151,40 @@ class AbstractGraph {
     return state;
   }
 
-  async _doRun(state, signal = {}) {
+  /**
+   * Core algorithm logic.
+   * @param {GraphState} state       Current graph state
+   * @param {AbortSignal} signal
+   * @returns {GridCoordinates3d[]|null}
+   */
+  async doRun(state, signal) {
+    const iter = this._doRun(state);
+
+    /*
+    let result = iter.next();
+    while ( !result.done ) {
+      if ( signal.aborted ) return null;
+      result = iter.next();
+    }
+    return result.value;
+    */
+
+    return Boolean(this.world.constructor.idleYield)
+      ? IdleTaskRunner.runIdle(iter, { signal })
+      : IdleTaskRunner.runPriority(iter, { signal });
+  }
+
+  *_doRun(state) {
+    const yieldIter = this.world.constructor.idleYield;
     let MAX_ITER = this.world.constructor.maxIterations(state.start, state.goal) || 1e03;
     while ( state.iter < MAX_ITER ) {
-      if ( signal.aborted ) {
-        console.debug(`${this.constructor.name}|Pathfinding run aborted.`);
-        return null;
-      }
       state.iter += 1;
       if ( !state.frontier.length ) return false;
-      const reachedGoal = await this._processNextFrontier(state);
+      const reachedGoal = this._processNextFrontier(state);
       if ( reachedGoal ) return true;
+
+      // Yield every X iterations to allow the runner to check time/abort.
+      if ( (state.iter % yieldIter) === 0 ) yield;
     }
     console.warn(`${this.constructor.name}|findPath stuck in loop.`, state);
     return false;
@@ -141,11 +199,11 @@ class AbstractGraph {
     return path;
   }
 
-  async _processNextFrontier(state) {
+  _processNextFrontier(state) {
     const current = state.frontier.dequeue();
     state.closedSet.add(current.key);
     if ( this.debug ) {
-      if ( this.debugDelay ) await sleep(this.debugDelay);
+      if ( this.debugDelay ) sleepSync(this.debugDelay);
       this.world.drawNode(current, { color: Draw.COLORS.blue, alpha: 0.2, radius: 3 });
     }
 
@@ -420,7 +478,7 @@ let akra = canvas.tokens.placeables.find(t => t.name === "Akra")
 let perrin = canvas.tokens.placeables.find(t => t.name === "Perrin")
 
 // collision, webGPU, clockwiseSweep
-CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"  // |"v"|"edge"
+CONFIG.elevationruler.clockwiseSweepPathfinding.cornerGapType = "v"  // |"v"|"edge"
 algorithm = "clockwiseSweep"
 graphPathfinding = {
   cost: "terrain",      // "manhattan"|"euclidean"|"foundry"|"terrain"
@@ -457,14 +515,14 @@ await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
 
 console.log("\n\n-----Clockwise Sweep: 'V' -----")
 algorithm = "clockwiseSweep"
-CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"
+CONFIG.elevationruler.clockwiseSweepPathfinding.cornerGapType = "v"
 await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
 await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
 await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
 
 console.log("\n\n-----Clockwise Sweep: 'Edge' -----")
 algorithm = "clockwiseSweep"
-CONFIG.elevationruler.clockwiseSweepCornerGapType = "edge"
+CONFIG.elevationruler.clockwiseSweepPathfinding.cornerGapType = "edge"
 await testPathfinding(randal, zanna, { algorithm, graphPathfinding })
 await testPathfinding(beiro, riswynn, { algorithm, graphPathfinding })
 await testPathfinding(akra, perrin, { algorithm, graphPathfinding })
@@ -589,7 +647,7 @@ res.pf.debugDelay = 100
 await res.pf.findPath(path[0], path.at(-1))
 
 // Clockwise sweep
-CONFIG.elevationruler.clockwiseSweepCornerGapType = "v"
+CONFIG.elevationruler.clockwiseSweepPathfinding.cornerGapType = "v"
 await pf.startPathfinding(start);
 pf.world._cornerMap.keys().forEach(key => Draw.point(PIXI.Point.invertKey(key)))
 pf.world._cornerMap.values().forEach(v => {
@@ -601,7 +659,7 @@ pf.world.existingNodes.values().forEach(node => Draw.point(node, { color: Draw.C
 
 
 
-CONFIG.elevationruler.clockwiseSweepCornerGapType = "v" // gap|v|edge
+CONFIG.elevationruler.clockwiseSweepPathfinding.cornerGapType = "v" // gap|v|edge
 node = ClockwiseSweepPathfindingNode.create(start)
 ClockwiseSweepPathfindingNode.CORNER_OFFSET = 20
 

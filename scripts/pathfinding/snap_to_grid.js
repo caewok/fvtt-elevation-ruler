@@ -35,6 +35,9 @@ class LinearPathfindingWorld extends mix(GraphPathfindingWorld)
   .with(Euclidean2dHeuristic, Node, SceneGraphFilter, Neighbors2d) {
 
   /** @type {number} */
+  static get idleYield() { return 0; }
+
+  /** @type {number} */
   MAX_LINEAR_DIST2 = (canvas.grid.size * 3) ** 2;
 
   /** @type {GridCoordinates3d[]} */

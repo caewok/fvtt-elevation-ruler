@@ -17,6 +17,9 @@ import { Draw } from "../geometry/Draw.js";
  */
 export class GraphPathfindingWorld {
 
+  /** @type {number} */
+  static get idleYield() { return CONFIG[MODULE_ID].graphPathfinding.idleYield || 0; }
+
   /** @type {object} */
   config = {};
 
@@ -123,7 +126,7 @@ export class GraphPathfindingWorld {
     // Can either cap at reasonable limit. 10K – 20K unless using worker or yielding to main thread
     // using requestAnimationFrame.
     // Balanced for A*: 5 * manhattan distance between start and goal. But fails pretty hard at mazes.
-    const MIN_ITERATIONS = 1000;
+    const MIN_ITERATIONS = 200;
     const { size, rect } = canvas.scene.dimensions;
     const balanced = (manhattan(start, goal) / size) * 10;
     const minBalanced = Math.max(balanced, MIN_ITERATIONS); // Do a reasonable number of iterations regardless.

@@ -101,6 +101,7 @@ Hooks.once("init", function() {
       cost: "terrain",      // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
       heuristic: "euclidean", // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
       neighborFilter: "clockwiseSweep",    // @type{"clockwiseSweep"|"occlusion"|"sceneGraph"}
+      idleYield: 25,          // @type {number} Number of iterations to yield. 0 means do not yield for idle.
     },
 
     /**
@@ -109,6 +110,20 @@ Hooks.once("init", function() {
      * edge: Offset by moving away from the corner in the direction of the edge creating the shadow.
      * @type {"v"|"edge"}
      */
+    clockwiseSweepPathfinding: {
+      cost: "terrain",         // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
+      heuristic: "euclidean",  // @type {"manhattan"|"euclidean"|"foundry"|"terrain"}
+      use3d: false,         // @type {true|false}. TODO: Currently non-functional.
+      /**
+       * How to offset the corners for the clockwise sweep pathfinding.
+       * v: Offset using the V created by corners
+       * edge: Offset by moving away from the corner in the direction of the edge creating the shadow.
+       * @type {"v"|"edge"}
+       */
+      cornerGapType: "v",
+      idleYield: 0,           // @type {number} Number of iterations to yield. 0 means do not yield for idle.
+    },
+
     clockwiseSweepCornerGapType: "v",
 
     /**
