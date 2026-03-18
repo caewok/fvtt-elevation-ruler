@@ -160,6 +160,10 @@ class AbstractGraph {
   async doRun(state, signal) {
     const iter = this._doRun(state);
 
+    // Try one iteration to see if it is easily solved before moving to idle task .
+    const result = iter.next();
+    if ( result.done ) return result.value;
+
     /*
     let result = iter.next();
     while ( !result.done ) {
