@@ -418,14 +418,11 @@ export class ClockwiseSweepPathfindingWorld extends GraphPathfindingWorld {
 
       // Get the region border, padded so the points are not in the region.
       const geom = region[GEOMETRY_LIB_ID]?.[GEOMETRY_ID];
-      if ( !geom ) continue;
-      for ( const combinedFace of geom.iterateFaces() ) {
-        const top = combinedFace.top;
-        const top2d = top.toPolygon2d();
-        if ( Array.isArray(top2d) ) {
-          for ( const poly of top2d ) this._addTerrainPointsForPolygon(poly, top.isHole);
-        } else this._addTerrainPointsForPolygon(top2d, top.isHole);
-      }
+      if ( !geom || !geom.faces.top.length ) continue;
+      const top2d = geom.faces.top.toPolygon2d(); // For region, could be a Polygon3d or a Polygons3d.
+      if ( Array.isArray(top2d) ) {
+        for ( const poly of top2d ) this._addTerrainPointsForPolygon(poly, top.isHole);
+      } else this._addTerrainPointsForPolygon(top2d, top.isHole);
     }
   }
 
