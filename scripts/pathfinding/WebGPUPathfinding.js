@@ -201,7 +201,7 @@ const GPUTerrainMixin = superclass => class extends superclass {
 
     // Need to earcut faces but also handle holes.
     const vertices = [];
-    for ( const faces of geom.combinedFaces ) {
+    for ( const faces of geom.iterateFaces() ) {
       if ( faces.top instanceof CONFIG[GEOMETRY_LIB_ID].lib.threeD.Polygons3d ) {
         const paths = faces.top.toClipperPaths();
         const top = Polygon3dVertices.polygonTopFace(paths, { topZ: 0, stride: 3 });
