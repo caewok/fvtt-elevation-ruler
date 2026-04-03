@@ -199,9 +199,9 @@ Hooks.on("canvasReady", function() {
   ];
   for ( const type of geometryTypes ) {
     const cl = geometryTracking[`${type}GeometryTracker`];
-    const watcher = cl.create();
-    watcher.activate();
-    watcher.registerExistingPlaceables();
+    cl.registerHooks();
+    cl.registerExistingPlaceables();
+    cl.activate();
   }
 
   Settings.pathfinderReady = true;

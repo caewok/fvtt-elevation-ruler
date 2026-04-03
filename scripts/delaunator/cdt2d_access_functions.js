@@ -31,8 +31,8 @@ export function cdt2dConstrainedGraph(sceneGraph) {
   const edges = new Array(sceneGraph.edges.size);
   i = 0;
   for ( const edge of sceneGraph.edges.values() ) {
-    const iA = pointIndexMap.get(edge.A.key);
-    const iB = pointIndexMap.get(edge.B.key);
+    const iA = pointIndexMap.get(edge.a.key);
+    const iB = pointIndexMap.get(edge.b.key);
     edges[i] = [iA, iB];
     i += 1;
   }
