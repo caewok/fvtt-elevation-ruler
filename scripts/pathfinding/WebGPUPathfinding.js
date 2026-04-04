@@ -624,13 +624,13 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
     if ( !path[0].almostEqual(start) ) {
       source = new foundry.canvas.sources.PointMovementSource({ object: this.token });
       opts = { type: "move", mode: "any", source };
-      if ( CONFIG.Canvas.polygonBackends[type].testCollision(start, path[0], opts) ) return null;
+      if ( CONFIG.Canvas.polygonBackends.move.testCollision(start, path[0], opts) ) return null;
       path.unshift(start);
     }
     if ( !path.at(-1).almostEqual(goal) ) {
       source ||= new foundry.canvas.sources.PointMovementSource({ object: this.token });
       opts ||= { type: "move", mode: "any", source };
-      if ( CONFIG.Canvas.polygonBackends[type].testCollision(start, end, opts) ) return null;
+      if ( CONFIG.Canvas.polygonBackends.move.testCollision(path.at(-1), goal, opts) ) return null;
       path.push(goal);
     }
     return path;
