@@ -127,7 +127,7 @@ async function pathfind(path, wrapped, waypoints, options, token) {
       const pt = tokenTopLeftFromCenter(token, foundPath[i]);
       const prevW = waypoints[i - 1];
       if ( prevW.x.almostEqual(pt.x) && prevW.y.almostEqual(pt.y) ) continue;
-      waypoints.push({ ...foundryStart, checkpoint: false, explicit: false, x: pt.x, y: pt.y });
+      waypoints.push({ ...foundryStart, checkpoint: true, explicit: false, intermediate: false, x: pt.x, y: pt.y });
     }
     const prevW = waypoints.at(-1);
     if ( prevW.x.almostEqual(foundryEnd.x) && prevW.y.almostEqual(foundryEnd.y) ) waypoints.pop();
