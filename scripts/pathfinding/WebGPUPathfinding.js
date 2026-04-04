@@ -12,19 +12,12 @@ import { MODULE_ID } from "../const.js";
 import { AbstractPathfinder } from "./AbstractPathfinder.js";
 import { GEOMETRY_LIB_ID, GEOMETRY_ID } from "../geometry/const.js";
 import { Settings } from "../settings.js";
-import { combineTypedArrays } from "../geometry/util.js";
 import { tokenTerrainValue, regionTerrainValue, TERRAIN_FEATURES } from "./terrain_utils.js";
-import {
-  HorizontalQuadVertices,
-  Polygon3dVertices,
-  Ellipse3dVertices,
-  Circle3dVertices,
-  Hex3dVertices,
-} from "../geometry/placeable_vertices/BasicVertices.js";
 import { VertexObject } from "../geometry/placeable_vertices/PlaceableVertices.js";
 import { GridCoordinates3d } from "../geometry/3d/GridCoordinates3d.js";
 import { mix } from "../geometry/mixwith.js";
 import { dropIntermediatePoints, straightenPath } from "./path_cleaning.js";
+import { Triangle3d } from "../geometry/3d/Polygon3d.js";
 
 // TODO: import { FastBitSet } from "../FastBitSet/FastBitSet.js";
 
@@ -115,65 +108,10 @@ const GPUTerrainMixin = superclass => class extends superclass {
    */
   static convertTokenTopsToVertexObject(tokens) {
     tokens ||= canvas.tokens.placeables;
-    const vos = tokens.map(token => this._convertTokenTopToVertexObject(token));
+    const vos = tokens.map(token => this._convertPlaceableTopToVertexObject(token));
     const vo = vos.length === 1 ? vos[0] : vos[0].combine(...vos.slice(1));
     vo.condense(vo);
     vo.dropZ();
-    return vo;
-  }
-
-  /**
-   * Convert token top to vertices object.
-   * @param {Token} token
-   * @returns {VertexObject}
-   */
-  static _convertTokenTopToVertexObject(token) {
-    const vo = new VertexObject();
-    if ( token.isConstrainedTokenBorder ) {
-      vo.vertices = Polygon3dVertices.polygonTopFace(token.constrainedTokenBorder, { topZ: token.bottomZ, stride: 3 });
-      vo.hasNormals = false;
-      vo.hasUVs = false;
-      return vo;
-    }
-
-    if ( CONFIG[GEOMETRY_LIB_ID].CONFIG.useTokenSphere ) {
-      // Assume for now that we would run into the largest part of the sphere radius.
-      // This might be reasonable for two colliding tokens, plus simpler for pathfinding.
-      // Same treatment as ellipse.
-      const { width, height } = token.document;
-      const zHeight = (token.topZ - token.bottomZ) / canvas.dimensions.size;
-      const density = Circle3dVertices.defaultDensityForDimensions(width, height, zHeight);
-      vo.vertices = Circle3dVertices.polygonTopFace(undefined, { density });
-
-    } else {
-      const SHAPES = CONST.TOKEN_SHAPES;
-      switch ( token.document.shape ) {
-        case SHAPES.ELLIPSE_1:
-        case SHAPES.ELLIPSE_2: {
-          const { width, height } = token.document;
-          const zHeight = (token.topZ - token.bottomZ) / canvas.dimensions.size;
-          const density = Ellipse3dVertices.defaultDensityForDimensions(width, height, zHeight);
-          vo.vertices = Ellipse3dVertices.polygonTopFace(undefined, { density });
-          break;
-        }
-
-        case SHAPES.RECTANGLE_1:
-        case SHAPES.RECTANGLE_2: vo.vertices = HorizontalQuadVertices.top; break;
-
-        case SHAPES.TRAPEZOID_1:
-        case SHAPES.TRAPEZOID_2: {
-          const shape = Hex3dVertices.hexagonalShapeForToken(token);
-          vo.vertices = Polygon3dVertices._polygonTopFaceFan(shape, { topZ: 0.5 });
-        }
-      }
-    }
-
-    vo.hasNormals = true;
-    vo.hasUVs = true;
-    vo.dropNormalsAndUVs({ out: vo });
-
-    const geom = token[GEOMETRY_LIB_ID][GEOMETRY_ID];
-    vo.transformToModel(geom.modelMatrix, vo);
     return vo;
   }
 
@@ -184,7 +122,7 @@ const GPUTerrainMixin = superclass => class extends superclass {
    */
   static convertRegionTopsToVertexObject(regions) {
     regions ||= canvas.regions.placeables;
-    const vos = regions.map(region => this._convertRegionTopToVertexObject(region));
+    const vos = regions.map(region => this._convertPlaceableTopToVertexObject(region));
     const vo = vos.length === 1 ? vos[0] : vos[0].combine(...vos.slice(1));
     vo.condense(vo);
     vo.dropZ();
@@ -192,36 +130,20 @@ const GPUTerrainMixin = superclass => class extends superclass {
   }
 
   /**
-   * Convert region top to vertices object.
-   * @param {Region} region
+   * Convert a placeable with a top geometry to vertices object.
+   * @param {Token|Region|Wall|Tile} placeable
    * @returns {VertexObject}
    */
-  static _convertRegionTopToVertexObject(region) {
-    const geom = region[GEOMETRY_LIB_ID][GEOMETRY_ID];
+  static _convertPlaceableTopToVertexObject(placeable) {
+    // First convert to Triangles3d.
+    const top = placeable[GEOMETRY_LIB_ID][GEOMETRY_ID].faces.top;
+    const tris = top.triangulate();
 
-    // Need to earcut faces but also handle holes.
-    const vertices = [];
-    for ( const faces of geom.iterateFaces() ) {
-      if ( faces.top instanceof CONFIG[GEOMETRY_LIB_ID].lib.threeD.Polygons3d ) {
-        const paths = faces.top.toClipperPaths();
-        const top = Polygon3dVertices.polygonTopFace(paths, { topZ: 0, stride: 3 });
-        vertices.push(top);
-      } else {
-        const tris = faces.top.triangulate();
-        const outArr = new Float32Array(9 * tris.length);
-        let outIdx = 0;
-        for ( const tri of tris ) {
-          tri.toVertices({ outArr, outIdx });
-          outIdx += 9;
-        }
-        vertices.push(outArr);
-      }
-    }
+    // Then convert to vertices.
     const vo = new VertexObject();
     vo.hasUVs = false;
     vo.hasNormals = false;
-    if ( !vertices.length ) return vo;
-    vo.vertices = vertices.length > 1 ? combineTypedArrays(vertices) : vertices[0];
+    vo.vertices = Triangle3d.trianglesToVertices(tris);
     return vo;
   }
 
@@ -371,7 +293,6 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       translationX,
       translationY,
     };
-    params.debug = CONFIG[MODULE_ID].debug;
     return this.executeFunction("initialize", [params]);
   }
 
@@ -389,7 +310,6 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       bufferType,
       clear,
     };
-    params.debug = CONFIG[MODULE_ID].debug;
     return this.executeFunction("updateBufferBlockingSegments", [params], [segments.buffer]);
   }
 
@@ -410,7 +330,6 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       bufferType,
       clear,
     };
-    params.debug = CONFIG[MODULE_ID].debug;
     return this.executeFunction("updateBufferTerrainTriangles", [params], [triVO.vertices.buffer, triVO.indices.buffer]);
   }
 
@@ -421,7 +340,6 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
    */
   clearBuffer(bufferType = "transient") {
     const params = { bufferType };
-    params.debug = CONFIG[MODULE_ID].debug;
     return this.executeFunction("clearBuffer", [params]);
   }
 
@@ -442,7 +360,6 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
    */
   async extractBufferData({ bufferType = "transient" } = {}) {
     const params = { bufferType };
-    params.debug = CONFIG[MODULE_ID].debug;
     const res = await this.executeFunction("extractBufferData", [params]);
     return res;
   }
@@ -458,7 +375,6 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
    */
   async calculateDistanceMap(start) {
     const params = { startX: start.x, startY: start.y, elevation: start.elevation };
-    params.debug = CONFIG[MODULE_ID].debug;
     return this.executeFunction("calculateDistanceMap", [params]);
   }
 
@@ -475,16 +391,16 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
       signal,
       diagonalCost: this.constructor.diagonalCost,
     };
-    params.debug = CONFIG[MODULE_ID].debug;
     const res = await this.executeFunction("findPath", [params]);
-    const nPts = res.path.length;
+    const nPts = Math.floor(res.path.length * 0.5); // Path is array of x,y coordinates.
     if ( !nPts ) return null;
 
     // Switch to 3d coordinates.
-    const path = Array(nPts * 0.5);
-    for ( let i = 0, j = 0; i < nPts; i += 2, j += 1 ) {
-      path[j] = GridCoordinates3d.tmp.set(res.path[i], res.path[i+1], start.z);
+    const path = Array(nPts);
+    for ( let i = 0, j = 0; j < nPts; ) {
+      path[j++] = GridCoordinates3d.tmp.set(res.path[i++], res.path[i++], start.z);
     }
+
     return path;
   }
 
@@ -495,6 +411,11 @@ export class WebGPUPathfinderWorker extends foundry.helpers.AsyncWorker {
 
   async terminate() {
     return this.executeFunction("terminate");
+  }
+
+  async toggleDebug(debug) {
+    const params = { debug };
+    await this.executeFunction("toggleDebug", [params]);
   }
 
   static get diagonalCost() {
@@ -693,7 +614,26 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
   // ----- NOTE: Pathfind ----- //
 
   async _findPath(start, goal, _signal) {
-    return this.constructor.worker.findPath(start, goal);
+    const path = await this.constructor.worker.findPath(start, goal);
+    if ( !path || !path.length ) return null;
+
+    // If the start or end is absent, add.
+    // Can happen if the start or end is not on the WebGPU grid.
+    let source;
+    let opts;
+    if ( !path[0].almostEqual(start) ) {
+      source = new foundry.canvas.sources.PointMovementSource({ object: this.token });
+      opts = { type: "move", mode: "any", source };
+      if ( CONFIG.Canvas.polygonBackends[type].testCollision(start, path[0], opts) ) return null;
+      path.unshift(start);
+    }
+    if ( !path.at(-1).almostEqual(goal) ) {
+      source ||= new foundry.canvas.sources.PointMovementSource({ object: this.token });
+      opts ||= { type: "move", mode: "any", source };
+      if ( CONFIG.Canvas.polygonBackends[type].testCollision(start, end, opts) ) return null;
+      path.push(goal);
+    }
+    return path;
   }
 
   // ----- NOTE: Path cleaning ----- //
@@ -734,6 +674,10 @@ export class WebGPUPathfinder extends mix(AbstractPathfinder).with(GPUTerrainMix
     await this.destroy();
     if ( this.worker ) await this.worker.terminate();
     this.worker = null;
+  }
+
+  static async toggleDebug(value) {
+    if ( this.worker ) await this.worker.toggleDebug(value);
   }
 }
 
@@ -928,7 +872,8 @@ colorFn = value => {
 
 alphaFn = value => value === 255 ? 1 : 1 ? 0.1 : 0.5
 PixelCache = CONFIG.GeometryLib.lib.PixelCache
-cache = PixelCache.fromPixelArray(bufferData.buffer, bufferData.width, { resolution: worker.resolution, translate: worker.sceneTranslation })
+cache = PixelCache.fromPixelArray(bufferData.buffer, bufferData.width,
+  { resolution: worker.resolution, translate: worker.sceneTranslation })
 
 
 alphaFn = value => value === 255 ? 1 : 1 ? 0.1 : 0.5
@@ -1176,7 +1121,8 @@ new Set(bufferData.sort((a, b) => a - b))
 
 
 Terrain = api.pathfinding.Terrain
-terrain = Terrain.fromPixelArray(bufferData, pf.constructor.worker.gridDims.x, { resolution: pf.constructor.worker.resolution })
+terrain = Terrain.fromPixelArray(bufferData, pf.constructor.worker.gridDims.x,
+  { resolution: pf.constructor.worker.resolution })
 terrain.translation = pf.constructor.worker.sceneTranslation
 terrain.draw({ skip: 20, local: false })
 
@@ -1187,8 +1133,6 @@ bufferData[pf.constructor.worker.pf.terrainMapper.indexAtCanvas(1997, 2699)]
 WebGPUPathfinderFakeWorker.worker.resolution
 await WebGPUPathfinderFakeWorker.destroy()
 await WebGPUPathfinderFakeWorker.initialize(2/100)
-
-
 
 worker = WebGPUPathfinderFakeWorker.worker
 await worker.destroy();

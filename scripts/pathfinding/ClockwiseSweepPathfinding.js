@@ -60,8 +60,9 @@ export class ClockwiseSweepPathfinder extends GraphPathfinder {
    * @returns {Point[]}
    */
   async snapPathToGrid(path) {
-    path = await snapPathToGrid(path, this.token);
-    return optimizeGridPath(path, this.token);
+    const snappedPath = await snapPathToGrid(path, this.token);
+    if ( !snappedPath ) return path;
+    return optimizeGridPath(snappedPath, this.token);
     // TODO: Could use specialized version that limits collision tests between a and b
     //       to edges encountered in a's sweep.
 

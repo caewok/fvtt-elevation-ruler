@@ -176,7 +176,7 @@ Hooks.once("init", function() {
     Settings
   };
 
-  loadTemplates(Object.values(TEMPLATES)).then(_value => log("Templates loaded."));
+  foundry.applications.handlebars.loadTemplates(Object.values(TEMPLATES)).then(_value => log("Templates loaded."));
 });
 
 // Setup is after init; before ready.

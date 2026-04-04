@@ -131,13 +131,12 @@ function estimateIterations(startX, startY) {
  * @param {number} [options.resolution=1]
  * @param {number} [options.translationX=0]
  * @param {number} [options.translationY=0]
- * @param {boolean} [options.debug=false]
  * @returns {boolean}
  */
-async function initialize({ debug, ...opts } = {}) { /* eslint-disable-line no-unused-vars */
+async function initialize(opts) { /* eslint-disable-line no-unused-vars */
   pf = new GPUPathfinder();
   await pf.initialize(opts);
-  if ( debug ) console.debug("WebGPUPathfinderWorker|Initialized.");
+  if ( pf.debug ) console.debug("WebGPUPathfinderWorker|Initialized.");
   return [true];
 }
 
@@ -150,14 +149,14 @@ async function initialize({ debug, ...opts } = {}) { /* eslint-disable-line no-u
  * @param {boolean} [options.debug=false]
  * @returns {boolean}
  */
-function updateBufferBlockingSegments({ segments, bufferType = "transient", openDoors = false, clear = true, debug = false } = {}) { /* eslint-disable-line no-unused-vars */
+function updateBufferBlockingSegments({ segments, bufferType = "transient", openDoors = false, clear = true } = {}) { /* eslint-disable-line no-unused-vars */
   const size = countUniquePixelsForSegments(segments);
   const doorMult = openDoors ? -1 : 1;
   SCENE_EDGES[bufferType] = clear ? size * doorMult
     : SCENE_EDGES[bufferType] += size * doorMult;
 
   pf.terrainMapper.processBlockingSegments(segments, { bufferType, openDoors, clear });
-  if ( debug ) console.debug(`WebGPUPathfinderWorker|Updated blocking segments for ${bufferType} buffer.`);
+  if ( pf.debug ) console.debug(`WebGPUPathfinderWorker|Updated blocking segments for ${bufferType} buffer.`);
   return [true];
 }
 
@@ -171,9 +170,9 @@ function updateBufferBlockingSegments({ segments, bufferType = "transient", open
  * @param {boolean} [options.debug=false]
  * @returns {boolean}
  */
-function updateBufferTerrainTriangles({ vertices, indices, bufferType = "transient", clear = true, debug = false } = {}) { /* eslint-disable-line no-unused-vars */
+function updateBufferTerrainTriangles({ vertices, indices, bufferType = "transient", clear = true } = {}) { /* eslint-disable-line no-unused-vars */
   pf.terrainMapper.processTerrainTriangles(vertices, indices, { bufferType, clear });
-  if ( debug ) console.debug(`WebGPUPathfinderWorker|Updated terrain for ${bufferType} buffer.`);
+  if ( pf.debug ) console.debug(`WebGPUPathfinderWorker|Updated terrain for ${bufferType} buffer.`);
   return [true];
 }
 
@@ -182,9 +181,9 @@ function updateBufferTerrainTriangles({ vertices, indices, bufferType = "transie
  * @param {"transient"|"static"|"subject"} [options.bufferType="transient"]
  * @param {boolean} [options.debug=false]
  */
-function clearBuffer({ bufferType = "transient", debug = false } = {}) { /* eslint-disable-line no-unused-vars */
+function clearBuffer({ bufferType = "transient" } = {}) { /* eslint-disable-line no-unused-vars */
   pf.terrainMapper.clearTerrainMap(bufferType);
-  if ( debug ) console.debug(`WebGPUPathfinderWorker|Cleared ${bufferType} buffer.`);
+  if ( pf.debug ) console.debug(`WebGPUPathfinderWorker|Cleared ${bufferType} buffer.`);
   return [true];
 }
 
@@ -220,9 +219,9 @@ async function extractBufferData({ bufferType = "transient" } = {}) { /* eslint-
  * @param {boolean} [options.debug=false]
  * @returns {boolean}
  */
-async function calculateDistanceMap({ startX = 0, startY = 0, elevation = 0, signal, debug = false } = {}) { /* eslint-disable-line no-unused-vars */
-  await pf.calculateDistanceMap({ x: startX, y: startY }, signal, debug);
-  if ( debug ) console.debug(`WebGPUPathfinderWorker|Distance map calculated for ${startX},${startY},${elevation}.`);
+async function calculateDistanceMap({ startX = 0, startY = 0, elevation = 0, signal } = {}) { /* eslint-disable-line no-unused-vars */
+  await pf.calculateDistanceMap({ x: startX, y: startY }, signal);
+  if ( pf.debug ) console.debug(`WebGPUPathfinderWorker|Distance map calculated for ${startX},${startY},${elevation}.`);
   return [true];
 }
 
@@ -240,13 +239,13 @@ async function calculateDistanceMap({ startX = 0, startY = 0, elevation = 0, sig
 async function findPath({ /* eslint-disable-line no-unused-vars */
   startX = 0, startY = 0,
   endX = 0, endY = 0,
-  diagonalCost = Math.SQRT2, _elevation = 0, signal = {}, debug = false
+  diagonalCost = Math.SQRT2, _elevation = 0, signal = {}
 }) {
   const start = { x: startX, y: startY };
   const goal = { x: endX, y: endY };
   pf.diagonalCost = diagonalCost;
   const path = await pf.findPath(start, goal, signal, diagonalCost);
-  if ( debug ) console.debug(`WebGPUPathfinderWorker|Path length ${path.length} found for ${startX},${startY}.`);
+  if ( pf.debug ) console.debug(`WebGPUPathfinderWorker|Path length ${path.length * 0.5} found for ${startX},${startY} -> ${endX},${endY}.`);
   return [{ path }, [path.buffer]];
 }
 
@@ -269,6 +268,15 @@ async function terminate() { /* eslint-disable-line no-unused-vars */
   return [true];
 }
 
+/**
+ * Toggle debug for this worker.
+ */
+async function toggleDebug({ debug } = {}) { /* eslint-disable-line no-unused-vars */
+  if ( typeof debug === "undefined" ) pf.debug = !pf.debug;
+  else pf.debug = debug;
+  return [true];
+}
+
 
 /**
  * Get a path
@@ -287,23 +295,25 @@ class GPUPathfinder {
    */
   static staticTerrainMap = new Map();
 
+  debug = false;
+
 
   // ----- NOTE: Initialize ----- //
 
-  async initialize({ resolution = 1, sceneWidth, sceneHeight, translationX = 0, translationY = 0, debug = false } = {}) { /* eslint-disable-line max-len */
+  async initialize({ resolution = 1, sceneWidth, sceneHeight, translationX = 0, translationY = 0 } = {}) { /* eslint-disable-line max-len */
     this.destroy();
     await this.constructor.initializeDevice();
-    if ( debug ) console.debug("WebGPUPathfinderWorker|Initialized device.");
+    if ( this.debug ) console.debug("WebGPUPathfinderWorker|Initialized device.");
     this.terrainMapper = new GPUTerrainMap(sceneWidth, sceneHeight, this.constructor.device, {
       resolution, translationX, translationY });
-    if ( debug ) console.debug("WebGPUPathfinderWorker|Initializing terrain mapper...");
+    if ( this.debug ) console.debug("WebGPUPathfinderWorker|Initializing terrain mapper...");
     await this.terrainMapper.initialize();
-    if ( debug ) console.debug("WebGPUPathfinderWorker|Finished initializing terrain mapper.");
+    if ( this.debug ) console.debug("WebGPUPathfinderWorker|Finished initializing terrain mapper.");
     this.distanceMap = new Uint32Array(this.terrainMapper.area);
     this.createPipeline();
     this.createBuffers();
     this.createBindGroups();
-    if ( debug ) console.debug("WebGPUPathfinderWorker|Finished initialization.");
+    if ( this.debug ) console.debug("WebGPUPathfinderWorker|Finished initialization.");
   }
 
   /** @type {GPUDevice} */
@@ -323,21 +333,23 @@ class GPUPathfinder {
 
   get distanceMapStatus() { return this.#distanceMapStatus; }
 
-  async calculateDistanceMap(start, _signal = {}, debug = false) {
+  async calculateDistanceMap(start, _signal = {}) {
+    if ( this.debug ) console.debug(`WebGPUPathfinderWorker|Calculating distance map for ${start.x},${start.y},${start.z}`);
+
     this.#distanceMapStatus = this.constructor.STATUS.CALCULATING;
     this.buffers.read.unmap();
 
-    if ( debug ) console.time("GPU Combine buffers");
+    if ( this.debug ) console.time("GPU Combine buffers");
     this.terrainMapper.combineTerrainBuffers();
-    if ( debug ) console.timeEnd("GPU Combine buffers");
+    if ( this.debug ) console.timeEnd("GPU Combine buffers");
 
-    if ( debug ) console.time("GPU Pathfinding Setup");
+    if ( this.debug ) console.time("GPU Pathfinding Setup");
     this._wavefrontPropagation(start);
-    if ( debug ) console.timeEnd("GPU Pathfinding Setup");
+    if ( this.debug ) console.timeEnd("GPU Pathfinding Setup");
 
-    if ( debug ) console.time("GPU Pathfinding Read Result");
+    if ( this.debug ) console.time("GPU Pathfinding Read Result");
     await this._readPropagationResult();
-    if ( debug ) console.timeEnd("GPU Pathfinding Read Result");
+    if ( this.debug ) console.timeEnd("GPU Pathfinding Read Result");
     this.#distanceMapStatus = this.constructor.STATUS.READY;
   }
 
@@ -370,7 +382,7 @@ class GPUPathfinder {
     const workgroupY = Math.ceil(height / 16);
     const iterations = estimateIterations(start.x, start.y);
     const steps = Math.ceil(iterations / this.constructor.INTERNAL_ITERATIONS);
-    // console.debug(`Running ${iterations} iterations for the distance map.`);
+    if ( this.debug ) console.debug(`Running ${iterations} iterations for the distance map.`);
 
     // NOTE: This assumes the propagation passes can act out-of-order.
     // If not, the compute pass must be called repeatedly within the loop.
@@ -454,12 +466,16 @@ class GPUPathfinder {
 
 
   async findPath(start, goal, signal = {}, diagonalCost = Math.SQRT2) {
+    if ( this.debug ) console.debug(`WebGPUPathfinderWorker|findPath from ${start.x},${start.y},${start.z} to ${goal.x},${goal.y},${goal.z}`);
     if ( this.distanceMapStatus === this.constructor.STATUS.NOT_READY ) {
       await this.calculateDistanceMap(start, signal);
     }
 
     // TODO: Check start elevation and switch buffer data accordingly.
-    return this.backtrackPath(goal, signal, diagonalCost);
+    if ( this.debug ) console.time("backtrack");
+    const path = this.backtrackPath(goal, signal, diagonalCost);
+    if ( this.debug ) console.timeEnd("backtrack");
+    return path;
   }
 
   /**
@@ -472,6 +488,8 @@ class GPUPathfinder {
    * • >2.0: Penalizes/prevents diagonal movement entirely.
    */
   backtrackPath({ x, y } = {}, signal, diagonalCost = Math.SQRT2) { /* eslint-disable-line default-param-last */
+    if ( this.debug ) console.debug(`WebGPUPathfinderWorker|Calculating backtrackPath for ${x},${y}`);
+
     let { x: currX, y: currY } = this.terrainMapper.fromCanvasCoordinates(x, y);
     const distMap = this.distanceMap;
     let idx = this.terrainMapper.indexAtLocal(currX, currY);

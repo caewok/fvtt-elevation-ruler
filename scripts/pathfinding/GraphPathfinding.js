@@ -284,7 +284,7 @@ pf = new ClockwiseSweepPathfinder(akra)
 
 start = GridCoordinates3d.fromObject(beiro.center)
 end = GridCoordinates3d.fromObject(randal.center)
-pf = new ClockwiseSweepPathfinder(beiro)
+pf = new WebGPUPathfinder(beiro)
 
 midE = (pf.token.topE - pf.token.bottomE) * 0.5;
 start.elevation += midE;
@@ -296,7 +296,7 @@ pf.debugDelay = 100;
 await pf.startPathfinding(start);
 path = await pf._findPath(start, end)
 pf.constructor.drawPath(path)
-pf.validatePath(path, start, end)
+pf.validatePath(path.map(pt => GridCoordinates3d.fromObject(pt)), start, end)
 
 
 graph = new pf.graphClass(pf.world)
