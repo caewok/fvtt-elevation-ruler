@@ -157,7 +157,6 @@ export function segmentBounds(a, b) {
   return new PIXI.Rectangle(xMinMax.min, yMinMax.min, xMinMax.max - xMinMax.min, yMinMax.max - yMinMax.min);
 }
 
-
 /**
  * Helper to inject configuration html into the application config.
  */
@@ -287,5 +286,31 @@ export function roundMultiple(num) {
   const multiple = Settings.get(Settings.KEYS.LABELING.ROUND_TO_MULTIPLE);
   if (multiple) return num.toNearest(multiple);
   return num;
+}
+
+/**
+ * Get the top left for a token given a center point.
+ * @param {Token} token
+ * @param {PIXI.Point|Point3d} center
+ * @returns {PIXI.Point|Point3d}
+ */
+export function tokenTopLeftFromCenter(token, center) {
+  // See Token.document.getCenterPoint
+  const out = center.clone();
+  if ( canvas.grid.isHexagonal ) {
+    const shape = token.getShape();
+    if ( shape.type === PIXI.SHAPES.POLY ) {
+      const center = shape.center;
+      out.x -= (center.x * canvas.grid.sizeX);
+      out.y -= (center.y * canvas.grid.sizeY);
+      return out;
+    }
+  }
+
+  // Otherwise use a token rectangle.
+  const { width, height } = token.document.getSize();
+  out.x -= (width * 0.5);
+  out.y -= (height * 0.5);
+  return out;
 }
 

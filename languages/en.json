@@ -27,6 +27,15 @@
     "elevationruler.keybindings.teleport.name": "Teleport along ruler",
     "elevationruler.keybindings.teleport.hint": "When measuring, hold this key when you release the dragged token or hit the spacebar to move the token to the ruler destination without animation.",
 
+    "elevationruler.settings.pathfinding-algorithm.name": "Pathfinding Algorithm",
+    "elevationruler.settings.pathfinding-algorithm-simple": "Simple",
+    "elevationruler.settings.pathfinding-algorithm-collision": "Gridded Collision",
+    "elevationruler.settings.pathfinding-algorithm-cwsweep": "Clockwise Sweep",
+    "elevationruler.settings.pathfinding-algorithm-trianglemesh": "Triangle Mesh",
+    "elevationruler.settings.pathfinding-algorithm-polymesh": "Polygon Mesh",
+    "elevationruler.settings.pathfinding-algorithm-navmesh": "Navigation Mesh (Recast/Detour)",
+    "elevationruler.settings.pathfinding-algorithm-webgpu": "WebGPU",
+
     "elevationruler.settings.levels-use-floor-label.name": "Levels Floor Label",
     "elevationruler.settings.levels-use-floor-label.hint": "If Levels module is active, label the ruler with the current floor, if the Levels UI floors are named.",
     "elevationruler.settings.levels-labels-never": "Never",
@@ -90,6 +99,11 @@
     "elevationruler.settings.pathfinding_tokens_block_no": "No",
     "elevationruler.settings.pathfinding_tokens_block_hostile": "Hostile only",
     "elevationruler.settings.pathfinding_tokens_block_all": "All",
+
+    "elevationruler.settings.pathfinding_difficulty_friendly.name": "Move Multiplier: Friendlies",
+     "elevationruler.settings.pathfinding_difficulty_friendly.hint": "Penalize movement speed when moving through friendly tokens",
+    "elevationruler.settings.pathfinding_difficulty_hostile.name": "Move Multiplier: Hostiles",
+    "elevationruler.settings.pathfinding_difficulty_hostile.hint": "Penalize movement speed when moving through hostile tokens",
 
     "elevationruler.settings.pathfinding_limit_token_los.name": "Limit Pathfinding to Explored Areas",
     "elevationruler.settings.pathfinding_limit_token_los.hint": "When pathfinding, limit the range of the pathfinding to explored areas unless the user is the GM",
