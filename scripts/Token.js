@@ -74,7 +74,7 @@ function _onDragEnd(wrapped) {
 function findMovementPath(wrapped, waypoints, options) {
   if ( waypoints.length < 2 ) return wrapped(waypoints, options);
   const pf = this[MODULE_ID]?.[PATHFINDING_ID];
-  if ( !pf ) return wrapped(waypoints, options);
+  if ( !pf || !Settings.doPathfinding ) return wrapped(waypoints, options);
 
   // For debugging.
   // const dist = canvas.grid.measurePath(waypoints).euclidean;
