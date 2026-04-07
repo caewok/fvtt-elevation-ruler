@@ -8,7 +8,8 @@ PIXI,
 import { MODULE_ID } from "../const.js";
 import { EdgeGraph } from "../EdgeGraph.js";
 
-Hooks.on("quenchReady", quench => {
+export function registerTests(quench) {
+
   quench.registerBatch(
     `${MODULE_ID}.EdgeGraph`,
 
@@ -54,4 +55,4 @@ Hooks.on("quenchReady", quench => {
     });
 
   }, { displayName: "EdgeGraph" });
-});
+}
