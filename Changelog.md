@@ -1,3 +1,10 @@
+# 13.0.1
+Fix console errors on pressing the P hotkey. Closes #273.
+Fix import error for PixelCache.test.js. Closes #272.
+Dynamically import tests only when Quench module is present.
+Remove currently non-functional keybindings.
+Update Polish translation. Thanks @Lioheart!
+
 # 13.0
 Update to v13. Mirror Foundry version number.
 Remove features now covered by v13 base install.
