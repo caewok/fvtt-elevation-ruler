@@ -52,8 +52,17 @@ import { snapPathToGrid } from "./pathfinding/snap_to_grid.js";
 // Load the geometry library.
 import "./geometry/registration.js";
 
-// Tests
-import "./tests/EdgeGraph.test.js";
+/**
+ * If quench is present, register tests.
+ */
+Hooks.on("quenchReady", async (quench) => {
+  try {
+    const { registerTests } = await import(`/modules/${MODULE_ID}/scripts/tests/index.js`);
+    registerTests(quench);
+  } catch(err) {
+    console.error("Failed to load Quench tests:", err);
+  }
+});
 
 Hooks.once("init", function() {
   // Configuration
