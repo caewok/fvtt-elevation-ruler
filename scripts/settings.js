@@ -177,17 +177,20 @@ export class Settings extends ModuleSettingsAbstract {
       ],
       onDown: () => {
         this.FORCE_TOGGLE_PATHFINDING ||= true;
-        const ruler = canvas.controls.ruler;
-        if ( ruler._state === Ruler.STATES.MEASURING ) ruler.measure(ruler.destination, { force: true });
+
+        // Force a path recalculation.
+        canvas.tokens.controlled.forEach(t => t.recalculatePlannedMovementPath());
       },
       onUp: () => {
         this.FORCE_TOGGLE_PATHFINDING &&= false;
-        const ruler = canvas.controls.ruler;
-        if ( ruler._state === Ruler.STATES.MEASURING ) ruler.measure(ruler.destination, { force: true });
+
+        // Force a path recalculation.
+        canvas.tokens.controlled.forEach(t => t.recalculatePlannedMovementPath());
       },
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
 
+    /* TODO: Fix or remove.
     game.keybindings.register(MODULE_ID, KEYBINDINGS.FORCE_TO_GROUND, {
       name: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.FORCE_TO_GROUND}.name`),
       hint: game.i18n.localize(`${MODULE_ID}.keybindings.${KEYBINDINGS.FORCE_TO_GROUND}.hint`),
@@ -214,6 +217,7 @@ export class Settings extends ModuleSettingsAbstract {
       ],
       precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL
     });
+    */
   }
 
   static async initializePathfinding(algorithm) {
@@ -288,6 +292,11 @@ export class Settings extends ModuleSettingsAbstract {
     const pf = obj[PATHFINDING_ID];
     if ( pf && pf.constructor === cl ) return;
     obj[PATHFINDING_ID] = new cl(token);
+  }
+
+  static get doPathfinding() {
+    const pathfindingActive = ui.controls.controls.tokens.tools?.[Settings.KEYS.CONTROLS.PATHFINDING]?.active;
+    return pathfindingActive ^ this.FORCE_TOGGLE_PATHFINDING;
   }
 }
 
